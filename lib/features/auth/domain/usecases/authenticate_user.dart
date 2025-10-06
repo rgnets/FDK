@@ -1,0 +1,35 @@
+import 'package:fpdart/fpdart.dart';
+import 'package:rgnets_fdk/core/errors/failures.dart';
+import 'package:rgnets_fdk/core/usecases/usecase.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
+import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
+
+final class AuthenticateUser extends UseCase<User, AuthenticateUserParams> {
+  AuthenticateUser(this.repository);
+
+  final AuthRepository repository;
+
+  @override
+  Future<Either<Failure, User>> call(AuthenticateUserParams params) async {
+    return repository.authenticate(
+      fqdn: params.fqdn,
+      login: params.login,
+      apiKey: params.apiKey,
+    );
+  }
+}
+
+class AuthenticateUserParams extends Params {
+  const AuthenticateUserParams({
+    required this.fqdn,
+    required this.login,
+    required this.apiKey,
+  });
+
+  final String fqdn;
+  final String login;
+  final String apiKey;
+
+  @override
+  List<Object> get props => [fqdn, login, apiKey];
+}

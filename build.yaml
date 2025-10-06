@@ -1,0 +1,18 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Options for json_serializable
+          explicit_to_json: true
+          include_if_null: false
+          field_rename: snake
+      freezed:
+        options:
+          # Options for freezed
+          map: true
+          when: true
+      riverpod_generator:
+        options:
+          # Options for riverpod_generator
+          scoped: false

@@ -1,0 +1,207 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
+import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
+import 'package:rgnets_fdk/core/widgets/widgets.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+
+/// Rooms management screen
+class RoomsScreen extends ConsumerStatefulWidget {
+  const RoomsScreen({super.key});
+
+  @override
+  ConsumerState<RoomsScreen> createState() => _RoomsScreenState();
+}
+
+class _RoomsScreenState extends ConsumerState<RoomsScreen> {
+  int _selectedTabIndex = 0; // 0=All, 1=Ready, 2=Issues
+  final ScrollController _scrollController = ScrollController();
+  @override
+  void initState() {
+    super.initState();
+    // Load rooms when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(roomsNotifierProvider.notifier).refresh();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+  
+  String _getFilterFromIndex(int index) {
+    switch (index) {
+      case 1:
+        return 'ready';
+      case 2:
+        return 'issues';
+      default:
+        return 'all';
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    // AppBar removed from RoomsScreen - search and filter functionality preserved in state
+    return Scaffold(
+      body: Consumer(
+        builder: (context, ref, child) {
+          final roomsAsync = ref.watch(roomsNotifierProvider);
+          final roomStats = ref.watch(roomStatsProvider);
+          final currentFilter = _getFilterFromIndex(_selectedTabIndex);
+          final filteredRooms = ref.watch(filteredRoomViewModelsProvider(currentFilter));
+          
+          return roomsAsync.when(
+            loading: () => const Center(child: LoadingIndicator()),
+            error: (error, stack) => Center(
+              child: EmptyState(
+                icon: Icons.error_outline,
+                title: 'Error loading rooms',
+                subtitle: error.toString(),
+                actionLabel: 'Retry',
+                onAction: () => ref.read(roomsNotifierProvider.notifier).refresh(),
+              ),
+            ),
+            data: (_) {
+          
+              return RefreshIndicator(
+                onRefresh: () => ref.read(roomsNotifierProvider.notifier).refresh(),
+            child: Column(
+              children: [
+                // HUD Tab Bar - taller with full data
+                HUDTabBar(
+                  height: 80,
+                  showFullCount: true,
+                  tabs: [
+                    HUDTab(
+                      label: 'Total Rooms',
+                      icon: Icons.meeting_room,
+                      count: roomStats.total,
+                      filterValue: 'all',
+                    ),
+                    HUDTab(
+                      label: 'Ready',
+                      icon: Icons.check_circle,
+                      iconColor: Colors.green,
+                      count: roomStats.ready,
+                      filterValue: 'ready',
+                    ),
+                    HUDTab(
+                      label: 'Issues',
+                      icon: Icons.warning,
+                      iconColor: Colors.orange,
+                      count: roomStats.withIssues,
+                      filterValue: 'issues',
+                    ),
+                  ],
+                  selectedIndex: _selectedTabIndex,
+                  onTabSelected: (index) {
+                    setState(() => _selectedTabIndex = index);
+                  },
+                  onActiveTabTapped: () {
+                    _scrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOut,
+                    );
+                  },
+                ),
+                
+                // Rooms list
+                Expanded(
+                  child: () {
+                    return filteredRooms.isEmpty
+                      ? EmptyState(
+                          icon: _selectedTabIndex == 1 
+                            ? Icons.check_circle
+                            : _selectedTabIndex == 2
+                              ? Icons.warning
+                              : Icons.meeting_room,
+                          title: _selectedTabIndex == 1
+                            ? 'No ready rooms'
+                            : _selectedTabIndex == 2
+                              ? 'No rooms with issues'
+                              : 'No rooms configured',
+                          subtitle: _selectedTabIndex == 0
+                            ? 'Rooms will appear here once synced'
+                            : 'No rooms match the selected filter',
+                          actionLabel: _selectedTabIndex == 0 ? 'Sync Rooms' : null,
+                          onAction: _selectedTabIndex == 0 
+                            ? () => ref.read(roomsNotifierProvider.notifier).refresh()
+                            : null,
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: filteredRooms.length,
+                          itemBuilder: (context, index) {
+                            final roomVm = filteredRooms[index];
+                            final statusColor = roomVm.hasIssues ? Colors.orange : Colors.green;
+                            final percentage = roomVm.onlinePercentage;
+                            
+                            // Build subtitle lines
+                            final subtitleLines = <UnifiedInfoLine>[
+                              UnifiedInfoLine(
+                                icon: Icons.devices,
+                                text: '${roomVm.onlineDevices}/${roomVm.deviceCount} devices online',
+                              ),
+                            ];
+                            
+                            return UnifiedListItem(
+                              title: roomVm.name,
+                              icon: Icons.meeting_room,
+                              status: roomVm.hasIssues 
+                                ? UnifiedItemStatus.warning 
+                                : UnifiedItemStatus.good,
+                              subtitleLines: subtitleLines,
+                              trailingWidget: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${percentage.toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    roomVm.hasIssues ? 'Has Issues' : 'Ready',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              showChevron: true,
+                              onTap: () => context.push('/rooms/${roomVm.id}'),
+                            );
+                          },
+                        );
+                  }(),
+                ),
+                ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

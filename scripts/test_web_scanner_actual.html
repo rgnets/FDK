@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Scanner Test - RG Nets FDK</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 8px;
+        }
+        .status { font-weight: bold; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196F3; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #1976D2; }
+        #video {
+            width: 100%;
+            max-width: 500px;
+            height: 300px;
+            background: #000;
+            border: 2px solid #444;
+        }
+        .log-entry {
+            padding: 5px;
+            margin: 2px 0;
+            background: #2a2a2a;
+            border-left: 3px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Web Scanner Functionality Test</h1>
+    
+    <div class="test-section">
+        <h2>Camera Support Detection</h2>
+        <button onclick="checkCameraSupport()">Check Camera Support</button>
+        <div id="camera-support"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Camera Access Test</h2>
+        <button onclick="requestCameraAccess()">Request Camera Access</button>
+        <video id="video" autoplay></video>
+        <div id="camera-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Mobile Scanner Package Check</h2>
+        <button onclick="checkMobileScannerSupport()">Check Mobile Scanner Support</button>
+        <div id="scanner-support"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Flutter Web App Scanner Test</h2>
+        <button onclick="testFlutterScanner()">Open Flutter Scanner</button>
+        <iframe id="flutter-frame" src="http://localhost:8081/#/scanner" style="width:100%; height:500px; border:1px solid #444; display:none;"></iframe>
+        <div id="flutter-status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="${type}">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+            console.log(`[${type}] ${message}`);
+        }
+
+        async function checkCameraSupport() {
+            const supportDiv = document.getElementById('camera-support');
+            supportDiv.innerHTML = '<h3>Testing Camera Support...</h3>';
+            
+            // Check if MediaDevices API is available
+            if (!navigator.mediaDevices) {
+                supportDiv.innerHTML += '<p class="error">❌ MediaDevices API not available</p>';
+                log('MediaDevices API not available', 'error');
+                return;
+            }
+            
+            if (!navigator.mediaDevices.getUserMedia) {
+                supportDiv.innerHTML += '<p class="error">❌ getUserMedia not available</p>';
+                log('getUserMedia not available', 'error');
+                return;
+            }
+            
+            supportDiv.innerHTML += '<p class="success">✅ MediaDevices API available</p>';
+            supportDiv.innerHTML += '<p class="success">✅ getUserMedia available</p>';
+            
+            // Check if camera devices exist
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(device => device.kind === 'videoinput');
+                
+                if (cameras.length > 0) {
+                    supportDiv.innerHTML += `<p class="success">✅ ${cameras.length} camera(s) found</p>`;
+                    cameras.forEach((camera, index) => {
+                        supportDiv.innerHTML += `<p class="info">📷 Camera ${index + 1}: ${camera.label || 'Unknown'}</p>`;
+                        log(`Camera found: ${camera.label || camera.deviceId}`, 'success');
+                    });
+                } else {
+                    supportDiv.innerHTML += '<p class="warning">⚠️ No cameras found</p>';
+                    log('No cameras found', 'warning');
+                }
+            } catch (error) {
+                supportDiv.innerHTML += `<p class="error">❌ Error enumerating devices: ${error.message}</p>`;
+                log(`Error enumerating devices: ${error.message}`, 'error');
+            }
+            
+            // Check browser compatibility
+            const isChrome = /Chrome/.test(navigator.userAgent);
+            const isFirefox = /Firefox/.test(navigator.userAgent);
+            const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+            
+            supportDiv.innerHTML += '<h4>Browser Compatibility:</h4>';
+            if (isChrome) {
+                supportDiv.innerHTML += '<p class="success">✅ Chrome detected - Full support</p>';
+            } else if (isFirefox) {
+                supportDiv.innerHTML += '<p class="success">✅ Firefox detected - Full support</p>';
+            } else if (isSafari) {
+                supportDiv.innerHTML += '<p class="warning">⚠️ Safari detected - Limited support</p>';
+            } else {
+                supportDiv.innerHTML += '<p class="info">ℹ️ Unknown browser - Support may vary</p>';
+            }
+        }
+
+        async function requestCameraAccess() {
+            const statusDiv = document.getElementById('camera-status');
+            const video = document.getElementById('video');
+            
+            statusDiv.innerHTML = '<p class="info">📷 Requesting camera access...</p>';
+            log('Requesting camera access...', 'info');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                video.srcObject = stream;
+                statusDiv.innerHTML = '<p class="success">✅ Camera access granted and streaming</p>';
+                log('Camera access granted', 'success');
+                
+                // Get camera capabilities
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+                const settings = track.getSettings();
+                
+                statusDiv.innerHTML += '<h4>Camera Settings:</h4>';
+                statusDiv.innerHTML += `<p class="info">Resolution: ${settings.width}x${settings.height}</p>`;
+                statusDiv.innerHTML += `<p class="info">Frame Rate: ${settings.frameRate}fps</p>`;
+                
+                if (capabilities.torch) {
+                    statusDiv.innerHTML += '<p class="success">✅ Torch/Flash available</p>';
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<p class="error">❌ Camera access denied: ${error.message}</p>`;
+                log(`Camera access error: ${error.message}`, 'error');
+                
+                if (error.name === 'NotAllowedError') {
+                    statusDiv.innerHTML += '<p class="warning">⚠️ Please allow camera permissions in browser settings</p>';
+                } else if (error.name === 'NotFoundError') {
+                    statusDiv.innerHTML += '<p class="error">❌ No camera device found</p>';
+                }
+            }
+        }
+
+        function checkMobileScannerSupport() {
+            const supportDiv = document.getElementById('scanner-support');
+            supportDiv.innerHTML = '<h3>Mobile Scanner Package Analysis:</h3>';
+            
+            // Information from research
+            supportDiv.innerHTML += '<p class="success">✅ mobile_scanner v7.0.1 supports web platform</p>';
+            supportDiv.innerHTML += '<p class="info">ℹ️ Uses ZXing-JS for web barcode scanning</p>';
+            supportDiv.innerHTML += '<p class="info">ℹ️ Automatically loads required scripts</p>';
+            supportDiv.innerHTML += '<p class="success">✅ No manual script injection needed for v5.0.0+</p>';
+            
+            // Check if ZXing could be loaded
+            supportDiv.innerHTML += '<h4>ZXing Library Check:</h4>';
+            
+            // Try to detect if ZXing is available
+            if (window.ZXing || window.ZXingBrowser) {
+                supportDiv.innerHTML += '<p class="success">✅ ZXing library detected</p>';
+                log('ZXing library detected', 'success');
+            } else {
+                supportDiv.innerHTML += '<p class="warning">⚠️ ZXing not detected (may load dynamically)</p>';
+                log('ZXing not detected yet', 'warning');
+            }
+            
+            // Test recommendations
+            supportDiv.innerHTML += '<h4>Recommendations:</h4>';
+            supportDiv.innerHTML += '<p class="info">1. Ensure HTTPS or localhost for camera access</p>';
+            supportDiv.innerHTML += '<p class="info">2. Check browser console for CORS issues</p>';
+            supportDiv.innerHTML += '<p class="info">3. Verify camera permissions are granted</p>';
+            supportDiv.innerHTML += '<p class="info">4. Test with different barcode types</p>';
+        }
+
+        function testFlutterScanner() {
+            const frame = document.getElementById('flutter-frame');
+            const statusDiv = document.getElementById('flutter-status');
+            
+            frame.style.display = 'block';
+            statusDiv.innerHTML = '<p class="info">Loading Flutter scanner...</p>';
+            
+            // Listen for messages from Flutter app
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'scanner-status') {
+                    statusDiv.innerHTML += `<p class="info">Flutter Scanner: ${event.data.message}</p>`;
+                    log(`Flutter Scanner: ${event.data.message}`, 'info');
+                }
+            });
+            
+            statusDiv.innerHTML += '<p class="warning">⚠️ Check browser console for Flutter scanner logs</p>';
+            statusDiv.innerHTML += '<p class="info">ℹ️ If camera doesn\'t work, manual input should be available</p>';
+        }
+
+        // Auto-run basic check on load
+        window.onload = () => {
+            log('Web Scanner Test Page Loaded', 'success');
+            checkCameraSupport();
+        };
+    </script>
+</body>
+</html>

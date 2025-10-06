@@ -1,0 +1,47 @@
+# Asset Configuration for pubspec.yaml
+# Copy this section into your pubspec.yaml file
+
+flutter:
+  # Application assets
+  assets:
+    # Logo files
+    - assets/images/logos/fdk_logo.png
+    - assets/images/logos/fdk_logo.svg
+    
+    # Background images
+    - assets/images/backgrounds/scanner_background.png
+    
+    # UI Elements
+    - assets/images/ui_elements/hud_box.png
+    - assets/images/ui_elements/hud_box.svg
+    - assets/images/ui_elements/hud_text_box.png
+    - assets/images/ui_elements/hud_text_box.svg
+    - assets/images/ui_elements/hud_text_box_alt.png
+    - assets/images/ui_elements/hud_text_box_alt.svg
+    
+    # Onboarding screens
+    - assets/images/onboarding/onboarding_welcome.png
+    - assets/images/onboarding/onboarding_features.png
+    - assets/images/onboarding/onboarding_connect.png
+    
+    # Note: Mockups are excluded from production
+    # They are kept for reference only during development
+    
+    # Icon directories (when populated)
+    # - assets/icons/navigation/
+    # - assets/icons/status/
+    # - assets/icons/device_types/
+    # - assets/icons/actions/
+    
+    # Animation files (when created)
+    # - assets/animations/
+
+  # Font configuration (when custom fonts are added)
+  # fonts:
+  #   - family: RGNets
+  #     fonts:
+  #       - asset: assets/fonts/RGNets-Regular.ttf
+  #       - asset: assets/fonts/RGNets-Bold.ttf
+  #         weight: 700
+  #       - asset: assets/fonts/RGNets-Light.ttf
+  #         weight: 300

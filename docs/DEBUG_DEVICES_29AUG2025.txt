@@ -1,0 +1,131 @@
+ Analysis of Device-Specific Issues
+
+  Based on my line-by-line analysis, here are the potential causes for the issues you're
+  experiencing:
+
+  Pixel 9 XL - Header Bar Not Displaying
+
+  Likely Causes:
+
+  1. SafeArea Issue (lib/core/widgets/fdk_app_bar.dart:130-132)
+    - The SafeArea only sets bottom: false but doesn't explicitly set top: true
+    - Pixel 9 XL has a tall status bar/camera cutout that might cause rendering issues
+  2. Fixed Height Problem (lib/core/widgets/fdk_app_bar.dart:26-27, 125)
+    - The app bar has a hardcoded height of 65 pixels
+    - This might be too small for devices with tall status bars
+  3. Complex Custom Painting (lib/core/widgets/wave_line_painter.dart)
+    - The WaveLinePainter uses complex paths and gradients
+    - May have rendering issues with certain GPU/driver combinations
+  4. Animation Performance (lib/core/widgets/fdk_app_bar.dart:47-64)
+    - Continuous animation running at 60fps
+    - Multiple AnimatedBuilder widgets updating constantly
+
+  Samsung Fold 6 - App Crashes After Few Seconds
+
+  Likely Causes:
+
+  1. Foldable Display Configuration Changes (android/app/src/main/AndroidManifest.xml:21)
+    - The app handles screenSize|smallestScreenSize|screenLayout|density changes
+    - Foldable devices trigger multiple configuration changes when folding/unfolding
+  2. Memory/Resource Issues
+    - Adaptive refresh manager creating multiple timers
+  (lib/core/services/adaptive_refresh_manager.dart)
+    - Background refresh service starting immediately on app launch (lib/main.dart:67)
+    - No error boundaries or exception catching in main app initialization
+  3. Responsive Layout Issues
+    - No specific handling for foldable aspect ratios
+    - MediaQuery might return unexpected values during fold transitions
+  4. Material 3 Compatibility (lib/core/theme/app_theme.dart:11)
+    - useMaterial3: true might have device-specific bugs
+
+  Debugging Suggestions
+
+  1. Enable Verbose Logging
+
+  # Run with verbose logging
+  flutter run --verbose --device-id <device_id>
+
+  2. Add Debug Output for Header Bar
+
+  Create a test file to capture device metrics:
+  // test_device_metrics.dart
+  print('Status Bar Height: ${MediaQuery.of(context).padding.top}');
+  print('Device Pixel Ratio: ${MediaQuery.of(context).devicePixelRatio}');
+  print('Screen Size: ${MediaQuery.of(context).size}');
+
+  3. Capture Crash Logs from Samsung Fold
+
+  # Monitor logcat for crashes
+  adb logcat -c  # Clear existing logs
+  # Run the app
+  adb logcat > fold_crash.log  # Capture all logs
+
+  4. Test Without Animations
+
+  # Disable animations to isolate rendering issues
+  flutter run --profile --no-animations
+
+  5. Add Error Boundaries
+
+  We can add a wrapper to catch and log errors:
+  // In main.dart, wrap the app with error handling
+  runZonedGuarded(() {
+    runApp(ProviderScope(...));
+  }, (error, stack) {
+    // Log error to file or console
+    print('Caught error: $error');
+    print('Stack trace: $stack');
+  });
+
+  6. Device-Specific Testing Commands
+
+  For Pixel 9 XL header issue:
+  # Take screenshot for analysis
+  adb shell screencap -p /sdcard/header_issue.png
+  adb pull /sdcard/header_issue.png
+
+  # Check display metrics
+  adb shell wm size
+  adb shell wm density
+
+  For Samsung Fold crash:
+  # Monitor memory usage
+  adb shell dumpsys meminfo com.yourpackage.name
+
+  # Check for native crashes
+  adb shell bugreport > bugreport.zip
+
+  7. Minimal Reproduction Test
+
+  Create a minimal app with just the FDKAppBar to isolate the issue:
+  // test_header_only.dart
+  void main() {
+    runApp(MaterialApp(
+      home: Scaffold(
+        appBar: FDKAppBar(),
+        body: Center(child: Text('Test')),
+      ),
+    ));
+  }
+
+  8. Performance Profiling
+
+  # Profile the app to find performance issues
+  flutter run --profile
+  # Then use DevTools to analyze timeline
+
+  Next Steps for Debugging Together
+
+  Please provide:
+  1. Logcat output from both devices when the issues occur
+  2. Flutter doctor -v output
+  3. Device specifications (Android version, exact model numbers)
+  4. Screenshots of the Pixel 9 XL header issue
+  5. Crash stack trace from Samsung Fold if available
+
+  With this information, I can help pinpoint the exact cause and suggest targeted fixes without
+  changing code prematurely.
+
+
+
+
