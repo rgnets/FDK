@@ -1,0 +1,95 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+.flutter-plugins
+.packages
+flutter_export_environment.sh
+**/generated_plugin_registrant.dart
+linked_packages/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+android/.gradle/
+android/local.properties
+android/**/flutter_export_environment.sh
+android/**/GeneratedPluginRegistrant.*
+/android/build/
+
+# iOS artifacts
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/.generated/
+macos/Pods/
+macos/Flutter/ephemeral/
+
+# Desktop artifacts
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Temporary test and debug scripts
+test/debug_*.dart
+test/api_*_test.dart
+test/test_*.dart
+test/verify_*.dart
+
+# Utility scripts
+capture_logs.*
+run_and_log.*
+
+# Windows temp file
+nul
+
+# Local testing files
+.secrets
+.env.local
+.actrc
+event.json
+push-event.json
+
+# Fastlane sensitive files
+android/fastlane/play_store_key.json
+ios/fastlane/AuthKey_*.p8
+**/.env
