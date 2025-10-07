@@ -1,27 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logging_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/features/debug/debug_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
-  final logger = Logger()
-    ..i('🚀 STAGING DEBUG APP STARTING - main_staging_debug.dart entry point');
   WidgetsFlutterBinding.ensureInitialized();
-  
-  logger.i('📊 SETTING ENVIRONMENT TO STAGING');
   // Set environment to staging - uses interurban test API with auto-auth
   EnvironmentConfig.setEnvironment(Environment.staging);
-  
-  logger.i('🔧 INITIALIZING PROVIDERS');
+  LoggerService.configure(level: LogLevel.debug);
+  LoggerService.info(
+    '🚀 STAGING DEBUG APP STARTING - main_staging_debug.dart entry point',
+  );
+  LoggerService.info('📊 SETTING ENVIRONMENT TO STAGING');
+
+  LoggerService.info('🔧 INITIALIZING PROVIDERS');
   // Initialize providers
   final sharedPreferences = await SharedPreferences.getInstance();
-  
-  logger.i('🏗️ LAUNCHING DEBUG APP');
+
+  LoggerService.info('🏗️ LAUNCHING DEBUG APP');
   runApp(
     ProviderScope(
       overrides: [
@@ -47,7 +49,7 @@ class FDKDebugApp extends StatelessWidget {
         ),
       ],
     );
-    
+
     return MaterialApp.router(
       title: 'RG Nets FDK Debug (Staging)',
       debugShowCheckedModeBanner: false,
