@@ -341,7 +341,9 @@ void main() {
               }
               
               // Wait with exponential backoff
-              await Future.delayed(Duration(milliseconds: delays[attemptCount - 1]));
+              await Future<void>.delayed(
+                Duration(milliseconds: delays[attemptCount - 1]),
+              );
             }
           }
           

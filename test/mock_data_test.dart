@@ -44,26 +44,9 @@ void main() {
       for (final room in rooms) {
         expect(room.id, isNotEmpty);
         expect(room.name, isNotEmpty);
-        expect(room.building, isNotEmpty);
-        expect(room.floor, isNotEmpty);
-        // Device counts are no longer part of RoomModel
-        // They are calculated in the presentation layer
-        
-        // Check enterprise building names
-        expect(room.building, isIn([
-          'Corporate Headquarters',
-          'Technology Center', 
-          'Research & Development',
-          'Manufacturing East',
-          'Manufacturing West',
-          'Distribution Center',
-          'Data Center Primary',
-          'Data Center Secondary',
-          'Executive Building',
-          'Training Facility',
-          'Customer Center',
-          'Support Operations',
-        ]));
+        expect(room.metadata, isNotNull);
+        expect(room.metadata!['area_sqft'], isNotNull);
+        expect(room.metadata!['department'], isNotNull);
       }
     });
     

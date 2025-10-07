@@ -1,106 +1,119 @@
 #!/usr/bin/env dart
 
+import 'dart:io';
+
+void _write([String? message]) => stdout.writeln(message ?? '');
+
 /// Analyze why development shows 3 lines while staging shows 2 lines
 void main() {
-  print('=' * 80);
-  print('ANALYZING ROOM LIST DISPLAY LINES');
-  print('=' * 80);
-  
-  print('\n1. UI STRUCTURE (rooms_screen.dart lines 148-161)');
-  print('-' * 40);
-  print('The UnifiedListItem shows:');
-  print('  Line 1: title (roomVm.name)');
-  print('  Line 2+: subtitleLines array');
-  print('');
-  print('subtitleLines construction:');
-  print('  IF roomVm.locationDisplay.isNotEmpty THEN');
-  print('    ADD line with locationDisplay');
-  print('  ALWAYS ADD line with device count');
-  
-  print('\n2. LOCATION DISPLAY LOGIC (room_view_models.dart lines 34-43)');
-  print('-' * 40);
-  print('locationDisplay getter:');
-  print('  IF building != null → adds building');
-  print('  IF floor != null → adds "Floor \$floor"');
-  print('  Returns: parts.join(" ")');
-  print('');
-  print('Example outputs:');
-  print('  building="North Tower", floor=1 → "North Tower Floor 1"');
-  print('  building=null, floor=1 → "Floor 1"');
-  print('  building="North Tower", floor=null → "North Tower"');
-  print('  building=null, floor=null → "" (empty string)');
-  
-  print('\n3. DATA FLOW ANALYSIS');
-  print('-' * 40);
-  
-  print('DEVELOPMENT (after our fix):');
-  print('  RoomMockDataSource parses JSON:');
-  print('    - Sets name: "(North Tower) 101"');
-  print('    - Sets building: "North Tower"');
-  print('    - Sets floor: "1" (extracted from room number)');
-  print('  RoomViewModel gets:');
-  print('    - name: "(North Tower) 101"');
-  print('    - building: "North Tower"');
-  print('    - floor: "1"');
-  print('    - locationDisplay: "North Tower Floor 1" ← NOT EMPTY!');
-  print('  UI shows 3 lines:');
-  print('    1. "(North Tower) 101"');
-  print('    2. "North Tower Floor 1" ← EXTRA LINE!');
-  print('    3. "X/Y devices online"');
-  
-  print('\nSTAGING:');
-  print('  RemoteDataSource parses JSON:');
-  print('    - Sets name: "(Interurban) 803"');
-  print('    - Sets building: "" (empty or null)');
-  print('    - Sets floor: "" (empty or null)');
-  print('  RoomViewModel gets:');
-  print('    - name: "(Interurban) 803"');
-  print('    - building: null or empty');
-  print('    - floor: null or empty');
-  print('    - locationDisplay: "" ← EMPTY!');
-  print('  UI shows 2 lines:');
-  print('    1. "(Interurban) 803"');
-  print('    2. "X/Y devices online"');
-  
-  print('\n4. THE PROBLEM');
-  print('-' * 40);
-  print('Development sets building and floor fields, causing locationDisplay');
-  print('to return a non-empty string, which adds an extra line to the UI.');
-  print('');
-  print('Staging does NOT set building and floor (or sets them empty),');
-  print('so locationDisplay returns empty string and no extra line is added.');
-  
-  print('\n5. WHY THIS HAPPENS');
-  print('-' * 40);
-  print('In RoomMockDataSource (after our fix):');
-  print('  building: propertyName ?? "" → "North Tower"');
-  print('  floor: _extractFloor(roomNumber) → "1"');
-  print('');
-  print('In RemoteDataSource:');
-  print('  building: roomData["building"]?.toString() ?? ""');
-  print('  floor: roomData["floor"]?.toString() ?? ""');
-  print('  → The API likely does NOT return building/floor fields!');
-  
-  print('\n6. THE ROOT CAUSE');
-  print('-' * 40);
-  print('The real API (staging) does not include "building" or "floor" fields');
-  print('in the room data, so these remain empty/null.');
-  print('');
-  print('Our mock data source is setting these fields from the parsed data,');
-  print('causing the extra location line to appear.');
-  print('');
-  print('Since the room name already contains "(Building) Room" format,');
-  print('the separate building/floor fields are redundant!');
-  
-  print('\n7. SOLUTION');
-  print('-' * 40);
-  print('RoomMockDataSource should NOT set building and floor fields');
-  print('(or set them to empty) to match staging behavior.');
-  print('');
-  print('The display name already contains all needed information:');
-  print('  "(North Tower) 101" - no need for separate location line');
-  
-  print('\n' + '=' * 80);
-  print('ANALYSIS COMPLETE');
-  print('=' * 80);
+  _write('=' * 80);
+  _write('ANALYZING ROOM LIST DISPLAY LINES');
+  _write('=' * 80);
+
+  _write();
+  _write('1. UI STRUCTURE (rooms_screen.dart lines 148-161)');
+  _write('-' * 40);
+  _write('The UnifiedListItem shows:');
+  _write('  Line 1: title (roomVm.name)');
+  _write('  Line 2+: subtitleLines array');
+  _write();
+  _write('subtitleLines construction:');
+  _write('  IF roomVm.locationDisplay.isNotEmpty THEN');
+  _write('    ADD line with locationDisplay');
+  _write('  ALWAYS ADD line with device count');
+
+  _write();
+  _write('2. LOCATION DISPLAY LOGIC (room_view_models.dart lines 34-43)');
+  _write('-' * 40);
+  _write('locationDisplay getter:');
+  _write('  IF building != null → adds building');
+  _write(r'  IF floor != null → adds "Floor $floor"');
+  _write('  Returns: parts.join(" ")');
+  _write();
+  _write('Example outputs:');
+  _write('  building="North Tower", floor=1 → "North Tower Floor 1"');
+  _write('  building=null, floor=1 → "Floor 1"');
+  _write('  building="North Tower", floor=null → "North Tower"');
+  _write('  building=null, floor=null → "" (empty string)');
+
+  _write();
+  _write('3. DATA FLOW ANALYSIS');
+  _write('-' * 40);
+
+  _write('DEVELOPMENT (after our fix):');
+  _write('  RoomMockDataSource parses JSON:');
+  _write('    - Sets name: "(North Tower) 101"');
+  _write('    - Sets building: "North Tower"');
+  _write('    - Sets floor: "1" (extracted from room number)');
+  _write('  RoomViewModel gets:');
+  _write('    - name: "(North Tower) 101"');
+  _write('    - building: "North Tower"');
+  _write('    - floor: "1"');
+  _write('    - locationDisplay: "North Tower Floor 1" ← NOT EMPTY!');
+  _write('  UI shows 3 lines:');
+  _write('    1. "(North Tower) 101"');
+  _write('    2. "North Tower Floor 1" ← EXTRA LINE!');
+  _write('    3. "X/Y devices online"');
+
+  _write();
+  _write('STAGING:');
+  _write('  RemoteDataSource parses JSON:');
+  _write('    - Sets name: "(Interurban) 803"');
+  _write('    - Sets building: "" (empty or null)');
+  _write('    - Sets floor: "" (empty or null)');
+  _write('  RoomViewModel gets:');
+  _write('    - name: "(Interurban) 803"');
+  _write('    - building: null or empty');
+  _write('    - floor: null or empty');
+  _write('    - locationDisplay: "" ← EMPTY!');
+  _write('  UI shows 2 lines:');
+  _write('    1. "(Interurban) 803"');
+  _write('    2. "X/Y devices online"');
+
+  _write();
+  _write('4. THE PROBLEM');
+  _write('-' * 40);
+  _write('Development sets building and floor fields, causing locationDisplay');
+  _write('to return a non-empty string, which adds an extra line to the UI.');
+  _write();
+  _write('Staging does NOT set building and floor (or sets them empty),');
+  _write('so locationDisplay returns empty string and no extra line is added.');
+
+  _write();
+  _write('5. WHY THIS HAPPENS');
+  _write('-' * 40);
+  _write('In RoomMockDataSource (after our fix):');
+  _write('  building: propertyName ?? "" → "North Tower"');
+  _write('  floor: _extractFloor(roomNumber) → "1"');
+  _write();
+  _write('In RemoteDataSource:');
+  _write('  building: roomData["building"]?.toString() ?? ""');
+  _write('  floor: roomData["floor"]?.toString() ?? ""');
+  _write('  → The API likely does NOT return building/floor fields!');
+
+  _write();
+  _write('6. THE ROOT CAUSE');
+  _write('-' * 40);
+  _write('The real API (staging) does not include "building" or "floor" fields');
+  _write('in the room data, so these remain empty/null.');
+  _write();
+  _write('Our mock data source is setting these fields from the parsed data,');
+  _write('causing the extra location line to appear.');
+  _write();
+  _write('Since the room name already contains "(Building) Room" format,');
+  _write('the separate building/floor fields are redundant!');
+
+  _write();
+  _write('7. SOLUTION');
+  _write('-' * 40);
+  _write('RoomMockDataSource should NOT set building and floor fields');
+  _write('(or set them to empty) to match staging behavior.');
+  _write();
+  _write('The display name already contains all needed information:');
+  _write('  "(North Tower) 101" - no need for separate location line');
+
+  _write();
+  _write('=' * 80);
+  _write('ANALYSIS COMPLETE');
+  _write('=' * 80);
 }

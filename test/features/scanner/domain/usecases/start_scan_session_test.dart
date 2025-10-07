@@ -41,13 +41,13 @@ void main() {
     test('should start scan session successfully', () async {
       // arrange
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => Right(tScanSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tScanSession));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, Right(tScanSession));
+      expect(result, Right<Failure, ScanSession>(tScanSession));
       verify(() => mockRepository.startSession(tDeviceType)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -60,13 +60,13 @@ void main() {
         deviceType: DeviceType.ont,
       );
       when(() => mockRepository.startSession(DeviceType.ont))
-          .thenAnswer((_) async => Right(tOntSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tOntSession));
 
       // act
       final result = await usecase(tOntParams);
 
       // assert
-      expect(result, Right(tOntSession));
+      expect(result, Right<Failure, ScanSession>(tOntSession));
       result.fold(
         (failure) => fail('Should not return failure'),
         (session) => expect(session.deviceType, DeviceType.ont),
@@ -82,13 +82,13 @@ void main() {
         deviceType: DeviceType.switchDevice,
       );
       when(() => mockRepository.startSession(DeviceType.switchDevice))
-          .thenAnswer((_) async => Right(tSwitchSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tSwitchSession));
 
       // act
       final result = await usecase(tSwitchParams);
 
       // assert
-      expect(result, Right(tSwitchSession));
+      expect(result, Right<Failure, ScanSession>(tSwitchSession));
       result.fold(
         (failure) => fail('Should not return failure'),
         (session) => expect(session.deviceType, DeviceType.switchDevice),
@@ -103,13 +103,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.startSession(tDeviceType)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -121,13 +121,13 @@ void main() {
         statusCode: 409,
       );
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.startSession(tDeviceType)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -138,13 +138,13 @@ void main() {
         message: 'Failed to save session to cache',
       );
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.startSession(tDeviceType)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -156,13 +156,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.startSession(tDeviceType)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -170,7 +170,7 @@ void main() {
     test('should pass correct device type to repository', () async {
       // arrange
       when(() => mockRepository.startSession(any()))
-          .thenAnswer((_) async => Right(tScanSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tScanSession));
 
       // act
       await usecase(tParams);
@@ -182,7 +182,7 @@ void main() {
     test('should return session with correct initial state', () async {
       // arrange
       when(() => mockRepository.startSession(tDeviceType))
-          .thenAnswer((_) async => Right(tScanSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tScanSession));
 
       // act
       final result = await usecase(tParams);

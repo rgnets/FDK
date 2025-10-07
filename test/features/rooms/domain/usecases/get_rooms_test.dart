@@ -21,25 +21,23 @@ void main() {
     final tRoomsList = [
       Room(
         id: 'room-1',
-        name: 'Main Office',
+        name: '(Building A) Main Office',
+        roomNumber: '101',
         description: 'Primary office space',
         location: 'Ground Floor',
-        floor: 1,
-        building: 'Building A',
-        deviceIds: ['device-1', 'device-2'],
-        metadata: {'capacity': 50, 'type': 'office'},
+        deviceIds: const ['device-1', 'device-2'],
+        metadata: const {'capacity': 50, 'type': 'office'},
         createdAt: DateTime(2024, 1, 1, 10, 0, 0),
         updatedAt: DateTime(2024, 1, 2, 10, 0, 0),
       ),
       Room(
         id: 'room-2',
-        name: 'Conference Room A',
+        name: '(Building A) Conference Room A',
+        roomNumber: '201',
         description: 'Large conference room',
         location: 'First Floor',
-        floor: 2,
-        building: 'Building A',
-        deviceIds: ['device-3', 'device-4', 'device-5'],
-        metadata: {'capacity': 20, 'type': 'conference'},
+        deviceIds: const ['device-3', 'device-4', 'device-5'],
+        metadata: const {'capacity': 20, 'type': 'conference'},
         createdAt: DateTime(2024, 1, 1, 11, 0, 0),
         updatedAt: DateTime(2024, 1, 2, 11, 0, 0),
       ),
@@ -204,14 +202,14 @@ void main() {
         (failure) => fail('Should not return failure'),
         (rooms) {
           expect(rooms.first.id, 'room-1');
-          expect(rooms.first.name, 'Main Office');
-          expect(rooms.first.floor, 1);
-          expect(rooms.first.deviceIds, ['device-1', 'device-2']);
+          expect(rooms.first.name, '(Building A) Main Office');
+          expect(rooms.first.roomNumber, '101');
+          expect(rooms.first.deviceIds, const ['device-1', 'device-2']);
           
           expect(rooms.last.id, 'room-2');
-          expect(rooms.last.name, 'Conference Room A');
-          expect(rooms.last.floor, 2);
-          expect(rooms.last.deviceIds, ['device-3', 'device-4', 'device-5']);
+          expect(rooms.last.name, '(Building A) Conference Room A');
+          expect(rooms.last.roomNumber, '201');
+          expect(rooms.last.deviceIds, const ['device-3', 'device-4', 'device-5']);
         },
       );
     });

@@ -56,15 +56,15 @@ void main() {
     test('should process barcode successfully when validation passes', () async {
       // arrange
       when(() => mockRepository.validateBarcode(tBarcode, tDeviceType))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right<Failure, bool>(true));
       when(() => mockRepository.updateSession(tSessionId, tBarcode))
-          .thenAnswer((_) async => Right(tUpdatedSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tUpdatedSession));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, Right(tUpdatedSession));
+      expect(result, Right<Failure, ScanSession>(tUpdatedSession));
       verify(() => mockRepository.validateBarcode(tBarcode, tDeviceType)).called(1);
       verify(() => mockRepository.updateSession(tSessionId, tBarcode)).called(1);
       verifyNoMoreInteractions(mockRepository);
@@ -73,13 +73,18 @@ void main() {
     test('should return ValidationFailure when barcode validation fails', () async {
       // arrange
       when(() => mockRepository.validateBarcode(tBarcode, tDeviceType))
-          .thenAnswer((_) async => const Right(false));
+          .thenAnswer((_) async => const Right<Failure, bool>(false));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(ValidationFailure(message: 'Invalid barcode for device type')));
+      expect(
+        result,
+        const Left<Failure, ScanSession>(
+          ValidationFailure(message: 'Invalid barcode for device type'),
+        ),
+      );
       verify(() => mockRepository.validateBarcode(tBarcode, tDeviceType)).called(1);
       verifyNever(() => mockRepository.updateSession(any(), any()));
       verifyNoMoreInteractions(mockRepository);
@@ -92,13 +97,13 @@ void main() {
         statusCode: 503,
       );
       when(() => mockRepository.validateBarcode(tBarcode, tDeviceType))
-          .thenAnswer((_) async => const Left(tValidationFailure));
+          .thenAnswer((_) async => const Left<Failure, bool>(tValidationFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tValidationFailure));
+      expect(result, const Left<Failure, ScanSession>(tValidationFailure));
       verify(() => mockRepository.validateBarcode(tBarcode, tDeviceType)).called(1);
       verifyNever(() => mockRepository.updateSession(any(), any()));
       verifyNoMoreInteractions(mockRepository);
@@ -111,15 +116,15 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.validateBarcode(tBarcode, tDeviceType))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right<Failure, bool>(true));
       when(() => mockRepository.updateSession(tSessionId, tBarcode))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.validateBarcode(tBarcode, tDeviceType)).called(1);
       verify(() => mockRepository.updateSession(tSessionId, tBarcode)).called(1);
       verifyNoMoreInteractions(mockRepository);
@@ -132,15 +137,15 @@ void main() {
         statusCode: 404,
       );
       when(() => mockRepository.validateBarcode(tBarcode, tDeviceType))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right<Failure, bool>(true));
       when(() => mockRepository.updateSession(tSessionId, tBarcode))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, ScanSession>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, ScanSession>(tFailure));
       verify(() => mockRepository.validateBarcode(tBarcode, tDeviceType)).called(1);
       verify(() => mockRepository.updateSession(tSessionId, tBarcode)).called(1);
     });
@@ -153,15 +158,15 @@ void main() {
         deviceType: DeviceType.ont,
       );
       when(() => mockRepository.validateBarcode(tBarcode, DeviceType.ont))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right<Failure, bool>(true));
       when(() => mockRepository.updateSession(tSessionId, tBarcode))
-          .thenAnswer((_) async => Right(tUpdatedSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tUpdatedSession));
 
       // act
       final result = await usecase(tOntParams);
 
       // assert
-      expect(result, Right(tUpdatedSession));
+      expect(result, Right<Failure, ScanSession>(tUpdatedSession));
       verify(() => mockRepository.validateBarcode(tBarcode, DeviceType.ont)).called(1);
       verify(() => mockRepository.updateSession(tSessionId, tBarcode)).called(1);
     });
@@ -187,15 +192,15 @@ void main() {
         ],
       );
       when(() => mockRepository.validateBarcode(tMacAddress, tDeviceType))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right<Failure, bool>(true));
       when(() => mockRepository.updateSession(tSessionId, tMacAddress))
-          .thenAnswer((_) async => Right(tMacSession));
+          .thenAnswer((_) async => Right<Failure, ScanSession>(tMacSession));
 
       // act
       final result = await usecase(tMacParams);
 
       // assert
-      expect(result, Right(tMacSession));
+      expect(result, Right<Failure, ScanSession>(tMacSession));
       verify(() => mockRepository.validateBarcode(tMacAddress, tDeviceType)).called(1);
       verify(() => mockRepository.updateSession(tSessionId, tMacAddress)).called(1);
     });

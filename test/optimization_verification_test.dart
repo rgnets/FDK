@@ -54,7 +54,7 @@ void main() {
         final sequentialResults = <List<Map<String, dynamic>>>[];
         
         for (final type in deviceTypes) {
-          await Future.delayed(const Duration(milliseconds: 100)); // Simulate API delay
+          await Future<void>.delayed(const Duration(milliseconds: 100)); // Simulate API delay
           sequentialResults.add([{'id': type, 'name': 'Device for $type'}]);
         }
         sequentialStopwatch.stop();
@@ -62,7 +62,7 @@ void main() {
         // Parallel approach (optimized)
         final parallelStopwatch = Stopwatch()..start();
         final parallelFutures = deviceTypes.map((type) async {
-          await Future.delayed(const Duration(milliseconds: 100)); // Same API delay
+          await Future<void>.delayed(const Duration(milliseconds: 100)); // Same API delay
           return [{'id': type, 'name': 'Device for $type'}];
         });
         final parallelResults = await Future.wait(parallelFutures);
@@ -97,7 +97,7 @@ void main() {
           
           // Process batch in parallel
           final batchFutures = batch.map((page) async {
-            await Future.delayed(const Duration(milliseconds: 50)); // API delay
+            await Future<void>.delayed(const Duration(milliseconds: 50)); // API delay
             return 'Page $page data';
           });
           
@@ -105,7 +105,7 @@ void main() {
           allResults.addAll(batchResults);
           
           // Small delay between batches to be server-friendly
-          await Future.delayed(const Duration(milliseconds: 10));
+          await Future<void>.delayed(const Duration(milliseconds: 10));
         }
         batchStopwatch.stop();
         
@@ -138,7 +138,7 @@ void main() {
         expect(isCacheValid(), isTrue);
         
         // Wait for cache to expire
-        await Future.delayed(const Duration(milliseconds: 150));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         
         // Cache should now be expired
         expect(isCacheValid(), isFalse);
@@ -210,7 +210,7 @@ void main() {
         stopwatch.stop();
         
         // Wait for stream events
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
         
         // Verify parallel execution (should be fast)
         expect(stopwatch.elapsedMilliseconds, lessThan(200));
@@ -247,7 +247,7 @@ void main() {
         
         // Perform refresh - should not throw
         await backgroundRefreshService.refreshNow();
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
         
         // Devices should have error, rooms should succeed
         expect(deviceEvents.where((e) => e.isError).length, equals(1));
@@ -265,7 +265,7 @@ void main() {
           pageSize: 10,
           fetchPage: (page, pageSize) async {
             apiCallCount++;
-            await Future.delayed(const Duration(milliseconds: 50)); // Simulate API delay
+            await Future<void>.delayed(const Duration(milliseconds: 50)); // Simulate API delay
             
             final startIndex = (page - 1) * pageSize;
             return List.generate(pageSize, (i) => 'Item ${startIndex + i + 1}');
@@ -310,7 +310,7 @@ void main() {
           pageSize: 10,
           cachePages: true,
           fetchPage: (page, pageSize) async {
-            await Future.delayed(const Duration(milliseconds: 50));
+            await Future<void>.delayed(const Duration(milliseconds: 50));
             return List.generate(10, (i) => 'Page $page Item ${i + 1}');
           },
         );
@@ -347,17 +347,17 @@ void main() {
         
         // Perform various operations
         await performanceMonitor.trackFuture('fast_operation', () async {
-          await Future.delayed(const Duration(milliseconds: 50));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
           return 'fast result';
         });
         
         await performanceMonitor.trackFuture('slow_operation', () async {
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future<void>.delayed(const Duration(milliseconds: 200));
           return 'slow result';
         });
         
         await performanceMonitor.trackFuture('fast_operation', () async {
-          await Future.delayed(const Duration(milliseconds: 60));
+          await Future<void>.delayed(const Duration(milliseconds: 60));
           return 'fast result 2';
         });
         
@@ -394,15 +394,15 @@ void main() {
         // Track parallel operations
         final results = await performanceMonitor.trackParallel('parallel_test', [
           () async {
-            await Future.delayed(const Duration(milliseconds: 100));
+            await Future<void>.delayed(const Duration(milliseconds: 100));
             return 'result1';
           },
           () async {
-            await Future.delayed(const Duration(milliseconds: 80));
+            await Future<void>.delayed(const Duration(milliseconds: 80));
             return 'result2';
           },
           () async {
-            await Future.delayed(const Duration(milliseconds: 120));
+            await Future<void>.delayed(const Duration(milliseconds: 120));
             return 'result3';
           },
         ]);
@@ -434,19 +434,19 @@ void main() {
         final results = await performanceMonitor.trackParallel('dashboard_load', [
           // Device data with caching
           () async {
-            await Future.delayed(const Duration(milliseconds: 50)); // Cache hit simulation
+            await Future<void>.delayed(const Duration(milliseconds: 50)); // Cache hit simulation
             return 'devices_cached';
           },
           
           // Background refresh of rooms
           () async {
-            await Future.delayed(const Duration(milliseconds: 80)); // API call
+            await Future<void>.delayed(const Duration(milliseconds: 80)); // API call
             return 'rooms_refreshed';
           },
           
           // Paginated notifications
           () async {
-            await Future.delayed(const Duration(milliseconds: 60)); // First page cached
+            await Future<void>.delayed(const Duration(milliseconds: 60)); // First page cached
             return 'notifications_paginated';
           },
         ]);
@@ -488,7 +488,7 @@ void main() {
           futures.add(
             performanceMonitor.trackFuture('concurrent_$i', () async {
               // Simulate I/O operation
-              await Future.delayed(Duration(milliseconds: 100 + (i * 10)));
+              await Future<void>.delayed(Duration(milliseconds: 100 + (i * 10)));
               return 'result_$i';
             })
           );
@@ -496,7 +496,7 @@ void main() {
         
         // This should not be blocked by the futures above
         final quickWork = performanceMonitor.trackFuture('quick_work', () async {
-          await Future.delayed(const Duration(milliseconds: 20));
+          await Future<void>.delayed(const Duration(milliseconds: 20));
           return 'quick_result';
         });
         

@@ -21,13 +21,13 @@ void main() {
     test('should reset settings to defaults successfully', () async {
       // arrange
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(null));
+      expect(result, const Right<Failure, void>(null));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -39,13 +39,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -56,13 +56,13 @@ void main() {
         message: 'Failed to clear settings cache',
       );
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -74,13 +74,13 @@ void main() {
         statusCode: 503,
       );
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -88,7 +88,7 @@ void main() {
     test('should handle successful reset with void return type', () async {
       // arrange
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       final result = await usecase(const NoParams());
@@ -105,7 +105,7 @@ void main() {
     test('should call repository method once', () async {
       // arrange
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       await usecase(const NoParams());
@@ -122,13 +122,13 @@ void main() {
         statusCode: 403,
       );
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -140,13 +140,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.resetSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.resetSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
