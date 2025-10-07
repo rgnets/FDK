@@ -11,9 +11,7 @@ abstract class RoomMockDataSource {
 }
 
 class RoomMockDataSourceImpl implements RoomMockDataSource {
-  const RoomMockDataSourceImpl({
-    required this.mockDataService,
-  });
+  const RoomMockDataSourceImpl({required this.mockDataService});
 
   final MockDataService mockDataService;
   static final _logger = Logger();
@@ -21,29 +19,31 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   @override
   Future<List<RoomModel>> getRooms() async {
     _logger.i('RoomMockDataSource: Using mock data for development');
-    
+
     // Simulate network delay
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    
+
     // Use JSON like production does for consistency
     final pmsRoomsJson = mockDataService.getMockPmsRoomsJson();
     final results = pmsRoomsJson['results'] as List<dynamic>;
-    
-    _logger.i('RoomMockDataSource: Parsing ${results.length} mock rooms from JSON');
-    
+
+    _logger.i(
+      'RoomMockDataSource: Parsing ${results.length} mock rooms from JSON',
+    );
+
     return results.map((json) {
       final roomData = json as Map<String, dynamic>;
-      
+
       // Parse exactly like RemoteDataSource does
       final roomNumber = roomData['room']?.toString();
       final pmsProperty = roomData['pms_property'] as Map<String, dynamic>?;
       final propertyName = pmsProperty?['name']?.toString();
-      
+
       // Build display name from room and property
       final displayName = propertyName != null && roomNumber != null
           ? '($propertyName) $roomNumber'
           : roomNumber ?? 'Room ${roomData['id']}';
-      
+
       return RoomModel(
         id: roomData['id']?.toString() ?? '',
         name: displayName,
@@ -56,29 +56,32 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   @override
   Future<RoomModel> getRoom(String id) async {
     _logger.i('RoomMockDataSource: Getting mock room $id');
-    
+
     // Simulate network delay
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    
+
     // Use JSON like production does for consistency
     final pmsRoomsJson = mockDataService.getMockPmsRoomsJson();
-    final results = pmsRoomsJson['results'] as List<dynamic>;
-    
+    final results = (pmsRoomsJson['results'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+
     final roomData = results.firstWhere(
-      (r) => r['id'].toString() == id,
+      (room) => room['id'].toString() == id,
       orElse: () => throw Exception('Room with ID "$id" not found'),
-    ) as Map<String, dynamic>;
-    
+    );
+
     // Parse exactly like RemoteDataSource does
     final roomNumber = roomData['room']?.toString();
-    final pmsProperty = roomData['pms_property'] as Map<String, dynamic>?;
-    final propertyName = pmsProperty?['name']?.toString();
-    
+    final pmsProperty = roomData['pms_property'];
+    final propertyName = pmsProperty is Map<String, dynamic>
+        ? pmsProperty['name']?.toString()
+        : null;
+
     // Build display name from room and property
     final displayName = propertyName != null && roomNumber != null
         ? '($propertyName) $roomNumber'
         : roomNumber ?? 'Room ${roomData['id']}';
-    
+
     return RoomModel(
       id: roomData['id']?.toString() ?? '',
       name: displayName,
@@ -90,14 +93,16 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   @override
   Future<RoomModel> createRoom(RoomModel room) async {
     _logger.i('RoomMockDataSource: Mock creating room ${room.name}');
-    
+
     // Simulate network delay
     await Future<void>.delayed(const Duration(milliseconds: 400));
-    
+
     // In a real mock implementation, you might add it to an in-memory store
     // For now, just return the room with a generated ID if needed
     final updatedRoom = RoomModel(
-      id: room.id.isNotEmpty ? room.id : 'mock_${DateTime.now().millisecondsSinceEpoch}',
+      id: room.id.isNotEmpty
+          ? room.id
+          : 'mock_${DateTime.now().millisecondsSinceEpoch}',
       name: room.name,
       deviceIds: room.deviceIds,
       metadata: {
@@ -106,17 +111,17 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
         'updatedAt': DateTime.now().toIso8601String(),
       },
     );
-    
+
     return updatedRoom;
   }
 
   @override
   Future<RoomModel> updateRoom(RoomModel room) async {
     _logger.i('RoomMockDataSource: Mock updating room ${room.id}');
-    
+
     // Simulate network delay
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    
+
     // Return the room with updated metadata
     return RoomModel(
       id: room.id,
@@ -132,10 +137,10 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   @override
   Future<void> deleteRoom(String id) async {
     _logger.i('RoomMockDataSource: Mock deleting room $id');
-    
+
     // Simulate network delay
     await Future<void>.delayed(const Duration(milliseconds: 250));
-    
+
     // In a real mock implementation, you might remove it from an in-memory store
     // For now, just log the action
     _logger.i('RoomMockDataSource: Mock deletion of room $id completed');
@@ -144,9 +149,10 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   /// Extract device IDs from room data
   List<String> _extractDeviceIds(Map<String, dynamic> roomData) {
     final deviceIds = <String>{};
-    
+
     // Extract access points
-    if (roomData['access_points'] != null && roomData['access_points'] is List) {
+    if (roomData['access_points'] != null &&
+        roomData['access_points'] is List) {
       final apList = roomData['access_points'] as List;
       for (final ap in apList) {
         if (ap is Map && ap['id'] != null) {
@@ -154,9 +160,10 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
         }
       }
     }
-    
+
     // Extract media converters
-    if (roomData['media_converters'] != null && roomData['media_converters'] is List) {
+    if (roomData['media_converters'] != null &&
+        roomData['media_converters'] is List) {
       final mcList = roomData['media_converters'] as List;
       for (final mc in mcList) {
         if (mc is Map && mc['id'] != null) {
@@ -164,7 +171,7 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
         }
       }
     }
-    
+
     return deviceIds.toList();
   }
 }

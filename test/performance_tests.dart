@@ -233,7 +233,7 @@ void main() {
         await backgroundRefreshService.refreshNow();
 
         // Wait for streams to emit events
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
         // Assert
         expect(deviceRefreshEvents.length, greaterThanOrEqualTo(2)); // refreshing + success
@@ -257,7 +257,7 @@ void main() {
 
         // Act
         await backgroundRefreshService.refreshNow();
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
         // Assert
         expect(deviceRefreshEvents.any((event) => event.isError), isTrue);
@@ -292,7 +292,7 @@ void main() {
 
         // Act
         backgroundRefreshService.startBackgroundRefresh();
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
         backgroundRefreshService.stopBackgroundRefresh();
 
         // Assert - verify timer was set up (indirect test through no exceptions)
@@ -308,7 +308,7 @@ void main() {
           pageSize: 10,
           fetchPage: (page, pageSize) async {
             // Simulate API delay
-            await Future.delayed(const Duration(milliseconds: 50));
+            await Future<void>.delayed(const Duration(milliseconds: 50));
             
             // Return mock data for testing
             final startIndex = (page - 1) * pageSize;
@@ -392,7 +392,7 @@ void main() {
 
         // Act
         await paginationService.loadNextPage();
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
 
         // Assert
         expect(stateUpdates.length, greaterThanOrEqualTo(1));
@@ -441,7 +441,7 @@ void main() {
         final duration = await performanceMonitor.trackFuture(
           'test_operation',
           () async {
-            await Future.delayed(const Duration(milliseconds: 100));
+            await Future<void>.delayed(const Duration(milliseconds: 100));
             return 'success';
           },
         );
@@ -479,15 +479,15 @@ void main() {
           'parallel_test',
           [
             () async {
-              await Future.delayed(const Duration(milliseconds: 50));
+              await Future<void>.delayed(const Duration(milliseconds: 50));
               return 'result1';
             },
             () async {
-              await Future.delayed(const Duration(milliseconds: 75));
+              await Future<void>.delayed(const Duration(milliseconds: 75));
               return 'result2';
             },
             () async {
-              await Future.delayed(const Duration(milliseconds: 25));
+              await Future<void>.delayed(const Duration(milliseconds: 25));
               return 'result3';
             },
           ],
@@ -506,12 +506,12 @@ void main() {
       test('should generate performance report', () async {
         // Arrange - create some performance data
         await performanceMonitor.trackFuture('fast_operation', () async {
-          await Future.delayed(const Duration(milliseconds: 50));
+          await Future<void>.delayed(const Duration(milliseconds: 50));
           return 'fast';
         });
 
         await performanceMonitor.trackFuture('slow_operation', () async {
-          await Future.delayed(const Duration(milliseconds: 1200));
+          await Future<void>.delayed(const Duration(milliseconds: 1200));
           return 'slow';
         });
 
@@ -530,7 +530,7 @@ void main() {
         // Arrange - create multiple samples
         for (var i = 0; i < 10; i++) {
           await performanceMonitor.trackFuture('stats_test', () async {
-            await Future.delayed(Duration(milliseconds: 50 + (i * 10)));
+            await Future<void>.delayed(Duration(milliseconds: 50 + (i * 10)));
             return 'sample $i';
           });
         }
@@ -553,7 +553,7 @@ void main() {
         // Act - start multiple operations concurrently
         final futures = List.generate(5, (i) => 
           performanceMonitor.trackFuture('concurrent_op_$i', () async {
-            await Future.delayed(Duration(milliseconds: 50 + (i * 10)));
+            await Future<void>.delayed(Duration(milliseconds: 50 + (i * 10)));
             return 'result $i';
           })
         );

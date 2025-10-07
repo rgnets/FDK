@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices_params.dart';
 
 class MockDeviceRepository extends Mock implements DeviceRepository {}
 
@@ -57,7 +58,7 @@ void main() {
           .thenAnswer((_) async => Right<Failure, List<Device>>(tDevicesList));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, Right<Failure, List<Device>>(tDevicesList));
@@ -72,7 +73,7 @@ void main() {
           .thenAnswer((_) async => const Right<Failure, List<Device>>(tEmptyList));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Right<Failure, List<Device>>(tEmptyList));
@@ -90,7 +91,7 @@ void main() {
           .thenAnswer((_) async => const Left<Failure, List<Device>>(tFailure));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Left<Failure, List<Device>>(tFailure));
@@ -108,7 +109,7 @@ void main() {
           .thenAnswer((_) async => const Left<Failure, List<Device>>(tFailure));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Left<Failure, List<Device>>(tFailure));
@@ -126,7 +127,7 @@ void main() {
           .thenAnswer((_) async => const Left<Failure, List<Device>>(tFailure));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Left<Failure, List<Device>>(tFailure));
@@ -144,7 +145,7 @@ void main() {
           .thenAnswer((_) async => const Left<Failure, List<Device>>(tFailure));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Left<Failure, List<Device>>(tFailure));
@@ -161,7 +162,7 @@ void main() {
           .thenAnswer((_) async => const Left<Failure, List<Device>>(tFailure));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       expect(result, const Left<Failure, List<Device>>(tFailure));
@@ -175,7 +176,7 @@ void main() {
           .thenAnswer((_) async => Right<Failure, List<Device>>(tDevicesList));
 
       // act
-      await usecase();
+      await usecase(const GetDevicesParams());
 
       // assert
       verify(() => mockRepository.getDevices()).called(1);
@@ -188,7 +189,7 @@ void main() {
           .thenAnswer((_) async => Right<Failure, List<Device>>(tDevicesList));
 
       // act
-      final result = await usecase();
+      final result = await usecase(const GetDevicesParams());
 
       // assert
       result.fold(

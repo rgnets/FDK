@@ -24,13 +24,13 @@ void main() {
     test('should get settings from repository successfully', () async {
       // arrange
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => Right(tSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tSettings));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, Right(tSettings));
+      expect(result, Right<Failure, AppSettings>(tSettings));
       verify(() => mockRepository.getSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -44,13 +44,13 @@ void main() {
         enableOfflineMode: false,
       );
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => Right(tCustomSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tCustomSettings));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, Right(tCustomSettings));
+      expect(result, Right<Failure, AppSettings>(tCustomSettings));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -70,13 +70,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.getSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -87,13 +87,13 @@ void main() {
         message: 'Failed to read settings from cache',
       );
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.getSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -105,13 +105,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.getSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -150,13 +150,13 @@ void main() {
         enableMockData: true,
       );
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => const Right(tAllConfigSettings));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tAllConfigSettings));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(tAllConfigSettings));
+      expect(result, const Right<Failure, AppSettings>(tAllConfigSettings));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -186,7 +186,7 @@ void main() {
     test('should call repository method once', () async {
       // arrange
       when(() => mockRepository.getSettings())
-          .thenAnswer((_) async => Right(tSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tSettings));
 
       // act
       await usecase(const NoParams());

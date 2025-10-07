@@ -50,13 +50,13 @@ void main() {
     test('should export settings successfully', () async {
       // arrange
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tExportedData));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tExportedData));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(tExportedData));
+      expect(result, const Right<Failure, Map<String, dynamic>>(tExportedData));
       verify(() => mockRepository.exportSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -64,7 +64,7 @@ void main() {
     test('should return exported data with correct structure', () async {
       // arrange
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tExportedData));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tExportedData));
 
       // act
       final result = await usecase(const NoParams());
@@ -98,13 +98,13 @@ void main() {
         'exportedAt': '2024-01-01T10:00:00Z',
       };
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tMinimalExport));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tMinimalExport));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(tMinimalExport));
+      expect(result, const Right<Failure, Map<String, dynamic>>(tMinimalExport));
       result.fold(
         (failure) => fail('Should not return failure'),
         (data) {
@@ -123,13 +123,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, Map<String, dynamic>>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, Map<String, dynamic>>(tFailure));
       verify(() => mockRepository.exportSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -140,13 +140,13 @@ void main() {
         message: 'Failed to read settings from cache for export',
       );
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, Map<String, dynamic>>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, Map<String, dynamic>>(tFailure));
       verify(() => mockRepository.exportSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -158,13 +158,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, Map<String, dynamic>>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, Map<String, dynamic>>(tFailure));
       verify(() => mockRepository.exportSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -205,13 +205,13 @@ void main() {
         },
       };
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tComplexExport));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tComplexExport));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(tComplexExport));
+      expect(result, const Right<Failure, Map<String, dynamic>>(tComplexExport));
       result.fold(
         (failure) => fail('Should not return failure'),
         (data) {
@@ -227,7 +227,7 @@ void main() {
     test('should call repository method once', () async {
       // arrange
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tExportedData));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tExportedData));
 
       // act
       await usecase(const NoParams());
@@ -245,13 +245,13 @@ void main() {
         'exportedAt': '2024-01-01T10:00:00Z',
       };
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Right(tEmptyExport));
+          .thenAnswer((_) async => const Right<Failure, Map<String, dynamic>>(tEmptyExport));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(tEmptyExport));
+      expect(result, const Right<Failure, Map<String, dynamic>>(tEmptyExport));
       result.fold(
         (failure) => fail('Should not return failure'),
         (data) {
@@ -268,13 +268,13 @@ void main() {
         statusCode: 403,
       );
       when(() => mockRepository.exportSettings())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, Map<String, dynamic>>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, Map<String, dynamic>>(tFailure));
       verify(() => mockRepository.exportSettings()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });

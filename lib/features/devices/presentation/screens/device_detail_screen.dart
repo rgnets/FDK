@@ -352,26 +352,46 @@ class _DeviceHeader extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends StatelessWidget {
-  
+class _OverviewTab extends StatefulWidget {
   const _OverviewTab({required this.device});
+
   final Device device;
-  
+
+  @override
+  State<_OverviewTab> createState() => _OverviewTabState();
+}
+
+class _OverviewTabState extends State<_OverviewTab>
+    with AutomaticKeepAliveClientMixin<_OverviewTab> {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
-    // Use the comprehensive device detail sections widget
-    // that shows ALL available fields organized in sections
-    return DeviceDetailSections(device: device);
+    super.build(context);
+    // Comprehensive device detail sections widget showing organized fields
+    return DeviceDetailSections(device: widget.device);
   }
 }
 
-class _NetworkTab extends StatelessWidget {
-  
+class _NetworkTab extends StatefulWidget {
   const _NetworkTab({required this.device});
+
   final Device device;
-  
+
+  @override
+  State<_NetworkTab> createState() => _NetworkTabState();
+}
+
+class _NetworkTabState extends State<_NetworkTab>
+    with AutomaticKeepAliveClientMixin<_NetworkTab> {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    final device = widget.device;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -429,13 +449,24 @@ class _NetworkTab extends StatelessWidget {
   }
 }
 
-class _StatisticsTab extends StatelessWidget {
-  
+class _StatisticsTab extends StatefulWidget {
   const _StatisticsTab({required this.device});
+
   final Device device;
-  
+
+  @override
+  State<_StatisticsTab> createState() => _StatisticsTabState();
+}
+
+class _StatisticsTabState extends State<_StatisticsTab>
+    with AutomaticKeepAliveClientMixin<_StatisticsTab> {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    final device = widget.device;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -504,15 +535,26 @@ class _StatisticsTab extends StatelessWidget {
   }
 }
 
-class _LogsTab extends StatelessWidget {
-  
+class _LogsTab extends StatefulWidget {
   const _LogsTab({required this.device});
+
   final Device device;
-  
+
+  @override
+  State<_LogsTab> createState() => _LogsTabState();
+}
+
+class _LogsTabState extends State<_LogsTab>
+    with AutomaticKeepAliveClientMixin<_LogsTab> {
+  late final List<Map<String, dynamic>> _logs = _generateMockLogs();
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   Widget build(BuildContext context) {
-    final logs = _generateMockLogs();
-    
+    super.build(context);
+
     return Column(
       children: [
         // Filter bar
@@ -555,9 +597,9 @@ class _LogsTab extends StatelessWidget {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.only(bottom: 80),
-            itemCount: logs.length,
+            itemCount: _logs.length,
             itemBuilder: (context, index) {
-              final log = logs[index];
+              final log = _logs[index];
               return _LogItem(log: log);
             },
           ),

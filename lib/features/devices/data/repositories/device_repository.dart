@@ -125,12 +125,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
       
       return Right(devices);
     } on Exception catch (e) {
-      _logger.e('DeviceRepositoryImpl: ERROR - $e');
-      
-      // No fallback - fail explicitly
-      _logger.e('DeviceRepositoryImpl: Data source failed - $e');
-      
-      _logger.d('DeviceRepositoryImpl: Trying cache fallback');
+      _logger
+        ..e('DeviceRepositoryImpl: Data source failed - $e')
+        ..d('DeviceRepositoryImpl: Trying cache fallback');
       try {
         // Fallback to cached data ONLY in development/production
         final cachedModels = await localDataSource.getCachedDevices();

@@ -1,15 +1,15 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'room_device_view_model.freezed.dart';
 part 'room_device_view_model.g.dart';
 
 /// Room device filtering and management view model
-/// 
+///
 /// Following MVVM architecture, this view model handles all business logic
 /// for device filtering, counting, and display within room context.
 /// Extracts complex logic from UI components to maintain separation of concerns.
@@ -25,7 +25,7 @@ class RoomDeviceState with _$RoomDeviceState {
 }
 
 /// Device statistics for a room
-@freezed  
+@freezed
 class RoomDeviceStats with _$RoomDeviceStats {
   const factory RoomDeviceStats({
     @Default(0) int total,
@@ -37,7 +37,7 @@ class RoomDeviceStats with _$RoomDeviceStats {
 }
 
 /// Room device view model provider
-/// 
+///
 /// Provides device filtering and statistics for a specific room.
 /// Follows Clean Architecture and MVVM patterns.
 @Riverpod(keepAlive: true)
@@ -45,24 +45,24 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
   @override
   RoomDeviceState build(String roomId) {
     // Set up listeners for future updates
-    ref.listen(devicesNotifierProvider, (previous, next) {
-      next.when(
-        data: (devices) => _updateDevices(roomId, devices),
-        loading: _setLoading,
-        error: (error, stack) => _setError(error.toString()),
-      );
-    });
-    
-    // Listen to room changes to validate room still exists
-    ref.listen(roomViewModelByIdProvider(roomId), (previous, next) {
-      if (next == null) {
-        _setError('Room not found: $roomId');
-      }
-    });
-    
+    ref
+      ..listen(devicesNotifierProvider, (previous, next) {
+        next.when(
+          data: (devices) => _updateDevices(roomId, devices),
+          loading: _setLoading,
+          error: (error, stack) => _setError(error.toString()),
+        );
+      })
+      // Listen to room changes to validate room still exists
+      ..listen(roomViewModelByIdProvider(roomId), (previous, next) {
+        if (next == null) {
+          _setError('Room not found: $roomId');
+        }
+      });
+
     // Process current state of devices provider
     final devicesState = ref.read(devicesNotifierProvider);
-    
+
     // Return appropriate initial state based on current data
     return devicesState.when(
       data: (devices) {
@@ -71,16 +71,17 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
           final roomIdInt = int.tryParse(roomId);
           if (roomIdInt == null) {
             return RoomDeviceState(
-              error: 'Invalid room ID format: "$roomId". Room IDs must be numeric.',
+              error:
+                  'Invalid room ID format: "$roomId". Room IDs must be numeric.',
             );
           }
-          
+
           // Filter devices for this room
           final roomDevices = _filterDevicesForRoom(devices, roomIdInt);
-          
+
           // Calculate statistics
           final stats = _calculateDeviceStats(roomDevices);
-          
+
           // Return initial state with devices
           return RoomDeviceState(
             allDevices: roomDevices,
@@ -88,7 +89,7 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
             stats: stats,
             isLoading: false,
           );
-        } catch (e) {
+        } on Object catch (e) {
           return RoomDeviceState(
             error: 'Failed to process devices for room $roomId: $e',
           );
@@ -98,22 +99,24 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
       error: (error, _) => RoomDeviceState(error: error.toString()),
     );
   }
-  
+
   /// Update devices when data changes
   void _updateDevices(String roomId, List<Device> allDevices) {
     try {
       // Validate room ID format (must be numeric)
       final roomIdInt = int.tryParse(roomId);
       if (roomIdInt == null) {
-        throw ArgumentError('Invalid room ID format: "$roomId". Room IDs must be numeric.');
+        throw ArgumentError(
+          'Invalid room ID format: "$roomId". Room IDs must be numeric.',
+        );
       }
-      
+
       // Filter devices for this room
       final roomDevices = _filterDevicesForRoom(allDevices, roomIdInt);
-      
+
       // Calculate statistics
       final stats = _calculateDeviceStats(roomDevices);
-      
+
       // Update state
       state = RoomDeviceState(
         allDevices: roomDevices,
@@ -121,12 +124,11 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
         stats: stats,
         isLoading: false,
       );
-      
     } on Exception catch (e) {
       _setError('Failed to process devices for room $roomId: $e');
     }
   }
-  
+
   /// Filter devices for a specific room
   List<Device> _filterDevicesForRoom(List<Device> allDevices, int roomIdInt) {
     try {
@@ -135,14 +137,13 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
         // This is the established pattern from room_view_models.dart
         return device.pmsRoomId == roomIdInt;
       }).toList();
-      
     } on Exception catch (e) {
       // Defensive programming - if filtering fails, return empty list
       // This prevents UI crashes from propagating
       throw Exception('Device filtering failed: $e');
     }
   }
-  
+
   /// Calculate device statistics with strict type validation
   RoomDeviceStats _calculateDeviceStats(List<Device> devices) {
     try {
@@ -150,12 +151,12 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
       var switches = 0;
       var onts = 0;
       var wlanControllers = 0;
-      
+
       for (final device in devices) {
         // Validate device type before counting
         // This will throw ArgumentError for invalid types (as requested)
         DeviceTypes.validateDeviceType(device.type);
-        
+
         // Count by device type using constants
         switch (device.type) {
           case DeviceTypes.accessPoint:
@@ -172,10 +173,12 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
             break;
           default:
             // This should never happen due to validation above
-            throw StateError('Unhandled device type in statistics: ${device.type}');
+            throw StateError(
+              'Unhandled device type in statistics: ${device.type}',
+            );
         }
       }
-      
+
       return RoomDeviceStats(
         total: devices.length,
         accessPoints: accessPoints,
@@ -183,62 +186,54 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
         onts: onts,
         wlanControllers: wlanControllers,
       );
-      
     } on Exception catch (e) {
       // Re-throw with context - this will bubble up as requested
       throw Exception('Device statistics calculation failed: $e');
     }
   }
-  
+
   /// Filter devices by type
   void filterByType(String? deviceType) {
     if (state.isLoading || state.error != null) {
       return;
     }
-    
+
     try {
       List<Device> filtered;
-      
+
       if (deviceType == null || deviceType.isEmpty) {
         // Show all devices
         filtered = state.allDevices;
       } else {
         // Validate the filter type
         DeviceTypes.validateDeviceType(deviceType);
-        
+
         // Filter by type
         filtered = state.allDevices.where((device) {
           return device.type == deviceType;
         }).toList();
       }
-      
+
       state = state.copyWith(filteredDevices: filtered);
-      
     } on Exception catch (e) {
       _setError('Device type filtering failed: $e');
     }
   }
-  
+
   /// Set loading state
   void _setLoading() {
-    state = state.copyWith(
-      isLoading: true,
-      error: null,
-    );
+    state = state.copyWith(isLoading: true, error: null);
   }
-  
+
   /// Set error state
   void _setError(String error) {
-    state = state.copyWith(
-      isLoading: false,
-      error: error,
-    );
+    state = state.copyWith(isLoading: false, error: error);
   }
-  
+
   /// Refresh room devices
   Future<void> refresh() async {
     _setLoading();
-    
+
     try {
       // Trigger device refresh through the devices provider
       await ref.read(devicesNotifierProvider.notifier).userRefresh();
@@ -255,7 +250,7 @@ enum DeviceTypeFilter {
   switches,
   onts,
   wlanControllers;
-  
+
   /// Get the device type string for filtering
   String? get deviceType {
     switch (this) {
@@ -271,7 +266,7 @@ enum DeviceTypeFilter {
         return DeviceTypes.wlanController;
     }
   }
-  
+
   /// Get display name for UI
   String get displayName {
     switch (this) {
@@ -287,7 +282,7 @@ enum DeviceTypeFilter {
         return 'WLAN Controllers';
     }
   }
-  
+
   /// Get icon identifier for UI
   String get iconIdentifier {
     switch (this) {

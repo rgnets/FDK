@@ -33,13 +33,13 @@ void main() {
     test('should update settings successfully', () async {
       // arrange
       when(() => mockRepository.updateSettings(tUpdatedSettings))
-          .thenAnswer((_) async => Right(tUpdatedSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tUpdatedSettings));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, Right(tUpdatedSettings));
+      expect(result, Right<Failure, AppSettings>(tUpdatedSettings));
       verify(() => mockRepository.updateSettings(tUpdatedSettings)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -47,7 +47,7 @@ void main() {
     test('should return updated settings with all changes applied', () async {
       // arrange
       when(() => mockRepository.updateSettings(tUpdatedSettings))
-          .thenAnswer((_) async => Right(tUpdatedSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tUpdatedSettings));
 
       // act
       final result = await usecase(tParams);
@@ -73,13 +73,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.updateSettings(tUpdatedSettings))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.updateSettings(tUpdatedSettings)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -91,13 +91,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.updateSettings(tUpdatedSettings))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.updateSettings(tUpdatedSettings)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -108,13 +108,13 @@ void main() {
         message: 'Failed to save settings to cache',
       );
       when(() => mockRepository.updateSettings(tUpdatedSettings))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.updateSettings(tUpdatedSettings)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -126,13 +126,13 @@ void main() {
       );
       final tSingleParams = UpdateSettingsParams(settings: tSingleUpdate);
       when(() => mockRepository.updateSettings(tSingleUpdate))
-          .thenAnswer((_) async => Right(tSingleUpdate));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tSingleUpdate));
 
       // act
       final result = await usecase(tSingleParams);
 
       // assert
-      expect(result, Right(tSingleUpdate));
+      expect(result, Right<Failure, AppSettings>(tSingleUpdate));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -168,13 +168,13 @@ void main() {
       );
       const tCompleteParams = UpdateSettingsParams(settings: tCompleteUpdate);
       when(() => mockRepository.updateSettings(tCompleteUpdate))
-          .thenAnswer((_) async => const Right(tCompleteUpdate));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tCompleteUpdate));
 
       // act
       final result = await usecase(tCompleteParams);
 
       // assert
-      expect(result, const Right(tCompleteUpdate));
+      expect(result, const Right<Failure, AppSettings>(tCompleteUpdate));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -203,7 +203,7 @@ void main() {
     test('should pass correct settings to repository', () async {
       // arrange
       when(() => mockRepository.updateSettings(any()))
-          .thenAnswer((_) async => Right(tUpdatedSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tUpdatedSettings));
 
       // act
       await usecase(tParams);
@@ -222,13 +222,13 @@ void main() {
       );
       final tExtremeParams = UpdateSettingsParams(settings: tExtremeSettings);
       when(() => mockRepository.updateSettings(tExtremeSettings))
-          .thenAnswer((_) async => Right(tExtremeSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tExtremeSettings));
 
       // act
       final result = await usecase(tExtremeParams);
 
       // assert
-      expect(result, Right(tExtremeSettings));
+      expect(result, Right<Failure, AppSettings>(tExtremeSettings));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_result.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/validate_device_scan.dart';
@@ -39,7 +40,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
 
       test('should return false when serial number is missing', () async {
@@ -55,7 +56,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when MAC address is missing', () async {
@@ -71,7 +72,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when serial number is empty', () async {
@@ -87,7 +88,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when MAC address is empty', () async {
@@ -103,7 +104,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when both fields are missing', () async {
@@ -119,7 +120,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
     });
 
@@ -137,7 +138,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
 
       test('should return false when serial number is missing', () async {
@@ -153,7 +154,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when MAC address is missing', () async {
@@ -169,7 +170,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when both fields are empty strings', () async {
@@ -185,7 +186,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
     });
 
@@ -203,7 +204,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
 
       test('should return true when serial number is present and MAC address is also present', () async {
@@ -219,7 +220,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
 
       test('should return false when serial number is missing', () async {
@@ -235,7 +236,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
 
       test('should return false when serial number is empty', () async {
@@ -251,7 +252,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(false));
+        expect(result, const Right<Failure, bool>(false));
       });
     });
 
@@ -289,7 +290,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
 
       test('should validate session with additional metadata', () async {
@@ -310,7 +311,7 @@ void main() {
         final result = await usecase(tParams);
 
         // assert
-        expect(result, const Right(true));
+        expect(result, const Right<Failure, bool>(true));
       });
     });
 

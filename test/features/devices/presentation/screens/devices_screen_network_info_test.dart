@@ -24,7 +24,7 @@ String formatNetworkInfo(Device device) {
 void main() {
   group('DevicesScreen Network Info Formatting', () {
     test('should show "No IP • No MAC" for null values', () {
-      final device = Device(
+      const device = Device(
         id: 'test1',
         name: 'Test Device',
         type: 'access_point',
@@ -37,7 +37,7 @@ void main() {
     });
 
     test('should show "No IP • No MAC" for empty strings', () {
-      final device = Device(
+      const device = Device(
         id: 'test2',
         name: 'Test Device',
         type: 'access_point',
@@ -50,7 +50,7 @@ void main() {
     });
 
     test('should show "No IP • No MAC" for whitespace only', () {
-      final device = Device(
+      const device = Device(
         id: 'test3',
         name: 'Test Device',
         type: 'access_point',
@@ -63,7 +63,7 @@ void main() {
     });
 
     test('should show IP and MAC when both present', () {
-      final device = Device(
+      const device = Device(
         id: 'test4',
         name: 'Test Device',
         type: 'access_point',
@@ -79,7 +79,7 @@ void main() {
     });
 
     test('should show only IP when MAC is empty', () {
-      final device = Device(
+      const device = Device(
         id: 'test5',
         name: 'Test Device',
         type: 'access_point',
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('should show only MAC when IP is null', () {
-      final device = Device(
+      const device = Device(
         id: 'test6',
         name: 'Test Device',
         type: 'access_point',
@@ -105,7 +105,7 @@ void main() {
     });
 
     test('should show only IPv6 address when it is long', () {
-      final device = Device(
+      const device = Device(
         id: 'test7',
         name: 'Test Device',
         type: 'access_point',
@@ -121,7 +121,7 @@ void main() {
     });
 
     test('should show short IPv6 with MAC', () {
-      final device = Device(
+      const device = Device(
         id: 'test8',
         name: 'Test Device',
         type: 'access_point',

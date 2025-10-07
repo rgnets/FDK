@@ -16,9 +16,7 @@ abstract class RoomRemoteDataSource {
 }
 
 class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
-  const RoomRemoteDataSourceImpl({
-    required this.apiService,
-  });
+  const RoomRemoteDataSourceImpl({required this.apiService});
 
   final ApiService apiService;
   static final _logger = Logger();
@@ -36,52 +34,35 @@ class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
     _logger
       ..i('RoomRemoteDataSource: Fetching ALL PMS rooms from API (page_size=0)')
       ..i('RoomRemoteDataSource: Environment is ${EnvironmentConfig.name}')
-      ..i('RoomRemoteDataSource: API Base URL: ${EnvironmentConfig.apiBaseUrl}');
+      ..i(
+        'RoomRemoteDataSource: API Base URL: ${EnvironmentConfig.apiBaseUrl}',
+      );
 
     final allRooms = <RoomModel>[];
 
     // Fetch all rooms with page_size=0 (no pagination)
-    _logger.d('RoomRemoteDataSource: Fetching /api/pms_rooms.json?page_size=0...');
+    _logger.d(
+      'RoomRemoteDataSource: Fetching /api/pms_rooms.json?page_size=0...',
+    );
     final response = await apiService.get<dynamic>(
       '/api/pms_rooms.json?page_size=0',
     );
 
-    if (response.data != null) {
-      // Handle both response formats
-      List<dynamic> results;
-      
-      if (response.data is List) {
-        // Direct list response when page_size=0
-        results = response.data as List<dynamic>;
-        _logger.d('RoomRemoteDataSource: Got direct List with ${results.length} rooms');
-      } else if (response.data is Map && response.data['results'] != null) {
-        // Map with results field (shouldn't happen with page_size=0 but handle it)
-        results = response.data['results'] as List<dynamic>;
-        _logger.d('RoomRemoteDataSource: Got Map with results field containing ${results.length} rooms');
-      } else {
-        _logger.e('RoomRemoteDataSource: Unexpected response format: ${response.data.runtimeType}');
-        throw Exception('Unexpected API response format');
-      }
-
-      // Process all room results
+    final data = response.data;
+    if (data != null) {
+      final results = _extractResults(data);
       for (final json in results) {
         final roomData = json as Map<String, dynamic>;
-        
-        // Build display name from room and property
-        final roomNumber = roomData['room']?.toString();
-        final propertyName = roomData['pms_property']?['name']?.toString();
-        
-        // Format as "(Building) Room" if we have both
-        final displayName = propertyName != null && roomNumber != null
-            ? '($propertyName) $roomNumber'
-            : roomNumber ?? 'Room ${roomData['id']}';
-        
-        allRooms.add(RoomModel(
-          id: roomData['id']?.toString() ?? '',
-          name: displayName,
-          deviceIds: _extractDeviceIds(roomData),
-          metadata: roomData,
-        ));
+        final displayName = _buildDisplayName(roomData);
+
+        allRooms.add(
+          RoomModel(
+            id: roomData['id']?.toString() ?? '',
+            name: displayName,
+            deviceIds: _extractDeviceIds(roomData),
+            metadata: roomData,
+          ),
+        );
       }
     }
 
@@ -90,28 +71,24 @@ class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
       throw Exception('No rooms available from API');
     }
 
-    _logger.i('RoomRemoteDataSource: Successfully fetched ${allRooms.length} total rooms from API');
+    _logger.i(
+      'RoomRemoteDataSource: Successfully fetched ${allRooms.length} total rooms from API',
+    );
     return allRooms;
   }
 
   @override
   Future<RoomModel> getRoom(String id) async {
     _logger.i('RoomRemoteDataSource: Fetching room $id from API');
-    
-    final response = await apiService.get<Map<String, dynamic>>('/api/pms_rooms/$id.json');
+
+    final response = await apiService.get<Map<String, dynamic>>(
+      '/api/pms_rooms/$id.json',
+    );
 
     if (response.data != null) {
       final roomData = response.data!;
-      
-      // Build display name from room and property
-      final roomNumber = roomData['room']?.toString();
-      final propertyName = roomData['pms_property']?['name']?.toString();
-      
-      // Format as "(Building) Room" if we have both
-      final displayName = propertyName != null && roomNumber != null
-          ? '($propertyName) $roomNumber'
-          : roomNumber ?? 'Room ${roomData['id']}';
-      
+      final displayName = _buildDisplayName(roomData);
+
       return RoomModel(
         id: roomData['id']?.toString() ?? '',
         name: displayName,
@@ -141,13 +118,50 @@ class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
     throw UnimplementedError('Room deletion not yet supported by API');
   }
 
+  List<dynamic> _extractResults(dynamic data) {
+    if (data is List<dynamic>) {
+      _logger.d(
+        'RoomRemoteDataSource: Got direct List with ${data.length} rooms',
+      );
+      return data;
+    }
+    if (data is Map<String, dynamic>) {
+      final results = data['results'];
+      if (results is List<dynamic>) {
+        _logger.d(
+          'RoomRemoteDataSource: Got Map with results field containing ${results.length} rooms',
+        );
+        return results;
+      }
+    }
+    _logger.e(
+      'RoomRemoteDataSource: Unexpected response format: ${data.runtimeType}',
+    );
+    throw Exception('Unexpected API response format');
+  }
+
+  String _buildDisplayName(Map<String, dynamic> roomData) {
+    final roomNumber = roomData['room']?.toString();
+    final pmsProperty = roomData['pms_property'];
+    final propertyName = pmsProperty is Map<String, dynamic>
+        ? pmsProperty['name']?.toString()
+        : null;
+    if (propertyName != null && roomNumber != null) {
+      return '($propertyName) $roomNumber';
+    }
+    return roomNumber ?? 'Room ${roomData['id']}';
+  }
+
   /// Extract device IDs from room data following the established logic
   List<String> _extractDeviceIds(Map<String, dynamic> roomData) {
     final deviceIds = <String>{}; // Use Set to prevent duplicates
     final roomId = roomData['id']?.toString();
 
     if (roomId == null) {
-      LoggerService.warning('Room ID is null, cannot extract devices', tag: 'RoomRemoteDataSource');
+      LoggerService.warning(
+        'Room ID is null, cannot extract devices',
+        tag: 'RoomRemoteDataSource',
+      );
       return [];
     }
 
@@ -157,55 +171,61 @@ class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
     // Track total devices in response for comparison
     var totalDevicesInResponse = 0;
 
-    // Extract access point IDs from the access_points array
-    // TRUST THE API - it returns the correct devices for each room
-    if (roomData['access_points'] != null && roomData['access_points'] is List) {
-      final apList = roomData['access_points'] as List;
-      totalDevicesInResponse += apList.length;
+    void addDevices(List<dynamic>? list, {String? prefix}) {
+      if (list == null) {
+        return;
+      }
+      totalDevicesInResponse += list.length;
 
-      for (final ap in apList) {
-        if (ap is Map && ap['id'] != null) {
-          // Simply add all access points returned by the API
-          deviceIds.add(ap['id'].toString());
+      for (final entry in list) {
+        if (entry is! Map<String, dynamic>) {
+          continue;
+        }
+        final id = entry['id'];
+        if (id != null) {
+          deviceIds.add(prefix != null ? '$prefix$id' : id.toString());
+        }
+
+        final nested = entry['devices'];
+        if (nested is List<dynamic>) {
+          totalDevicesInResponse += nested.length;
+          for (final device in nested) {
+            if (device is Map<String, dynamic>) {
+              final nestedId = device['id'];
+              if (nestedId != null) {
+                deviceIds.add(nestedId.toString());
+              }
+            }
+          }
         }
       }
     }
 
-    // Extract media converter (ONT) IDs from the media_converters array
-    // TRUST THE API - it returns the correct devices for each room
-    if (roomData['media_converters'] != null && roomData['media_converters'] is List) {
-      final mcList = roomData['media_converters'] as List;
-      totalDevicesInResponse += mcList.length;
+    addDevices(roomData['access_points'] as List<dynamic>?, prefix: 'ap_');
+    addDevices(roomData['media_converters'] as List<dynamic>?, prefix: 'ont_');
+    addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
+    addDevices(roomData['wlan_devices'] as List<dynamic>?, prefix: 'wlan_');
 
-      for (final mc in mcList) {
-        if (mc is Map && mc['id'] != null) {
-          // Simply add all media converters returned by the API
-          deviceIds.add(mc['id'].toString());
-        }
-      }
-    }
+    // Note: switch_ports are ports, not switches themselves. Those should not
+    // be added. The real switch devices come from switch_devices above.
 
-    // Note: switch_ports are ports, not switches themselves
-    // We should NOT include switch_ports as they are not devices
-    // The actual switch devices come from switch_devices endpoint
+    addDevices(roomData['infrastructure_devices'] as List<dynamic>?);
 
-    // Also check infrastructure_devices if present
-    // TRUST THE API - it returns the correct devices for each room
-    if (roomData['infrastructure_devices'] != null && roomData['infrastructure_devices'] is List) {
-      final deviceList = roomData['infrastructure_devices'] as List;
-      totalDevicesInResponse += deviceList.length;
-
-      for (final device in deviceList) {
-        if (device is Map && device['id'] != null) {
-          // Simply add all infrastructure devices returned by the API
-          deviceIds.add(device['id'].toString());
-        }
+    final routerStats = roomData['router_stats'];
+    if (routerStats is Map<String, dynamic>) {
+      final routerDevices = routerStats['devices'];
+      if (routerDevices is Map<String, dynamic>) {
+        addDevices(routerDevices['recent'] as List<dynamic>?);
       }
     }
 
     // Log extraction results
     final extractedList = deviceIds.toList();
-    LoggerService.logDeviceExtraction(roomId, extractedList, totalInResponse: totalDevicesInResponse);
+    LoggerService.logDeviceExtraction(
+      roomId,
+      extractedList,
+      totalInResponse: totalDevicesInResponse,
+    );
 
     return extractedList;
   }

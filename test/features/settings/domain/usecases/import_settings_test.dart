@@ -69,13 +69,13 @@ void main() {
     test('should import settings successfully', () async {
       // arrange
       when(() => mockRepository.importSettings(tImportData))
-          .thenAnswer((_) async => const Right(tImportedSettings));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tImportedSettings));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Right(tImportedSettings));
+      expect(result, const Right<Failure, AppSettings>(tImportedSettings));
       verify(() => mockRepository.importSettings(tImportData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -83,7 +83,7 @@ void main() {
     test('should return imported settings with correct values', () async {
       // arrange
       when(() => mockRepository.importSettings(tImportData))
-          .thenAnswer((_) async => const Right(tImportedSettings));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tImportedSettings));
 
       // act
       final result = await usecase(tParams);
@@ -116,13 +116,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.importSettings(tInvalidData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tInvalidParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tInvalidData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -139,13 +139,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.importSettings(tIncompatibleData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tIncompatibleParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tIncompatibleData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -157,13 +157,13 @@ void main() {
         statusCode: 500,
       );
       when(() => mockRepository.importSettings(tImportData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tImportData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -174,13 +174,13 @@ void main() {
         message: 'Failed to save imported settings to cache',
       );
       when(() => mockRepository.importSettings(tImportData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tImportData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -201,13 +201,13 @@ void main() {
       );
       const tPartialParams = ImportSettingsParams(data: tPartialData);
       when(() => mockRepository.importSettings(tPartialData))
-          .thenAnswer((_) async => Right(tPartialSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tPartialSettings));
 
       // act
       final result = await usecase(tPartialParams);
 
       // assert
-      expect(result, Right(tPartialSettings));
+      expect(result, Right<Failure, AppSettings>(tPartialSettings));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -228,13 +228,13 @@ void main() {
       final tParamsWithExtra = ImportSettingsParams(data: tDataWithExtra);
       
       when(() => mockRepository.importSettings(tDataWithExtra))
-          .thenAnswer((_) async => const Right(tImportedSettings));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tImportedSettings));
 
       // act
       final result = await usecase(tParamsWithExtra);
 
       // assert
-      expect(result, const Right(tImportedSettings));
+      expect(result, const Right<Failure, AppSettings>(tImportedSettings));
       verify(() => mockRepository.importSettings(tDataWithExtra)).called(1);
     });
 
@@ -247,13 +247,13 @@ void main() {
       final tDefaultSettings = AppSettings.defaults();
       const tEmptyParams = ImportSettingsParams(data: tEmptyData);
       when(() => mockRepository.importSettings(tEmptyData))
-          .thenAnswer((_) async => Right(tDefaultSettings));
+          .thenAnswer((_) async => Right<Failure, AppSettings>(tDefaultSettings));
 
       // act
       final result = await usecase(tEmptyParams);
 
       // assert
-      expect(result, Right(tDefaultSettings));
+      expect(result, Right<Failure, AppSettings>(tDefaultSettings));
       result.fold(
         (failure) => fail('Should not return failure'),
         (settings) {
@@ -268,7 +268,7 @@ void main() {
     test('should pass correct import data to repository', () async {
       // arrange
       when(() => mockRepository.importSettings(any()))
-          .thenAnswer((_) async => const Right(tImportedSettings));
+          .thenAnswer((_) async => const Right<Failure, AppSettings>(tImportedSettings));
 
       // act
       await usecase(tParams);
@@ -290,13 +290,13 @@ void main() {
         statusCode: 400,
       );
       when(() => mockRepository.importSettings(tMalformedData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tMalformedParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tMalformedData)).called(1);
     });
 
@@ -307,13 +307,13 @@ void main() {
         statusCode: 403,
       );
       when(() => mockRepository.importSettings(tImportData))
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, AppSettings>(tFailure));
 
       // act
       final result = await usecase(tParams);
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, AppSettings>(tFailure));
       verify(() => mockRepository.importSettings(tImportData)).called(1);
       verifyNoMoreInteractions(mockRepository);
     });

@@ -1,22 +1,25 @@
 #!/usr/bin/env dart
 
-/// Comprehensive Integration Test (Phase 5)
-/// Tests that all fixes work together to resolve the devices tab crash
+// Comprehensive Integration Test (Phase 5)
+// Tests that all fixes work together to resolve the devices tab crash
+// ignore_for_file: avoid_catching_errors, avoid_catches_without_on_clauses, require_trailing_commas, unreachable_from_main
 
 import 'dart:io';
 
+void _write([String? message]) => stdout.writeln(message ?? '');
+
 void main() async {
-  print('=== Comprehensive Integration Test (Phase 5) ===');
-  print('Date: ${DateTime.now()}');
-  print('');
+  _write('=== Comprehensive Integration Test (Phase 5) ===');
+  _write('Date: ${DateTime.now()}');
+  _write('');
 
   await runIntegrationTests();
 }
 
 /// Run comprehensive integration tests
 Future<void> runIntegrationTests() async {
-  print('🧪 COMPREHENSIVE INTEGRATION TESTING');
-  print('Testing the complete fix from constants to UI...');
+  _write('🧪 COMPREHENSIVE INTEGRATION TESTING');
+  _write('Testing the complete fix from constants to UI...');
   
   var testsPassed = 0;
   var testsTotal = 0;
@@ -25,124 +28,124 @@ Future<void> runIntegrationTests() async {
   testsTotal++;
   if (testDeviceTypeConstants()) {
     testsPassed++;
-    print('✅ Test 1: Device type constants integration PASSED');
+    _write('✅ Test 1: Device type constants integration PASSED');
   } else {
-    print('❌ Test 1: Device type constants integration FAILED');
+    _write('❌ Test 1: Device type constants integration FAILED');
   }
   
   // Test 2: End-to-end device filtering
   testsTotal++;
   if (testEndToEndFiltering()) {
     testsPassed++;
-    print('✅ Test 2: End-to-end device filtering PASSED');
+    _write('✅ Test 2: End-to-end device filtering PASSED');
   } else {
-    print('❌ Test 2: End-to-end device filtering FAILED');
+    _write('❌ Test 2: End-to-end device filtering FAILED');
   }
   
   // Test 3: View model error handling
   testsTotal++;
   if (testViewModelErrorHandling()) {
     testsPassed++;
-    print('✅ Test 3: View model error handling PASSED');
+    _write('✅ Test 3: View model error handling PASSED');
   } else {
-    print('❌ Test 3: View model error handling FAILED');
+    _write('❌ Test 3: View model error handling FAILED');
   }
   
   // Test 4: UI crash prevention
   testsTotal++;
   if (testUICrashPrevention()) {
     testsPassed++;
-    print('✅ Test 4: UI crash prevention PASSED');
+    _write('✅ Test 4: UI crash prevention PASSED');
   } else {
-    print('❌ Test 4: UI crash prevention FAILED');
+    _write('❌ Test 4: UI crash prevention FAILED');
   }
   
   // Test 5: Architecture compliance
   testsTotal++;
   if (testArchitectureCompliance()) {
     testsPassed++;
-    print('✅ Test 5: Architecture compliance PASSED');
+    _write('✅ Test 5: Architecture compliance PASSED');
   } else {
-    print('❌ Test 5: Architecture compliance FAILED');
+    _write('❌ Test 5: Architecture compliance FAILED');
   }
   
-  print('\n📊 COMPREHENSIVE INTEGRATION TEST RESULTS:');
-  print('   Passed: $testsPassed/$testsTotal');
+  _write('\n📊 COMPREHENSIVE INTEGRATION TEST RESULTS:');
+  _write('   Passed: $testsPassed/$testsTotal');
   
   if (testsPassed == testsTotal) {
-    print('🎉 ALL INTEGRATION TESTS PASSED!');
-    print('✅ DEVICES TAB CRASH IS FIXED!');
-    print('');
-    print('🔧 FIXES IMPLEMENTED:');
-    print('   ✓ Created DeviceTypes constants (Domain Layer)');
-    print('   ✓ Verified data source consistency');  
-    print('   ✓ Built RoomDeviceViewModel (MVVM pattern)');
-    print('   ✓ Fixed presentation layer device type checks');
-    print('   ✓ Added proper error handling with exceptions');
-    print('   ✓ Updated room detail screen and device detail screen');
-    print('');
-    print('🏗️  ARCHITECTURAL COMPLIANCE:');
-    print('   ✓ Clean Architecture - Domain defines contracts');
-    print('   ✓ MVVM Pattern - Business logic in ViewModels');
-    print('   ✓ Dependency Injection - Riverpod providers');
-    print('   ✓ Error Handling - Throwing exceptions as requested');
-    print('   ✓ Immutable State - Freezed classes');
-    print('');
-    print('🚀 THE DEVICES TAB SHOULD NO LONGER CRASH THE APP!');
+    _write('🎉 ALL INTEGRATION TESTS PASSED!');
+    _write('✅ DEVICES TAB CRASH IS FIXED!');
+    _write('');
+    _write('🔧 FIXES IMPLEMENTED:');
+    _write('   ✓ Created DeviceTypes constants (Domain Layer)');
+    _write('   ✓ Verified data source consistency');  
+    _write('   ✓ Built RoomDeviceViewModel (MVVM pattern)');
+    _write('   ✓ Fixed presentation layer device type checks');
+    _write('   ✓ Added proper error handling with exceptions');
+    _write('   ✓ Updated room detail screen and device detail screen');
+    _write('');
+    _write('🏗️  ARCHITECTURAL COMPLIANCE:');
+    _write('   ✓ Clean Architecture - Domain defines contracts');
+    _write('   ✓ MVVM Pattern - Business logic in ViewModels');
+    _write('   ✓ Dependency Injection - Riverpod providers');
+    _write('   ✓ Error Handling - Throwing exceptions as requested');
+    _write('   ✓ Immutable State - Freezed classes');
+    _write('');
+    _write('🚀 THE DEVICES TAB SHOULD NO LONGER CRASH THE APP!');
   } else {
-    print('❌ INTEGRATION ISSUES FOUND!');
-    print('📋 Additional work needed');
+    _write('❌ INTEGRATION ISSUES FOUND!');
+    _write('📋 Additional work needed');
     exit(1);
   }
 }
 
 /// Test device type constants work correctly
 bool testDeviceTypeConstants() {
-  print('  🔍 Testing Device Type Constants Integration...');
+  _write('  🔍 Testing Device Type Constants Integration...');
   
   try {
     // Test that constants exist and are correct
     if (DeviceTypes.accessPoint != 'access_point') {
-      print('    ❌ Access point constant wrong');
+      _write('    ❌ Access point constant wrong');
       return false;
     }
     
     if (DeviceTypes.networkSwitch != 'switch') {
-      print('    ❌ Switch constant wrong');
+      _write('    ❌ Switch constant wrong');
       return false;
     }
     
     if (DeviceTypes.ont != 'ont') {
-      print('    ❌ ONT constant wrong');
+      _write('    ❌ ONT constant wrong');
       return false;
     }
     
     if (DeviceTypes.wlanController != 'wlan_controller') {
-      print('    ❌ WLAN controller constant wrong');
+      _write('    ❌ WLAN controller constant wrong');
       return false;
     }
     
     // Test validation works
     try {
       DeviceTypes.validateDeviceType('invalid');
-      print('    ❌ Should throw for invalid type');
+      _write('    ❌ Should throw for invalid type');
       return false;
     } on ArgumentError catch (_) {
       // Expected
     }
     
-    print('    ✅ Device type constants work correctly');
+    _write('    ✅ Device type constants work correctly');
     return true;
     
   } catch (e) {
-    print('    ❌ Exception in constants test: $e');
+    _write('    ❌ Exception in constants test: $e');
     return false;
   }
 }
 
 /// Test end-to-end device filtering simulation
 bool testEndToEndFiltering() {
-  print('  🔍 Testing End-to-End Device Filtering...');
+  _write('  🔍 Testing End-to-End Device Filtering...');
   
   try {
     // Simulate the entire flow: API data -> View Model -> UI counts
@@ -167,7 +170,7 @@ bool testEndToEndFiltering() {
     final room101Devices = viewModel.filterDevicesForRoom(devices, 101);
     
     if (room101Devices.length != 3) {
-      print('    ❌ Wrong device count for room 101: ${room101Devices.length}');
+      _write('    ❌ Wrong device count for room 101: ${room101Devices.length}');
       return false;
     }
     
@@ -175,17 +178,17 @@ bool testEndToEndFiltering() {
     final stats = viewModel.calculateStats(room101Devices);
     
     if (stats['accessPoints'] != 1) {
-      print('    ❌ Wrong access point count: ${stats['accessPoints']}');
+      _write('    ❌ Wrong access point count: ${stats['accessPoints']}');
       return false;
     }
     
     if (stats['switches'] != 1) {
-      print('    ❌ Wrong switch count: ${stats['switches']}');
+      _write('    ❌ Wrong switch count: ${stats['switches']}');
       return false;
     }
     
     if (stats['onts'] != 1) {
-      print('    ❌ Wrong ONT count: ${stats['onts']}');
+      _write('    ❌ Wrong ONT count: ${stats['onts']}');
       return false;
     }
     
@@ -193,23 +196,23 @@ bool testEndToEndFiltering() {
     for (final device in room101Devices) {
       final iconId = getIconForDevice(device.type);
       if (iconId == 'device_hub') {
-        print('    ❌ Device ${device.type} got default icon - fix not working');
+        _write('    ❌ Device ${device.type} got default icon - fix not working');
         return false;
       }
     }
     
-    print('    ✅ End-to-end filtering works correctly');
+    _write('    ✅ End-to-end filtering works correctly');
     return true;
     
   } catch (e) {
-    print('    ❌ Exception in end-to-end test: $e');
+    _write('    ❌ Exception in end-to-end test: $e');
     return false;
   }
 }
 
 /// Test view model error handling 
 bool testViewModelErrorHandling() {
-  print('  🔍 Testing View Model Error Handling...');
+  _write('  🔍 Testing View Model Error Handling...');
   
   try {
     final viewModel = MockRoomDeviceViewModel();
@@ -217,10 +220,10 @@ bool testViewModelErrorHandling() {
     // Test invalid room ID
     try {
       viewModel.validateRoomId('invalid-room');
-      print('    ❌ Should throw for invalid room ID');
+      _write('    ❌ Should throw for invalid room ID');
       return false;
     } on ArgumentError catch (_) {
-      print('    ✅ Invalid room ID correctly throws ArgumentError');
+      _write('    ✅ Invalid room ID correctly throws ArgumentError');
     }
     
     // Test invalid device type
@@ -233,23 +236,23 @@ bool testViewModelErrorHandling() {
     
     try {
       viewModel.calculateStats([invalidDevice]);
-      print('    ❌ Should throw for invalid device type');
+      _write('    ❌ Should throw for invalid device type');
       return false;
     } on ArgumentError catch (_) {
-      print('    ✅ Invalid device type correctly throws ArgumentError');
+      _write('    ✅ Invalid device type correctly throws ArgumentError');
     }
     
     return true;
     
   } catch (e) {
-    print('    ❌ Exception in error handling test: $e');
+    _write('    ❌ Exception in error handling test: $e');
     return false;
   }
 }
 
 /// Test UI crash prevention
 bool testUICrashPrevention() {
-  print('  🔍 Testing UI Crash Prevention...');
+  _write('  🔍 Testing UI Crash Prevention...');
   
   try {
     // Simulate the FIXED UI logic vs the BROKEN UI logic
@@ -263,7 +266,7 @@ bool testUICrashPrevention() {
     final fixedSwitches = testDevices.where((d) => d.type == DeviceTypes.networkSwitch).length;
     
     if (fixedAccessPoints != 1 || fixedSwitches != 1) {
-      print('    ❌ Fixed logic not working correctly');
+      _write('    ❌ Fixed logic not working correctly');
       return false;
     }
     
@@ -272,51 +275,51 @@ bool testUICrashPrevention() {
     final brokenSwitches = testDevices.where((d) => d.type == 'Switch').length;
     
     if (brokenAccessPoints != 0 || brokenSwitches != 0) {
-      print('    ❌ Broken logic comparison failed');
+      _write('    ❌ Broken logic comparison failed');
       return false;
     }
     
-    print('    ✅ UI crash prevention works - device counts are now correct');
+    _write('    ✅ UI crash prevention works - device counts are now correct');
     return true;
     
   } catch (e) {
-    print('    ❌ Exception in UI crash test: $e');
+    _write('    ❌ Exception in UI crash test: $e');
     return false;
   }
 }
 
 /// Test architecture compliance
 bool testArchitectureCompliance() {
-  print('  🔍 Testing Architecture Compliance...');
+  _write('  🔍 Testing Architecture Compliance...');
   
   try {
-    print('    ✅ Clean Architecture:');
-    print('       - Domain layer defines DeviceTypes constants');
-    print('       - No dependencies from domain to other layers');
-    print('       - Business logic separated from UI');
+    _write('    ✅ Clean Architecture:');
+    _write('       - Domain layer defines DeviceTypes constants');
+    _write('       - No dependencies from domain to other layers');
+    _write('       - Business logic separated from UI');
     
-    print('    ✅ MVVM Pattern:');
-    print('       - RoomDeviceViewModel handles business logic'); 
-    print('       - UI components are presentational only');
-    print('       - State management through Riverpod providers');
+    _write('    ✅ MVVM Pattern:');
+    _write('       - RoomDeviceViewModel handles business logic'); 
+    _write('       - UI components are presentational only');
+    _write('       - State management through Riverpod providers');
     
-    print('    ✅ Dependency Injection:');
-    print('       - All providers use Riverpod @riverpod annotation');
-    print('       - Dependencies injected through ref parameter');
+    _write('    ✅ Dependency Injection:');
+    _write('       - All providers use Riverpod @riverpod annotation');
+    _write('       - Dependencies injected through ref parameter');
     
-    print('    ✅ Error Handling:');
-    print('       - ArgumentErrors thrown for invalid data (as requested)');
-    print('       - StateErrors for unexpected conditions'); 
-    print('       - Proper error propagation to UI');
+    _write('    ✅ Error Handling:');
+    _write('       - ArgumentErrors thrown for invalid data (as requested)');
+    _write('       - StateErrors for unexpected conditions'); 
+    _write('       - Proper error propagation to UI');
     
-    print('    ✅ Immutable State:');
-    print('       - Freezed classes for state objects');
-    print('       - copyWith for state updates');
+    _write('    ✅ Immutable State:');
+    _write('       - Freezed classes for state objects');
+    _write('       - copyWith for state updates');
     
     return true;
     
   } catch (e) {
-    print('    ❌ Exception in architecture test: $e');
+    _write('    ❌ Exception in architecture test: $e');
     return false;
   }
 }
@@ -341,17 +344,17 @@ String getIconForDevice(String deviceType) {
 /// Mock classes
 
 class MockDevice {
-  final String id;
-  final String name;
-  final String type;
-  final int pmsRoomId;
-
   MockDevice({
     required this.id,
     required this.name,
     required this.type,
     required this.pmsRoomId,
   });
+
+  final String id;
+  final String name;
+  final String type;
+  final int pmsRoomId;
 }
 
 class MockRoomDeviceViewModel {
