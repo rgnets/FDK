@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
@@ -19,7 +19,7 @@ class BackgroundRefreshService {
 
   static final _logger = Logger();
 
-  final DeviceRemoteDataSource deviceRemoteDataSource;
+  final DeviceDataSource deviceRemoteDataSource;
   final DeviceLocalDataSource deviceLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;

@@ -4,16 +4,20 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Set environment from dart-define
-  const envString = String.fromEnvironment('ENVIRONMENT', defaultValue: 'development');
+  const envString = String.fromEnvironment(
+    'ENVIRONMENT',
+    defaultValue: 'development',
+  );
   // Starting app - environment info available via EnvironmentConfig
-  
+
   Environment env;
   switch (envString.toLowerCase()) {
     case 'staging':
@@ -27,10 +31,11 @@ void main() async {
       env = Environment.development;
       break;
   }
-  
+
   EnvironmentConfig.setEnvironment(env);
+  LoggerService.configure();
   // Environment configuration complete - details available via EnvironmentConfig getters
-  
+
   // Initialize providers with error handling
   late final SharedPreferences sharedPreferences;
   try {
@@ -40,7 +45,7 @@ void main() async {
     debugPrint('Failed to initialize SharedPreferences: $e');
     return;
   }
-  
+
   runApp(
     ProviderScope(
       overrides: [

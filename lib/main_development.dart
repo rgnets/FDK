@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logging_config.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Set environment to development - uses synthetic data, no auth required
   EnvironmentConfig.setEnvironment(Environment.development);
-  
+  LoggerService.configure(level: LogLevel.debug, enableCrashReporting: false);
+
   // Initialize providers with error handling
   late final SharedPreferences sharedPreferences;
   try {
@@ -20,7 +23,7 @@ void main() async {
     debugPrint('Failed to initialize SharedPreferences: $e');
     return;
   }
-  
+
   runApp(
     ProviderScope(
       overrides: [

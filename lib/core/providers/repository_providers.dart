@@ -66,8 +66,8 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
 });
 
 /// Device remote data source provider (for backward compatibility)
-final deviceRemoteDataSourceProvider = Provider<DeviceRemoteDataSourceImpl>((ref) {
-  return ref.watch(deviceDataSourceProvider) as DeviceRemoteDataSourceImpl;
+final deviceRemoteDataSourceProvider = Provider<DeviceDataSource>((ref) {
+  return ref.watch(deviceDataSourceProvider);
 });
 
 /// Room local data source provider

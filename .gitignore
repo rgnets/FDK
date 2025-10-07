@@ -37,6 +37,8 @@ migrate_working_dir/
 flutter_export_environment.sh
 **/generated_plugin_registrant.dart
 linked_packages/
+build_logs/
+coverage/
 
 # Symbolication related
 app.*.symbols
