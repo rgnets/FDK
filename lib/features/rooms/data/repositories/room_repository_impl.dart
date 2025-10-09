@@ -29,7 +29,6 @@ class RoomRepositoryImpl implements RoomRepository {
       _logger
         ..i('RoomRepositoryImpl.getRooms() called')
         ..i('Environment check: isDevelopment=${EnvironmentConfig.isDevelopment}, isStaging=${EnvironmentConfig.isStaging}, isProduction=${EnvironmentConfig.isProduction}');
-      
       // Try to use cached data first if valid (except in development mode)
       if (localDataSource != null && !EnvironmentConfig.isDevelopment) {
         final isValid = await localDataSource!.isCacheValid();

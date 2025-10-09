@@ -7,6 +7,9 @@ abstract class AuthRepository {
     required String fqdn,
     required String login,
     required String apiKey,
+    String? siteName,
+    DateTime? issuedAt,
+    String? signature,
   });
   
   Future<Either<Failure, void>> signOut();
