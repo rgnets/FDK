@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fpdart/fpdart.dart';
 import 'package:logger/logger.dart';
 
+import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
@@ -76,6 +77,14 @@ class DeviceRepositoryImpl implements DeviceRepository {
   }) async {
     try {
       _logger.i('🔍 DEVICE_REPOSITORY: getDevices() called at ${DateTime.now().toIso8601String()}');
+
+      if (!EnvironmentConfig.enableRestFallback) {
+        _logger
+          ..w('DeviceRepositoryImpl: REST fallback disabled; skipping remote fetch')
+          ..w('DeviceRepositoryImpl: Returning empty device list until WebSocket feeds are wired');
+        await localDataSource.clearCache();
+        return const Right(<Device>[]);
+      }
       
       // Try to use cached data first if valid
       if (await localDataSource.isCacheValid()) {
@@ -144,6 +153,12 @@ class DeviceRepositoryImpl implements DeviceRepository {
   /// Refresh data in background without blocking UI
   Future<void> _refreshInBackground() async {
     try {
+      if (!EnvironmentConfig.enableRestFallback) {
+        _logger.d(
+          'DeviceRepositoryImpl: Skipping background refresh (REST fallback disabled)',
+        );
+        return;
+      }
       _logger.d('DeviceRepositoryImpl: Starting background refresh');
       final deviceModels = await dataSource.getDevices();
       await localDataSource.cacheDevices(deviceModels);

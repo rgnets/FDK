@@ -15,6 +15,9 @@ final class AuthenticateUser extends UseCase<User, AuthenticateUserParams> {
       fqdn: params.fqdn,
       login: params.login,
       apiKey: params.apiKey,
+      siteName: params.siteName,
+      issuedAt: params.issuedAt,
+      signature: params.signature,
     );
   }
 }
@@ -24,12 +27,25 @@ class AuthenticateUserParams extends Params {
     required this.fqdn,
     required this.login,
     required this.apiKey,
+    this.siteName,
+    this.issuedAt,
+    this.signature,
   });
 
   final String fqdn;
   final String login;
   final String apiKey;
+  final String? siteName;
+  final DateTime? issuedAt;
+  final String? signature;
 
   @override
-  List<Object> get props => [fqdn, login, apiKey];
+  List<Object?> get props => [
+    fqdn,
+    login,
+    apiKey,
+    siteName,
+    issuedAt,
+    signature,
+  ];
 }

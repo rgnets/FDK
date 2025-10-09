@@ -12,14 +12,21 @@ abstract class AuthLocalDataSource {
     required String apiUrl,
     required String apiToken,
     required String username,
+    String? siteName,
+    DateTime? issuedAt,
+    String? signature,
+    bool markAuthenticated = false,
   });
   Future<void> clearCredentials();
+  Future<void> saveSession({
+    required String token,
+    required DateTime expiresAt,
+  });
+  Future<void> clearSession();
 }
 
 class AuthLocalDataSourceImpl implements AuthLocalDataSource {
-  const AuthLocalDataSourceImpl({
-    required this.storageService,
-  });
+  const AuthLocalDataSourceImpl({required this.storageService});
 
   final StorageService storageService;
   static const String _userKey = 'current_user';
@@ -71,12 +78,20 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
     required String apiUrl,
     required String apiToken,
     required String username,
+    String? siteName,
+    DateTime? issuedAt,
+    String? signature,
+    bool markAuthenticated = false,
   }) async {
     try {
       await storageService.saveCredentials(
         apiUrl: apiUrl,
         apiToken: apiToken,
         username: username,
+        siteName: siteName,
+        issuedAtIso: issuedAt?.toUtc().toIso8601String(),
+        signature: signature,
+        markAuthenticated: markAuthenticated,
       );
     } on Exception catch (e) {
       throw Exception('Failed to save credentials: $e');
@@ -89,6 +104,27 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       await storageService.clearCredentials();
     } on Exception catch (e) {
       throw Exception('Failed to clear credentials: $e');
+    }
+  }
+
+  @override
+  Future<void> saveSession({
+    required String token,
+    required DateTime expiresAt,
+  }) async {
+    try {
+      await storageService.saveSession(token: token, expiresAt: expiresAt);
+    } on Exception catch (e) {
+      throw Exception('Failed to save session: $e');
+    }
+  }
+
+  @override
+  Future<void> clearSession() async {
+    try {
+      await storageService.clearSession();
+    } on Exception catch (e) {
+      throw Exception('Failed to clear session: $e');
     }
   }
 }

@@ -4,7 +4,6 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
-import 'package:rgnets_fdk/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
     as auth_impl;
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
@@ -37,12 +36,6 @@ import 'package:rgnets_fdk/features/settings/domain/repositories/settings_reposi
 final authLocalDataSourceProvider = Provider<AuthLocalDataSource>((ref) {
   final storage = ref.watch(storageServiceProvider);
   return AuthLocalDataSourceImpl(storageService: storage);
-});
-
-/// Auth remote data source provider
-final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  return AuthRemoteDataSourceImpl(apiService: apiService);
 });
 
 /// Device local data source provider
@@ -93,12 +86,10 @@ final roomMockDataSourceProvider = Provider<RoomMockDataSource>((ref) {
 
 /// Auth repository provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
   final localDataSource = ref.watch(authLocalDataSourceProvider);
   final mockDataService = ref.watch(mockDataServiceProvider);
 
   return auth_impl.AuthRepositoryImpl(
-    remoteDataSource: remoteDataSource,
     localDataSource: localDataSource,
     mockDataService: mockDataService,
   );

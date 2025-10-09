@@ -68,19 +68,19 @@ class ApiService {
           
           // Add base URL
           final apiUrl = _storageService.apiUrl;
-          if (apiUrl != null && EnvironmentConfig.isProduction) {
-            // Production uses stored URL
+          if (apiUrl != null && apiUrl.isNotEmpty) {
             options.baseUrl = apiUrl;
             _logger.d('API_SERVICE: Using stored API URL: $apiUrl');
           } else {
-            // Use environment-specific URL
             options.baseUrl = EnvironmentConfig.apiBaseUrl;
-            _logger.d('API_SERVICE: Using environment API URL: ${options.baseUrl}');
+            _logger.d(
+              'API_SERVICE: Using environment API URL: ${options.baseUrl}',
+            );
           }
           
           // Note: Staging uses Basic Auth, not api_key parameter
           // Production may need api_key parameter depending on configuration
-          if (EnvironmentConfig.isProduction) {
+          if (apiUrl != null && apiUrl.isNotEmpty) {
             final apiKeyValue = _storageService.apiToken ?? '';
             if (apiKeyValue.isNotEmpty && !options.path.contains('api_key=')) {
               // Add api_key as query parameter for production
