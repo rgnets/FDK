@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
+
 /// Connection states emitted by [WebSocketService].
 enum SocketConnectionState { disconnected, connecting, connected, reconnecting }
 
@@ -32,10 +34,15 @@ class WebSocketConfig {
 
 /// Parameters used when establishing a socket connection.
 class WebSocketConnectionParams {
-  const WebSocketConnectionParams({required this.uri, this.handshakeMessage});
+  const WebSocketConnectionParams({
+    required this.uri,
+    this.handshakeMessage,
+    this.headers,
+  });
 
   final Uri uri;
   final Map<String, dynamic>? handshakeMessage;
+  final Map<String, dynamic>? headers;
 }
 
 /// Envelope for socket messages.
@@ -53,7 +60,8 @@ class SocketMessage {
   final Map<String, dynamic>? raw;
 }
 
-typedef WebSocketChannelFactory = WebSocketChannel Function(Uri uri);
+typedef WebSocketChannelFactory =
+    WebSocketChannel Function(Uri uri, {Map<String, dynamic>? headers});
 
 /// Service responsible for managing WebSocket connections, reconnection,
 /// heartbeat, and message dispatch.
@@ -64,7 +72,7 @@ class WebSocketService {
     WebSocketChannelFactory? channelFactory,
   }) : _config = config,
        _logger = logger ?? Logger(),
-       _channelFactory = channelFactory ?? WebSocketChannel.connect;
+       _channelFactory = channelFactory ?? connectWebSocket;
 
   final WebSocketConfig _config;
   final Logger _logger;
@@ -151,7 +159,7 @@ class WebSocketService {
     );
     try {
       _logger.i('WebSocketService: Connecting to ${params.uri}');
-      final channel = _channelFactory(params.uri);
+      final channel = _channelFactory(params.uri, headers: params.headers);
 
       _channel = channel;
       _subscription = channel.stream.listen(

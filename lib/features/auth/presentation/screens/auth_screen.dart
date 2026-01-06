@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
@@ -67,9 +70,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   height: 56,
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      // Navigate to scanner and wait for result
+                      // Navigate to auth-scanner (outside shell) and wait for result
                       final result = await context.push<Map<String, dynamic>>(
-                        '/scanner?mode=auth',
+                        '/auth-scanner?mode=auth',
                       );
                       if (result != null && context.mounted) {
                         // Process scanned credentials
@@ -158,11 +161,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<void> _processScannedCredentials(
     Map<String, dynamic> credentials,
   ) async {
+    final logger = ref.read(loggerProvider);
+    logger.i('AUTH_SCREEN: _processScannedCredentials called');
+    logger.d('AUTH_SCREEN: credentials = $credentials');
+
     if (!mounted) {
+      logger.w('AUTH_SCREEN: Widget not mounted, returning early');
       return;
     }
 
     final navigator = Navigator.of(context);
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final goRouter = GoRouter.of(context);
 
@@ -187,10 +196,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ? siteNameRaw.trim()
               : null;
 
+      logger.d('AUTH_SCREEN: Parsed - fqdn=$fqdn, login=$login, apiKey=${apiKey != null ? "${apiKey.substring(0, 4)}..." : "null"}');
+
       if (fqdn == null || login == null || apiKey == null) {
+        logger.e('AUTH_SCREEN: Invalid credential payload - missing required fields');
         throw Exception('Invalid credential payload');
       }
 
+      logger.i('AUTH_SCREEN: Showing credential approval sheet...');
       final approved = await _showCredentialApprovalSheet(
         fqdn: fqdn,
         login: login,
@@ -199,11 +212,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         issuedAt: issuedAt,
         signature: signature,
       );
+      logger.i('AUTH_SCREEN: Approval sheet returned: $approved');
 
       if (!approved) {
         if (!mounted) {
+          logger.w('AUTH_SCREEN: Widget not mounted after approval sheet');
           return;
         }
+        logger.w('AUTH_SCREEN: Approval was cancelled or returned false');
         scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('Approval cancelled. You can rescan or edit entries.'),
@@ -216,10 +232,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return;
       }
 
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: LoadingIndicator()),
+      loadingShown = true;
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: LoadingIndicator()),
+        ),
       );
       loadingShown = true;
 
@@ -246,8 +265,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return;
       }
 
-      if (loadingShown && navigator.canPop()) {
-        navigator.pop();
+      if (loadingShown && rootNavigator.canPop()) {
+        rootNavigator.pop();
         loadingShown = false;
       }
 
@@ -284,8 +303,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           );
     } on Exception catch (e) {
       if (mounted) {
-        if (loadingShown && navigator.canPop()) {
-          navigator.pop();
+        if (loadingShown && rootNavigator.canPop()) {
+          rootNavigator.pop();
           loadingShown = false;
         }
         scaffoldMessenger.showSnackBar(
@@ -306,21 +325,40 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     DateTime? issuedAt,
     String? signature,
   }) async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (_) => CredentialApprovalSheet(
-        fqdn: fqdn,
-        login: login,
-        apiKey: apiKey,
-        siteName: siteName,
-        issuedAt: issuedAt,
-        signature: signature,
-      ),
-    );
-    return result ?? false;
+    final logger = ref.read(loggerProvider);
+    logger.d('AUTH_SCREEN: _showCredentialApprovalSheet called');
+    logger.d('AUTH_SCREEN: context.mounted = $mounted');
+
+    if (!mounted) {
+      logger.e('AUTH_SCREEN: Cannot show sheet - widget not mounted');
+      return false;
+    }
+
+    logger.i('AUTH_SCREEN: Calling showModalBottomSheet...');
+    try {
+      final result = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: false,
+        enableDrag: false,
+        builder: (sheetContext) {
+          logger.d('AUTH_SCREEN: BottomSheet builder executing');
+          return CredentialApprovalSheet(
+            fqdn: fqdn,
+            login: login,
+            apiKey: apiKey,
+            siteName: siteName,
+            issuedAt: issuedAt,
+            signature: signature,
+          );
+        },
+      );
+      logger.i('AUTH_SCREEN: showModalBottomSheet returned: $result');
+      return result ?? false;
+    } catch (e, stack) {
+      logger.e('AUTH_SCREEN: showModalBottomSheet threw error: $e\n$stack');
+      return false;
+    }
   }
 
   Future<void> _showManualEntryDialog() async {

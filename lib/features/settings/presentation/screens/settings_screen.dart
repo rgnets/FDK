@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -553,25 +555,29 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _showSignOutDialog(BuildContext context, WidgetRef ref) {
+    // Capture router before showing dialog to avoid using stale context
+    final router = GoRouter.of(context);
+
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
         content: const Text(
           'Are you sure you want to sign out? You will need to scan the QR code again to reconnect.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(context).pop();
-              await ref.read(authProvider.notifier).signOut();
-              if (context.mounted) {
-                context.go('/auth');
-              }
+              // Pop dialog first
+              Navigator.of(dialogContext).pop();
+              // Navigate immediately using captured router (before provider invalidation)
+              router.go('/auth');
+              // Then sign out (this can happen in background)
+              unawaited(ref.read(authProvider.notifier).signOut());
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Sign Out'),

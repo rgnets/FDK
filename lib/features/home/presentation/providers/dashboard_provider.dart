@@ -18,9 +18,12 @@ class DashboardStats extends _$DashboardStats {
     // Initialize services from providers
     _backgroundRefreshService = ref.watch(backgroundRefreshServiceProvider);
     _performanceMonitor = ref.watch(performanceMonitorProvider);
+    final storage = ref.watch(storageServiceProvider);
     
     // Start background refresh service
-    _backgroundRefreshService.startBackgroundRefresh();
+    if (storage.isAuthenticated || EnvironmentConfig.isDevelopment) {
+      _backgroundRefreshService.startBackgroundRefresh();
+    }
     
     // Track dashboard loading performance
     return _performanceMonitor.trackFuture(
