@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/features/home/presentation/widgets/welcome_card.dart'
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_card.dart';
 
 /// Home dashboard screen - Main entry point for the application
 class HomeScreen extends ConsumerStatefulWidget {
@@ -94,11 +95,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Welcome card with user info
               WelcomeCard(),
               SizedBox(height: 24),
-              
+
               // Network overview with statistics
               NetworkOverviewSection(),
               SizedBox(height: 24),
-              
+
+              // Speed test card
+              SpeedTestCard(),
+              SizedBox(height: 24),
+
               // Recent alerts/notifications
               RecentAlertsSection(),
             ],
