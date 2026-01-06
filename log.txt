@@ -1,0 +1,133 @@
+Launching lib/main_production.dart on Pixel Fold in debug mode...
+Running Gradle task 'assembleDebug'...                           2,615ms
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+Installing build/app/outputs/flutter-apk/app-debug.apk...           6.7s
+D/FlutterJNI(13127): Beginning load of flutter...
+D/FlutterJNI(13127): flutter (null) was loaded normally!
+I/flutter (13127): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   EnvironmentConfig.setEnvironment (package:rgnets_fdk/core/config/environment.dart:11:13)[0m
+I/flutter (13127): [38;5;12m│ #1   main (package:rgnets_fdk/main_production.dart:14:21)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 🔧 EnvironmentConfig: Setting environment to production[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   EnvironmentConfig.setEnvironment (package:rgnets_fdk/core/config/environment.dart:14:9)[0m
+I/flutter (13127): [38;5;12m│ #1   main (package:rgnets_fdk/main_production.dart:14:21)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 🔧 EnvironmentConfig: Environment set, isDevelopment=false, isStaging=false, isProduction=true[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   EnvironmentConfig.setEnvironment (package:rgnets_fdk/core/config/environment.dart:17:9)[0m
+I/flutter (13127): [38;5;12m│ #1   main (package:rgnets_fdk/main_production.dart:14:21)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 🔧 EnvironmentConfig: API Base URL will be: https://api.rgnets.com[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   EnvironmentConfig.setEnvironment (package:rgnets_fdk/core/config/environment.dart:18:9)[0m
+I/flutter (13127): [38;5;12m│ #1   main (package:rgnets_fdk/main_production.dart:14:21)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 🔧 EnvironmentConfig: WebSocket URL will be: wss://zew.netlab.ninja/ws[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   EnvironmentConfig.setEnvironment (package:rgnets_fdk/core/config/environment.dart:19:9)[0m
+I/flutter (13127): [38;5;12m│ #1   main (package:rgnets_fdk/main_production.dart:14:21)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 🔧 EnvironmentConfig: useSyntheticData=false[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+Syncing files to device Pixel Fold...                           
+I/nets.rgnets_fdk(13127): Compiler allocated 4970KB to compile void android.view.ViewRootImpl.performTraversals()
+Syncing files to device Pixel Fold...                               57ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on Pixel Fold is available at: http://127.0.0.1:59637/X-VM0z9H0Zc=/
+I/Choreographer(13127): Skipped 46 frames!  The application may be doing too much work on its main thread.
+The Flutter DevTools debugger and profiler on Pixel Fold is available at: http://127.0.0.1:9101?uri=http://127.0.0.1:59637/X-VM0z9H0Zc=/
+I/HWUI    (13127): Using FreeType backend (prop=Auto)
+D/ImeBackDispatcher(13127): switch root view (mImeCallbacks.size=0)
+D/InsetsController(13127): hide(ime())
+I/ImeTracker(13127): com.rgnets.rgnets_fdk:5d15963a: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+D/WindowOnBackDispatcher(13127): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@a75c7bb
+D/WindowOnBackDispatcher(13127): setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@d54eb06
+D/ProfileInstaller(13127): Installing profile for com.rgnets.rgnets_fdk
+I/nets.rgnets_fdk(13127): Background concurrent mark compact GC freed 24MB AllocSpace bytes, 16(7776KB) LOS objects, 82% free, 5127KB/29MB, paused 186us,5.086ms total 78.617ms
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   new ApiService (package:rgnets_fdk/core/services/api_service.dart:18:9)[0m
+I/flutter (13127): [38;5;12m│ #1   apiServiceProvider.<anonymous closure> (package:rgnets_fdk/core/providers/core_providers.dart:81:10)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 API_SERVICE: Constructor called[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   new ApiService (package:rgnets_fdk/core/services/api_service.dart:19:9)[0m
+I/flutter (13127): [38;5;12m│ #1   apiServiceProvider.<anonymous closure> (package:rgnets_fdk/core/providers/core_providers.dart:81:10)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 API_SERVICE: Environment is production[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   new ApiService (package:rgnets_fdk/core/services/api_service.dart:20:9)[0m
+I/flutter (13127): [38;5;12m│ #1   apiServiceProvider.<anonymous closure> (package:rgnets_fdk/core/providers/core_providers.dart:81:10)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 API_SERVICE: apiBaseUrl=https://api.rgnets.com[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+I/flutter (13127): [38;5;12m│ #0   new DeviceRepositoryImpl (package:rgnets_fdk/features/devices/data/repositories/device_repository.dart:21:13)[0m
+I/flutter (13127): [38;5;12m│ #1   deviceRepositoryProvider.<anonymous closure> (package:rgnets_fdk/core/providers/repository_providers.dart:103:22)[0m
+I/flutter (13127): [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+I/flutter (13127): [38;5;12m│ 💡 DEVICE_REPOSITORY: Constructor called[0m
+I/flutter (13127): [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+D/WindowOnBackDispatcher(13127): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@a75c7bb
+I/DynamiteModule(13127): Considering local module com.google.mlkit.dynamite.barcode:10000 and remote module com.google.mlkit.dynamite.barcode:0
+I/DynamiteModule(13127): Selected local version of com.google.mlkit.dynamite.barcode
+D/QuirkSettingsLoader(13127): QuirkSettings$MetadataHolderService is not found.
+D/CameraX (13127): QuirkSettings from app metadata: null
+D/CameraX (13127): QuirkSettings by default: QuirkSettings{enabledWhenDeviceHasQuirk=true, forceEnabledQuirks=[], forceDisabledQuirks=[]}
+D/TransportRuntime.JobInfoScheduler(13127): Scheduling upload for context TransportContext(cct, DEFAULT, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) with jobId=-2053560901 in 642865ms(Backend next call timestamp 1767734346384). Attempt 1
+D/TransportRuntime.JobInfoScheduler(13127): Scheduling upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) with jobId=-2048580164 in 86400000ms(Backend next call timestamp 1760079248246). Attempt 1
+I/CameraManagerGlobal(13127): Connecting to camera service
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=DEFAULT, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, DEFAULT, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+I/Camera2CameraInfo(13127): Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_FULL
+I/Camera2CameraInfo(13127): Device Level: INFO_SUPPORTED_HARDWARE_LEVEL_FULL
+I/CameraPresencePrvdr(13127): Starting CameraPresenceProvider monitoring.
+I/CameraPresenceSrc(13127): First observer added. Starting monitoring.
+I/Camera2PresenceSrc(13127): Starting system availability monitoring.
+D/Camera2PresenceSrc(13127): System onCameraAvailable: 0
+D/Camera2PresenceSrc(13127): System onCameraAvailable: 1
+D/Camera2PresenceSrc(13127): [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=0}, CameraIdentifier{cameraIds=1}
+D/Camera2PresenceSrc(13127): [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=0}, CameraIdentifier{cameraIds=1}
+D/Camera2PresenceSrc(13127): [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=0}, CameraIdentifier{cameraIds=1}
+D/Camera2PresenceSrc(13127): System onCameraUnavailable: 0
+D/Camera2PresenceSrc(13127): [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=0}, CameraIdentifier{cameraIds=1}
+D/nativeloader(13127): Load /data/app/~~CZQVi3jbm024joy7oG69Iw==/com.rgnets.rgnets_fdk-RxK5zI2FYl2zMCq0Ajs3Yg==/base.apk!/lib/arm64-v8a/libbarhopper_v3.so using class loader ns clns-9 (caller=/data/app/~~CZQVi3jbm024joy7oG69Iw==/com.rgnets.rgnets_fdk-RxK5zI2FYl2zMCq0Ajs3Yg==/base.apk!classes15.dex): ok
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+I/tflite  (13127): Initialized TensorFlow Lite runtime.
+W/libc    (13127): Access denied finding property "ro.mediatek.platform"
+W/libc    (13127): Access denied finding property "ro.chipname"
+W/libc    (13127): Access denied finding property "ro.hardware.chipname"
+I/tflite  (13127): Created TensorFlow Lite XNNPACK delegate for CPU.
+I/tflite  (13127): Replacing 43 out of 43 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 1 partitions for the whole graph.
+I/tflite  (13127): Replacing 35 out of 47 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 23 partitions for the whole graph.
+I/native  (13127): I0000 00:00:1767733703.890054   13282 oned_decoder_client.cc:696] barhopper::deep_learning::OnedDecoderClient is created successfully.
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+E/BufferQueueProducer(13127): [ImageReader-1600x1200f22m6-13127-2](id:334700000004,api:4,p:1170,c:13127) queueBuffer: BufferQueue has been abandoned
+D/TransportRuntime.SQLiteEventStore(13127): Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+D/TransportRuntime.JobInfoScheduler(13127): Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+E/BufferQueueProducer(13127): [ImageReader-1600x1200f22m6-13127-2](id:334700000004,api:4,p:1170,c:13127) dequeueBuffer: BufferQueue has been abandoned
+E/BufferQueueProducer(13127): [ImageReader-1600x1200f22m6-13127-2](id:334700000004,api:4,p:1170,c:13127) cancelBuffer: BufferQueue has been abandoned
+D/WindowOnBackDispatcher(13127): setTopOnBackInvokedCallback (unwrapped): android.app.Activity$$ExternalSyntheticLambda0@d54eb06
+D/Camera2PresenceSrc(13127): System onCameraAvailable: 0
+D/Camera2PresenceSrc(13127): [FetchData] Refreshed camera list: CameraIdentifier{cameraIds=0}, CameraIdentifier{cameraIds=1}
+D/WindowOnBackDispatcher(13127): setTopOnBackInvokedCallback (unwrapped): io.flutter.embedding.android.FlutterActivity$1@a75c7bb

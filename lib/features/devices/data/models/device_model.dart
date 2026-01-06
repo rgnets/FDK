@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 
 part 'device_model.freezed.dart';
 part 'device_model.g.dart';
@@ -87,4 +87,3 @@ extension DeviceModelX on DeviceModel {
     );
   }
 }
-

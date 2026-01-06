@@ -1,0 +1,39 @@
+name: WebSocket Handshake Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - Development
+  pull_request:
+    paths:
+      - 'FDK/**'
+      - '.github/workflows/ws-handshake-smoke.yml'
+
+jobs:
+  handshake:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      WS_FQDN: ${{ secrets.WS_FQDN }}
+      WS_LOGIN: ${{ secrets.WS_LOGIN }}
+      WS_API_KEY: ${{ secrets.WS_API_KEY }}
+      WS_SITE: ${{ secrets.WS_SITE }}
+      WS_URL: ${{ secrets.WS_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        working-directory: FDK
+        run: flutter pub get
+
+      - name: Run WebSocket handshake smoke test
+        working-directory: FDK
+        run: dart run tool/ws_auth_smoke.dart

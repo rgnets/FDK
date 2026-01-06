@@ -4,12 +4,9 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 
 /// Widget for displaying all device fields in organized sections
 class DeviceDetailSections extends StatelessWidget {
+  const DeviceDetailSections({required this.device, super.key});
+
   final Device device;
-  
-  const DeviceDetailSections({
-    super.key,
-    required this.device,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +46,11 @@ class DeviceDetailSections extends StatelessWidget {
         _DetailRow('ID', device.id),
         _DetailRow('Name', device.name),
         _DetailRow('Type', device.type),
-        _DetailRow('Status', device.status, 
-          valueColor: _getStatusColor(device.status)),
+        _DetailRow(
+          'Status',
+          device.status,
+          valueColor: _getStatusColor(device.status),
+        ),
         if (device.lastSeen != null)
           _DetailRow('Last Seen', _formatDateTime(device.lastSeen!)),
       ],
@@ -58,8 +58,10 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildLocationSection(BuildContext context) {
-    if (device.pmsRoom == null && device.location == null) return const SizedBox.shrink();
-    
+    if (device.pmsRoom == null && device.location == null) {
+      return const SizedBox.shrink();
+    }
+
     return _SectionCard(
       title: 'Location',
       icon: Icons.location_on_outlined,
@@ -72,8 +74,7 @@ class DeviceDetailSections extends StatelessWidget {
           if (device.pmsRoom!.extractedNumber != null)
             _DetailRow('Room Number', device.pmsRoom!.extractedNumber!),
         ],
-        if (device.location != null)
-          _DetailRow('Location', device.location!),
+        if (device.location != null) _DetailRow('Location', device.location!),
         if (device.pmsRoomId != null)
           _DetailRow('PMS Room ID', device.pmsRoomId.toString()),
       ],
@@ -89,23 +90,23 @@ class DeviceDetailSections extends StatelessWidget {
           _DetailRow('IP Address', device.ipAddress!),
         if (device.macAddress != null)
           _DetailRow('MAC Address', device.macAddress!),
-        if (device.vlan != null)
-          _DetailRow('VLAN', device.vlan.toString()),
+        if (device.vlan != null) _DetailRow('VLAN', device.vlan.toString()),
       ],
     );
   }
 
   Widget _buildWirelessSection(BuildContext context) {
-    if (device.ssid == null && device.channel == null && device.signalStrength == null) {
+    if (device.ssid == null &&
+        device.channel == null &&
+        device.signalStrength == null) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'Wireless Configuration',
       icon: Icons.wifi,
       children: [
-        if (device.ssid != null)
-          _DetailRow('SSID', device.ssid!),
+        if (device.ssid != null) _DetailRow('SSID', device.ssid!),
         if (device.channel != null)
           _DetailRow('Channel', device.channel.toString()),
         if (device.signalStrength != null)
@@ -119,11 +120,13 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildPerformanceSection(BuildContext context) {
-    if (device.cpuUsage == null && device.memoryUsage == null && 
-        device.temperature == null && device.uptime == null) {
+    if (device.cpuUsage == null &&
+        device.memoryUsage == null &&
+        device.temperature == null &&
+        device.uptime == null) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'Performance',
       icon: Icons.speed,
@@ -145,19 +148,27 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildTrafficSection(BuildContext context) {
-    if (device.currentUpload == null && device.currentDownload == null &&
-        device.totalUpload == null && device.totalDownload == null) {
+    if (device.currentUpload == null &&
+        device.currentDownload == null &&
+        device.totalUpload == null &&
+        device.totalDownload == null) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'Traffic Statistics',
       icon: Icons.swap_vert,
       children: [
         if (device.currentUpload != null)
-          _DetailRow('Current Upload', '${device.currentUpload!.toStringAsFixed(2)} Mbps'),
+          _DetailRow(
+            'Current Upload',
+            '${device.currentUpload!.toStringAsFixed(2)} Mbps',
+          ),
         if (device.currentDownload != null)
-          _DetailRow('Current Download', '${device.currentDownload!.toStringAsFixed(2)} Mbps'),
+          _DetailRow(
+            'Current Download',
+            '${device.currentDownload!.toStringAsFixed(2)} Mbps',
+          ),
         if (device.totalUpload != null)
           _DetailRow('Total Upload', _formatBytes(device.totalUpload!)),
         if (device.totalDownload != null)
@@ -167,21 +178,21 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildSystemSection(BuildContext context) {
-    if (device.model == null && device.serialNumber == null && 
-        device.firmware == null && device.restartCount == null) {
+    if (device.model == null &&
+        device.serialNumber == null &&
+        device.firmware == null &&
+        device.restartCount == null) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'System Information',
       icon: Icons.computer,
       children: [
-        if (device.model != null)
-          _DetailRow('Model', device.model!),
+        if (device.model != null) _DetailRow('Model', device.model!),
         if (device.serialNumber != null)
           _DetailRow('Serial Number', device.serialNumber!),
-        if (device.firmware != null)
-          _DetailRow('Firmware', device.firmware!),
+        if (device.firmware != null) _DetailRow('Firmware', device.firmware!),
         if (device.restartCount != null)
           _DetailRow('Restart Count', device.restartCount.toString()),
       ],
@@ -194,8 +205,10 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildNotesSection(BuildContext context) {
-    if (device.note == null) return const SizedBox.shrink();
-    
+    if (device.note == null) {
+      return const SizedBox.shrink();
+    }
+
     return _SectionCard(
       title: 'Notes',
       icon: Icons.note,
@@ -215,7 +228,7 @@ class DeviceDetailSections extends StatelessWidget {
     if (device.images == null || device.images!.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'Images',
       icon: Icons.photo_library,
@@ -233,7 +246,11 @@ class DeviceDetailSections extends StatelessWidget {
                   child: Container(
                     width: 120,
                     color: Colors.grey[300],
-                    child: const Icon(Icons.image, size: 40, color: Colors.grey),
+                    child: const Icon(
+                      Icons.image,
+                      size: 40,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               );
@@ -248,7 +265,7 @@ class DeviceDetailSections extends StatelessWidget {
     if (device.metadata == null || device.metadata!.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return _SectionCard(
       title: 'Additional Metadata',
       icon: Icons.data_object,
@@ -265,16 +282,18 @@ class DeviceDetailSections extends StatelessWidget {
     return key
         .replaceAll('_', ' ')
         .split(' ')
-        .map((word) => word.isNotEmpty 
-            ? '${word[0].toUpperCase()}${word.substring(1)}' 
-            : '')
+        .map(
+          (word) => word.isNotEmpty
+              ? '${word[0].toUpperCase()}${word.substring(1)}'
+              : '',
+        )
         .join(' ');
   }
 
   String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inMinutes < 1) {
       return 'Just now';
     } else if (difference.inHours < 1) {
@@ -292,7 +311,7 @@ class DeviceDetailSections extends StatelessWidget {
     final days = seconds ~/ 86400;
     final hours = (seconds % 86400) ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
-    
+
     if (days > 0) {
       return '$days days, $hours hours';
     } else if (hours > 0) {
@@ -303,9 +322,15 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(2)} KB';
-    if (bytes < 1073741824) return '${(bytes / 1048576).toStringAsFixed(2)} MB';
+    if (bytes < 1024) {
+      return '$bytes B';
+    }
+    if (bytes < 1048576) {
+      return '${(bytes / 1024).toStringAsFixed(2)} KB';
+    }
+    if (bytes < 1073741824) {
+      return '${(bytes / 1048576).toStringAsFixed(2)} MB';
+    }
     return '${(bytes / 1073741824).toStringAsFixed(2)} GB';
   }
 
@@ -326,15 +351,15 @@ class DeviceDetailSections extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final List<Widget> children;
-
   const _SectionCard({
     required this.title,
     required this.icon,
     required this.children,
   });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -366,11 +391,11 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
+  const _DetailRow(this.label, this.value, {this.valueColor});
+
   final String label;
   final String value;
   final Color? valueColor;
-
-  const _DetailRow(this.label, this.value, {this.valueColor});
 
   @override
   Widget build(BuildContext context) {
@@ -383,9 +408,9 @@ class _DetailRow extends StatelessWidget {
             flex: 2,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
             ),
           ),
           Expanded(

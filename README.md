@@ -1,26 +1,151 @@
 # RG Nets Field Deployment Kit (FDK)
 
-A Flutter-based mobile application for field technicians to manage network infrastructure devices through integration with RG Nets' rXg network management systems.
+RG Nets’ Field Deployment Kit is a multi-platform Flutter app that helps rXg field technicians provision rooms, scan devices, and troubleshoot onsite networks in real time.
 
-## 🎯 Project Status
+---
 
-✅ **Flutter Setup Complete**
-- Flutter project structure created with package `com.rgnets.rgnets_fdk`
-- Dependencies configured (Provider, go_router, Dio, etc.)
-- Assets organized following Flutter conventions
-- Documentation updated with RG Nets branding
-- Basic splash screen with dark theme implemented
-- Tests passing
+## Highlights
 
-## Getting Started
+- Technician-first workflow covering onboarding, room inventory, device scanning, issue triage, and debug tools
+- Modular architecture with Riverpod, GoRouter, and feature slices for auth, rooms, devices, notifications, and scanner flows
+- WebSocket-ready service layer (Phase 2) built on top of the hardened REST/Dio stack with Drift caching
+- Offline aware: Drift local stores, background refresh service, and SharedPreferences session cache
+- Logging pipeline driven by `LoggerService` with environment-sensitive verbosity and crash-reporting hooks
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## Tech Stack
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+| Layer | Tooling |
+|-------|---------|
+| UI & Navigation | Flutter, GoRouter, hooks_riverpod |
+| State & DI | Riverpod, ProviderScope overrides, generated providers |
+| Data | Drift, Dio, Retrofit, Freezed, json_serializable |
+| Device Capabilities | mobile_scanner, connectivity_plus, battery_plus, image_picker |
+| Utilities | logger, fpdart, intl, shared_preferences |
+| Build Tooling | build_runner, integration_test, flutter_lints |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Flutter SDK 3.35.5 (stable) / Dart 3.9.2
+- Xcode 16.4 and CocoaPods 1.16.2 (macOS/iOS builds)
+- Android Studio 2025.1 with Android SDK 36
+- macOS 15.6.1 (host)
+- Optional: Windows host/CI runner for native Windows builds
+
+### Installation
+
+```bash
+git clone <repository-url>
+cd FDK
+
+# Fetch dependencies and generated code
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+```
+
+### Running
+
+```bash
+# Development (synthetic data, verbose logging)
+flutter run -t lib/main_development.dart
+
+# Staging (interurban test API)
+flutter run -t lib/main_staging.dart --dart-define=ENVIRONMENT=staging
+
+# Staging Debug (launches debug dashboard)
+flutter run -t lib/main_staging_debug.dart --dart-define=ENVIRONMENT=staging
+
+# Production (requires secrets provided via --dart-define)
+flutter run -t lib/main_production.dart \
+  --dart-define=ENVIRONMENT=production \
+  --dart-define=API_URL=<fqdn> \
+  --dart-define=API_USERNAME=<user> \
+  --dart-define=API_KEY=<token>
+```
+
+### Build Matrix Script
+
+Use `scripts/build_matrix.sh` to validate Android, iOS (simulator), and macOS builds in one pass (Windows build requires a Windows host):
+
+```bash
+./scripts/build_matrix.sh
+# Build logs written to build_logs/<target>.log
+```
+
+### Pre-commit Checks
+
+`scripts/pre_commit.sh` runs formatting, analyzer, and tests. Link it into Git hooks:
+
+```bash
+ln -s ../../scripts/pre_commit.sh .git/hooks/pre-commit
+
+# Skip tests temporarily (legacy suite currently failing) with:
+SKIP_TESTS=1 ./scripts/pre_commit.sh
+```
+
+---
+
+## Logging & Telemetry
+
+- Logging level controlled via `LOG_LEVEL` dart-define (`off`, `error`, `warning`, `info`, `debug`, `trace`).
+- Crash reporting toggle via `ENABLE_CRASH_REPORTING` (defaults to true in production). Currently backed by a stub reporter ready for Sentry integration.
+- Defaults: development → `debug`, staging → `info`, production → `warning`.
+
+```bash
+flutter run -t lib/main_development.dart \
+  --dart-define=LOG_LEVEL=trace \
+  --dart-define=ENABLE_CRASH_REPORTING=false
+```
+
+---
+
+## Directory Guide
+
+```
+lib/
+├─ core/             # cross-cutting config, services, utility widgets
+├─ features/         # feature modules (auth, rooms, devices, scanner, etc.)
+├─ providers/        # shared provider overrides and DI helpers
+├─ routes/           # GoRouter configuration
+├─ main*.dart        # environment-specific entrypoints
+assets/              # branding, mockups, onboarding art
+docs/                # architecture references, plans, reports
+scripts/             # automation (build matrix, pre-commit checks)
+test/                # unit/widget tests
+test_programs/       # exploratory scripts and repros
+build_logs/          # generated by build_matrix.sh (ignored)
+```
+
+---
+
+## Testing
+
+```bash
+flutter analyze
+flutter test            # Note: legacy tests currently fail (RoomModel expectations)
+dart run build_runner build --delete-conflicting-outputs
+```
+
+Known failures are tracked in `docs/changes/phase1-upgrade.md` (Step 3) and will be addressed in subsequent iterations.
+
+---
+
+## Documentation & Plans
+
+- `docs/setup.md` — environment requirements, workflow scripts, troubleshooting.
+- `implementationPlan.md` — long-range roadmap to surpass ATT-FE-Tool.
+- `docs/changes/phase1-upgrade.md` — Phase 1 execution log.
+- Additional architecture, API, and feature docs live under `docs/`.
+
+---
+
+## Next Steps
+
+Phase 1 hardening continues with lint clean-up, automated tests, and backend WebSocket preparation. Phase 2 focuses on real-time data channels, offline conflict handling, and enhanced technician dashboards.
+
+For questions or to coordinate milestones, contact the RG Nets engineering lead overseeing the Field Deployment Kit program.

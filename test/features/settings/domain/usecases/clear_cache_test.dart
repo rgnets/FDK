@@ -21,13 +21,13 @@ void main() {
     test('should clear cache successfully', () async {
       // arrange
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Right(null));
+      expect(result, const Right<Failure, void>(null));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -38,13 +38,13 @@ void main() {
         message: 'Failed to clear application cache',
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -56,13 +56,13 @@ void main() {
         statusCode: 503,
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -74,13 +74,13 @@ void main() {
         statusCode: 403,
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -88,7 +88,7 @@ void main() {
     test('should handle successful cache clear with void return type', () async {
       // arrange
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       final result = await usecase(const NoParams());
@@ -105,7 +105,7 @@ void main() {
     test('should call repository method once', () async {
       // arrange
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Right(null));
+          .thenAnswer((_) async => const Right<Failure, void>(null));
 
       // act
       await usecase(const NoParams());
@@ -121,13 +121,13 @@ void main() {
         message: 'Unable to access cache storage',
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -138,13 +138,13 @@ void main() {
         message: 'Some cache entries could not be cleared',
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -155,13 +155,13 @@ void main() {
         message: 'Insufficient disk space for cache operations',
       );
       when(() => mockRepository.clearCache())
-          .thenAnswer((_) async => const Left(tFailure));
+          .thenAnswer((_) async => const Left<Failure, void>(tFailure));
 
       // act
       final result = await usecase(const NoParams());
 
       // assert
-      expect(result, const Left(tFailure));
+      expect(result, const Left<Failure, void>(tFailure));
       verify(() => mockRepository.clearCache()).called(1);
       verifyNoMoreInteractions(mockRepository);
     });

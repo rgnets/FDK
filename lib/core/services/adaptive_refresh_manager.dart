@@ -6,12 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Configuration for refresh intervals based on conditions
 class RefreshConfig {
-  final Duration foregroundInterval;
-  final Duration backgroundInterval;
-  final Duration wifiInterval;
-  final Duration cellularInterval;
-  final Duration lowBatteryInterval;
-
   const RefreshConfig({
     this.foregroundInterval = const Duration(seconds: 30),
     this.backgroundInterval = const Duration(minutes: 10),
@@ -19,15 +13,23 @@ class RefreshConfig {
     this.cellularInterval = const Duration(minutes: 2),
     this.lowBatteryInterval = const Duration(minutes: 15),
   });
+
+  final Duration foregroundInterval;
+  final Duration backgroundInterval;
+  final Duration wifiInterval;
+  final Duration cellularInterval;
+  final Duration lowBatteryInterval;
 }
 
 /// Manages adaptive refresh based on network, battery, and app state
 class AdaptiveRefreshManager {
+  AdaptiveRefreshManager({RefreshConfig refreshConfig = const RefreshConfig()})
+    : config = refreshConfig;
+
   final RefreshConfig config;
   final Battery _battery = Battery();
   final Connectivity _connectivity = Connectivity();
 
-  Timer? _refreshTimer;
   bool _isInForeground = true;
   bool _shouldContinueRefreshing = true;
   List<ConnectivityResult> _currentConnectivity = [ConnectivityResult.none];
@@ -37,24 +39,22 @@ class AdaptiveRefreshManager {
   // Callbacks
   VoidCallback? onRefreshNeeded;
 
-  AdaptiveRefreshManager({
-    this.config = const RefreshConfig(),
-  });
-
   /// Initialize and start monitoring
   Future<void> initialize() async {
     // Get initial states
     _currentConnectivity = await _connectivity.checkConnectivity();
     _batteryLevel = await _battery.batteryLevel;
-    
+
     // Monitor battery state
     _battery.onBatteryStateChanged.listen((BatteryState state) {
-      _isCharging = state == BatteryState.charging || 
-                    state == BatteryState.full;
+      _isCharging =
+          state == BatteryState.charging || state == BatteryState.full;
     });
 
     // Monitor connectivity changes
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       _currentConnectivity = results;
       _updateRefreshInterval();
     });
@@ -64,34 +64,42 @@ class AdaptiveRefreshManager {
   /// Waits AFTER each refresh completes before scheduling the next one
   void startSequentialRefresh(Future<void> Function() refreshCallback) {
     _shouldContinueRefreshing = true;
-    _scheduleNextRefresh(refreshCallback);
+    unawaited(_scheduleNextRefresh(refreshCallback));
   }
 
   /// Schedule the next refresh in the sequence
-  void _scheduleNextRefresh(Future<void> Function() refreshCallback) async {
-    if (!_shouldContinueRefreshing) return;
+  Future<void> _scheduleNextRefresh(
+    Future<void> Function() refreshCallback,
+  ) async {
+    if (!_shouldContinueRefreshing) {
+      return;
+    }
 
     try {
       // Perform the refresh
       await refreshCallback();
-      
+
       // Calculate wait duration based on current conditions
       final waitDuration = _calculateRefreshInterval();
-      
+
       // Wait AFTER the refresh completes
       await Future<void>.delayed(waitDuration);
-      
+
       // Schedule the next refresh
       if (_shouldContinueRefreshing) {
-        _scheduleNextRefresh(refreshCallback);
+        await _scheduleNextRefresh(refreshCallback);
       }
-    } catch (e) {
+    } on Object catch (error, stackTrace) {
       // On error, wait longer before retrying
       final errorWaitDuration = _calculateRefreshInterval() * 2;
       await Future<void>.delayed(errorWaitDuration);
-      
+
       if (_shouldContinueRefreshing) {
-        _scheduleNextRefresh(refreshCallback);
+        await _scheduleNextRefresh(refreshCallback);
+      }
+      if (kDebugMode) {
+        debugPrint('Adaptive refresh retry after error: $error');
+        debugPrint(stackTrace.toString());
       }
     }
   }
@@ -113,7 +121,7 @@ class AdaptiveRefreshManager {
     if (_currentConnectivity.contains(ConnectivityResult.mobile)) {
       baseInterval = config.cellularInterval;
     } else if (_currentConnectivity.contains(ConnectivityResult.wifi) ||
-               _currentConnectivity.contains(ConnectivityResult.ethernet)) {
+        _currentConnectivity.contains(ConnectivityResult.ethernet)) {
       baseInterval = config.wifiInterval;
     } else {
       // No connection - use background interval
@@ -141,7 +149,7 @@ class AdaptiveRefreshManager {
   }
 
   /// Set app foreground state
-  void setForegroundState(bool isInForeground) {
+  void setForegroundState({required bool isInForeground}) {
     _isInForeground = isInForeground;
     _updateRefreshInterval();
   }
@@ -149,8 +157,6 @@ class AdaptiveRefreshManager {
   /// Stop refresh timer
   void stopRefresh() {
     _shouldContinueRefreshing = false;
-    _refreshTimer?.cancel();
-    _refreshTimer = null;
   }
 
   /// Dispose resources
@@ -174,13 +180,11 @@ class AdaptiveRefreshManager {
 /// Provider for adaptive refresh manager
 final adaptiveRefreshManagerProvider = Provider<AdaptiveRefreshManager>((ref) {
   final manager = AdaptiveRefreshManager();
-  
-  ref.onDispose(() {
-    manager.dispose();
-  });
-  
+
+  ref.onDispose(manager.dispose);
+
   // Initialize on creation
   manager.initialize();
-  
+
   return manager;
 });

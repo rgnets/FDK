@@ -19,16 +19,20 @@ class Room with _$Room {
   /// Extract building information from the name field
   /// API returns format like "(Interurban) 007" or "(North Tower) 101"
   String? get extractedBuilding {
-    if (building != null) return building;
-    
+    if (building != null) {
+      return building;
+    }
+
     final match = RegExp(r'\(([^)]+)\)').firstMatch(name);
     return match?.group(1);
   }
 
   /// Extract room number from the name field
   String? get extractedNumber {
-    if (number != null) return number;
-    
+    if (number != null) {
+      return number;
+    }
+
     final parts = name.split(')');
     if (parts.length > 1) {
       return parts[1].trim();
@@ -40,7 +44,7 @@ class Room with _$Room {
   String get displayName {
     final bldg = extractedBuilding;
     final num = extractedNumber;
-    
+
     if (bldg != null && num != null) {
       return '$bldg Room $num';
     }

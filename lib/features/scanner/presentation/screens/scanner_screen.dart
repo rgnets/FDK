@@ -7,25 +7,23 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
-import 'package:rgnets_fdk/features/scanner/domain/entities/scan_result.dart' as scanner_entities;
+import 'package:rgnets_fdk/features/scanner/domain/entities/scan_result.dart'
+    as scanner_entities;
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_auth_qr.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier.dart';
 
 /// QR/Barcode scanner screen
 class ScannerScreen extends ConsumerStatefulWidget {
-  
-  const ScannerScreen({
-    super.key,
-    this.mode,
-  });
+  const ScannerScreen({super.key, this.mode});
   final String? mode;
 
   @override
   ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProviderStateMixin {
+class _ScannerScreenState extends ConsumerState<ScannerScreen>
+    with TickerProviderStateMixin {
   MobileScannerController? _controller;
   bool _isCameraActive = false;
   String? _lastScannedCode;
@@ -34,147 +32,218 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
   DeviceType? _selectedDeviceType;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   @override
   void initState() {
     super.initState();
     _initializeScanner();
     _initializeAnimations();
   }
-  
+
   void _initializeAnimations() {
     _pulseController = AnimationController(
       duration: const Duration(seconds: 1),
       vsync: this,
     );
-    _pulseAnimation = Tween<double>(
-      begin: 1,
-      end: 1.1,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
+    _pulseAnimation = Tween<double>(begin: 1, end: 1.1).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
     _pulseController.repeat(reverse: true);
   }
-  
+
   void _initializeScanner() {
     try {
-      LoggerService.debug('🎯 Initializing scanner controller...', tag: 'Scanner');
-      LoggerService.debug('🌐 Platform: ${kIsWeb ? "Web" : "Native"}', tag: 'Scanner');
-      
+      LoggerService.debug(
+        '🎯 Initializing scanner controller...',
+        tag: 'Scanner',
+      );
+      LoggerService.debug(
+        '🌐 Platform: ${kIsWeb ? "Web" : "Native"}',
+        tag: 'Scanner',
+      );
+
       if (kIsWeb) {
-        LoggerService.debug('🌐 Web platform detected - checking camera support', tag: 'Scanner');
+        LoggerService.debug(
+          '🌐 Web platform detected - checking camera support',
+          tag: 'Scanner',
+        );
         _checkWebCameraSupport();
       }
-      
+
       _controller = MobileScannerController(
         detectionSpeed: DetectionSpeed.normal,
         facing: CameraFacing.back,
         torchEnabled: false,
       );
-      LoggerService.debug('✅ Scanner controller initialized successfully', tag: 'Scanner');
+      LoggerService.debug(
+        '✅ Scanner controller initialized successfully',
+        tag: 'Scanner',
+      );
     } on Exception catch (e) {
-      LoggerService.error('❌ Failed to initialize scanner controller', error: e, tag: 'Scanner');
+      LoggerService.error(
+        '❌ Failed to initialize scanner controller',
+        error: e,
+        tag: 'Scanner',
+      );
       // On web or if camera fails, _controller will be null and handled in UI
     }
   }
-  
+
   void _checkWebCameraSupport() {
     if (kIsWeb) {
       try {
-        LoggerService.debug('🔍 Checking browser camera support...', tag: 'Scanner');
-        
+        LoggerService.debug(
+          '🔍 Checking browser camera support...',
+          tag: 'Scanner',
+        );
+
         // Basic web environment check without dart:html
         LoggerService.debug('🌐 Running in web environment', tag: 'Scanner');
-        LoggerService.debug('📱 Camera support will be tested during runtime', tag: 'Scanner');
-        
+        LoggerService.debug(
+          '📱 Camera support will be tested during runtime',
+          tag: 'Scanner',
+        );
+
         // Note: Camera support detection will happen during mobile_scanner initialization
-        LoggerService.debug('ℹ️ Mobile scanner will handle camera detection', tag: 'Scanner');
+        LoggerService.debug(
+          'ℹ️ Mobile scanner will handle camera detection',
+          tag: 'Scanner',
+        );
       } on Exception catch (e) {
-        LoggerService.error('❌ Error checking web camera support', error: e, tag: 'Scanner');
+        LoggerService.error(
+          '❌ Error checking web camera support',
+          error: e,
+          tag: 'Scanner',
+        );
       }
     }
   }
-  
+
   @override
   void dispose() {
-    _controller?.dispose();
     _countdownTimer?.cancel();
+    _controller?.dispose();
+    _controller = null;
     _pulseController.dispose();
     super.dispose();
   }
-  
+
   void _handleBarcode(BarcodeCapture capture) {
     LoggerService.debug('📷 Barcode capture detected', tag: 'Scanner');
-    
+
     final scannerState = ref.read(scannerNotifierProvider).valueOrNull;
     if (scannerState == null) {
       LoggerService.warning('⚠️ Scanner state is null', tag: 'Scanner');
       return;
     }
-    
+
     if (!scannerState.isScanning) {
-      LoggerService.debug('🛑 Scanner is not in scanning state: ${scannerState.runtimeType}', tag: 'Scanner');
+      LoggerService.debug(
+        '🛑 Scanner is not in scanning state: ${scannerState.runtimeType}',
+        tag: 'Scanner',
+      );
       return;
     }
-    
+
     final barcodes = capture.barcodes;
     LoggerService.debug('📊 Found ${barcodes.length} barcodes', tag: 'Scanner');
-    
+
     for (final barcode in barcodes) {
-      LoggerService.debug('🔍 Processing barcode: ${barcode.rawValue}', tag: 'Scanner');
-      
+      LoggerService.debug(
+        '🔍 Processing barcode: ${barcode.rawValue}',
+        tag: 'Scanner',
+      );
+
       if (barcode.rawValue != null && barcode.rawValue != _lastScannedCode) {
-        LoggerService.debug('✅ New unique barcode: ${barcode.rawValue}', tag: 'Scanner');
-        
+        LoggerService.debug(
+          '✅ New unique barcode: ${barcode.rawValue}',
+          tag: 'Scanner',
+        );
+
         setState(() {
           _lastScannedCode = barcode.rawValue;
         });
-        
+
         // Process barcode through scanner notifier
-        ref.read(scannerNotifierProvider.notifier).processBarcode(barcode.rawValue!);
-        LoggerService.debug('📤 Barcode sent to scanner notifier', tag: 'Scanner');
+        ref
+            .read(scannerNotifierProvider.notifier)
+            .processBarcode(barcode.rawValue!);
+        LoggerService.debug(
+          '📤 Barcode sent to scanner notifier',
+          tag: 'Scanner',
+        );
       } else {
-        LoggerService.debug('🔄 Duplicate or null barcode, skipping', tag: 'Scanner');
+        LoggerService.debug(
+          '🔄 Duplicate or null barcode, skipping',
+          tag: 'Scanner',
+        );
       }
     }
   }
-  
+
   Future<void> _startScanSession() async {
     LoggerService.debug('🚀 Starting scan session...', tag: 'Scanner');
-    
+
     if (_selectedDeviceType == null) {
-      LoggerService.debug('❓ No device type selected, showing selection dialog', tag: 'Scanner');
+      LoggerService.debug(
+        '❓ No device type selected, showing selection dialog',
+        tag: 'Scanner',
+      );
       _showDeviceTypeSelection();
       return;
     }
-    
-    LoggerService.debug('📋 Selected device type: ${_selectedDeviceType!.name}', tag: 'Scanner');
+
+    LoggerService.debug(
+      '📋 Selected device type: ${_selectedDeviceType!.name}',
+      tag: 'Scanner',
+    );
 
     try {
-      LoggerService.debug('🎯 Calling scanner notifier startScanning...', tag: 'Scanner');
-      await ref.read(scannerNotifierProvider.notifier).startScanning(_selectedDeviceType!);
-      LoggerService.debug('✅ Scanner notifier startScanning completed', tag: 'Scanner');
+      LoggerService.debug(
+        '🎯 Calling scanner notifier startScanning...',
+        tag: 'Scanner',
+      );
+      await ref
+          .read(scannerNotifierProvider.notifier)
+          .startScanning(_selectedDeviceType!);
+      LoggerService.debug(
+        '✅ Scanner notifier startScanning completed',
+        tag: 'Scanner',
+      );
     } on Exception catch (e) {
-      LoggerService.error('❌ Error starting scanner notifier', error: e, tag: 'Scanner');
+      LoggerService.error(
+        '❌ Error starting scanner notifier',
+        error: e,
+        tag: 'Scanner',
+      );
       return;
     }
-    
+
     setState(() {
       _isCameraActive = true;
       _remainingSeconds = 6;
     });
-    
-    LoggerService.debug('⏰ Camera active: $_isCameraActive, Countdown: $_remainingSeconds', tag: 'Scanner');
-    
+
+    LoggerService.debug(
+      '⏰ Camera active: $_isCameraActive, Countdown: $_remainingSeconds',
+      tag: 'Scanner',
+    );
+
     // Try to start camera, with proper error handling for web and permission issues
     if (!kIsWeb && _controller != null) {
       try {
         LoggerService.debug('📱 Starting native camera...', tag: 'Scanner');
         await _controller!.start();
-        LoggerService.debug('✅ Native camera started successfully', tag: 'Scanner');
+        LoggerService.debug(
+          '✅ Native camera started successfully',
+          tag: 'Scanner',
+        );
       } on Exception catch (e) {
-        LoggerService.error('❌ Failed to start native camera', error: e, tag: 'Scanner');
+        LoggerService.error(
+          '❌ Failed to start native camera',
+          error: e,
+          tag: 'Scanner',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -185,18 +254,33 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         }
       }
     } else if (kIsWeb) {
-      LoggerService.debug('🌐 Web platform detected - camera may have limitations', tag: 'Scanner');
+      LoggerService.debug(
+        '🌐 Web platform detected - camera may have limitations',
+        tag: 'Scanner',
+      );
       if (_controller != null) {
         try {
-          LoggerService.debug('🌐 Attempting to start web camera...', tag: 'Scanner');
+          LoggerService.debug(
+            '🌐 Attempting to start web camera...',
+            tag: 'Scanner',
+          );
           await _controller!.start();
-          LoggerService.debug('✅ Web camera started successfully', tag: 'Scanner');
+          LoggerService.debug(
+            '✅ Web camera started successfully',
+            tag: 'Scanner',
+          );
         } on Exception catch (e) {
-          LoggerService.error('❌ Web camera failed to start', error: e, tag: 'Scanner');
+          LoggerService.error(
+            '❌ Web camera failed to start',
+            error: e,
+            tag: 'Scanner',
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Web camera unavailable: $e\nUse manual input below.'),
+                content: Text(
+                  'Web camera unavailable: $e\nUse manual input below.',
+                ),
                 backgroundColor: Colors.orange,
                 duration: const Duration(seconds: 5),
               ),
@@ -207,44 +291,49 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
     }
     _startCountdown();
   }
-  
+
   void _startCountdown() {
     _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       setState(() {
         _remainingSeconds--;
       });
-      
+
       if (_remainingSeconds <= 0) {
         timer.cancel();
-        _handleSessionTimeout();
+        await _handleSessionTimeout();
       }
     });
   }
-  
-  void _handleSessionTimeout() {
+
+  Future<void> _handleSessionTimeout() async {
     final scannerState = ref.read(scannerNotifierProvider).valueOrNull;
     if (scannerState?.session?.isComplete ?? false) {
       // Complete the session
-      ref.read(scannerNotifierProvider.notifier).completeSession();
+      await ref
+          .read(scannerNotifierProvider.notifier)
+          .completeSession();
     }
-    _stopScanning();
+    await _stopAndDisposeCamera();
   }
-  
-  void _stopScanning() {
+
+  Future<void> _stopAndDisposeCamera() async {
     setState(() {
       _isCameraActive = false;
       _remainingSeconds = 6;
     });
     _countdownTimer?.cancel();
     try {
-      _controller?.stop();
+      await _controller?.stop();
       LoggerService.debug('Camera stopped successfully', tag: 'Scanner');
     } on Exception catch (e) {
       LoggerService.error('Error stopping camera', error: e, tag: 'Scanner');
     }
+    await _controller?.dispose();
+    _controller = null;
   }
-  
+
+
   void _showDeviceTypeSelection() {
     showDialog<void>(
       context: context,
@@ -252,24 +341,28 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         title: const Text('Select Device Type'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: DeviceType.values.map((type) => 
-            ListTile(
-              title: Text(type.displayName),
-              subtitle: Text('${type.abbreviation} - Requires ${_getRequiredBarcodesText(type)}'),
-              onTap: () {
-                setState(() {
-                  _selectedDeviceType = type;
-                });
-                Navigator.of(context).pop();
-                _startScanSession();
-              },
-            ),
-          ).toList(),
+          children: DeviceType.values
+              .map(
+                (type) => ListTile(
+                  title: Text(type.displayName),
+                  subtitle: Text(
+                    '${type.abbreviation} - Requires ${_getRequiredBarcodesText(type)}',
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _selectedDeviceType = type;
+                    });
+                    Navigator.of(context).pop();
+                    _startScanSession();
+                  },
+                ),
+              )
+              .toList(),
         ),
       ),
     );
   }
-  
+
   String _getRequiredBarcodesText(DeviceType type) {
     switch (type) {
       case DeviceType.accessPoint:
@@ -279,14 +372,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         return '1 barcode (Serial)';
     }
   }
-  
-  
+
   Future<void> _processAuthCode(String code) async {
-    const useCase = ProcessAuthQr();
+    final useCase = ProcessAuthQr();
     final result = await useCase(ProcessAuthQrParams(qrCode: code));
-    
-    result.fold(
-      (failure) {
+
+    await result.match(
+      (failure) async {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.message),
@@ -294,46 +386,62 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
           ),
         );
       },
-      (credentials) {
-        // Return credentials to auth screen
+      (credentials) async {
+        await _stopAndDisposeCamera();
+        if (!mounted) {
+          return;
+        }
         Navigator.of(context).pop({
           'fqdn': credentials.fqdn,
           'login': credentials.login,
           'apiKey': credentials.apiKey,
+          'siteName': credentials.siteName,
+          'issuedAt': credentials.issuedAt.toIso8601String(),
+          if (credentials.signature != null) 'signature': credentials.signature,
         });
       },
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     LoggerService.debug('🏗️ Building scanner screen UI...', tag: 'Scanner');
-    
+
     // Watch scanner state
     final scannerAsync = ref.watch(scannerNotifierProvider)
       // Log scanner state changes
       ..when(
-        data: (state) => LoggerService.debug('📊 Scanner state: ${state.runtimeType}', tag: 'Scanner'),
-        loading: () => LoggerService.debug('⏳ Scanner state: Loading', tag: 'Scanner'),
-        error: (error, stack) => LoggerService.error('❌ Scanner state: Error - $error', tag: 'Scanner'),
+        data: (state) => LoggerService.debug(
+          '📊 Scanner state: ${state.runtimeType}',
+          tag: 'Scanner',
+        ),
+        loading: () =>
+            LoggerService.debug('⏳ Scanner state: Loading', tag: 'Scanner'),
+        error: (error, stack) => LoggerService.error(
+          '❌ Scanner state: Error - $error',
+          tag: 'Scanner',
+        ),
       );
-    
+
     // On web platform, show a different UI since camera might not work
     if (kIsWeb) {
       LoggerService.debug('🌐 Rendering web scanner UI', tag: 'Scanner');
       return _buildWebScanner();
     }
-    
+
     // Handle auth mode differently
     if (widget.mode == 'auth') {
       LoggerService.debug('🔐 Rendering auth scanner UI', tag: 'Scanner');
       return _buildAuthScanner();
     }
-    
+
     LoggerService.debug('📱 Rendering native scanner UI', tag: 'Scanner');
-        
+
     // AppBar removed from main scanner - torch and camera controls need relocation
-    LoggerService.debug('ScannerScreen: AppBar removed, camera controls preserved', tag: 'Scanner');
+    LoggerService.debug(
+      'ScannerScreen: AppBar removed, camera controls preserved',
+      tag: 'Scanner',
+    );
     return Scaffold(
       body: scannerAsync.when(
         data: _buildScannerBody,
@@ -367,7 +475,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                 AppButton(
                   text: 'Retry',
                   onPressed: () {
-                    LoggerService.debug('🔄 Retrying scanner initialization', tag: 'Scanner');
+                    LoggerService.debug(
+                      '🔄 Retrying scanner initialization',
+                      tag: 'Scanner',
+                    );
                     ref.invalidate(scannerNotifierProvider);
                   },
                 ),
@@ -378,25 +489,35 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   Widget _buildAuthScanner() {
     // AppBar removed from auth scanner - torch control needs relocation
-    LoggerService.debug('AuthScanner: AppBar removed, torch control preserved', tag: 'Scanner');
-    return Scaffold(
-      body: _buildAuthBody(),
+    LoggerService.debug(
+      'AuthScanner: AppBar removed, torch control preserved',
+      tag: 'Scanner',
     );
+    return Scaffold(body: _buildAuthBody());
   }
-  
+
   Widget _buildScannerBody(ScannerState state) {
-    LoggerService.debug('🏗️ Building scanner body for state: ${state.runtimeType}', tag: 'Scanner');
-    
+    LoggerService.debug(
+      '🏗️ Building scanner body for state: ${state.runtimeType}',
+      tag: 'Scanner',
+    );
+
     if (_controller == null) {
-      LoggerService.warning('⚠️ Scanner controller is null, showing loading', tag: 'Scanner');
+      LoggerService.warning(
+        '⚠️ Scanner controller is null, showing loading',
+        tag: 'Scanner',
+      );
       return const Center(child: LoadingIndicator());
     }
-    
-    LoggerService.debug('📷 Controller available, scanning active: ${state.isScanning}', tag: 'Scanner');
-    
+
+    LoggerService.debug(
+      '📷 Controller available, scanning active: ${state.isScanning}',
+      tag: 'Scanner',
+    );
+
     return Stack(
       children: [
         // Camera view
@@ -404,7 +525,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
           controller: _controller,
           onDetect: state.isScanning ? _handleBarcode : null,
         ),
-        
+
         // Debug overlay
         Positioned(
           top: 50,
@@ -450,30 +571,27 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
             ),
           ),
         ),
-        
+
         // Scanning overlay
-        if (state.isScanning && _isCameraActive)
-          _buildScanningOverlay(state),
-        
+        if (state.isScanning && _isCameraActive) _buildScanningOverlay(state),
+
         // Session info panel
-        if (state.session != null)
-          _buildSessionInfoPanel(state.session!),
-        
+        if (state.session != null) _buildSessionInfoPanel(state.session!),
+
         // Control buttons
         _buildControlButtons(state),
-        
+
         // Completion panel
-        if (state.isComplete)
-          _buildCompletionPanel(state.session!),
+        if (state.isComplete) _buildCompletionPanel(state.session!),
       ],
     );
   }
-  
+
   Widget _buildAuthBody() {
     if (_controller == null) {
       return const Center(child: LoadingIndicator());
     }
-    
+
     return Stack(
       children: [
         // Camera view
@@ -482,7 +600,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
           onDetect: (capture) {
             final barcodes = capture.barcodes;
             for (final barcode in barcodes) {
-              if (barcode.rawValue != null && barcode.rawValue != _lastScannedCode) {
+              if (barcode.rawValue != null &&
+                  barcode.rawValue != _lastScannedCode) {
                 setState(() {
                   _lastScannedCode = barcode.rawValue;
                 });
@@ -492,12 +611,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
             }
           },
         ),
-        
+
         // Auth scanning overlay
         DecoratedBox(
-          decoration: const BoxDecoration(
-            color: Colors.black54,
-          ),
+          decoration: const BoxDecoration(color: Colors.black54),
           child: Stack(
             children: [
               Center(
@@ -519,9 +636,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                 right: 0,
                 child: Text(
                   'Position authentication QR code within frame',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: Colors.white),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -531,12 +648,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ],
     );
   }
-  
+
   Widget _buildScanningOverlay(ScannerState state) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Colors.black54,
-      ),
+      decoration: const BoxDecoration(color: Colors.black54),
       child: Stack(
         children: [
           // Scanning frame
@@ -551,9 +666,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     height: 250,
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: _remainingSeconds > 3 
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.orange,
+                        color: _remainingSeconds > 3
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.orange,
                         width: 3,
                       ),
                       borderRadius: BorderRadius.circular(20),
@@ -563,7 +678,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
               },
             ),
           ),
-          
+
           // Countdown timer
           Positioned(
             top: 100,
@@ -571,11 +686,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: _remainingSeconds > 3 
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.orange,
+                  color: _remainingSeconds > 3
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.orange,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -588,7 +706,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
               ),
             ),
           ),
-          
+
           // Instructions
           Positioned(
             bottom: 100,
@@ -607,9 +725,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                 const SizedBox(height: 8),
                 Text(
                   'Keep scanning until time runs out',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -619,7 +737,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   Widget _buildSessionInfoPanel(ScanSession session) {
     return Positioned(
       top: 16,
@@ -647,7 +765,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                   const Spacer(),
                   if (session.status == ScanSessionStatus.scanning)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(12),
@@ -669,13 +790,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                 const SizedBox(height: 8),
                 Text(
                   'Scanned Barcodes (${session.scannedBarcodes.length}):',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                ...session.scannedBarcodes.map((result) => 
-                  Padding(
+                ...session.scannedBarcodes.map(
+                  (result) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
@@ -706,14 +827,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                   value: _getCompletionProgress(session),
                   backgroundColor: Colors.grey[300],
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    session.isComplete ? Colors.green : Theme.of(context).colorScheme.primary,
+                    session.isComplete
+                        ? Colors.green
+                        : Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  session.isComplete 
-                    ? 'Device scan complete!'
-                    : _getProgressText(session),
+                  session.isComplete
+                      ? 'Device scan complete!'
+                      : _getProgressText(session),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: session.isComplete ? Colors.green : null,
                   ),
@@ -725,7 +848,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   Widget _buildControlButtons(ScannerState state) {
     return Positioned(
       bottom: 32,
@@ -746,9 +869,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                   child: AppButton(
                     text: 'Stop Scanning',
                     icon: Icons.stop,
-                    onPressed: () {
-                      ref.read(scannerNotifierProvider.notifier).cancelSession();
-                      _stopScanning();
+                    onPressed: () async {
+                      await ref
+                          .read(scannerNotifierProvider.notifier)
+                          .cancelSession();
+                      await _stopAndDisposeCamera();
                     },
                     color: Colors.red,
                   ),
@@ -759,8 +884,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     child: AppButton(
                       text: 'Complete',
                       icon: Icons.check,
-                      onPressed: () {
-                        ref.read(scannerNotifierProvider.notifier).completeSession();
+                      onPressed: () async {
+                        await ref
+                            .read(scannerNotifierProvider.notifier)
+                            .completeSession();
+                        await _stopAndDisposeCamera();
                       },
                       color: Colors.green,
                     ),
@@ -780,7 +908,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   Widget _buildCompletionPanel(ScanSession session) {
     return Positioned(
       top: 0,
@@ -797,11 +925,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.check_circle,
-                    size: 64,
-                    color: Colors.green,
-                  ),
+                  const Icon(Icons.check_circle, size: 64, color: Colors.green),
                   const SizedBox(height: 16),
                   Text(
                     'Scan Complete!',
@@ -816,8 +940,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  ...session.scannedBarcodes.map((result) => 
-                    Padding(
+                  ...session.scannedBarcodes.map(
+                    (result) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -854,7 +978,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                           text: 'Register',
                           icon: Icons.cloud_upload,
                           onPressed: () {
-                            ref.read(scannerNotifierProvider.notifier).completeSession();
+                            ref
+                                .read(scannerNotifierProvider.notifier)
+                                .completeSession();
                           },
                           color: Colors.green,
                         ),
@@ -869,7 +995,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   Color _getBarcodeTypeColor(scanner_entities.BarcodeType type) {
     switch (type) {
       case scanner_entities.BarcodeType.serialNumber:
@@ -886,7 +1012,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         return Colors.grey;
     }
   }
-  
+
   double _getCompletionProgress(ScanSession session) {
     switch (session.deviceType) {
       case DeviceType.accessPoint:
@@ -903,7 +1029,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         return session.serialNumber != null ? 1.0 : 0.0;
     }
   }
-  
+
   String _getProgressText(ScanSession session) {
     switch (session.deviceType) {
       case DeviceType.accessPoint:
@@ -921,16 +1047,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
         }
         return 'All required barcodes scanned';
       case DeviceType.switchDevice:
-        return session.serialNumber != null 
-          ? 'Serial number scanned'
-          : 'Scan serial number';
+        return session.serialNumber != null
+            ? 'Serial number scanned'
+            : 'Scan serial number';
     }
   }
-  
+
   Widget _buildWebScanner() {
     final scannerAsync = ref.watch(scannerNotifierProvider);
     final barcodeController = TextEditingController();
-    
+
     // AppBar removed from web scanner
     LoggerService.debug('WebScanner: AppBar removed', tag: 'Scanner');
     return Scaffold(
@@ -993,7 +1119,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Device type selection
                 if (_selectedDeviceType == null) ...[
                   const Text(
@@ -1040,7 +1166,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                   // Manual barcode entry
                   Text(
                     'Scanning ${_selectedDeviceType?.name ?? 'Device'}',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1048,9 +1177,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Show accumulated barcodes
-                  if (state.session != null && state.session!.scannedBarcodes.isNotEmpty) ...[
+                  if (state.session != null &&
+                      state.session!.scannedBarcodes.isNotEmpty) ...[
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(12),
@@ -1062,9 +1192,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
-                            ...state.session!.scannedBarcodes.map((barcode) => 
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
+                            ...state.session!.scannedBarcodes.map(
+                              (barcode) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
                                 child: Row(
                                   children: [
                                     Icon(
@@ -1076,7 +1208,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                                     Expanded(
                                       child: Text(
                                         'Barcode: $barcode',
-                                        style: const TextStyle(fontFamily: 'monospace'),
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1089,7 +1223,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     ),
                     const SizedBox(height: 16),
                   ],
-                  
+
                   // Manual input field
                   TextField(
                     controller: barcodeController,
@@ -1102,7 +1236,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                         onPressed: () {
                           final barcode = barcodeController.text.trim();
                           if (barcode.isNotEmpty) {
-                            ref.read(scannerNotifierProvider.notifier).processBarcode(barcode);
+                            ref
+                                .read(scannerNotifierProvider.notifier)
+                                .processBarcode(barcode);
                             barcodeController.clear();
                           }
                         },
@@ -1110,13 +1246,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                     ),
                     onSubmitted: (barcode) {
                       if (barcode.trim().isNotEmpty) {
-                        ref.read(scannerNotifierProvider.notifier).processBarcode(barcode.trim());
+                        ref
+                            .read(scannerNotifierProvider.notifier)
+                            .processBarcode(barcode.trim());
                         barcodeController.clear();
                       }
                     },
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Action buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1124,21 +1262,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                       if (state.session != null) ...[
                         ElevatedButton.icon(
                           onPressed: state.session!.isComplete
-                            ? () async {
-                                await ref.read(scannerNotifierProvider.notifier).completeSession();
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Device registered successfully'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                  setState(() {
-                                    _selectedDeviceType = null;
-                                  });
+                              ? () async {
+                                  await ref
+                                      .read(scannerNotifierProvider.notifier)
+                                      .completeSession();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Device registered successfully',
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    setState(() {
+                                      _selectedDeviceType = null;
+                                    });
+                                  }
                                 }
-                              }
-                            : null,
+                              : null,
                           icon: const Icon(Icons.check),
                           label: const Text('Complete Registration'),
                           style: ElevatedButton.styleFrom(
@@ -1150,7 +1292,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
                       ],
                       OutlinedButton.icon(
                         onPressed: () async {
-                          await ref.read(scannerNotifierProvider.notifier).cancelSession();
+                          await ref
+                              .read(scannerNotifierProvider.notifier)
+                              .cancelSession();
                           setState(() {
                             _selectedDeviceType = null;
                           });
@@ -1168,7 +1312,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> with TickerProvid
       ),
     );
   }
-  
+
   String _getRequirementsText(DeviceType? type) {
     switch (type) {
       case DeviceType.accessPoint:

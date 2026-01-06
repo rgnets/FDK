@@ -1,19 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
-import 'package:rgnets_fdk/features/auth/data/datasources/auth_remote_data_source.dart';
-import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart' as auth_impl;
+import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
+    as auth_impl;
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
-import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_mock_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart' as device_impl;
+import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
+    as device_impl;
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
-import 'package:rgnets_fdk/features/notifications/data/repositories/notification_repository_impl.dart' as notification_impl;
+import 'package:rgnets_fdk/features/notifications/data/repositories/notification_repository_impl.dart'
+    as notification_impl;
 import 'package:rgnets_fdk/features/notifications/domain/repositories/notification_repository.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_mock_data_source.dart';
@@ -36,12 +38,6 @@ final authLocalDataSourceProvider = Provider<AuthLocalDataSource>((ref) {
   return AuthLocalDataSourceImpl(storageService: storage);
 });
 
-/// Auth remote data source provider
-final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  return AuthRemoteDataSourceImpl(apiService: apiService);
-});
-
 /// Device local data source provider
 final deviceLocalDataSourceProvider = Provider<DeviceLocalDataSource>((ref) {
   final storage = ref.watch(storageServiceProvider);
@@ -53,21 +49,17 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
   if (EnvironmentConfig.isDevelopment) {
     // Use mock data source in development
     final mockDataService = ref.watch(mockDataServiceProvider);
-    return DeviceMockDataSourceImpl(
-      mockDataService: mockDataService,
-    );
+    return DeviceMockDataSourceImpl(mockDataService: mockDataService);
   } else {
     // Use remote data source in staging/production
     final apiService = ref.watch(apiServiceProvider);
-    return DeviceRemoteDataSourceImpl(
-      apiService: apiService,
-    );
+    return DeviceRemoteDataSourceImpl(apiService: apiService);
   }
 });
 
 /// Device remote data source provider (for backward compatibility)
-final deviceRemoteDataSourceProvider = Provider<DeviceRemoteDataSourceImpl>((ref) {
-  return ref.watch(deviceDataSourceProvider) as DeviceRemoteDataSourceImpl;
+final deviceRemoteDataSourceProvider = Provider<DeviceDataSource>((ref) {
+  return ref.watch(deviceDataSourceProvider);
 });
 
 /// Room local data source provider
@@ -94,12 +86,10 @@ final roomMockDataSourceProvider = Provider<RoomMockDataSource>((ref) {
 
 /// Auth repository provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final remoteDataSource = ref.watch(authRemoteDataSourceProvider);
   final localDataSource = ref.watch(authLocalDataSourceProvider);
   final mockDataService = ref.watch(mockDataServiceProvider);
-  
+
   return auth_impl.AuthRepositoryImpl(
-    remoteDataSource: remoteDataSource,
     localDataSource: localDataSource,
     mockDataService: mockDataService,
   );
@@ -109,10 +99,12 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
   final dataSource = ref.watch(deviceDataSourceProvider);
   final localDataSource = ref.watch(deviceLocalDataSourceProvider);
-  
+  final storageService = ref.watch(storageServiceProvider);
+
   return device_impl.DeviceRepositoryImpl(
     dataSource: dataSource,
     localDataSource: localDataSource,
+    storageService: storageService,
   );
 });
 
@@ -121,7 +113,7 @@ final roomRepositoryProvider = Provider<RoomRepository>((ref) {
   final remoteDataSource = ref.watch(roomRemoteDataSourceProvider);
   final mockDataSource = ref.watch(roomMockDataSourceProvider);
   final localDataSource = ref.watch(roomLocalDataSourceProvider);
-  
+
   return RoomRepositoryImpl(
     remoteDataSource: remoteDataSource,
     mockDataSource: mockDataSource,
@@ -133,7 +125,7 @@ final roomRepositoryProvider = Provider<RoomRepository>((ref) {
 final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
   final notificationService = ref.watch(notificationGenerationServiceProvider);
   final deviceRepository = ref.watch(deviceRepositoryProvider);
-  
+
   return notification_impl.NotificationRepositoryImpl(
     notificationGenerationService: notificationService,
     deviceRepository: deviceRepository,
@@ -149,7 +141,7 @@ final scannerLocalDataSourceProvider = Provider<ScannerLocalDataSource>((ref) {
 final scannerRepositoryProvider = Provider<ScannerRepository>((ref) {
   final localDataSource = ref.watch(scannerLocalDataSourceProvider);
   final deviceRepository = ref.watch(deviceRepositoryProvider);
-  
+
   return ScannerRepositoryImpl(
     localDataSource: localDataSource,
     deviceRepository: deviceRepository,
@@ -166,18 +158,21 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 // Services that depend on repositories
 // ============================================================================
 
-
 /// Background refresh service provider
-final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>((ref) {
+final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>((
+  ref,
+) {
   final deviceRemoteDataSource = ref.watch(deviceRemoteDataSourceProvider);
   final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
   final roomRepository = ref.watch(roomRepositoryProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
-  
+  final storageService = ref.watch(storageServiceProvider);
+
   return BackgroundRefreshService(
     deviceRemoteDataSource: deviceRemoteDataSource,
     deviceLocalDataSource: deviceLocalDataSource,
     roomRepository: roomRepository,
     notificationGenerationService: notificationService,
+    storageService: storageService,
   );
 });

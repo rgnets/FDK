@@ -35,7 +35,16 @@ class AppRouter {
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
       ),
-      
+
+      // Auth scanner (outside of shell to maintain context with auth screen)
+      GoRoute(
+        path: '/auth-scanner',
+        builder: (context, state) {
+          final mode = state.uri.queryParameters['mode'];
+          return ScannerScreen(mode: mode);
+        },
+      ),
+
       // Debug screen (outside of shell for direct access)
       GoRoute(
         path: '/debug',
