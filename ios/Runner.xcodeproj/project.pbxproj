@@ -14,6 +14,25 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		FDK0001A1E8E89220040F4C2 /* Iperf3Bridge.m in Sources */ = {isa = PBXBuildFile; fileRef = FDK0001B1E8E89220040F4C2 /* Iperf3Bridge.m */; };
+		FDK0002A1E8E89220040F4C2 /* Iperf3Plugin.m in Sources */ = {isa = PBXBuildFile; fileRef = FDK0002B1E8E89220040F4C2 /* Iperf3Plugin.m */; };
+		FDK0003A1E8E89220040F4C2 /* iperf3_bridge.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0003B1E8E89220040F4C2 /* iperf3_bridge.c */; };
+		FDK0004A1E8E89220040F4C2 /* cjson.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0004B1E8E89220040F4C2 /* cjson.c */; };
+		FDK0005A1E8E89220040F4C2 /* iperf_api.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0005B1E8E89220040F4C2 /* iperf_api.c */; };
+		FDK0006A1E8E89220040F4C2 /* iperf_client_api.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0006B1E8E89220040F4C2 /* iperf_client_api.c */; };
+		FDK0007A1E8E89220040F4C2 /* iperf_error.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0007B1E8E89220040F4C2 /* iperf_error.c */; };
+		FDK0008A1E8E89220040F4C2 /* iperf_locale.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0008B1E8E89220040F4C2 /* iperf_locale.c */; };
+		FDK0009A1E8E89220040F4C2 /* iperf_sctp.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0009B1E8E89220040F4C2 /* iperf_sctp.c */; };
+		FDK0010A1E8E89220040F4C2 /* iperf_server_api.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0010B1E8E89220040F4C2 /* iperf_server_api.c */; };
+		FDK0011A1E8E89220040F4C2 /* iperf_tcp.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0011B1E8E89220040F4C2 /* iperf_tcp.c */; };
+		FDK0012A1E8E89220040F4C2 /* iperf_time.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0012B1E8E89220040F4C2 /* iperf_time.c */; };
+		FDK0013A1E8E89220040F4C2 /* iperf_udp.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0013B1E8E89220040F4C2 /* iperf_udp.c */; };
+		FDK0014A1E8E89220040F4C2 /* iperf_util.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0014B1E8E89220040F4C2 /* iperf_util.c */; };
+		FDK0015A1E8E89220040F4C2 /* net.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0015B1E8E89220040F4C2 /* net.c */; };
+		FDK0016A1E8E89220040F4C2 /* timer.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0016B1E8E89220040F4C2 /* timer.c */; };
+		FDK0017A1E8E89220040F4C2 /* units.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0017B1E8E89220040F4C2 /* units.c */; };
+		FDK0018A1E8E89220040F4C2 /* dscp.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0018B1E8E89220040F4C2 /* dscp.c */; };
+		FDK0019A1E8E89220040F4C2 /* tcp_info.c in Sources */ = {isa = PBXBuildFile; fileRef = FDK0019B1E8E89220040F4C2 /* tcp_info.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +74,46 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		FDK0001C1E8E89220040F4C2 /* Iperf3Bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Iperf3Bridge.h; sourceTree = "<group>"; };
+		FDK0001B1E8E89220040F4C2 /* Iperf3Bridge.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Iperf3Bridge.m; sourceTree = "<group>"; };
+		FDK0002C1E8E89220040F4C2 /* Iperf3Plugin.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Iperf3Plugin.h; sourceTree = "<group>"; };
+		FDK0002B1E8E89220040F4C2 /* Iperf3Plugin.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Iperf3Plugin.m; sourceTree = "<group>"; };
+		FDK0003B1E8E89220040F4C2 /* iperf3_bridge.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf3_bridge.c; sourceTree = "<group>"; };
+		FDK0003C1E8E89220040F4C2 /* iperf3_bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf3_bridge.h; sourceTree = "<group>"; };
+		FDK0004B1E8E89220040F4C2 /* cjson.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = cjson.c; sourceTree = "<group>"; };
+		FDK0004C1E8E89220040F4C2 /* cjson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = cjson.h; sourceTree = "<group>"; };
+		FDK0005B1E8E89220040F4C2 /* iperf_api.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_api.c; sourceTree = "<group>"; };
+		FDK0005C1E8E89220040F4C2 /* iperf_api.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_api.h; sourceTree = "<group>"; };
+		FDK0006B1E8E89220040F4C2 /* iperf_client_api.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_client_api.c; sourceTree = "<group>"; };
+		FDK0007B1E8E89220040F4C2 /* iperf_error.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_error.c; sourceTree = "<group>"; };
+		FDK0008B1E8E89220040F4C2 /* iperf_locale.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_locale.c; sourceTree = "<group>"; };
+		FDK0008C1E8E89220040F4C2 /* iperf_locale.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_locale.h; sourceTree = "<group>"; };
+		FDK0009B1E8E89220040F4C2 /* iperf_sctp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_sctp.c; sourceTree = "<group>"; };
+		FDK0009C1E8E89220040F4C2 /* iperf_sctp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_sctp.h; sourceTree = "<group>"; };
+		FDK0010B1E8E89220040F4C2 /* iperf_server_api.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_server_api.c; sourceTree = "<group>"; };
+		FDK0011B1E8E89220040F4C2 /* iperf_tcp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_tcp.c; sourceTree = "<group>"; };
+		FDK0011C1E8E89220040F4C2 /* iperf_tcp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_tcp.h; sourceTree = "<group>"; };
+		FDK0012B1E8E89220040F4C2 /* iperf_time.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_time.c; sourceTree = "<group>"; };
+		FDK0012C1E8E89220040F4C2 /* iperf_time.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_time.h; sourceTree = "<group>"; };
+		FDK0013B1E8E89220040F4C2 /* iperf_udp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_udp.c; sourceTree = "<group>"; };
+		FDK0013C1E8E89220040F4C2 /* iperf_udp.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_udp.h; sourceTree = "<group>"; };
+		FDK0014B1E8E89220040F4C2 /* iperf_util.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = iperf_util.c; sourceTree = "<group>"; };
+		FDK0014C1E8E89220040F4C2 /* iperf_util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_util.h; sourceTree = "<group>"; };
+		FDK0015B1E8E89220040F4C2 /* net.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = net.c; sourceTree = "<group>"; };
+		FDK0015C1E8E89220040F4C2 /* net.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = net.h; sourceTree = "<group>"; };
+		FDK0016B1E8E89220040F4C2 /* timer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = timer.c; sourceTree = "<group>"; };
+		FDK0016C1E8E89220040F4C2 /* timer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = timer.h; sourceTree = "<group>"; };
+		FDK0017B1E8E89220040F4C2 /* units.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = units.c; sourceTree = "<group>"; };
+		FDK0017C1E8E89220040F4C2 /* units.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = units.h; sourceTree = "<group>"; };
+		FDK0018B1E8E89220040F4C2 /* dscp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dscp.c; sourceTree = "<group>"; };
+		FDK0019B1E8E89220040F4C2 /* tcp_info.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = tcp_info.c; sourceTree = "<group>"; };
+		FDK0020B1E8E89220040F4C2 /* iperf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf.h; sourceTree = "<group>"; };
+		FDK0021B1E8E89220040F4C2 /* iperf_auth.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iperf_auth.h; sourceTree = "<group>"; };
+		FDK0022B1E8E89220040F4C2 /* config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		FDK0023B1E8E89220040F4C2 /* flowlabel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = flowlabel.h; sourceTree = "<group>"; };
+		FDK0024B1E8E89220040F4C2 /* portable_endian.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = portable_endian.h; sourceTree = "<group>"; };
+		FDK0025B1E8E89220040F4C2 /* queue.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = queue.h; sourceTree = "<group>"; };
+		FDK0026B1E8E89220040F4C2 /* version.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,8 +176,80 @@
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				FDK0001C1E8E89220040F4C2 /* Iperf3Bridge.h */,
+				FDK0001B1E8E89220040F4C2 /* Iperf3Bridge.m */,
+				FDK0002C1E8E89220040F4C2 /* Iperf3Plugin.h */,
+				FDK0002B1E8E89220040F4C2 /* Iperf3Plugin.m */,
+				FDK00100GRP1E8E89220040F4C2 /* Native */,
 			);
 			path = Runner;
+			sourceTree = "<group>";
+		};
+		FDK00100GRP1E8E89220040F4C2 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				FDK0003B1E8E89220040F4C2 /* iperf3_bridge.c */,
+				FDK0003C1E8E89220040F4C2 /* iperf3_bridge.h */,
+				FDK00101GRP1E8E89220040F4C2 /* iperf3 */,
+			);
+			path = Native;
+			sourceTree = "<group>";
+		};
+		FDK00101GRP1E8E89220040F4C2 /* iperf3 */ = {
+			isa = PBXGroup;
+			children = (
+				FDK00102GRP1E8E89220040F4C2 /* src */,
+				FDK00103GRP1E8E89220040F4C2 /* include */,
+			);
+			path = iperf3;
+			sourceTree = "<group>";
+		};
+		FDK00102GRP1E8E89220040F4C2 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				FDK0004B1E8E89220040F4C2 /* cjson.c */,
+				FDK0004C1E8E89220040F4C2 /* cjson.h */,
+				FDK0022B1E8E89220040F4C2 /* config.h */,
+				FDK0018B1E8E89220040F4C2 /* dscp.c */,
+				FDK0023B1E8E89220040F4C2 /* flowlabel.h */,
+				FDK0020B1E8E89220040F4C2 /* iperf.h */,
+				FDK0005B1E8E89220040F4C2 /* iperf_api.c */,
+				FDK0005C1E8E89220040F4C2 /* iperf_api.h */,
+				FDK0021B1E8E89220040F4C2 /* iperf_auth.h */,
+				FDK0006B1E8E89220040F4C2 /* iperf_client_api.c */,
+				FDK0007B1E8E89220040F4C2 /* iperf_error.c */,
+				FDK0008B1E8E89220040F4C2 /* iperf_locale.c */,
+				FDK0008C1E8E89220040F4C2 /* iperf_locale.h */,
+				FDK0009B1E8E89220040F4C2 /* iperf_sctp.c */,
+				FDK0009C1E8E89220040F4C2 /* iperf_sctp.h */,
+				FDK0010B1E8E89220040F4C2 /* iperf_server_api.c */,
+				FDK0011B1E8E89220040F4C2 /* iperf_tcp.c */,
+				FDK0011C1E8E89220040F4C2 /* iperf_tcp.h */,
+				FDK0012B1E8E89220040F4C2 /* iperf_time.c */,
+				FDK0012C1E8E89220040F4C2 /* iperf_time.h */,
+				FDK0013B1E8E89220040F4C2 /* iperf_udp.c */,
+				FDK0013C1E8E89220040F4C2 /* iperf_udp.h */,
+				FDK0014B1E8E89220040F4C2 /* iperf_util.c */,
+				FDK0014C1E8E89220040F4C2 /* iperf_util.h */,
+				FDK0015B1E8E89220040F4C2 /* net.c */,
+				FDK0015C1E8E89220040F4C2 /* net.h */,
+				FDK0024B1E8E89220040F4C2 /* portable_endian.h */,
+				FDK0025B1E8E89220040F4C2 /* queue.h */,
+				FDK0019B1E8E89220040F4C2 /* tcp_info.c */,
+				FDK0016B1E8E89220040F4C2 /* timer.c */,
+				FDK0016C1E8E89220040F4C2 /* timer.h */,
+				FDK0017B1E8E89220040F4C2 /* units.c */,
+				FDK0017C1E8E89220040F4C2 /* units.h */,
+				FDK0026B1E8E89220040F4C2 /* version.h */,
+			);
+			path = src;
+			sourceTree = "<group>";
+		};
+		FDK00103GRP1E8E89220040F4C2 /* include */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = include;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -270,6 +401,25 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				FDK0001A1E8E89220040F4C2 /* Iperf3Bridge.m in Sources */,
+				FDK0002A1E8E89220040F4C2 /* Iperf3Plugin.m in Sources */,
+				FDK0003A1E8E89220040F4C2 /* iperf3_bridge.c in Sources */,
+				FDK0004A1E8E89220040F4C2 /* cjson.c in Sources */,
+				FDK0005A1E8E89220040F4C2 /* iperf_api.c in Sources */,
+				FDK0006A1E8E89220040F4C2 /* iperf_client_api.c in Sources */,
+				FDK0007A1E8E89220040F4C2 /* iperf_error.c in Sources */,
+				FDK0008A1E8E89220040F4C2 /* iperf_locale.c in Sources */,
+				FDK0009A1E8E89220040F4C2 /* iperf_sctp.c in Sources */,
+				FDK0010A1E8E89220040F4C2 /* iperf_server_api.c in Sources */,
+				FDK0011A1E8E89220040F4C2 /* iperf_tcp.c in Sources */,
+				FDK0012A1E8E89220040F4C2 /* iperf_time.c in Sources */,
+				FDK0013A1E8E89220040F4C2 /* iperf_udp.c in Sources */,
+				FDK0014A1E8E89220040F4C2 /* iperf_util.c in Sources */,
+				FDK0015A1E8E89220040F4C2 /* net.c in Sources */,
+				FDK0016A1E8E89220040F4C2 /* timer.c in Sources */,
+				FDK0017A1E8E89220040F4C2 /* units.c in Sources */,
+				FDK0018A1E8E89220040F4C2 /* dscp.c in Sources */,
+				FDK0019A1E8E89220040F4C2 /* tcp_info.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,6 +513,19 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"HAVE_CONFIG_H=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Runner/Native",
+					"$(SRCROOT)/Runner/Native/iperf3/src",
+					"$(SRCROOT)/Runner/Native/iperf3/include",
+					"$(SRCROOT)/../native/src",
+					"$(SRCROOT)/../native/iperf3/src",
+					"$(SRCROOT)/../native/iperf3/include",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -542,6 +705,19 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"HAVE_CONFIG_H=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Runner/Native",
+					"$(SRCROOT)/Runner/Native/iperf3/src",
+					"$(SRCROOT)/Runner/Native/iperf3/include",
+					"$(SRCROOT)/../native/src",
+					"$(SRCROOT)/../native/iperf3/src",
+					"$(SRCROOT)/../native/iperf3/include",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -564,6 +740,19 @@
 				CLANG_ENABLE_MODULES = YES;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"HAVE_CONFIG_H=1",
+				);
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Runner/Native",
+					"$(SRCROOT)/Runner/Native/iperf3/src",
+					"$(SRCROOT)/Runner/Native/iperf3/include",
+					"$(SRCROOT)/../native/src",
+					"$(SRCROOT)/../native/iperf3/src",
+					"$(SRCROOT)/../native/iperf3/include",
+				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
