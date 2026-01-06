@@ -7,6 +7,7 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -17,6 +18,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
   DeviceRepositoryImpl({
     required this.dataSource,
     required this.localDataSource,
+    required this.storageService,
   }) {
     _logger.i('DEVICE_REPOSITORY: Constructor called');
     
@@ -28,6 +30,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
   
   final DeviceDataSource dataSource;
   final DeviceLocalDataSource localDataSource;
+  final StorageService storageService;
   
   
   // Pagination service for efficient loading
@@ -77,6 +80,11 @@ class DeviceRepositoryImpl implements DeviceRepository {
   }) async {
     try {
       _logger.i('🔍 DEVICE_REPOSITORY: getDevices() called at ${DateTime.now().toIso8601String()}');
+
+      if (!_isAuthenticated()) {
+        _logger.w('DeviceRepositoryImpl: Skipping getDevices (not authenticated)');
+        return const Right(<Device>[]);
+      }
 
       if (!EnvironmentConfig.enableRestFallback) {
         _logger
@@ -153,6 +161,10 @@ class DeviceRepositoryImpl implements DeviceRepository {
   /// Refresh data in background without blocking UI
   Future<void> _refreshInBackground() async {
     try {
+      if (!_isAuthenticated()) {
+        _logger.d('DeviceRepositoryImpl: Skipping background refresh (not authenticated)');
+        return;
+      }
       if (!EnvironmentConfig.enableRestFallback) {
         _logger.d(
           'DeviceRepositoryImpl: Skipping background refresh (REST fallback disabled)',
@@ -179,6 +191,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
     List<String>? fields,
   }) async {
     try {
+      if (!_isAuthenticated()) {
+        return Left(DeviceFailure(message: 'Not authenticated'));
+      }
       // Use data source
       final deviceModel = await dataSource.getDevice(id, fields: fields);
       await localDataSource.cacheDevice(deviceModel);
@@ -200,6 +215,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<Failure, List<Device>>> getDevicesByRoom(String roomId) async {
     try {
+      if (!_isAuthenticated()) {
+        return const Right(<Device>[]);
+      }
       // Use data source
       final deviceModels = await dataSource.getDevicesByRoom(roomId);
       final devices = deviceModels.map((model) => model.toEntity()).toList();
@@ -212,6 +230,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<Failure, List<Device>>> searchDevices(String query) async {
     try {
+      if (!_isAuthenticated()) {
+        return const Right(<Device>[]);
+      }
       final deviceModels = await dataSource.searchDevices(query);
       final devices = deviceModels.map((model) => model.toEntity()).toList();
       return Right(devices);
@@ -223,6 +244,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<Failure, Device>> updateDevice(Device device) async {
     try {
+      if (!_isAuthenticated()) {
+        return Left(DeviceFailure(message: 'Not authenticated'));
+      }
       final deviceModel = DeviceModel(
         id: device.id,
         name: device.name,
@@ -286,5 +310,12 @@ class DeviceRepositoryImpl implements DeviceRepository {
   void dispose() {
     _paginationService.dispose();
     _devicesStreamController.close();
+  }
+
+  bool _isAuthenticated() {
+    if (EnvironmentConfig.isDevelopment) {
+      return true;
+    }
+    return storageService.isAuthenticated;
   }
 }

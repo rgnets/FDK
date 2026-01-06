@@ -99,10 +99,12 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
   final dataSource = ref.watch(deviceDataSourceProvider);
   final localDataSource = ref.watch(deviceLocalDataSourceProvider);
+  final storageService = ref.watch(storageServiceProvider);
 
   return device_impl.DeviceRepositoryImpl(
     dataSource: dataSource,
     localDataSource: localDataSource,
+    storageService: storageService,
   );
 });
 
@@ -164,11 +166,13 @@ final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>((
   final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
   final roomRepository = ref.watch(roomRepositoryProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
+  final storageService = ref.watch(storageServiceProvider);
 
   return BackgroundRefreshService(
     deviceRemoteDataSource: deviceRemoteDataSource,
     deviceLocalDataSource: deviceLocalDataSource,
     roomRepository: roomRepository,
     notificationGenerationService: notificationService,
+    storageService: storageService,
   );
 });

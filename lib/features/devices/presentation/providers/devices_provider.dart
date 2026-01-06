@@ -1,5 +1,6 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
 import 'package:rgnets_fdk/core/services/adaptive_refresh_manager.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
@@ -23,9 +24,17 @@ class DevicesNotifier extends _$DevicesNotifier {
     // Initialize managers
     _refreshManager = ref.read(adaptiveRefreshManagerProvider);
     _cacheManager = ref.read(cacheManagerProvider);
+    final storage = ref.read(storageServiceProvider);
 
     if (LoggerConfig.isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Loading devices');
+    }
+
+    if (!storage.isAuthenticated) {
+      if (LoggerConfig.isVerboseLoggingEnabled) {
+        _logger.i('DevicesProvider: Skipping load (not authenticated)');
+      }
+      return [];
     }
 
     // Start sequential background refresh

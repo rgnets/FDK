@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -15,6 +16,7 @@ class BackgroundRefreshService {
     required this.deviceLocalDataSource,
     required this.roomRepository,
     required this.notificationGenerationService,
+    required this.storageService,
   });
 
   static final _logger = Logger();
@@ -23,6 +25,7 @@ class BackgroundRefreshService {
   final DeviceLocalDataSource deviceLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;
+  final StorageService storageService;
 
   Timer? _refreshTimer;
   bool _isRefreshing = false;
@@ -41,6 +44,10 @@ class BackgroundRefreshService {
   /// Start background refresh
   void startBackgroundRefresh() {
     _logger.d('BackgroundRefreshService: Starting background refresh');
+    if (!_isAuthenticated()) {
+      _logger.w('BackgroundRefreshService: Skipping start (not authenticated)');
+      return;
+    }
     
     // Schedule initial refresh after a delay
     Future<void>.delayed(_initialDelay, _performRefresh);
@@ -61,6 +68,10 @@ class BackgroundRefreshService {
   
   /// Perform refresh in background
   Future<void> _performRefresh() async {
+    if (!_isAuthenticated()) {
+      _logger.d('BackgroundRefreshService: Skipping refresh (not authenticated)');
+      return;
+    }
     if (_isRefreshing) {
       _logger.d('BackgroundRefreshService: Refresh already in progress, skipping');
       return;
@@ -82,6 +93,10 @@ class BackgroundRefreshService {
   /// Refresh devices in background
   Future<void> _refreshDevices() async {
     try {
+      if (!_isAuthenticated()) {
+        _logger.d('BackgroundRefreshService: Skipping device refresh (not authenticated)');
+        return;
+      }
       _deviceRefreshController.add(RefreshStatus.refreshing);
       
       // Fetch devices in background using compute for heavy processing
@@ -116,6 +131,10 @@ class BackgroundRefreshService {
   /// Refresh rooms in background
   Future<void> _refreshRooms() async {
     try {
+      if (!_isAuthenticated()) {
+        _logger.d('BackgroundRefreshService: Skipping room refresh (not authenticated)');
+        return;
+      }
       _roomRefreshController.add(RefreshStatus.refreshing);
       
       final stopwatch = Stopwatch()..start();
@@ -156,6 +175,8 @@ class BackgroundRefreshService {
     _deviceRefreshController.close();
     _roomRefreshController.close();
   }
+
+  bool _isAuthenticated() => storageService.isAuthenticated;
 }
 
 /// Status of background refresh

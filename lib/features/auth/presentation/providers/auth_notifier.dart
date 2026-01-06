@@ -7,9 +7,19 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/adaptive_refresh_manager.dart';
+import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart'
+    as devices_providers;
+import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart'
+    as dashboard_providers;
+import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
+    as device_notifications;
+import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
+    as notifications_domain;
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
@@ -201,20 +211,30 @@ class Auth extends _$Auth {
       _logger.d('AUTH_NOTIFIER: Setting state to unauthenticated');
       state = const AsyncValue.data(AuthStatus.unauthenticated());
 
-      // Disconnect WebSocket first (if enabled) to stop message processing
+      try {
+        await ref
+            .read(storageServiceProvider)
+            .setAuthenticated(value: false);
+      } on Exception catch (e) {
+        _logger.w('AUTH_NOTIFIER: Failed to mark unauthenticated: $e');
+      }
+
+      await _stopBackgroundServices();
+      _invalidateDataProviders();
+
+      // Disconnect WebSocket (if enabled) to stop message processing
       if (EnvironmentConfig.useWebSockets) {
         _logger.d('AUTH_NOTIFIER: Disconnecting WebSocket...');
-        try {
-          final webSocketService = ref.read(webSocketServiceProvider);
-          // Don't await - just fire and forget
-          unawaited(
-            webSocketService
-                .disconnect(code: 1000, reason: 'User signed out')
-                .timeout(const Duration(seconds: 2)),
-          );
-        } on Exception catch (e) {
-          _logger.w('AUTH_NOTIFIER: WebSocket disconnect error: $e');
-        }
+        final webSocketService = ref.read(webSocketServiceProvider);
+        // Fire and forget with proper async error handling
+        unawaited(
+          webSocketService
+              .disconnect(code: 1000, reason: 'User signed out')
+              .timeout(const Duration(seconds: 2))
+              .catchError((Object e) {
+            _logger.w('AUTH_NOTIFIER: WebSocket disconnect error: $e');
+          }),
+        );
       }
 
       // Clear storage in background with timeout
@@ -225,6 +245,31 @@ class Auth extends _$Auth {
     } on Exception catch (e, stack) {
       _logger.e('AUTH_NOTIFIER: ⚠️ Exception during sign out: $e\n$stack');
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
+    }
+  }
+
+  Future<void> _stopBackgroundServices() async {
+    try {
+      _logger.d('AUTH_NOTIFIER: Stopping background refresh services');
+      ref.read(backgroundRefreshServiceProvider).stopBackgroundRefresh();
+      ref.read(adaptiveRefreshManagerProvider).stopRefresh();
+      ref.read(cacheManagerProvider).clearAll();
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: Failed stopping background services: $e');
+    }
+  }
+
+  void _invalidateDataProviders() {
+    try {
+      _logger.d('AUTH_NOTIFIER: Invalidating data providers after sign out');
+      ref.invalidate(devices_providers.devicesNotifierProvider);
+      ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
+      ref.invalidate(
+        notifications_domain.notificationsDomainNotifierProvider,
+      );
+      ref.invalidate(dashboard_providers.dashboardStatsProvider);
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: Failed to invalidate data providers: $e');
     }
   }
 
@@ -270,6 +315,7 @@ class Auth extends _$Auth {
       fqdn: fqdn,
       apiKey: apiKey,
     );
+    final headers = _buildAuthHeaders(apiKey);
 
     if (service.isConnected) {
       await service.disconnect(code: 4000, reason: 'Re-authenticating');
@@ -283,13 +329,16 @@ class Auth extends _$Auth {
 
     final completer = Completer<_ActionCableAuthResult>();
     final subscription = service.messages.listen((message) {
+      _logger.d('AUTH_NOTIFIER: 📩 WebSocket message received: type=${message.type}, payload=${message.payload}');
       if (message.type == 'confirm_subscription' &&
           _identifierMatches(message, identifier)) {
+        _logger.i('AUTH_NOTIFIER: ✅ Subscription confirmed!');
         if (!completer.isCompleted) {
           completer.complete(const _ActionCableAuthResult.success());
         }
       } else if (message.type == 'reject_subscription' &&
           _identifierMatches(message, identifier)) {
+        _logger.e('AUTH_NOTIFIER: ❌ Subscription REJECTED by server');
         if (!completer.isCompleted) {
           completer.complete(
             const _ActionCableAuthResult.failure(
@@ -298,10 +347,11 @@ class Auth extends _$Auth {
           );
         }
       } else if (message.type == 'disconnect') {
+        final reason =
+            message.payload['reason'] as String? ??
+            message.payload['message'] as String?;
+        _logger.e('AUTH_NOTIFIER: ❌ Server sent disconnect: $reason');
         if (!completer.isCompleted) {
-          final reason =
-              message.payload['reason'] as String? ??
-              message.payload['message'] as String?;
           completer.complete(
             _ActionCableAuthResult.failure(
               reason ?? 'Connection closed by server',
@@ -311,9 +361,11 @@ class Auth extends _$Auth {
       }
     });
 
-    final stateSubscription = service.connectionState.listen((state) {
-      if (state == SocketConnectionState.disconnected &&
+    final stateSubscription = service.connectionState.listen((connState) {
+      _logger.d('AUTH_NOTIFIER: 🔌 WebSocket connection state changed: $connState');
+      if (connState == SocketConnectionState.disconnected &&
           !completer.isCompleted) {
+        _logger.e('AUTH_NOTIFIER: ❌ Connection closed before subscription confirmed');
         completer.complete(
           const _ActionCableAuthResult.failure(
             'Connection closed before subscription confirmed',
@@ -324,17 +376,26 @@ class Auth extends _$Auth {
 
     _logger
       ..i('AUTH_NOTIFIER: Initiating WebSocket handshake')
-      ..d('AUTH_NOTIFIER: WebSocket URI: $uri');
+      ..d('AUTH_NOTIFIER: WebSocket URI: $uri')
+      ..d('AUTH_NOTIFIER: Subscription identifier: $identifier');
 
     try {
-      await service.connect(WebSocketConnectionParams(uri: uri));
+      _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
+      await service.connect(
+        WebSocketConnectionParams(uri: uri, headers: headers),
+      );
+      _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
       service.send(subscriptionPayload);
+      _logger.d('AUTH_NOTIFIER: Subscription sent, waiting for confirmation (15s timeout)...');
 
       final result = await completer.future.timeout(
         const Duration(seconds: 15),
-        onTimeout: () => const _ActionCableAuthResult.failure(
-          'WebSocket handshake timed out',
-        ),
+        onTimeout: () {
+          _logger.e('AUTH_NOTIFIER: ⏱️ WebSocket handshake TIMED OUT after 15 seconds');
+          return const _ActionCableAuthResult.failure(
+            'WebSocket handshake timed out',
+          );
+        },
       );
 
       if (!result.success) {
@@ -460,11 +521,20 @@ Uri _buildActionCableUri({
       );
 
   final queryParameters = Map<String, String>.from(uri.queryParameters);
-  queryParameters['api_key'] = apiKey;
+  if (apiKey.isNotEmpty) {
+    queryParameters['api_key'] = apiKey;
+  }
 
   return uri.replace(
     queryParameters: queryParameters.isEmpty ? null : queryParameters,
   );
+}
+
+Map<String, dynamic> _buildAuthHeaders(String apiKey) {
+  if (apiKey.isEmpty) {
+    return const {};
+  }
+  return {'Authorization': 'Bearer $apiKey'};
 }
 
 bool _identifierMatches(SocketMessage message, String identifier) {
