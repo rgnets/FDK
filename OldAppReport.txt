@@ -1,0 +1,68 @@
+Old App Functionality Report (Iteration 1)
+App: ATT-FE-Tool
+Scope: View-level functionality summary for rebuild planning
+
+MainViewUnified
+- App shell with PageView tabs and bottom nav.
+- Initialization flow (connection check, credential check, data load) with overlay.
+- Connectivity monitoring and background refresh start.
+- Routes to scanner when credentials missing or invalid.
+
+HomeView
+- Dashboard summary with property name, health score, and quick stats.
+- Device online/offline counts by type.
+- Room readiness summary and issue breakdown.
+- Speed test card and pull-to-refresh.
+
+ConnectionView
+- Connection overview and core services status.
+- Manual sync and disconnect actions.
+- Profile details (FQDN/login), app version, endpoint.
+- Data sync timing and notification messages.
+
+BarcodeScannerUnified
+- Camera-based QR/Code128 scanning.
+- Mode selection for rXg credentials or device registration.
+- Room selection and unassigned device selection.
+- Registration/move flow with confirmation and mismatch handling.
+- Camera controls (flip, flash, zoom) and permission handling.
+
+DevicesView
+- Search and filter by device type.
+- Device cards with online status and issue count badges.
+- Swipe-to-delete with confirmation and queued delete on offline.
+- Navigate to device detail.
+
+IssuesView
+- Aggregated issues across devices.
+- Filters by device type and severity, plus search.
+- Issue cards with device/room context; navigate to device detail.
+
+RoomReadinessView
+- List of rooms with readiness status and issue counts.
+- Search and status filters; responsive list/grid.
+- Navigate to room detail.
+
+RoomDetailView
+- Room summary with device counts and issues.
+- Issues accordion and speed test selector.
+- Device tables for ONTs/APs; navigate to device detail.
+- Auto refresh with progress indicator.
+
+DeviceDetailView
+- Unified summary with status and issues.
+- Device details, ports/optics, and per-type sections.
+- Images viewer/upload and notes editing.
+- Speed test widgets and advanced info section.
+- Auto refresh and manual refresh.
+
+CredentialEntryView
+- Manual or JSON credential entry with validation.
+- Error handling and cancel back to scanner.
+
+NoteEditView
+- Edit and save device note with offline queue support.
+
+OnboardingView
+- Two-page onboarding with welcome and rXg setup guide.
+- Continue to scanner in main view.
