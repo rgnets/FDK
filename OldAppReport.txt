@@ -1,68 +1,164 @@
-Old App Functionality Report (Iteration 1)
-App: ATT-FE-Tool
-Scope: View-level functionality summary for rebuild planning
+# ATT-FE-Tool Functionality Report (Version 2)
 
-MainViewUnified
-- App shell with PageView tabs and bottom nav.
-- Initialization flow (connection check, credential check, data load) with overlay.
-- Connectivity monitoring and background refresh start.
-- Routes to scanner when credentials missing or invalid.
+This report breaks down the functionality of the ATT-FE-Tool application, organized by its views.
 
-HomeView
-- Dashboard summary with property name, health score, and quick stats.
-- Device online/offline counts by type.
-- Room readiness summary and issue breakdown.
-- Speed test card and pull-to-refresh.
+## Core Application Structure (`main_view.dart`)
 
-ConnectionView
-- Connection overview and core services status.
-- Manual sync and disconnect actions.
-- Profile details (FQDN/login), app version, endpoint.
-- Data sync timing and notification messages.
+- **Role:** Main container for the application's primary views post-authentication.
+- **Navigation:** Manages a `LiveNavBar` to switch between `HomeView`, `ConnectionView`, `DevicesView`, `IssuesView`, and `RoomReadinessView`. The `BarcodeScanner` is also accessed from here for device provisioning.
+- **Initialization:** After a successful login, this view orchestrates the application startup sequence.
+  - Shows an initialization overlay with progress messages.
+  - Fetches all initial data from the rXg via `RxgApiClient.getAllRxgData()`, populating device, room, and issue information.
+- **State Management:** Handles global application state, including network connectivity. It can re-trigger data synchronization if the network connection is restored.
 
-BarcodeScannerUnified
-- Camera-based QR/Code128 scanning.
-- Mode selection for rXg credentials or device registration.
-- Room selection and unassigned device selection.
-- Registration/move flow with confirmation and mismatch handling.
-- Camera controls (flip, flash, zoom) and permission handling.
+---
 
-DevicesView
-- Search and filter by device type.
-- Device cards with online status and issue count badges.
-- Swipe-to-delete with confirmation and queued delete on offline.
-- Navigate to device detail.
+## 1. Authentication and Onboarding
 
-IssuesView
-- Aggregated issues across devices.
-- Filters by device type and severity, plus search.
-- Issue cards with device/room context; navigate to device detail.
+The application offers two primary methods for authentication, preceded by a one-time onboarding experience for new users.
 
-RoomReadinessView
-- List of rooms with readiness status and issue counts.
-- Search and status filters; responsive list/grid.
-- Navigate to room detail.
+### 1a. Onboarding (`onboarding_view.dart`)
 
-RoomDetailView
-- Room summary with device counts and issues.
-- Issues accordion and speed test selector.
-- Device tables for ONTs/APs; navigate to device detail.
-- Auto refresh with progress indicator.
+- **Role:** First-time user experience.
+- **Functionality:**
+  - A two-page carousel that welcomes the user.
+  - Provides a high-level explanation of how to connect the app to an rXg instance, including an animated GIF.
+  - Navigates the user to the `ConnectionView` where they can choose a login method.
 
-DeviceDetailView
-- Unified summary with status and issues.
-- Device details, ports/optics, and per-type sections.
-- Images viewer/upload and notes editing.
-- Speed test widgets and advanced info section.
-- Auto refresh and manual refresh.
+### 1b. Barcode Scanner (for Login) (`barcode_scanner.dart`)
 
-CredentialEntryView
-- Manual or JSON credential entry with validation.
-- Error handling and cancel back to scanner.
+- **Role:** The primary and recommended method for authentication.
+- **Functionality:**
+  - Uses the device's camera to scan a QR code generated within the rXg web interface.
+  - The QR code contains the FQDN, username, and API key.
+  - Upon a successful scan, the credentials are automatically and securely stored, and the user is navigated to the `MainViewUnified`.
 
-NoteEditView
-- Edit and save device note with offline queue support.
+### 1c. Manual Credential Entry (`credential_entry_view.dart`)
 
-OnboardingView
-- Two-page onboarding with welcome and rXg setup guide.
-- Continue to scanner in main view.
+- **Role:** An alternative, manual method for authentication.
+- **Functionality:**
+  - Provides two methods for credential input:
+    1.  **Manual Form:** Separate fields for FQDN, Login, and API Key.
+    2.  **JSON Input:** A single text area to paste a JSON object containing the credentials.
+  - **Validation:** Uses a `ScannerValidationService` to validate the entered credentials against the rXg.
+  - **Navigation:** On successful validation, it saves the credentials and navigates the user to the main application. On failure, it displays an error message.
+
+---
+
+## 2. Barcode Scanner (for Device Provisioning) (`barcode_scanner.dart`)
+
+- **Role:** After login, the scanner's purpose shifts to become the primary tool for registering new hardware in the field. This is a critical workflow.
+- **Functionality:**
+  - **Hardware Scan:** The user scans the hardware barcode (MAC address or Serial Number) of a new device (AP, ONT, or Switch).
+  - **Registration Bottom Sheet:** Upon a successful scan, a modal bottom sheet appears, guiding the technician through the registration process.
+  - **Room Selection:** The user must select the room where the device is being installed.
+  - **Device Assignment:** The user can then either:
+    1.  **Create a New Device:** Provision a completely new device record in the rXg.
+    2.  **Assign to Designed Device:** Link the scanned hardware to a pre-existing "designed" (or planned) device entry in the rXg.
+  - **API Call:** The view calls the appropriate registration method in `RxgApiClient` (`registerAP`, `registerONT`, etc.) to complete the process.
+- **Use Case (Device/Room Lookup):** The scanner can also be used to scan a barcode on an already-installed device or a room plaque to be taken directly to that item's detail view in the app.
+
+---
+
+## 3. Home / Dashboard (`home_view.dart`)
+
+- **Role:** A high-level dashboard providing a "single pane of glass" overview of the system's health.
+- **Functionality:**
+  - **Property Name:** Displays the name of the property being monitored.
+  - **Health Score:** A prominent gauge that displays an overall system health score.
+  - **Quick Stats:** A summary of total devices, online percentage, and last data refresh time.
+  - **Room Readiness Overview:** A card summarizing "Ready" and "Not Ready" rooms.
+  - **Issue Breakdown:** Shows a count of all issues, broken down by severity (Critical, Warning, Info).
+  - **Devices Overview:** Shows online and offline counts for each device type (Switches, APs, ONTs).
+  - **Speed Test Card:** A card for running `iperf3` speed tests.
+
+---
+
+## 4. Connection Status (`connection_view.dart`)
+
+- **Role:** A detailed dashboard for monitoring the connection to the rXg and managing the user session.
+- **Functionality:**
+  - **Connection Status:** Detailed breakdown of Internet, Server reachability, and Authentication status.
+  - **Performance Metrics:** Displays connection quality and API latency.
+  - **Data Sync Status:** Shows the time of the last and next data synchronization.
+  - **User Profile:** Displays the FQDN and Login for the current user.
+  - **Actions:**
+    - **Manual Sync:** A button to force a full refresh of all data from the rXg.
+    - **Disconnect:** A button to log out, which securely clears all credentials and cached data, returning the user to the login screen.
+  - **Technical Details:** App version, API endpoint, and raw error messages for debugging.
+
+---
+
+## 5. Devices List (`devices_view.dart`)
+
+- **Role:** The primary screen for finding and navigating to specific devices.
+- **Functionality:**
+  - **Device List:** Displays all devices (Switches, APs, ONTs) in a scrollable list.
+  - **Device Card:** Each card shows the device name, type, online/offline status, and an issue-count badge.
+  - **Search & Filter:** Search by name/MAC/SN, filter by device type, and a "Phase" filter.
+  - **Deletion:** Allows users to delete a device by swiping, with a confirmation dialog and offline queuing.
+  - **Navigation:** Tapping a device navigates to its `DeviceDetailView`.
+
+---
+
+## 6. Issues List (`issues_view.dart`)
+
+- **Role:** A centralized view to see all detected problems across the entire system.
+- **Functionality:**
+  - **Issue List:** Aggregates and lists all issues from all devices.
+  - **Issue Card:** Shows severity, title, description, associated device/room, and a suggested resolution.
+  - **Search & Filter:** Search by text, filter by device type and issue severity.
+  - **Sorting:** The list is sorted to show the most critical issues first.
+  - **Navigation:** Tapping an issue navigates to the `DeviceDetailView` for the associated device.
+
+---
+
+## 7. Room Readiness List (`room_readiness_view.dart`)
+
+- **Role:** Provides a high-level overview of the installation/operational status of all rooms.
+- **Functionality:**
+  - **Room List/Grid:** Displays all rooms in a responsive list or grid.
+  - **Room Card:** Summarizes room status, device counts (online vs. total), and issue counts.
+  - **Search & Filter:** Search by room name, filter by readiness status ("Ready", "Partial", "Down") and "Phase".
+  - **Navigation:** Tapping a room card navigates to the `RoomDetailView`.
+
+---
+
+## 8. Room Detail (`room_detail_view.dart`)
+
+- **Role:** A detailed dashboard for a single room, showing all its devices and their statuses.
+- **Functionality:**
+  - **Room Summary:** A header card shows the room name, device counts, online status, and total issue count.
+  - **Device List:** Lists all ONTs and APs within the room, including their onboarding progress.
+  - **Issue Accordion:** Displays all issues for all devices in the room, grouped by severity.
+  - **Speed Tests:** A widget to initiate or view speed tests for the room.
+  - **Navigation:** Tapping a device or issue navigates to the `DeviceDetailView`.
+
+---
+
+## 9. Device Detail (`device_detail_view.dart`)
+
+- **Role:** A comprehensive, all-in-one view for a single network device. This is the most feature-rich screen.
+- **Functionality:**
+  - **Device Details:** Shows extensive information (IP, MAC, S/N, model, firmware, uptime) with copy-to-clipboard actions.
+  - **Image Management:** View a gallery, add images from camera/gallery, and view them in an interactive viewer.
+  - **Technician Notes:** View, add, edit, or clear a note for the device (navigates to `NoteEditView`).
+  - **Issue Display:** Lists all detected issues specific to this device.
+  - **Auto-Refresh:** The view auto-refreshes every 5 seconds.
+  - **Device-Specific Features:**
+    - **For APs:** Remotely control the device's LED (blink, on, off) for identification. Includes an in-app LED pattern reference guide.
+    - **For ONTs:** Displays detailed optical/PHY data.
+    - **For Switches:** Displays a detailed list of all switch ports and their status.
+  - **Advanced Info:** An expandable section showing raw technical data for debugging.
+
+---
+
+## 10. Note Edit (`note_edit_view.dart`)
+
+- **Role:** A simple, focused screen for editing a technician note.
+- **Functionality:**
+  - Provides a multi-line text field with a 255-character limit.
+  - On "Save", it calls the API to update the note. Handles offline queuing.
+  - "Cancel" discards changes.
+
+*This report is based on a combined static and architectural analysis of the Flutter application.*
