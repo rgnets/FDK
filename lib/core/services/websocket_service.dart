@@ -18,6 +18,7 @@ class WebSocketConfig {
     this.maxReconnectDelay = const Duration(seconds: 32),
     this.heartbeatInterval = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 45),
+    this.sendClientPing = true,
   });
 
   final Uri baseUri;
@@ -26,6 +27,7 @@ class WebSocketConfig {
   final Duration maxReconnectDelay;
   final Duration heartbeatInterval;
   final Duration heartbeatTimeout;
+  final bool sendClientPing;
 }
 
 /// Parameters used when establishing a socket connection.
@@ -218,13 +220,11 @@ class WebSocketService {
         return;
       }
 
-      final type = decoded['type'] as String? ?? 'unknown';
-      final payload =
-          (decoded['payload'] as Map<String, dynamic>?) ??
-          const <String, dynamic>{};
-      final headers = decoded['headers'] as Map<String, dynamic>?;
+      final payload = _extractPayload(decoded);
+      final type = _extractType(decoded, payload);
+      final headers = _extractHeaders(decoded);
 
-      if (type == 'system.heartbeat') {
+      if (type == 'system.heartbeat' || type == 'ping') {
         _lastHeartbeat = DateTime.now();
       }
 
@@ -280,26 +280,28 @@ class WebSocketService {
     _heartbeatTimer?.cancel();
     _heartbeatWatchdog?.cancel();
 
-    _heartbeatTimer = Timer.periodic(_config.heartbeatInterval, (_) {
-      if (_channel == null) {
-        return;
-      }
-      try {
-        sendType(
-          'system.ping',
-          payload: {
-            'timestamp': DateTime.now().toUtc().toIso8601String(),
-            'platform': kIsWeb ? 'web' : 'flutter',
-          },
-        );
-      } on Object catch (e, stack) {
-        _logger.e(
-          'WebSocketService: Failed to send ping',
-          error: e,
-          stackTrace: stack,
-        );
-      }
-    });
+    if (_config.sendClientPing) {
+      _heartbeatTimer = Timer.periodic(_config.heartbeatInterval, (_) {
+        if (_channel == null) {
+          return;
+        }
+        try {
+          sendType(
+            'system.ping',
+            payload: {
+              'timestamp': DateTime.now().toUtc().toIso8601String(),
+              'platform': kIsWeb ? 'web' : 'flutter',
+            },
+          );
+        } on Object catch (e, stack) {
+          _logger.e(
+            'WebSocketService: Failed to send ping',
+            error: e,
+            stackTrace: stack,
+          );
+        }
+      });
+    }
 
     _heartbeatWatchdog = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_lastHeartbeat == null) {
@@ -347,3 +349,54 @@ class WebSocketService {
 }
 
 SocketMessage? _lastMessage;
+
+Map<String, dynamic> _extractPayload(Map<String, dynamic> decoded) {
+  final payloadValue = decoded['payload'];
+  if (payloadValue is Map<String, dynamic>) {
+    return Map<String, dynamic>.from(payloadValue);
+  }
+
+  final messageValue = decoded['message'];
+  if (messageValue is Map<String, dynamic>) {
+    return Map<String, dynamic>.from(messageValue);
+  }
+  if (messageValue != null) {
+    return {'message': messageValue};
+  }
+
+  final fallback = Map<String, dynamic>.from(decoded)
+    ..remove('type')
+    ..remove('identifier')
+    ..remove('message')
+    ..remove('payload')
+    ..remove('headers');
+  return fallback;
+}
+
+String _extractType(
+  Map<String, dynamic> decoded,
+  Map<String, dynamic> payload,
+) {
+  final typeValue = decoded['type'];
+  if (typeValue is String && typeValue.isNotEmpty) {
+    return typeValue;
+  }
+  final actionValue = payload['action'];
+  if (actionValue is String && actionValue.isNotEmpty) {
+    return actionValue;
+  }
+  return 'message';
+}
+
+Map<String, dynamic>? _extractHeaders(Map<String, dynamic> decoded) {
+  final headers = decoded['headers'] as Map<String, dynamic>?;
+  final identifier = decoded['identifier'];
+  if (identifier == null) {
+    return headers;
+  }
+  final merged = <String, dynamic>{'identifier': identifier};
+  if (headers != null) {
+    merged.addAll(headers);
+  }
+  return merged;
+}
