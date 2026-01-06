@@ -13,6 +13,7 @@ final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
     maxReconnectDelay: EnvironmentConfig.webSocketMaxReconnectDelay,
     heartbeatInterval: EnvironmentConfig.webSocketHeartbeatInterval,
     heartbeatTimeout: EnvironmentConfig.webSocketHeartbeatTimeout,
+    sendClientPing: false,
   );
 });
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -196,40 +197,55 @@ class Auth extends _$Auth {
       ..d('AUTH_NOTIFIER: Current state before signout: ${state.value}');
 
     try {
-      // Get the use case
-      _logger.d('AUTH_NOTIFIER: Getting signOutUser use case');
-      final signOutUser = ref.read(signOutUserProvider);
+      // Set state to unauthenticated FIRST to unblock UI
+      _logger.d('AUTH_NOTIFIER: Setting state to unauthenticated');
+      state = const AsyncValue.data(AuthStatus.unauthenticated());
 
-      // Execute sign out
-      _logger.i('AUTH_NOTIFIER: Executing sign out');
-      final result = await signOutUser();
-      _logger.d('AUTH_NOTIFIER: Sign out use case completed');
-
-      // Update state based on result
-      final newStatus = result.fold(
-        (failure) {
-          _logger.e('AUTH_NOTIFIER: ❌ Sign out failed: ${failure.message}');
-          return AuthStatus.failure(failure.message);
-        },
-        (_) {
-          _logger.i('AUTH_NOTIFIER: ✅ Sign out successful');
-          return const AuthStatus.unauthenticated();
-        },
-      );
-
-      _logger.d('AUTH_NOTIFIER: Setting state to: $newStatus');
-      state = AsyncValue.data(newStatus);
-      _logger.d('AUTH_NOTIFIER: Final state after signout: ${state.value}');
+      // Disconnect WebSocket first (if enabled) to stop message processing
       if (EnvironmentConfig.useWebSockets) {
-        final webSocketService = ref.read(webSocketServiceProvider);
-        await webSocketService.disconnect(
-          code: 1000,
-          reason: 'User signed out',
-        );
+        _logger.d('AUTH_NOTIFIER: Disconnecting WebSocket...');
+        try {
+          final webSocketService = ref.read(webSocketServiceProvider);
+          // Don't await - just fire and forget
+          unawaited(
+            webSocketService
+                .disconnect(code: 1000, reason: 'User signed out')
+                .timeout(const Duration(seconds: 2)),
+          );
+        } on Exception catch (e) {
+          _logger.w('AUTH_NOTIFIER: WebSocket disconnect error: $e');
+        }
       }
+
+      // Clear storage in background with timeout
+      _logger.d('AUTH_NOTIFIER: Clearing storage in background');
+      unawaited(_clearStorageWithTimeout());
+
+      _logger.i('AUTH_NOTIFIER: ✅ Sign out initiated');
     } on Exception catch (e, stack) {
       _logger.e('AUTH_NOTIFIER: ⚠️ Exception during sign out: $e\n$stack');
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
+    }
+  }
+
+  Future<void> _clearStorageWithTimeout() async {
+    try {
+      final storage = ref.read(storageServiceProvider);
+      final localDataSource = ref.read(authLocalDataSourceProvider);
+      final notificationService = ref.read(notificationGenerationServiceProvider);
+
+      // Reset notification state to prevent memory leak on re-login
+      notificationService.reset();
+      _logger.d('AUTH_NOTIFIER: Notification state reset');
+
+      await Future.wait([
+        storage.clearCredentials(),
+        localDataSource.clearUser(),
+      ]).timeout(const Duration(seconds: 5));
+
+      _logger.d('AUTH_NOTIFIER: Storage cleared successfully');
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: Storage clear timed out or failed: $e');
     }
   }
 
@@ -241,44 +257,68 @@ class Auth extends _$Auth {
     DateTime? issuedAt,
     String? signature,
   }) async {
+    var failureHandled = false;
     final config = ref.read(webSocketConfigProvider);
     final storage = ref.read(storageServiceProvider);
     final localDataSource = ref.read(authLocalDataSourceProvider);
     final service = ref.read(webSocketServiceProvider);
 
-    final baseUri = config.baseUri;
-    final queryParameters = Map<String, String>.from(baseUri.queryParameters);
     final resolvedSite =
         (siteName ?? storage.siteName ?? fqdn).trim();
-    if (resolvedSite.isNotEmpty) {
-      queryParameters['site'] = resolvedSite;
-    }
-    final uri = baseUri.replace(
-      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    final uri = _buildActionCableUri(
+      baseUri: config.baseUri,
+      fqdn: fqdn,
+      apiKey: apiKey,
     );
-
-    final payload = <String, dynamic>{
-      'type': 'auth.init',
-      'payload': {
-        'fqdn': fqdn,
-        'login': login,
-        'api_key': apiKey,
-        'site_name': resolvedSite,
-        'timestamp': (issuedAt ?? DateTime.now().toUtc()).toIso8601String(),
-        if (signature != null && signature.isNotEmpty) 'signature': signature,
-      },
-    };
 
     if (service.isConnected) {
       await service.disconnect(code: 4000, reason: 'Re-authenticating');
     }
 
-    final completer = Completer<SocketMessage>();
+    final identifier = jsonEncode(const {'channel': 'RxgChannel'});
+    final subscriptionPayload = <String, dynamic>{
+      'command': 'subscribe',
+      'identifier': identifier,
+    };
+
+    final completer = Completer<_ActionCableAuthResult>();
     final subscription = service.messages.listen((message) {
-      if (message.type == 'auth.ack' || message.type == 'auth.error') {
+      if (message.type == 'confirm_subscription' &&
+          _identifierMatches(message, identifier)) {
         if (!completer.isCompleted) {
-          completer.complete(message);
+          completer.complete(const _ActionCableAuthResult.success());
         }
+      } else if (message.type == 'reject_subscription' &&
+          _identifierMatches(message, identifier)) {
+        if (!completer.isCompleted) {
+          completer.complete(
+            const _ActionCableAuthResult.failure(
+              'Subscription rejected by server',
+            ),
+          );
+        }
+      } else if (message.type == 'disconnect') {
+        if (!completer.isCompleted) {
+          final reason =
+              message.payload['reason'] as String? ??
+              message.payload['message'] as String?;
+          completer.complete(
+            _ActionCableAuthResult.failure(
+              reason ?? 'Connection closed by server',
+            ),
+          );
+        }
+      }
+    });
+
+    final stateSubscription = service.connectionState.listen((state) {
+      if (state == SocketConnectionState.disconnected &&
+          !completer.isCompleted) {
+        completer.complete(
+          const _ActionCableAuthResult.failure(
+            'Connection closed before subscription confirmed',
+          ),
+        );
       }
     });
 
@@ -287,18 +327,18 @@ class Auth extends _$Auth {
       ..d('AUTH_NOTIFIER: WebSocket URI: $uri');
 
     try {
-      await service.connect(
-        WebSocketConnectionParams(uri: uri, handshakeMessage: payload),
-      );
+      await service.connect(WebSocketConnectionParams(uri: uri));
+      service.send(subscriptionPayload);
 
-      final socketMessage = await completer.future.timeout(
+      final result = await completer.future.timeout(
         const Duration(seconds: 15),
+        onTimeout: () => const _ActionCableAuthResult.failure(
+          'WebSocket handshake timed out',
+        ),
       );
 
-      if (socketMessage.type == 'auth.error') {
-        final errorMessage =
-            socketMessage.payload['message'] as String? ??
-            'Authentication error';
+      if (!result.success) {
+        final errorMessage = result.message;
         await storage.setAuthenticated(value: false);
         await localDataSource.clearSession();
         await service.disconnect(code: 4401, reason: 'auth.error');
@@ -309,68 +349,47 @@ class Auth extends _$Auth {
           success: false,
           message: errorMessage,
         );
+        failureHandled = true;
         throw Exception(errorMessage);
       }
 
-      final payloadMap = socketMessage.payload;
-      final sessionToken = payloadMap['sessionToken'] as String?;
-      final expiresAtIso = payloadMap['expiresAt'] as String?;
-      DateTime? expiresAt;
-      if (expiresAtIso != null) {
-        expiresAt = DateTime.tryParse(expiresAtIso);
-      }
-
-      if (sessionToken != null &&
-          sessionToken.isNotEmpty &&
-          expiresAt != null) {
-        await localDataSource.saveSession(
-          token: sessionToken,
-          expiresAt: expiresAt,
-        );
-      } else {
-        await localDataSource.clearSession();
-      }
-
+      await localDataSource.clearSession();
       await storage.setAuthenticated(value: true);
 
-      final userPayload =
-          (payloadMap['user'] as Map<String, dynamic>?) ?? const {};
-      final resolvedLogin =
-          userPayload['login'] as String? ?? login;
-      final resolvedDisplayName =
-          userPayload['siteName'] as String? ?? resolvedSite;
-
       final userModel = UserModel(
-        username: resolvedLogin,
+        username: login,
         apiUrl: 'https://$fqdn',
-        displayName: resolvedDisplayName,
+        displayName: resolvedSite.isEmpty ? login : resolvedSite,
         email: null,
       );
       await localDataSource.saveUser(userModel);
 
       await _recordAuthAttempt(
         fqdn: fqdn,
-        login: resolvedLogin,
-        siteName: resolvedDisplayName,
+        login: login,
+        siteName: resolvedSite,
         success: true,
-        message: 'auth.ack',
+        message: 'action_cable.confirm_subscription',
       );
 
       return userModel.toEntity();
-    } on TimeoutException {
-      await storage.setAuthenticated(value: false);
-      await localDataSource.clearSession();
-      await service.disconnect(code: 4408, reason: 'Handshake timeout');
-      await _recordAuthAttempt(
-        fqdn: fqdn,
-        login: login,
-        siteName: siteName ?? resolvedSite,
-        success: false,
-        message: 'WebSocket handshake timed out',
-      );
-      throw Exception('WebSocket handshake timed out');
+    } on Exception catch (e) {
+      if (!failureHandled) {
+        await storage.setAuthenticated(value: false);
+        await localDataSource.clearSession();
+        await service.disconnect(code: 4401, reason: 'auth.error');
+        await _recordAuthAttempt(
+          fqdn: fqdn,
+          login: login,
+          siteName: resolvedSite,
+          success: false,
+          message: e.toString(),
+        );
+      }
+      rethrow;
     } finally {
       await subscription.cancel();
+      await stateSubscription.cancel();
     }
   }
 
@@ -424,4 +443,44 @@ User? currentUser(CurrentUserRef ref) {
 AuthStatus? authStatus(AuthStatusRef ref) {
   final authAsync = ref.watch(authProvider);
   return authAsync.valueOrNull;
+}
+
+Uri _buildActionCableUri({
+  required Uri baseUri,
+  required String fqdn,
+  required String apiKey,
+}) {
+  final useBaseUri = EnvironmentConfig.isDevelopment;
+  final uri = useBaseUri
+      ? baseUri
+      : Uri(
+        scheme: 'wss',
+        host: fqdn,
+        path: '/cable',
+      );
+
+  final queryParameters = Map<String, String>.from(uri.queryParameters);
+  queryParameters['api_key'] = apiKey;
+
+  return uri.replace(
+    queryParameters: queryParameters.isEmpty ? null : queryParameters,
+  );
+}
+
+bool _identifierMatches(SocketMessage message, String identifier) {
+  final headerIdentifier = message.headers?['identifier'];
+  if (headerIdentifier is String && headerIdentifier.isNotEmpty) {
+    return headerIdentifier == identifier;
+  }
+  return false;
+}
+
+class _ActionCableAuthResult {
+  const _ActionCableAuthResult.success()
+      : success = true,
+        message = '';
+  const _ActionCableAuthResult.failure(this.message) : success = false;
+
+  final bool success;
+  final String message;
 }
