@@ -46,12 +46,12 @@ final deviceLocalDataSourceProvider = Provider<DeviceLocalDataSource>((ref) {
 
 /// Device data source provider (interface)
 final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
-  if (EnvironmentConfig.isDevelopment) {
-    // Use mock data source in development
+  if (EnvironmentConfig.useSyntheticData) {
+    // Use mock data source when synthetic data is enabled
     final mockDataService = ref.watch(mockDataServiceProvider);
     return DeviceMockDataSourceImpl(mockDataService: mockDataService);
   } else {
-    // Use remote data source in staging/production
+    // Use remote data source otherwise
     final apiService = ref.watch(apiServiceProvider);
     return DeviceRemoteDataSourceImpl(apiService: apiService);
   }

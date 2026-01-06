@@ -21,7 +21,7 @@ class DashboardStats extends _$DashboardStats {
     final storage = ref.watch(storageServiceProvider);
     
     // Start background refresh service
-    if (storage.isAuthenticated || EnvironmentConfig.isDevelopment) {
+    if (storage.isAuthenticated || EnvironmentConfig.useSyntheticData) {
       _backgroundRefreshService.startBackgroundRefresh();
     }
     
@@ -29,8 +29,8 @@ class DashboardStats extends _$DashboardStats {
     return _performanceMonitor.trackFuture(
       'dashboard_stats_load',
       () async {
-        // Development mode: use mock data
-        if (EnvironmentConfig.isDevelopment) {
+        // Synthetic data mode: use mock data
+        if (EnvironmentConfig.useSyntheticData) {
           // Simulate loading delay for realistic testing
           await Future<void>.delayed(const Duration(milliseconds: 500));
           return MockDataService().getMockDashboardStats();
@@ -52,7 +52,7 @@ class DashboardStats extends _$DashboardStats {
     state = await AsyncValue.guard(() => _performanceMonitor.trackFuture(
       'dashboard_stats_refresh',
       () async {
-        if (EnvironmentConfig.isDevelopment) {
+        if (EnvironmentConfig.useSyntheticData) {
           await Future<void>.delayed(const Duration(milliseconds: 300));
           return MockDataService().getMockDashboardStats();
         }

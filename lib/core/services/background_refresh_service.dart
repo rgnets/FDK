@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
@@ -19,7 +19,7 @@ class BackgroundRefreshService {
     required this.storageService,
   });
 
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
 
   final DeviceDataSource deviceRemoteDataSource;
   final DeviceLocalDataSource deviceLocalDataSource;

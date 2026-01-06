@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 
@@ -21,7 +21,7 @@ class DeviceLocalDataSourceImpl implements DeviceLocalDataSource {
   });
 
   final StorageService storageService;
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
   static const String _devicesKey = 'cached_devices';
   static const String _deviceKeyPrefix = 'cached_device_';
   static const String _cacheTimestampKey = 'devices_cache_timestamp';

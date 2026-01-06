@@ -27,8 +27,8 @@ class AuthRepositoryImpl implements AuthRepository {
     String? signature,
   }) async {
     try {
-      // Development mode: return mock user immediately
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: return mock user immediately
+      if (EnvironmentConfig.useSyntheticData) {
         final mockUser = mockDataService.getMockUser();
 
         // Save mock user locally for consistency
@@ -95,8 +95,8 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, User?>> getCurrentUser() async {
     try {
-      // Development mode: return mock user
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: return mock user
+      if (EnvironmentConfig.useSyntheticData) {
         return Right(MockDataService().getMockUser());
       }
 
@@ -111,8 +111,8 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, bool>> isAuthenticated() async {
     try {
-      // Development mode: always authenticated
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: always authenticated
+      if (EnvironmentConfig.useSyntheticData) {
         return const Right(true);
       }
 

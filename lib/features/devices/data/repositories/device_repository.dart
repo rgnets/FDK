@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:fpdart/fpdart.dart';
-import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
@@ -26,7 +26,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
     _initializePaginationService();
   }
   
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
   
   final DeviceDataSource dataSource;
   final DeviceLocalDataSource localDataSource;
@@ -313,7 +313,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
   }
 
   bool _isAuthenticated() {
-    if (EnvironmentConfig.isDevelopment) {
+    if (EnvironmentConfig.useSyntheticData) {
       return true;
     }
     return storageService.isAuthenticated;

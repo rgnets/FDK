@@ -1,4 +1,5 @@
-import 'package:logger/logger.dart';
+import 'package:flutter/foundation.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/api_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -11,7 +12,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
   const DeviceRemoteDataSourceImpl({required this.apiService});
 
   final ApiService apiService;
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
 
   /// Extracts location from device map, prioritizing pms_room.name
   String _extractLocation(Map<String, dynamic> deviceMap) {
@@ -46,14 +47,76 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
     return null;
   }
 
+  /// Extract images from device map (handles various formats)
+  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
+    // Try various image field names
+    final imageKeys = [
+      'images',
+      'image',
+      'image_url',
+      'imageUrl',
+      'photos',
+      'photo',
+      'photo_url',
+      'photoUrl',
+      'device_images',
+      'device_image',
+    ];
+
+    for (final key in imageKeys) {
+      final value = deviceMap[key];
+      if (value == null) continue;
+
+      // Handle List of URLs
+      if (value is List && value.isNotEmpty) {
+        final urls = value
+            .map((e) {
+              if (e is String) return e;
+              if (e is Map) return e['url']?.toString() ?? e['src']?.toString();
+              return e?.toString();
+            })
+            .where((e) => e != null && e.isNotEmpty)
+            .cast<String>()
+            .toList();
+        if (urls.isNotEmpty) return urls;
+      }
+
+      // Handle single URL string
+      if (value is String && value.isNotEmpty) {
+        // Check if it's a JSON-encoded array
+        if (value.startsWith('[')) {
+          try {
+            final decoded = value.replaceAll(RegExp(r'[\[\]"]'), '').split(',');
+            final urls = decoded
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+            if (urls.isNotEmpty) return urls;
+          } on Exception catch (_) {
+            // Not valid JSON array, treat as single URL
+          }
+        }
+        return [value];
+      }
+
+      // Handle Map with url/src field
+      if (value is Map) {
+        final url = value['url']?.toString() ?? value['src']?.toString();
+        if (url != null && url.isNotEmpty) {
+          return [url];
+        }
+      }
+    }
+
+    return null;
+  }
+
   /// Fetch all items from endpoint without pagination
   Future<List<Map<String, dynamic>>> _fetchAllPages(
     String endpoint, {
     List<String>? fields,
   }) async {
     try {
-      _logger.d('Fetching all items from $endpoint');
-
       // Build query with field selection
       final fieldsParam = (fields?.isNotEmpty ?? false)
           ? '&only=${fields!.join(',')}'
@@ -65,25 +128,16 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       );
 
       if (response.data == null) {
-        _logger.w('No data received from $endpoint');
         return [];
       }
-
-      // Log the response type for debugging
-      _logger.d('Response type from $endpoint: ${response.data.runtimeType}');
 
       var results = <dynamic>[];
 
       // Handle different response formats
       if (response.data is List) {
-        // Direct array response (when page_size=0 might return unpaginated)
-        _logger.d('Direct array response from $endpoint');
         results = response.data as List<dynamic>;
       } else if (response.data is Map<String, dynamic>) {
         final data = response.data as Map<String, dynamic>;
-        _logger.d(
-          'Map response from $endpoint with keys: ${data.keys.toList()}',
-        );
 
         // Try different possible keys for the results array
         if (data['results'] != null && data['results'] is List) {
@@ -93,16 +147,9 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
         } else if (data['items'] != null && data['items'] is List) {
           results = data['items'] as List<dynamic>;
         } else {
-          // If no standard key found, log available keys for debugging
-          _logger.w(
-            'No recognized data key found in response from $endpoint. Keys: ${data.keys}',
-          );
           return [];
         }
       } else {
-        _logger.e(
-          'Unexpected response type from $endpoint: ${response.data.runtimeType}',
-        );
         return [];
       }
 
@@ -117,80 +164,38 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
         }
       }
 
-      _logger.i('Fetched ${uniqueResults.length} unique items from $endpoint');
       return uniqueResults.values.toList();
     } on Exception catch (e) {
-      _logger.e('Error fetching from $endpoint: $e');
+      _logger.e('Error fetching $endpoint: $e');
       return [];
     }
   }
 
-  // Track calls to prevent duplicate fetches
-  static int _getDevicesCallCount = 0;
-
   @override
   Future<List<DeviceModel>> getDevices({List<String>? fields}) async {
     try {
-      _getDevicesCallCount++;
-      final callId = _getDevicesCallCount;
-
-      _logger
-        ..i(
-          '📡 DEVICE_REMOTE_DATA_SOURCE: getDevices() CALL #$callId at ${DateTime.now().toIso8601String()}',
-        )
-        ..i(
-          'DeviceRemoteDataSource: Getting devices with fields: ${fields?.join(',')}',
-        )
-        ..i('🔍 DEBUG: Call stack trace for getDevices() - Call #$callId');
-      final stopwatch = Stopwatch()..start();
-
       // Fetch all device types in parallel with retry logic
-      _logger
-        ..d(
-          'DEVICE_REMOTE_DATA_SOURCE: Starting parallel fetch of device types with retry',
-        )
-        ..d('Starting parallel fetch of all device types');
       final results = await Future.wait([
         _fetchDeviceTypeWithRetry('access_points', fields: fields),
         _fetchDeviceTypeWithRetry('media_converters', fields: fields),
         _fetchDeviceTypeWithRetry('switch_devices', fields: fields),
         _fetchDeviceTypeWithRetry('wlan_devices', fields: fields),
       ]);
-      _logger.d('DEVICE_REMOTE_DATA_SOURCE: Parallel fetch completed');
 
       // Combine all results
-      final allDevices = <DeviceModel>[];
-      final apDevices = results[0];
-      final ontDevices = results[1];
-      final switchDevices = results[2];
-      final wlanDevices = results[3];
+      final allDevices = <DeviceModel>[
+        ...results[0],
+        ...results[1],
+        ...results[2],
+        ...results[3],
+      ];
 
-      // Combine all results (deduplication already handled in _fetchAllPages)
-      allDevices
-        ..addAll(apDevices)
-        ..addAll(ontDevices)
-        ..addAll(switchDevices)
-        ..addAll(wlanDevices);
-
-      stopwatch.stop();
-      _logger.i(
-        'Total ${allDevices.length} devices collected in ${stopwatch.elapsedMilliseconds}ms',
-      );
-
-      // Count devices by type for logging
-      final typeCounts = <String, int>{};
-      for (final device in allDevices) {
-        typeCounts[device.type] = (typeCounts[device.type] ?? 0) + 1;
-      }
-
-      _logger.d('Device counts by type:');
-      typeCounts.forEach((type, count) {
-        _logger.d('  $type: $count');
-      });
+      // Debug: Log device counts by type (using debugPrint for production visibility)
+      debugPrint('REMOTE_DATA_SOURCE: Fetched devices - APs: ${results[0].length}, ONTs: ${results[1].length}, Switches: ${results[2].length}, WLAN: ${results[3].length}');
 
       return allDevices;
     } on Exception catch (e) {
-      _logger.e('DeviceRemoteDataSource: Error - $e');
+      _logger.e('getDevices error: $e');
       throw Exception('Failed to get devices: $e');
     }
   }
@@ -199,52 +204,23 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
   Future<List<DeviceModel>> _fetchDeviceTypeWithRetry(
     String type, {
     List<String>? fields,
-    int maxRetries = 3,
+    int maxRetries = 2,
   }) async {
     for (var attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        _logger.d('Attempt $attempt of $maxRetries for $type');
-
-        // Try to fetch the device type
         final results = await _fetchDeviceType(type, fields: fields);
-
-        // If we got results, return them
-        if (results.isNotEmpty) {
-          _logger.i(
-            'Successfully fetched ${results.length} $type on attempt $attempt',
-          );
+        if (results.isNotEmpty || attempt == maxRetries) {
           return results;
         }
-
-        // Empty results might indicate a transient error - retry if not last attempt
-        if (attempt < maxRetries) {
-          _logger.w('Got 0 $type on attempt $attempt - retrying');
-          await Future<void>.delayed(Duration(seconds: attempt));
-          continue;
-        }
-
-        // Last attempt got empty results - accept it
-        _logger.w('Got 0 $type after $maxRetries attempts - may be legitimate');
-        return results;
-      } on Exception catch (e) {
-        _logger.e('Attempt $attempt failed for $type: $e');
-
-        // If this was our last attempt, return empty list for compatibility
+        // Empty results - brief retry delay
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      } on Exception catch (_) {
         if (attempt == maxRetries) {
-          _logger.e(
-            'All $maxRetries attempts failed for $type - returning empty list',
-          );
           return [];
         }
-
-        // Calculate backoff delay (exponential: 1s, 2s, 4s)
-        final delaySeconds = attempt;
-        _logger.d('Waiting ${delaySeconds}s before retry ${attempt + 1}');
-        await Future<void>.delayed(Duration(seconds: delaySeconds));
+        await Future<void>.delayed(const Duration(milliseconds: 500));
       }
     }
-
-    // Should never reach here, but return empty list for safety
     return [];
   }
 
@@ -254,47 +230,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
     List<String>? fields,
   }) async {
     try {
-      _logger
-        ..d(
-          'DEVICE_REMOTE_DATA_SOURCE: Fetching $type with fields: ${fields?.join(',')}',
-        )
-        ..d('Fetching $type')
-        ..i(
-          '🔍 _fetchDeviceType: Starting fetch for $type at ${DateTime.now().toIso8601String()}',
-        );
       final results = await _fetchAllPages('/api/$type.json', fields: fields);
-      _logger
-        ..d('DEVICE_REMOTE_DATA_SOURCE: Got ${results.length} $type')
-        ..d('Total $type fetched: ${results.length}')
-        ..i(
-          '🔍 _fetchDeviceType: Completed fetch for $type - got ${results.length} items',
-        );
-
-      // Special debugging for switches
-      if (type == 'switch_devices') {
-        _logger.i(
-          '🔍 SWITCH_DEVICES DEBUG: Raw API returned ${results.length} switches',
-        );
-        for (var i = 0; i < results.length; i++) {
-          final raw = results[i];
-          _logger.i(
-            '  Raw switch ${i + 1}: ID=${raw['id']}, Name=${raw['name'] ?? raw['nickname']}',
-          );
-        }
-      }
-
-      // Debug for WLAN devices
-      if (type == 'wlan_devices') {
-        _logger.i(
-          '🔍 WLAN_DEVICES DEBUG: Raw API returned ${results.length} WLAN devices',
-        );
-        for (var i = 0; i < results.length; i++) {
-          final raw = results[i];
-          _logger.i(
-            '  Raw WLAN ${i + 1}: ID=${raw['id']}, Name=${raw['name']}, Device=${raw['device']}',
-          );
-        }
-      }
 
       return results.map((deviceMap) {
         switch (type) {
@@ -312,6 +248,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
               'serial_number': deviceMap['serial_number'] ?? '',
               'location': _extractLocation(deviceMap),
               'last_seen': deviceMap['last_seen'] ?? deviceMap['updated_at'],
+              'images': _extractImages(deviceMap),
               'metadata': deviceMap,
             });
 
@@ -329,6 +266,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
               'serialNumber': deviceMap['serial_number'] ?? '',
               'location': _extractLocation(deviceMap),
               'last_seen': deviceMap['last_seen'] ?? deviceMap['updated_at'],
+              'images': _extractImages(deviceMap),
               'metadata': deviceMap,
             });
 
@@ -352,6 +290,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
               'location': _extractLocation(deviceMap),
               'last_seen':
                   deviceMap['last_config_sync_at'] ?? deviceMap['updated_at'],
+              'images': _extractImages(deviceMap),
               'metadata': deviceMap,
             });
 
@@ -372,6 +311,7 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
               'serial_number': deviceMap['serial_number'] ?? '',
               'location': _extractLocation(deviceMap),
               'last_seen': deviceMap['updated_at'],
+              'images': _extractImages(deviceMap),
               'metadata': deviceMap,
             });
 
@@ -430,90 +370,123 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
 
   @override
   Future<DeviceModel> getDevice(String id, {List<String>? fields}) async {
-    try {
-      // Try different endpoints based on what's available
+    // Extract the raw ID (remove prefix like ap_, ont_, sw_, wlan_)
+    final rawId = id.replaceFirst(RegExp('^(ap_|ont_|sw_|wlan_)'), '');
+
+    // Determine device type from prefix
+    String? deviceType;
+    if (id.startsWith('ap_')) {
+      deviceType = 'access_points';
+    } else if (id.startsWith('ont_')) {
+      deviceType = 'media_converters';
+    } else if (id.startsWith('sw_')) {
+      deviceType = 'switch_devices';
+    } else if (id.startsWith('wlan_')) {
+      deviceType = 'wlan_devices';
+    }
+
+    // Try specific endpoint first if we know the type
+    if (deviceType != null) {
       try {
         final response = await apiService.get<Map<String, dynamic>>(
-          '/api/devices/$id.json',
+          '/api/$deviceType/$rawId.json',
         );
         if (response.data != null) {
-          return DeviceModel.fromJson(response.data!);
+          return _buildDeviceModel(response.data!, deviceType);
         }
       } on Exception catch (_) {
-        // Try specific endpoints
-        try {
-          final response = await apiService.get<Map<String, dynamic>>(
-            '/api/switch_devices/$id.json',
-          );
-          if (response.data != null) {
-            final swMap = response.data!;
-            return DeviceModel.fromJson({
-              'id': swMap['id']?.toString() ?? '',
-              'name': swMap['name'] ?? 'Switch-${swMap['id']}',
-              'type': 'switch',
-              'status': _determineStatus(swMap),
-              'macAddress': swMap['scratch'] ?? '',
-              'ipAddress': swMap['host'] ?? '',
-              'model': swMap['model'] ?? '',
-              'serialNumber': swMap['serial_number'] ?? '',
-              'location': _extractLocation(swMap),
-              'lastSeen': swMap['last_config_sync_at'] ?? swMap['updated_at'],
-              'metadata': swMap,
-            });
-          }
-        } on Exception catch (_) {
-          // Try access points
-          try {
-            final response = await apiService.get<Map<String, dynamic>>(
-              '/api/access_points/$id.json',
-            );
-            if (response.data != null) {
-              final apMap = response.data!;
-              return DeviceModel.fromJson({
-                'id': apMap['id']?.toString() ?? '',
-                'name': apMap['name'] ?? 'AP-${apMap['id']}',
-                'type': 'access_point',
-                'status': _determineStatus(apMap),
-                'macAddress': apMap['mac'] ?? '',
-                'ipAddress': apMap['ip'] ?? '',
-                'model': apMap['model'] ?? '',
-                'serialNumber': apMap['serial_number'] ?? '',
-                'location': _extractLocation(apMap),
-                'lastSeen': apMap['updated_at'],
-                'metadata': apMap,
-              });
-            }
-          } on Exception catch (_) {
-            // Try media converters
-            try {
-              final response = await apiService.get<Map<String, dynamic>>(
-                '/api/media_converters/$id.json',
-              );
-              if (response.data != null) {
-                final ontMap = response.data!;
-                return DeviceModel.fromJson({
-                  'id': ontMap['id']?.toString() ?? '',
-                  'name': ontMap['name'] ?? 'ONT-${ontMap['id']}',
-                  'type': 'ont',
-                  'status': _determineStatus(ontMap),
-                  'macAddress': ontMap['mac'] ?? '',
-                  'ipAddress': ontMap['ip'] ?? '',
-                  'model': ontMap['model']?.toString() ?? '',
-                  'serialNumber': ontMap['serial_number'] ?? '',
-                  'location': _extractLocation(ontMap),
-                  'lastSeen': ontMap['updated_at'],
-                  'metadata': ontMap,
-                });
-              }
-            } on Exception catch (_) {
-              _logger.w('Device not found in any endpoint');
-            }
-          }
-        }
+        // Fall through to try other endpoints
       }
-      throw Exception('Device not found');
-    } on Exception catch (e) {
-      throw Exception('Failed to get device: $e');
+    }
+
+    // Try all endpoints
+    for (final endpoint in ['switch_devices', 'access_points', 'media_converters', 'wlan_devices']) {
+      try {
+        final response = await apiService.get<Map<String, dynamic>>(
+          '/api/$endpoint/$rawId.json',
+        );
+        if (response.data != null) {
+          return _buildDeviceModel(response.data!, endpoint);
+        }
+      } on Exception catch (_) {
+        // Continue to next endpoint
+      }
+    }
+
+    throw Exception('Device not found');
+  }
+
+  DeviceModel _buildDeviceModel(Map<String, dynamic> data, String endpoint) {
+    switch (endpoint) {
+      case 'access_points':
+        return DeviceModel.fromJson({
+          'id': 'ap_${data['id']?.toString() ?? ''}',
+          'name': data['name'] ?? 'AP-${data['id']}',
+          'type': 'access_point',
+          'status': _determineStatus(data),
+          'pms_room_id': _extractPmsRoomId(data),
+          'mac_address': data['mac'] ?? data['mac_address'] ?? '',
+          'ip_address': data['ip'] ?? data['ip_address'] ?? '',
+          'model': data['model'] ?? '',
+          'serial_number': data['serial_number'] ?? '',
+          'location': _extractLocation(data),
+          'last_seen': data['last_seen'] ?? data['updated_at'],
+          'images': _extractImages(data),
+          'metadata': data,
+        });
+
+      case 'media_converters':
+        return DeviceModel.fromJson({
+          'id': 'ont_${data['id']?.toString() ?? ''}',
+          'name': data['name'] ?? 'ONT-${data['id']}',
+          'type': 'ont',
+          'status': _determineStatus(data),
+          'pms_room_id': _extractPmsRoomId(data),
+          'mac_address': data['mac'] ?? data['mac_address'] ?? '',
+          'ip_address': data['ip'] ?? data['ip_address'] ?? '',
+          'model': data['model']?.toString() ?? '',
+          'serial_number': data['serial_number'] ?? '',
+          'location': _extractLocation(data),
+          'last_seen': data['last_seen'] ?? data['updated_at'],
+          'images': _extractImages(data),
+          'metadata': data,
+        });
+
+      case 'switch_devices':
+        return DeviceModel.fromJson({
+          'id': 'sw_${data['id']?.toString() ?? ''}',
+          'name': data['name'] ?? data['nickname'] ?? 'Switch-${data['id']}',
+          'type': 'switch',
+          'status': _determineStatus(data),
+          'pms_room_id': _extractPmsRoomId(data),
+          'mac_address': data['scratch'] ?? '',
+          'ip_address': data['host'] ?? data['loopback_ip'] ?? '',
+          'model': data['model'] ?? data['device'] ?? '',
+          'serial_number': data['serial_number'] ?? '',
+          'location': _extractLocation(data),
+          'last_seen': data['last_config_sync_at'] ?? data['updated_at'],
+          'images': _extractImages(data),
+          'metadata': data,
+        });
+
+      case 'wlan_devices':
+        return DeviceModel.fromJson({
+          'id': 'wlan_${data['id']?.toString() ?? ''}',
+          'name': data['name'] ?? 'WLAN-${data['id']}',
+          'type': 'wlan_controller',
+          'status': _determineStatus(data),
+          'mac_address': data['mac'] ?? data['mac_address'] ?? '',
+          'ip_address': data['host'] ?? data['ip'] ?? data['ip_address'] ?? '',
+          'model': data['model'] ?? data['device'] ?? '',
+          'serial_number': data['serial_number'] ?? '',
+          'location': _extractLocation(data),
+          'last_seen': data['updated_at'],
+          'images': _extractImages(data),
+          'metadata': data,
+        });
+
+      default:
+        return DeviceModel.fromJson(data);
     }
   }
 

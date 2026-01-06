@@ -1,4 +1,4 @@
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/features/settings/domain/entities/app_settings.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -45,7 +45,7 @@ class SettingsState {
 /// Main settings provider
 @riverpod
 class SettingsNotifier extends _$SettingsNotifier {
-  final Logger _logger = Logger();
+  final _logger = LoggerConfig.getLogger();
   AppSettings? _cachedSettings;
 
   @override

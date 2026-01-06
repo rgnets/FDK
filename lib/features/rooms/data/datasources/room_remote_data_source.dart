@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/api_service.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
@@ -19,7 +19,7 @@ class RoomRemoteDataSourceImpl implements RoomRemoteDataSource {
   const RoomRemoteDataSourceImpl({required this.apiService});
 
   final ApiService apiService;
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
 
   @override
   Future<List<RoomModel>> getRooms() async {

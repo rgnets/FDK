@@ -51,7 +51,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (EnvironmentConfig.isDevelopment) {
       logger
         ..i('🔧 SPLASH_SCREEN: Development mode detected')
-        ..d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
+        ..d('SPLASH_SCREEN: skipAutoLogin=${EnvironmentConfig.skipAutoLogin}')
+        ..d(
+          'SPLASH_SCREEN: useSyntheticData=${EnvironmentConfig.useSyntheticData}',
+        );
+
+      if (!EnvironmentConfig.useSyntheticData) {
+        logger.i('SPLASH_SCREEN: Dev remote mode, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
+
+      if (EnvironmentConfig.skipAutoLogin) {
+        logger.i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
+      logger.d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
       // Development mode: skip auth and go directly to home with synthetic data
       if (mounted) {
         logger.d('SPLASH_SCREEN: Widget is mounted, navigating...');
@@ -64,6 +84,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     if (EnvironmentConfig.isStaging) {
+      if (EnvironmentConfig.skipAutoLogin) {
+        logger
+          ..i('🧪 SPLASH_SCREEN: Staging mode detected')
+          ..i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
       // Staging mode: auto-authenticate with interurban credentials from QR code
       logger
         ..i('🧪 SPLASH_SCREEN: Staging mode detected')

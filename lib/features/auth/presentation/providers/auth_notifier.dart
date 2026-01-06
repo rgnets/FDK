@@ -511,14 +511,14 @@ Uri _buildActionCableUri({
   required String fqdn,
   required String apiKey,
 }) {
-  final useBaseUri = EnvironmentConfig.isDevelopment;
-  final uri = useBaseUri
+  final shouldUseBaseUri = EnvironmentConfig.isDevelopment && fqdn.isEmpty;
+  final uri = shouldUseBaseUri
       ? baseUri
       : Uri(
-        scheme: 'wss',
-        host: fqdn,
-        path: '/cable',
-      );
+          scheme: 'wss',
+          host: fqdn,
+          path: '/cable',
+        );
 
   final queryParameters = Map<String, String>.from(uri.queryParameters);
   if (apiKey.isNotEmpty) {
@@ -528,6 +528,15 @@ Uri _buildActionCableUri({
   return uri.replace(
     queryParameters: queryParameters.isEmpty ? null : queryParameters,
   );
+}
+
+bool _isLocalHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  return normalized.isEmpty ||
+      normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1' ||
+      normalized == '10.0.2.2';
 }
 
 Map<String, dynamic> _buildAuthHeaders(String apiKey) {

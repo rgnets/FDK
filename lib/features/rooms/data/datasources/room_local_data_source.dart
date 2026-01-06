@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
 
@@ -21,7 +21,7 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
   });
 
   final StorageService storageService;
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
   static const String _roomsKey = 'cached_rooms';
   static const String _roomKeyPrefix = 'cached_room_';
   static const String _cacheTimestampKey = 'rooms_cache_timestamp';

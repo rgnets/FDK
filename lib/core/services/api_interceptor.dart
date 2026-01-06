@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/app_config.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 
 /// API Interceptor for handling authentication and logging
@@ -15,7 +15,7 @@ class ApiInterceptor extends InterceptorsWrapper {
          onResponse: _onResponse,
        );
 
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
 
   static void _onRequest(
     RequestOptions options,

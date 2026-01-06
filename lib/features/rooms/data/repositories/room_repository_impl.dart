@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:fpdart/fpdart.dart';
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_mock_data_source.dart';
@@ -18,7 +18,7 @@ class RoomRepositoryImpl implements RoomRepository {
     this.localDataSource,
   });
   
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
   final RoomRemoteDataSource remoteDataSource;
   final RoomMockDataSource mockDataSource;
   final RoomLocalDataSource? localDataSource;
@@ -29,8 +29,8 @@ class RoomRepositoryImpl implements RoomRepository {
       _logger
         ..i('RoomRepositoryImpl.getRooms() called')
         ..i('Environment check: isDevelopment=${EnvironmentConfig.isDevelopment}, isStaging=${EnvironmentConfig.isStaging}, isProduction=${EnvironmentConfig.isProduction}');
-      // Try to use cached data first if valid (except in development mode)
-      if (localDataSource != null && !EnvironmentConfig.isDevelopment) {
+      // Try to use cached data first if valid (except in synthetic mode)
+      if (localDataSource != null && !EnvironmentConfig.useSyntheticData) {
         final isValid = await localDataSource!.isCacheValid();
         if (isValid) {
           _logger.i('RoomRepositoryImpl: Cache is valid, loading from cache');
@@ -46,9 +46,9 @@ class RoomRepositoryImpl implements RoomRepository {
         }
       }
       
-      // Development mode: use mock data
-      if (EnvironmentConfig.isDevelopment) {
-        _logger.i('RoomRepositoryImpl: Using DEVELOPMENT MODE - returning mock data');
+      // Synthetic data mode: use mock data
+      if (EnvironmentConfig.useSyntheticData) {
+        _logger.i('RoomRepositoryImpl: Using synthetic data - returning mock data');
         final roomModels = await mockDataSource.getRooms();
         final rooms = _convertRoomModelsToEntities(roomModels);
         _logger.i('RoomRepositoryImpl: Returning ${rooms.length} mock rooms');
@@ -93,8 +93,8 @@ class RoomRepositoryImpl implements RoomRepository {
     try {
       _logger.i('RoomRepositoryImpl.getRoom($id) called');
       
-      // Try cached data first (except in development mode)
-      if (localDataSource != null && !EnvironmentConfig.isDevelopment) {
+      // Try cached data first (except in synthetic mode)
+      if (localDataSource != null && !EnvironmentConfig.useSyntheticData) {
         final cachedRoom = await localDataSource!.getCachedRoom(id);
         if (cachedRoom != null && await localDataSource!.isCacheValid()) {
           _logger.i('RoomRepositoryImpl: Using cached room $id');
@@ -102,8 +102,8 @@ class RoomRepositoryImpl implements RoomRepository {
         }
       }
       
-      // Development mode: use mock data
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: use mock data
+      if (EnvironmentConfig.useSyntheticData) {
         _logger.i('RoomRepositoryImpl: Using mock data for room $id');
         final roomModel = await mockDataSource.getRoom(id);
         return Right(_convertRoomModelToEntity(roomModel));
@@ -142,8 +142,8 @@ class RoomRepositoryImpl implements RoomRepository {
       
       final roomModel = _convertEntityToRoomModel(room);
       
-      // Development mode: use mock data source
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: use mock data source
+      if (EnvironmentConfig.useSyntheticData) {
         final createdRoom = await mockDataSource.createRoom(roomModel);
         return Right(_convertRoomModelToEntity(createdRoom));
       }
@@ -170,8 +170,8 @@ class RoomRepositoryImpl implements RoomRepository {
       
       final roomModel = _convertEntityToRoomModel(room);
       
-      // Development mode: use mock data source
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: use mock data source
+      if (EnvironmentConfig.useSyntheticData) {
         final updatedRoom = await mockDataSource.updateRoom(roomModel);
         return Right(_convertRoomModelToEntity(updatedRoom));
       }
@@ -196,8 +196,8 @@ class RoomRepositoryImpl implements RoomRepository {
     try {
       _logger.i('RoomRepositoryImpl.deleteRoom($id) called');
       
-      // Development mode: use mock data source
-      if (EnvironmentConfig.isDevelopment) {
+      // Synthetic data mode: use mock data source
+      if (EnvironmentConfig.useSyntheticData) {
         await mockDataSource.deleteRoom(id);
         return const Right(null);
       }

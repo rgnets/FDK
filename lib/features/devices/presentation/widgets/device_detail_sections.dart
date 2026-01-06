@@ -32,8 +32,6 @@ class DeviceDetailSections extends StatelessWidget {
         _buildNotesSection(context),
         const SizedBox(height: 16),
         _buildImagesSection(context),
-        const SizedBox(height: 16),
-        _buildMetadataSection(context),
       ],
     );
   }
@@ -224,8 +222,26 @@ class DeviceDetailSections extends StatelessWidget {
     );
   }
 
+  /// Get valid image URLs from device
+  List<String> get _validImages {
+    final images = device.images;
+    if (images == null || images.isEmpty) {
+      return [];
+    }
+
+    // Filter to only valid http/https URLs
+    return images.where((url) {
+      if (url.isEmpty) {
+        return false;
+      }
+      final lower = url.toLowerCase();
+      return lower.startsWith('http://') || lower.startsWith('https://');
+    }).toList();
+  }
+
   Widget _buildImagesSection(BuildContext context) {
-    if (device.images == null || device.images!.isEmpty) {
+    final images = _validImages;
+    if (images.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -237,19 +253,51 @@ class DeviceDetailSections extends StatelessWidget {
           height: 120,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: device.images!.length,
+            itemCount: images.length,
             itemBuilder: (context, index) {
+              final imageUrl = images[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 120,
-                    color: Colors.grey[300],
-                    child: const Icon(
-                      Icons.image,
-                      size: 40,
-                      color: Colors.grey,
+                child: GestureDetector(
+                  onTap: () => _showEnlargedImage(context, imageUrl, index, images),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        cacheWidth: 240,
+                        cacheHeight: 240,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) {
+                            return child;
+                          }
+                          return Container(
+                            color: Colors.grey[800],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[800],
+                            child: const Icon(
+                              Icons.broken_image,
+                              size: 40,
+                              color: Colors.grey,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -261,33 +309,102 @@ class DeviceDetailSections extends StatelessWidget {
     );
   }
 
-  Widget _buildMetadataSection(BuildContext context) {
-    if (device.metadata == null || device.metadata!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return _SectionCard(
-      title: 'Additional Metadata',
-      icon: Icons.data_object,
-      children: device.metadata!.entries.map((entry) {
-        return _DetailRow(
-          _formatMetadataKey(entry.key),
-          entry.value?.toString() ?? 'N/A',
-        );
-      }).toList(),
+  void _showEnlargedImage(
+    BuildContext context,
+    String imageUrl,
+    int index,
+    List<String> images,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            // Image with interactive viewer
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (ctx, child, loadingProgress) {
+                      if (loadingProgress == null) {
+                        return child;
+                      }
+                      return Container(
+                        width: 300,
+                        height: 300,
+                        color: Colors.grey[900],
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (ctx, error, stackTrace) {
+                      return Container(
+                        width: 300,
+                        height: 300,
+                        color: Colors.grey[900],
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text(
+                              'Failed to load image',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            // Close button
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ),
+            // Image counter
+            if (images.length > 1)
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${index + 1} / ${images.length}',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
-  }
-
-  String _formatMetadataKey(String key) {
-    return key
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map(
-          (word) => word.isNotEmpty
-              ? '${word[0].toUpperCase()}${word.substring(1)}'
-              : '',
-        )
-        .join(' ');
   }
 
   String _formatDateTime(DateTime dateTime) {

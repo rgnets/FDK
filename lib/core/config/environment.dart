@@ -1,22 +1,17 @@
-import 'package:logger/logger.dart';
+import 'package:flutter/foundation.dart';
 
 /// Environment configuration for different build flavors
 enum Environment { development, staging, production }
 
 class EnvironmentConfig {
   static Environment _environment = Environment.development;
-  static final Logger _logger = Logger();
 
   static void setEnvironment(Environment env) {
-    _logger.i('🔧 EnvironmentConfig: Setting environment to ${env.name}');
     _environment = env;
-    _logger
-      ..i(
-        '🔧 EnvironmentConfig: Environment set, isDevelopment=$isDevelopment, isStaging=$isStaging, isProduction=$isProduction',
-      )
-      ..i('🔧 EnvironmentConfig: API Base URL will be: $apiBaseUrl')
-      ..i('🔧 EnvironmentConfig: WebSocket URL will be: $websocketBaseUrl')
-      ..i('🔧 EnvironmentConfig: useSyntheticData=$useSyntheticData');
+    // Only log in debug mode to avoid memory issues
+    if (kDebugMode) {
+      debugPrint('EnvironmentConfig: Set to ${env.name}');
+    }
   }
 
   static Environment get environment => _environment;
@@ -107,9 +102,20 @@ class EnvironmentConfig {
   /// Feature flags
   static bool get enableLogging => !isProduction;
   static bool get useSyntheticData =>
-      isDevelopment; // Only debug uses synthetic
+      isDevelopment &&
+      const bool.fromEnvironment(
+        'USE_SYNTHETIC_DATA',
+        defaultValue: false,
+      );
   static bool get enableDebugBanner => isDevelopment;
   static bool get enablePerformanceOverlay => isDevelopment;
+
+  static bool get skipAutoLogin {
+    return const bool.fromEnvironment(
+      'SKIP_AUTO_LOGIN',
+      defaultValue: false,
+    );
+  }
 
   /// API Credentials
   static String get apiUsername {

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 
 /// Service for monitoring and tracking performance metrics
 class PerformanceMonitorService {
@@ -11,7 +11,7 @@ class PerformanceMonitorService {
   // Performance metrics storage
   final _metrics = HashMap<String, List<PerformanceMetric>>();
   final _activeOperations = HashMap<String, Stopwatch>();
-  final Logger _logger = Logger();
+  final _logger = LoggerConfig.getLogger();
   
   // Stream for real-time metrics
   final _metricsController = StreamController<PerformanceMetric>.broadcast();

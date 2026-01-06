@@ -37,34 +37,16 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 
 /// Dio HTTP client provider
 final dioProvider = Provider<Dio>((ref) {
-  final dio = Dio(
+  return Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
     ),
   );
-
-  // Add interceptors for logging only in development
-  if (EnvironmentConfig.isDevelopment) {
-    final logger = ref.watch(loggerProvider);
-    dio.interceptors.add(
-      LogInterceptor(
-        request: true,
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
-        error: true,
-        logPrint: (object) => logger.d(object.toString()),
-      ),
-    );
-  }
-
-  return dio;
 });
 
 /// Storage service provider
