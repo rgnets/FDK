@@ -5,7 +5,7 @@ import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 
 abstract class DeviceLocalDataSource {
-  Future<List<DeviceModel>> getCachedDevices();
+  Future<List<DeviceModel>> getCachedDevices({bool allowStale = false});
   Future<void> cacheDevices(List<DeviceModel> devices);
   Future<DeviceModel?> getCachedDevice(String id);
   Future<void> cacheDevice(DeviceModel device);
@@ -47,10 +47,10 @@ class DeviceLocalDataSourceImpl implements DeviceLocalDataSource {
   }
 
   @override
-  Future<List<DeviceModel>> getCachedDevices() async {
+  Future<List<DeviceModel>> getCachedDevices({bool allowStale = false}) async {
     try {
       // Check if cache is valid
-      if (!await isCacheValid()) {
+      if (!allowStale && !await isCacheValid()) {
         _logger.d('Cache expired or invalid');
         return [];
       }

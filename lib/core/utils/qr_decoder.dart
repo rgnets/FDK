@@ -16,6 +16,13 @@ class QrDecoder {
       if (EnvironmentConfig.isStaging || EnvironmentConfig.isDevelopment) {
         // Use environment-configured credentials
         final apiUrl = EnvironmentConfig.apiBaseUrl;
+        final login = EnvironmentConfig.apiUsername;
+        final apiKey = EnvironmentConfig.apiKey;
+        if (apiUrl.isEmpty || login.isEmpty || apiKey.isEmpty) {
+          _logger.w('QR credentials not configured via environment');
+          return null;
+        }
+
         final fqdn = apiUrl
             .replaceFirst('https://', '')
             .replaceFirst('http://', '')
@@ -24,8 +31,8 @@ class QrDecoder {
 
         return {
           'fqdn': fqdn,
-          'login': EnvironmentConfig.apiUsername,
-          'apiKey': EnvironmentConfig.apiKey,
+          'login': login,
+          'apiKey': apiKey,
           'site_name': fqdn,
           'timestamp': DateTime.now().toUtc().toIso8601String(),
         };

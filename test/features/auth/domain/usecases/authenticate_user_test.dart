@@ -171,7 +171,7 @@ void main() {
         // assert
         expect(params1, equals(params2));
         expect(params1, isNot(equals(params3)));
-        expect(params1.props, [tFqdn, tLogin, tApiKey]);
+        expect(params1.props, [tFqdn, tLogin, tApiKey, null, null, null]);
       });
     });
   });

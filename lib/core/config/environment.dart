@@ -32,8 +32,10 @@ class EnvironmentConfig {
           defaultValue: 'http://mock-api.local',
         );
       case Environment.staging:
-        // Staging uses the interurban test environment
-        return 'https://vgw1-01.dal-interurban.mdu.attwifi.com';
+        return const String.fromEnvironment(
+          'STAGING_API_URL',
+          defaultValue: '',
+        );
       case Environment.production:
         // Production will use real customer URL (provided at runtime)
         return const String.fromEnvironment(
@@ -69,14 +71,6 @@ class EnvironmentConfig {
     return envFlag;
   }
 
-  static bool get enableRestFallback {
-    const envFlag = bool.fromEnvironment(
-      'USE_REST_FALLBACK',
-      defaultValue: true,
-    );
-    return envFlag;
-  }
-
   static Duration get webSocketInitialReconnectDelay => const Duration(
     milliseconds: int.fromEnvironment(
       'WS_RECONNECT_BASE_MS',
@@ -105,7 +99,7 @@ class EnvironmentConfig {
       isDevelopment &&
       const bool.fromEnvironment(
         'USE_SYNTHETIC_DATA',
-        defaultValue: false,
+        defaultValue: true,
       );
   static bool get enableDebugBanner => isDevelopment;
   static bool get enablePerformanceOverlay => isDevelopment;
@@ -123,8 +117,10 @@ class EnvironmentConfig {
       case Environment.development:
         return 'synthetic_user'; // Not used with synthetic data
       case Environment.staging:
-        // Interurban test credentials
-        return 'fetoolreadonly';
+        return const String.fromEnvironment(
+          'STAGING_API_LOGIN',
+          defaultValue: '',
+        );
       case Environment.production:
         return const String.fromEnvironment('API_USERNAME', defaultValue: '');
     }
@@ -135,14 +131,10 @@ class EnvironmentConfig {
       case Environment.development:
         return 'synthetic_key'; // Not used with synthetic data
       case Environment.staging:
-        // For staging, use environment variable with fallback to known staging key
-        // This ensures staging works even without explicit environment variables
-        const stagingKey = String.fromEnvironment(
+        return const String.fromEnvironment(
           'STAGING_API_KEY',
-          defaultValue:
-              'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r',
+          defaultValue: '',
         );
-        return stagingKey;
       case Environment.production:
         const key = String.fromEnvironment('API_KEY', defaultValue: '');
         if (key.isEmpty) {
