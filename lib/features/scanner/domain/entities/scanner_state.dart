@@ -223,6 +223,12 @@ class ScannerState with _$ScannerState {
     /// Matched device name.
     String? matchedDeviceName,
 
+    /// Matched device's current room ID (for move/reset detection).
+    int? matchedDeviceRoomId,
+
+    /// Matched device's current room name (for display).
+    String? matchedDeviceRoomName,
+
     /// Device match status.
     @Default(DeviceMatchStatus.unchecked) DeviceMatchStatus matchStatus,
   }) = _ScannerState;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
 
 /// Displays the requirements checklist for the current scan mode.
 ///
@@ -38,7 +39,7 @@ class ScannerRequirementsDisplay extends ConsumerWidget {
           Row(
             children: [
               Icon(
-                _getModeIcon(scanMode),
+                ScannerUtils.getModeIcon(scanMode),
                 size: 20,
                 color: Theme.of(context).colorScheme.primary,
               ),
@@ -154,20 +155,6 @@ class ScannerRequirementsDisplay extends ConsumerWidget {
     );
   }
 
-  IconData _getModeIcon(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return Icons.wifi;
-      case ScanMode.ont:
-        return Icons.router;
-      case ScanMode.switchDevice:
-        return Icons.lan;
-      case ScanMode.rxg:
-        return Icons.qr_code;
-      case ScanMode.auto:
-        return Icons.auto_awesome;
-    }
-  }
 }
 
 /// Compact inline version showing just the scan data values.
@@ -199,7 +186,7 @@ class ScannerDataDisplay extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (scanData.mac.isNotEmpty)
-            _buildDataRow(context, 'MAC', _formatMac(scanData.mac)),
+            _buildDataRow(context, 'MAC', ScannerUtils.formatMac(scanData.mac)),
           if (scanData.serialNumber.isNotEmpty)
             _buildDataRow(context, 'Serial', scanData.serialNumber),
           if (scanData.partNumber.isNotEmpty)
@@ -240,12 +227,5 @@ class ScannerDataDisplay extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _formatMac(String mac) {
-    if (mac.length != 12) return mac;
-    return '${mac.substring(0, 2)}:${mac.substring(2, 4)}:'
-        '${mac.substring(4, 6)}:${mac.substring(6, 8)}:'
-        '${mac.substring(8, 10)}:${mac.substring(10, 12)}';
   }
 }

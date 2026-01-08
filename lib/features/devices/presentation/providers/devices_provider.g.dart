@@ -21,7 +21,7 @@ final filteredDevicesProvider = Provider<List<Device>>.internal(
 );
 
 typedef FilteredDevicesRef = ProviderRef<List<Device>>;
-String _$devicesNotifierHash() => r'b1e3a083fbfa1297431caf28c36d1d6c2b437f5e';
+String _$devicesNotifierHash() => r'efb8f6d509a73400964d891ca9c5ca07f69cda1d';
 
 /// See also [DevicesNotifier].
 @ProviderFor(DevicesNotifier)

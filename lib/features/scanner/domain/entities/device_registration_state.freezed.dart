@@ -23,6 +23,12 @@ mixin _$DeviceRegistrationState {
   String? get deviceType => throw _privateConstructorUsedError;
   int? get matchedDeviceId => throw _privateConstructorUsedError;
   String? get matchedDeviceName => throw _privateConstructorUsedError;
+
+  /// Current room ID of matched device (for move/reset detection)
+  int? get matchedDeviceRoomId => throw _privateConstructorUsedError;
+
+  /// Current room name of matched device (for display)
+  String? get matchedDeviceRoomName => throw _privateConstructorUsedError;
   MatchMismatchInfo? get mismatchInfo => throw _privateConstructorUsedError;
   String? get errorMessage => throw _privateConstructorUsedError;
   DateTime? get registeredAt => throw _privateConstructorUsedError;
@@ -36,6 +42,8 @@ mixin _$DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)
@@ -52,6 +60,8 @@ mixin _$DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)?
@@ -68,6 +78,8 @@ mixin _$DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)?
@@ -111,6 +123,8 @@ abstract class $DeviceRegistrationStateCopyWith<$Res> {
       String? deviceType,
       int? matchedDeviceId,
       String? matchedDeviceName,
+      int? matchedDeviceRoomId,
+      String? matchedDeviceRoomName,
       MatchMismatchInfo? mismatchInfo,
       String? errorMessage,
       DateTime? registeredAt});
@@ -139,6 +153,8 @@ class _$DeviceRegistrationStateCopyWithImpl<$Res,
     Object? deviceType = freezed,
     Object? matchedDeviceId = freezed,
     Object? matchedDeviceName = freezed,
+    Object? matchedDeviceRoomId = freezed,
+    Object? matchedDeviceRoomName = freezed,
     Object? mismatchInfo = freezed,
     Object? errorMessage = freezed,
     Object? registeredAt = freezed,
@@ -171,6 +187,14 @@ class _$DeviceRegistrationStateCopyWithImpl<$Res,
       matchedDeviceName: freezed == matchedDeviceName
           ? _value.matchedDeviceName
           : matchedDeviceName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      matchedDeviceRoomId: freezed == matchedDeviceRoomId
+          ? _value.matchedDeviceRoomId
+          : matchedDeviceRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      matchedDeviceRoomName: freezed == matchedDeviceRoomName
+          ? _value.matchedDeviceRoomName
+          : matchedDeviceRoomName // ignore: cast_nullable_to_non_nullable
               as String?,
       mismatchInfo: freezed == mismatchInfo
           ? _value.mismatchInfo
@@ -217,6 +241,8 @@ abstract class _$$DeviceRegistrationStateImplCopyWith<$Res>
       String? deviceType,
       int? matchedDeviceId,
       String? matchedDeviceName,
+      int? matchedDeviceRoomId,
+      String? matchedDeviceRoomName,
       MatchMismatchInfo? mismatchInfo,
       String? errorMessage,
       DateTime? registeredAt});
@@ -245,6 +271,8 @@ class __$$DeviceRegistrationStateImplCopyWithImpl<$Res>
     Object? deviceType = freezed,
     Object? matchedDeviceId = freezed,
     Object? matchedDeviceName = freezed,
+    Object? matchedDeviceRoomId = freezed,
+    Object? matchedDeviceRoomName = freezed,
     Object? mismatchInfo = freezed,
     Object? errorMessage = freezed,
     Object? registeredAt = freezed,
@@ -278,6 +306,14 @@ class __$$DeviceRegistrationStateImplCopyWithImpl<$Res>
           ? _value.matchedDeviceName
           : matchedDeviceName // ignore: cast_nullable_to_non_nullable
               as String?,
+      matchedDeviceRoomId: freezed == matchedDeviceRoomId
+          ? _value.matchedDeviceRoomId
+          : matchedDeviceRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      matchedDeviceRoomName: freezed == matchedDeviceRoomName
+          ? _value.matchedDeviceRoomName
+          : matchedDeviceRoomName // ignore: cast_nullable_to_non_nullable
+              as String?,
       mismatchInfo: freezed == mismatchInfo
           ? _value.mismatchInfo
           : mismatchInfo // ignore: cast_nullable_to_non_nullable
@@ -305,6 +341,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
       this.deviceType,
       this.matchedDeviceId,
       this.matchedDeviceName,
+      this.matchedDeviceRoomId,
+      this.matchedDeviceRoomName,
       this.mismatchInfo,
       this.errorMessage,
       this.registeredAt})
@@ -326,6 +364,14 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
   final int? matchedDeviceId;
   @override
   final String? matchedDeviceName;
+
+  /// Current room ID of matched device (for move/reset detection)
+  @override
+  final int? matchedDeviceRoomId;
+
+  /// Current room name of matched device (for display)
+  @override
+  final String? matchedDeviceRoomName;
   @override
   final MatchMismatchInfo? mismatchInfo;
   @override
@@ -335,7 +381,7 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
 
   @override
   String toString() {
-    return 'DeviceRegistrationState(status: $status, matchStatus: $matchStatus, scannedMac: $scannedMac, scannedSerial: $scannedSerial, deviceType: $deviceType, matchedDeviceId: $matchedDeviceId, matchedDeviceName: $matchedDeviceName, mismatchInfo: $mismatchInfo, errorMessage: $errorMessage, registeredAt: $registeredAt)';
+    return 'DeviceRegistrationState(status: $status, matchStatus: $matchStatus, scannedMac: $scannedMac, scannedSerial: $scannedSerial, deviceType: $deviceType, matchedDeviceId: $matchedDeviceId, matchedDeviceName: $matchedDeviceName, matchedDeviceRoomId: $matchedDeviceRoomId, matchedDeviceRoomName: $matchedDeviceRoomName, mismatchInfo: $mismatchInfo, errorMessage: $errorMessage, registeredAt: $registeredAt)';
   }
 
   @override
@@ -356,6 +402,10 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
                 other.matchedDeviceId == matchedDeviceId) &&
             (identical(other.matchedDeviceName, matchedDeviceName) ||
                 other.matchedDeviceName == matchedDeviceName) &&
+            (identical(other.matchedDeviceRoomId, matchedDeviceRoomId) ||
+                other.matchedDeviceRoomId == matchedDeviceRoomId) &&
+            (identical(other.matchedDeviceRoomName, matchedDeviceRoomName) ||
+                other.matchedDeviceRoomName == matchedDeviceRoomName) &&
             (identical(other.mismatchInfo, mismatchInfo) ||
                 other.mismatchInfo == mismatchInfo) &&
             (identical(other.errorMessage, errorMessage) ||
@@ -374,6 +424,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
       deviceType,
       matchedDeviceId,
       matchedDeviceName,
+      matchedDeviceRoomId,
+      matchedDeviceRoomName,
       mismatchInfo,
       errorMessage,
       registeredAt);
@@ -396,6 +448,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)
@@ -409,6 +463,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
         deviceType,
         matchedDeviceId,
         matchedDeviceName,
+        matchedDeviceRoomId,
+        matchedDeviceRoomName,
         mismatchInfo,
         errorMessage,
         registeredAt);
@@ -425,6 +481,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)?
@@ -438,6 +496,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
         deviceType,
         matchedDeviceId,
         matchedDeviceName,
+        matchedDeviceRoomId,
+        matchedDeviceRoomName,
         mismatchInfo,
         errorMessage,
         registeredAt);
@@ -454,6 +514,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
             String? deviceType,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             MatchMismatchInfo? mismatchInfo,
             String? errorMessage,
             DateTime? registeredAt)?
@@ -469,6 +531,8 @@ class _$DeviceRegistrationStateImpl extends _DeviceRegistrationState {
           deviceType,
           matchedDeviceId,
           matchedDeviceName,
+          matchedDeviceRoomId,
+          matchedDeviceRoomName,
           mismatchInfo,
           errorMessage,
           registeredAt);
@@ -514,6 +578,8 @@ abstract class _DeviceRegistrationState extends DeviceRegistrationState {
       final String? deviceType,
       final int? matchedDeviceId,
       final String? matchedDeviceName,
+      final int? matchedDeviceRoomId,
+      final String? matchedDeviceRoomName,
       final MatchMismatchInfo? mismatchInfo,
       final String? errorMessage,
       final DateTime? registeredAt}) = _$DeviceRegistrationStateImpl;
@@ -533,6 +599,14 @@ abstract class _DeviceRegistrationState extends DeviceRegistrationState {
   int? get matchedDeviceId;
   @override
   String? get matchedDeviceName;
+  @override
+
+  /// Current room ID of matched device (for move/reset detection)
+  int? get matchedDeviceRoomId;
+  @override
+
+  /// Current room name of matched device (for display)
+  String? get matchedDeviceRoomName;
   @override
   MatchMismatchInfo? get mismatchInfo;
   @override

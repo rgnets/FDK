@@ -148,6 +148,32 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     return mac.replaceAll(RegExp('[^0-9A-Fa-f]'), '').toUpperCase();
   }
 
+  /// Extract room ID from device payload (handles nested and flat structures).
+  int? _extractRoomId(Map<String, dynamic> device) {
+    // Try flat structure first
+    if (device['pms_room_id'] != null) {
+      return device['pms_room_id'] as int?;
+    }
+    // Try nested pms_room object
+    final pmsRoom = device['pms_room'];
+    if (pmsRoom is Map<String, dynamic>) {
+      return pmsRoom['id'] as int?;
+    }
+    // Try alternate field names
+    return device['room_id'] as int?;
+  }
+
+  /// Extract room name from device payload (handles nested and flat structures).
+  String? _extractRoomName(Map<String, dynamic> device) {
+    // Try nested pms_room object first (preferred for name)
+    final pmsRoom = device['pms_room'];
+    if (pmsRoom is Map<String, dynamic>) {
+      return (pmsRoom['room_number'] ?? pmsRoom['name']) as String?;
+    }
+    // Try flat structure
+    return (device['pms_room_name'] ?? device['room_name']) as String?;
+  }
+
   /// Check if a device already exists with the given MAC and serial.
   /// Returns match status and any mismatches found.
   Future<void> checkDeviceMatch({
@@ -187,11 +213,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       if (byMac != null && bySerial != null) {
         if (byMac['id'] == bySerial['id']) {
           // Full match - same device
+          // Extract room info from device payload (nested or flat)
+          final roomId = _extractRoomId(byMac);
+          final roomName = _extractRoomName(byMac);
+
           state = state.copyWith(
             status: RegistrationStatus.idle,
             matchStatus: DeviceMatchStatus.fullMatch,
             matchedDeviceId: byMac['id'] as int?,
             matchedDeviceName: byMac['name'] as String?,
+            matchedDeviceRoomId: roomId,
+            matchedDeviceRoomName: roomName,
           );
           return;
         } else {

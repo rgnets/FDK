@@ -49,6 +49,10 @@ class DeviceRegistrationState with _$DeviceRegistrationState {
     String? deviceType,
     int? matchedDeviceId,
     String? matchedDeviceName,
+    /// Current room ID of matched device (for move/reset detection)
+    int? matchedDeviceRoomId,
+    /// Current room name of matched device (for display)
+    String? matchedDeviceRoomName,
     MatchMismatchInfo? mismatchInfo,
     String? errorMessage,
     DateTime? registeredAt,

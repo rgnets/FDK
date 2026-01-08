@@ -897,6 +897,12 @@ mixin _$ScannerState {
   /// Matched device name.
   String? get matchedDeviceName => throw _privateConstructorUsedError;
 
+  /// Matched device's current room ID (for move/reset detection).
+  int? get matchedDeviceRoomId => throw _privateConstructorUsedError;
+
+  /// Matched device's current room name (for display).
+  String? get matchedDeviceRoomName => throw _privateConstructorUsedError;
+
   /// Device match status.
   DeviceMatchStatus get matchStatus => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -916,6 +922,8 @@ mixin _$ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)
         $default,
   ) =>
@@ -937,6 +945,8 @@ mixin _$ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)?
         $default,
   ) =>
@@ -958,6 +968,8 @@ mixin _$ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)?
         $default, {
     required TResult orElse(),
@@ -1006,6 +1018,8 @@ abstract class $ScannerStateCopyWith<$Res> {
       String? selectedRoomNumber,
       int? matchedDeviceId,
       String? matchedDeviceName,
+      int? matchedDeviceRoomId,
+      String? matchedDeviceRoomName,
       DeviceMatchStatus matchStatus});
 
   $AccumulatedScanDataCopyWith<$Res> get scanData;
@@ -1039,6 +1053,8 @@ class _$ScannerStateCopyWithImpl<$Res, $Val extends ScannerState>
     Object? selectedRoomNumber = freezed,
     Object? matchedDeviceId = freezed,
     Object? matchedDeviceName = freezed,
+    Object? matchedDeviceRoomId = freezed,
+    Object? matchedDeviceRoomName = freezed,
     Object? matchStatus = null,
   }) {
     return _then(_value.copyWith(
@@ -1098,6 +1114,14 @@ class _$ScannerStateCopyWithImpl<$Res, $Val extends ScannerState>
           ? _value.matchedDeviceName
           : matchedDeviceName // ignore: cast_nullable_to_non_nullable
               as String?,
+      matchedDeviceRoomId: freezed == matchedDeviceRoomId
+          ? _value.matchedDeviceRoomId
+          : matchedDeviceRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      matchedDeviceRoomName: freezed == matchedDeviceRoomName
+          ? _value.matchedDeviceRoomName
+          : matchedDeviceRoomName // ignore: cast_nullable_to_non_nullable
+              as String?,
       matchStatus: null == matchStatus
           ? _value.matchStatus
           : matchStatus // ignore: cast_nullable_to_non_nullable
@@ -1149,6 +1173,8 @@ abstract class _$$ScannerStateImplCopyWith<$Res>
       String? selectedRoomNumber,
       int? matchedDeviceId,
       String? matchedDeviceName,
+      int? matchedDeviceRoomId,
+      String? matchedDeviceRoomName,
       DeviceMatchStatus matchStatus});
 
   @override
@@ -1182,6 +1208,8 @@ class __$$ScannerStateImplCopyWithImpl<$Res>
     Object? selectedRoomNumber = freezed,
     Object? matchedDeviceId = freezed,
     Object? matchedDeviceName = freezed,
+    Object? matchedDeviceRoomId = freezed,
+    Object? matchedDeviceRoomName = freezed,
     Object? matchStatus = null,
   }) {
     return _then(_$ScannerStateImpl(
@@ -1241,6 +1269,14 @@ class __$$ScannerStateImplCopyWithImpl<$Res>
           ? _value.matchedDeviceName
           : matchedDeviceName // ignore: cast_nullable_to_non_nullable
               as String?,
+      matchedDeviceRoomId: freezed == matchedDeviceRoomId
+          ? _value.matchedDeviceRoomId
+          : matchedDeviceRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      matchedDeviceRoomName: freezed == matchedDeviceRoomName
+          ? _value.matchedDeviceRoomName
+          : matchedDeviceRoomName // ignore: cast_nullable_to_non_nullable
+              as String?,
       matchStatus: null == matchStatus
           ? _value.matchStatus
           : matchStatus // ignore: cast_nullable_to_non_nullable
@@ -1267,6 +1303,8 @@ class _$ScannerStateImpl extends _ScannerState {
       this.selectedRoomNumber,
       this.matchedDeviceId,
       this.matchedDeviceName,
+      this.matchedDeviceRoomId,
+      this.matchedDeviceRoomName,
       this.matchStatus = DeviceMatchStatus.unchecked})
       : super._();
 
@@ -1333,6 +1371,14 @@ class _$ScannerStateImpl extends _ScannerState {
   @override
   final String? matchedDeviceName;
 
+  /// Matched device's current room ID (for move/reset detection).
+  @override
+  final int? matchedDeviceRoomId;
+
+  /// Matched device's current room name (for display).
+  @override
+  final String? matchedDeviceRoomName;
+
   /// Device match status.
   @override
   @JsonKey()
@@ -1340,7 +1386,7 @@ class _$ScannerStateImpl extends _ScannerState {
 
   @override
   String toString() {
-    return 'ScannerState(scanMode: $scanMode, uiState: $uiState, isAutoLocked: $isAutoLocked, wasAutoReverted: $wasAutoReverted, scanData: $scanData, lastSerialSeenAt: $lastSerialSeenAt, rxgCredentials: $rxgCredentials, errorMessage: $errorMessage, isPopupShowing: $isPopupShowing, isRegistrationInProgress: $isRegistrationInProgress, selectedRoomId: $selectedRoomId, selectedRoomNumber: $selectedRoomNumber, matchedDeviceId: $matchedDeviceId, matchedDeviceName: $matchedDeviceName, matchStatus: $matchStatus)';
+    return 'ScannerState(scanMode: $scanMode, uiState: $uiState, isAutoLocked: $isAutoLocked, wasAutoReverted: $wasAutoReverted, scanData: $scanData, lastSerialSeenAt: $lastSerialSeenAt, rxgCredentials: $rxgCredentials, errorMessage: $errorMessage, isPopupShowing: $isPopupShowing, isRegistrationInProgress: $isRegistrationInProgress, selectedRoomId: $selectedRoomId, selectedRoomNumber: $selectedRoomNumber, matchedDeviceId: $matchedDeviceId, matchedDeviceName: $matchedDeviceName, matchedDeviceRoomId: $matchedDeviceRoomId, matchedDeviceRoomName: $matchedDeviceRoomName, matchStatus: $matchStatus)';
   }
 
   @override
@@ -1376,6 +1422,10 @@ class _$ScannerStateImpl extends _ScannerState {
                 other.matchedDeviceId == matchedDeviceId) &&
             (identical(other.matchedDeviceName, matchedDeviceName) ||
                 other.matchedDeviceName == matchedDeviceName) &&
+            (identical(other.matchedDeviceRoomId, matchedDeviceRoomId) ||
+                other.matchedDeviceRoomId == matchedDeviceRoomId) &&
+            (identical(other.matchedDeviceRoomName, matchedDeviceRoomName) ||
+                other.matchedDeviceRoomName == matchedDeviceRoomName) &&
             (identical(other.matchStatus, matchStatus) ||
                 other.matchStatus == matchStatus));
   }
@@ -1397,6 +1447,8 @@ class _$ScannerStateImpl extends _ScannerState {
       selectedRoomNumber,
       matchedDeviceId,
       matchedDeviceName,
+      matchedDeviceRoomId,
+      matchedDeviceRoomName,
       matchStatus);
 
   @JsonKey(ignore: true)
@@ -1423,6 +1475,8 @@ class _$ScannerStateImpl extends _ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)
         $default,
   ) {
@@ -1441,6 +1495,8 @@ class _$ScannerStateImpl extends _ScannerState {
         selectedRoomNumber,
         matchedDeviceId,
         matchedDeviceName,
+        matchedDeviceRoomId,
+        matchedDeviceRoomName,
         matchStatus);
   }
 
@@ -1462,6 +1518,8 @@ class _$ScannerStateImpl extends _ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)?
         $default,
   ) {
@@ -1480,6 +1538,8 @@ class _$ScannerStateImpl extends _ScannerState {
         selectedRoomNumber,
         matchedDeviceId,
         matchedDeviceName,
+        matchedDeviceRoomId,
+        matchedDeviceRoomName,
         matchStatus);
   }
 
@@ -1501,6 +1561,8 @@ class _$ScannerStateImpl extends _ScannerState {
             String? selectedRoomNumber,
             int? matchedDeviceId,
             String? matchedDeviceName,
+            int? matchedDeviceRoomId,
+            String? matchedDeviceRoomName,
             DeviceMatchStatus matchStatus)?
         $default, {
     required TResult orElse(),
@@ -1521,6 +1583,8 @@ class _$ScannerStateImpl extends _ScannerState {
           selectedRoomNumber,
           matchedDeviceId,
           matchedDeviceName,
+          matchedDeviceRoomId,
+          matchedDeviceRoomName,
           matchStatus);
     }
     return orElse();
@@ -1571,6 +1635,8 @@ abstract class _ScannerState extends ScannerState {
       final String? selectedRoomNumber,
       final int? matchedDeviceId,
       final String? matchedDeviceName,
+      final int? matchedDeviceRoomId,
+      final String? matchedDeviceRoomName,
       final DeviceMatchStatus matchStatus}) = _$ScannerStateImpl;
   const _ScannerState._() : super._();
 
@@ -1630,6 +1696,14 @@ abstract class _ScannerState extends ScannerState {
 
   /// Matched device name.
   String? get matchedDeviceName;
+  @override
+
+  /// Matched device's current room ID (for move/reset detection).
+  int? get matchedDeviceRoomId;
+  @override
+
+  /// Matched device's current room name (for display).
+  String? get matchedDeviceRoomName;
   @override
 
   /// Device match status.

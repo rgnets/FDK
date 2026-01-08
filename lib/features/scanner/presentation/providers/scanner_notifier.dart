@@ -78,6 +78,8 @@ class ScannerNotifier extends _$ScannerNotifier {
       matchStatus: DeviceMatchStatus.unchecked,
       matchedDeviceId: null,
       matchedDeviceName: null,
+      matchedDeviceRoomId: null,
+      matchedDeviceRoomName: null,
     );
   }
 
@@ -171,11 +173,15 @@ class ScannerNotifier extends _$ScannerNotifier {
     required DeviceMatchStatus status,
     int? deviceId,
     String? deviceName,
+    int? deviceRoomId,
+    String? deviceRoomName,
   }) {
     state = state.copyWith(
       matchStatus: status,
       matchedDeviceId: deviceId,
       matchedDeviceName: deviceName,
+      matchedDeviceRoomId: deviceRoomId,
+      matchedDeviceRoomName: deviceRoomName,
     );
   }
 
@@ -214,6 +220,8 @@ class ScannerNotifier extends _$ScannerNotifier {
       matchStatus: DeviceMatchStatus.unchecked,
       matchedDeviceId: null,
       matchedDeviceName: null,
+      matchedDeviceRoomId: null,
+      matchedDeviceRoomName: null,
       selectedRoomId: null,
       selectedRoomNumber: null,
     );

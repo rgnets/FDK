@@ -1,4 +1,4 @@
-/// Speed test status enum
+/// Speed test status 
 enum SpeedTestStatus {
   idle,
   running,
