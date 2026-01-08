@@ -293,7 +293,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       // Get the registration service and register via WebSocket
       final registrationService = ref.read(deviceRegistrationServiceProvider);
 
-      registrationService.registerDevice(
+      // Check if WebSocket is connected before attempting registration
+      if (!registrationService.isConnected) {
+        const error = 'Cannot register device: WebSocket not connected';
+        state = state.copyWith(
+          status: RegistrationStatus.error,
+          errorMessage: error,
+        );
+        return RegistrationResult.failure(message: error);
+      }
+
+      final sent = registrationService.registerDevice(
         deviceType: deviceType,
         mac: mac,
         serialNumber: serial,
@@ -303,6 +313,15 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         existingDeviceId: existingDeviceId,
       );
 
+      if (!sent) {
+        const error = 'Failed to send registration message';
+        state = state.copyWith(
+          status: RegistrationStatus.error,
+          errorMessage: error,
+        );
+        return RegistrationResult.failure(message: error);
+      }
+
       LoggerService.info(
         'DeviceRegistration: Sent registration via WebSocket - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
         tag: 'DeviceRegistration',
@@ -310,6 +329,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
       // WebSocket registration is fire-and-forget
       // The device.created event will be received via the WebSocket listener
+      // Mark as pending until we receive confirmation
       state = state.copyWith(
         status: RegistrationStatus.success,
         registeredAt: DateTime.now(),

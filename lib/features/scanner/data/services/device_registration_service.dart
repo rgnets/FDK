@@ -11,9 +11,13 @@ class DeviceRegistrationService {
 
   final WebSocketService _wsService;
 
+  /// Check if WebSocket is connected.
+  bool get isConnected => _wsService.isConnected;
+
   /// Register a device via WebSocket.
   /// Sends a 'device.register' message with device data.
-  void registerDevice({
+  /// Returns true if message was sent, false if WebSocket not connected.
+  bool registerDevice({
     required DeviceType deviceType,
     required String mac,
     required String serialNumber,
@@ -27,7 +31,7 @@ class DeviceRegistrationService {
         'Cannot register device: WebSocket not connected',
         tag: _tag,
       );
-      return;
+      return false;
     }
 
     final payload = _buildPayload(
@@ -46,6 +50,7 @@ class DeviceRegistrationService {
     );
 
     _wsService.sendType('device.register', payload: payload);
+    return true;
   }
 
   Map<String, dynamic> _buildPayload({
