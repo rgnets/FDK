@@ -66,6 +66,14 @@ flutter run -t lib/main_production.dart \
   --dart-define=API_URL=<fqdn> \
   --dart-define=API_USERNAME=<user> \
   --dart-define=API_KEY=<token>
+
+# Production data with dev logs (force verbose logging)
+flutter run -t lib/main_production.dart \
+  --dart-define=ENVIRONMENT=production \
+  --dart-define=API_URL=<fqdn> \
+  --dart-define=API_USERNAME=<user> \
+  --dart-define=API_KEY=<token> \
+  --dart-define=LOG_LEVEL=debug
 ```
 
 ### Build Matrix Script

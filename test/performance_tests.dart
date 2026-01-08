@@ -7,38 +7,48 @@ import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 // Mock classes
-class MockDeviceRemoteDataSource extends Mock implements DeviceRemoteDataSource {}
 class MockDeviceLocalDataSource extends Mock implements DeviceLocalDataSource {}
 class MockRoomRepository extends Mock implements RoomRepository {}
 class MockNotificationGenerationService extends Mock implements NotificationGenerationService {}
+class MockStorageService extends Mock implements StorageService {}
+class MockWebSocketDataSyncService extends Mock implements WebSocketDataSyncService {}
+class MockWebSocketService extends Mock implements WebSocketService {}
 
 void main() {
   group('Performance Optimization Tests', () {
-    late MockDeviceRemoteDataSource mockRemoteDataSource;
     late MockDeviceLocalDataSource mockLocalDataSource;
     late MockRoomRepository mockRoomRepository;
     late MockNotificationGenerationService mockNotificationService;
+    late MockStorageService mockStorageService;
+    late MockWebSocketDataSyncService mockWebSocketDataSyncService;
+    late MockWebSocketService mockWebSocketService;
     late BackgroundRefreshService backgroundRefreshService;
     late PerformanceMonitorService performanceMonitor;
 
     setUp(() {
-      mockRemoteDataSource = MockDeviceRemoteDataSource();
       mockLocalDataSource = MockDeviceLocalDataSource();
       mockRoomRepository = MockRoomRepository();
       mockNotificationService = MockNotificationGenerationService();
+      mockStorageService = MockStorageService();
+      mockWebSocketDataSyncService = MockWebSocketDataSyncService();
+      mockWebSocketService = MockWebSocketService();
       performanceMonitor = PerformanceMonitorService.instance;
-      
+
       backgroundRefreshService = BackgroundRefreshService(
-        deviceRemoteDataSource: mockRemoteDataSource,
         deviceLocalDataSource: mockLocalDataSource,
         roomRepository: mockRoomRepository,
         notificationGenerationService: mockNotificationService,
+        storageService: mockStorageService,
+        webSocketService: mockWebSocketService,
+        webSocketDataSyncService: mockWebSocketDataSyncService,
       );
 
       // Clear any existing metrics
@@ -145,81 +155,18 @@ void main() {
       });
     });
 
-    group('Parallel API Calls Tests', () {
-      test('should fetch multiple device types in parallel', () async {
-        // Arrange
-        final apDevices = [
-          const DeviceModel(id: '1', name: 'AP 1', type: 'access_point', status: 'online'),
-        ];
-        final switchDevices = [
-          const DeviceModel(id: '2', name: 'Switch 1', type: 'switch', status: 'online'),
-        ];
-
-        when(() => mockRemoteDataSource.getDevices())
-            .thenAnswer((_) async => [...apDevices, ...switchDevices]);
-
-        // Act
-        final stopwatch = Stopwatch()..start();
-        final result = await mockRemoteDataSource.getDevices();
-        stopwatch.stop();
-
-        // Assert
-        expect(result.length, equals(2));
-        expect(result.where((d) => d.type == 'access_point').length, equals(1));
-        expect(result.where((d) => d.type == 'switch').length, equals(1));
-        
-        // Performance assertion - parallel calls should be faster than sequential
-        expect(stopwatch.elapsedMilliseconds, lessThan(5000), 
-               reason: 'Parallel API calls should complete within 5 seconds');
-      });
-
-      test('should handle partial failures in parallel API calls', () async {
-        // Arrange
-        when(() => mockRemoteDataSource.getDevices())
-            .thenThrow(Exception('Partial API failure'));
-
-        // Act & Assert
-        expect(
-          () => mockRemoteDataSource.getDevices(),
-          throwsA(isA<Exception>()),
-        );
-      });
-
-      test('should batch API requests to avoid server overload', () async {
-        // This test simulates the batching behavior in DeviceRemoteDataSourceImpl
-        // In real implementation, API calls are batched to avoid overwhelming server
-        
-        // Arrange
-        final devices = List.generate(
-          100,
-          (i) => DeviceModel(
-            id: i.toString(),
-            name: 'Device $i',
-            type: 'access_point',
-            status: 'online',
-          ),
-        );
-
-        when(() => mockRemoteDataSource.getDevices()).thenAnswer((_) async => devices);
-
-        // Act
-        final result = await mockRemoteDataSource.getDevices();
-
-        // Assert
-        expect(result.length, equals(100));
-        verify(() => mockRemoteDataSource.getDevices()).called(1);
-      });
-    });
-
     group('Background Refresh Service Tests', () {
       test('should refresh devices and rooms in parallel', () async {
         // Arrange
         final testDevices = [
           const DeviceModel(id: '1', name: 'Device 1', type: 'access_point', status: 'online'),
         ];
-
-        when(() => mockRemoteDataSource.getDevices()).thenAnswer((_) async => testDevices);
-        when(() => mockLocalDataSource.cacheDevices(any())).thenAnswer((_) async {});
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(true);
+        when(() => mockWebSocketDataSyncService.syncInitialData())
+            .thenAnswer((_) async {});
+        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
+            .thenAnswer((_) async => testDevices);
         when(() => mockRoomRepository.getRooms()).thenAnswer((_) async => const Right([]));
 
         // Track refresh events
@@ -236,21 +183,15 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
 
         // Assert
-        expect(deviceRefreshEvents.length, greaterThanOrEqualTo(2)); // refreshing + success
-        expect(roomRefreshEvents.length, greaterThanOrEqualTo(2)); // refreshing + success
-        expect(deviceRefreshEvents.last.isSuccess, isTrue);
-        expect(roomRefreshEvents.last.isSuccess, isTrue);
-        
-        verify(() => mockRemoteDataSource.getDevices()).called(1);
-        verify(() => mockLocalDataSource.cacheDevices(testDevices)).called(1);
-        verify(() => mockRoomRepository.getRooms()).called(1);
+        expect(deviceRefreshEvents.any((event) => event.isSuccess), isTrue);
+        expect(roomRefreshEvents.any((event) => event.isSuccess), isTrue);
+        verify(() => mockWebSocketDataSyncService.syncInitialData()).called(1);
       });
 
       test('should handle refresh errors gracefully', () async {
         // Arrange
-        when(() => mockRemoteDataSource.getDevices())
-            .thenThrow(Exception('API Error'));
-        when(() => mockRoomRepository.getRooms()).thenAnswer((_) async => const Right([]));
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(false);
 
         final deviceRefreshEvents = <RefreshStatus>[];
         backgroundRefreshService.deviceRefreshStream.listen(deviceRefreshEvents.add);
@@ -262,13 +203,18 @@ void main() {
         // Assert
         expect(deviceRefreshEvents.any((event) => event.isError), isTrue);
         final errorEvent = deviceRefreshEvents.firstWhere((event) => event.isError);
-        expect(errorEvent.error, contains('API Error'));
+        expect(errorEvent.error, contains('WebSocket disconnected'));
       });
 
       test('should prevent concurrent refresh operations', () async {
         // Arrange
-        final completer = Completer<List<DeviceModel>>();
-        when(() => mockRemoteDataSource.getDevices()).thenAnswer((_) => completer.future);
+        final completer = Completer<void>();
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(true);
+        when(() => mockWebSocketDataSyncService.syncInitialData())
+            .thenAnswer((_) => completer.future);
+        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
+            .thenAnswer((_) async => []);
         when(() => mockRoomRepository.getRooms()).thenAnswer((_) async => const Right([]));
 
         // Act - trigger two refresh operations
@@ -276,19 +222,18 @@ void main() {
         final future2 = backgroundRefreshService.refreshNow();
 
         // Complete the first request
-        completer.complete([]);
+        completer.complete();
 
         await Future.wait([future1, future2]);
 
-        // Assert - should only call API once due to concurrent protection
-        verify(() => mockRemoteDataSource.getDevices()).called(1);
+        // Assert - should only sync once due to concurrent protection
+        verify(() => mockWebSocketDataSyncService.syncInitialData()).called(1);
       });
 
       test('should start and stop background refresh timer', () async {
         // Arrange
-        when(() => mockRemoteDataSource.getDevices()).thenAnswer((_) async => []);
-        when(() => mockLocalDataSource.cacheDevices(any())).thenAnswer((_) async {});
-        when(() => mockRoomRepository.getRooms()).thenAnswer((_) async => const Right([]));
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(false);
 
         // Act
         backgroundRefreshService.startBackgroundRefresh();
@@ -586,9 +531,12 @@ void main() {
           )
         );
 
-        when(() => mockRemoteDataSource.getDevices()).thenAnswer((_) async => testDevices);
-        when(() => mockLocalDataSource.cacheDevices(any())).thenAnswer((_) async {});
-        when(() => mockLocalDataSource.isCacheValid()).thenAnswer((_) async => false);
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(true);
+        when(() => mockWebSocketDataSyncService.syncInitialData())
+            .thenAnswer((_) async {});
+        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
+            .thenAnswer((_) async => testDevices);
         when(() => mockRoomRepository.getRooms()).thenAnswer((_) async => const Right([]));
 
         // Act - Perform background refresh with performance monitoring
@@ -603,22 +551,19 @@ void main() {
         expect(stats!.successRate, equals(1.0));
         
         // Verify all components were called
-        verify(() => mockRemoteDataSource.getDevices()).called(1);
-        verify(() => mockLocalDataSource.cacheDevices(testDevices)).called(1);
+        verify(() => mockWebSocketDataSyncService.syncInitialData()).called(1);
         verify(() => mockRoomRepository.getRooms()).called(1);
       });
 
       test('should handle complex error scenarios with proper fallbacks', () async {
-        // Arrange - simulate partial failures
-        when(() => mockRemoteDataSource.getDevices())
-            .thenThrow(Exception('Network timeout'));
-        when(() => mockLocalDataSource.isCacheValid()).thenAnswer((_) async => true);
-        when(() => mockLocalDataSource.getCachedDevices()).thenAnswer((_) async => [
+        // Arrange - simulate cached fallback usage
+        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
+            .thenAnswer((_) async => [
           const DeviceModel(id: 'cached1', name: 'Cached Device', type: 'access_point', status: 'online'),
         ]);
 
-        // Act - should fall back to cached data when API fails
-        final cachedData = await mockLocalDataSource.getCachedDevices();
+        // Act - should fall back to cached data when WebSocket sync is unavailable
+        final cachedData = await mockLocalDataSource.getCachedDevices(allowStale: true);
 
         // Assert
         expect(cachedData.length, equals(1));

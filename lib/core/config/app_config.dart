@@ -1,3 +1,5 @@
+import 'package:rgnets_fdk/core/config/environment.dart';
+
 /// Application configuration
 /// Handles environment-specific settings and API configuration
 class AppConfig {
@@ -12,20 +14,25 @@ class AppConfig {
     // In production, these should come from secure environment variables
     // For staging, we provide working defaults for the test environment
     return {
-      'fqdn': const String.fromEnvironment('TEST_API_FQDN', 
-          defaultValue: 'vgw1-01.dal-interurban.mdu.attwifi.com'),
-      'login': const String.fromEnvironment('TEST_API_LOGIN', 
-          defaultValue: 'fetoolreadonly'),
-      'apiKey': const String.fromEnvironment('TEST_API_KEY', 
-          defaultValue: 'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r'),
+      'fqdn': const String.fromEnvironment(
+        'TEST_API_FQDN',
+        defaultValue: '',
+      ),
+      'login': const String.fromEnvironment(
+        'TEST_API_LOGIN',
+        defaultValue: '',
+      ),
+      'apiKey': const String.fromEnvironment(
+        'TEST_API_KEY',
+        defaultValue: '',
+      ),
     };
   }
   
   /// Get the API base URL
   static String get apiBaseUrl {
     // This is deprecated - use EnvironmentConfig.apiBaseUrl instead
-    final fqdn = testCredentials['fqdn'] ?? 'api.example.com';
-    return 'https://$fqdn';
+    return EnvironmentConfig.apiBaseUrl;
   }
   
   /// Get API headers for requests
@@ -33,9 +40,9 @@ class AppConfig {
     String? login,
     String? apiKey,
   }) {
-    // Use provided credentials or fall back to test credentials
-    final useLogin = login ?? testCredentials['login'] ?? '';
-    final useApiKey = apiKey ?? testCredentials['apiKey'] ?? '';
+    // Use provided credentials or fall back to environment configuration
+    final useLogin = login ?? EnvironmentConfig.apiUsername;
+    final useApiKey = apiKey ?? EnvironmentConfig.apiKey;
     
     return {
       'X-API-Login': useLogin,

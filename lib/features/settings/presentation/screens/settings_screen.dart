@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/widgets/connection_details_dialog.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
@@ -229,6 +231,15 @@ class SettingsScreen extends ConsumerWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Syncing data...')),
                     );
+
+                    // If WebSockets are enabled, trigger a full resync from server
+                    if (EnvironmentConfig.useWebSockets) {
+                      final syncService =
+                          ref.read(webSocketDataSyncServiceProvider);
+                      await syncService.syncInitialData();
+                    }
+
+                    // Refresh providers to pick up the new data
                     await Future.wait([
                       ref.read(devicesNotifierProvider.notifier).refresh(),
                       ref.read(roomsNotifierProvider.notifier).refresh(),

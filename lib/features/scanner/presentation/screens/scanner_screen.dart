@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+// import 'package:rgnets_fdk/core/utils/foldable_camera_wrapper.dart'; // TODO: Re-enable when needed
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_auth_qr.dart';
@@ -260,6 +261,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
               ),
             ),
           ),
+
+        // TODO: FoldableCameraWrapper - commented out for now
+        // FoldableCameraWrapper(
+        //   controller: _controller,
+        //   onDetect: state.isScanning ? _handleBarcode : null,
+        // ),
 
         // Top bar with device selector
         Positioned(
