@@ -51,7 +51,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (EnvironmentConfig.isDevelopment) {
       logger
         ..i('🔧 SPLASH_SCREEN: Development mode detected')
-        ..d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
+        ..d('SPLASH_SCREEN: skipAutoLogin=${EnvironmentConfig.skipAutoLogin}')
+        ..d(
+          'SPLASH_SCREEN: useSyntheticData=${EnvironmentConfig.useSyntheticData}',
+        );
+
+      if (!EnvironmentConfig.useSyntheticData) {
+        logger.i('SPLASH_SCREEN: Dev remote mode, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
+
+      if (EnvironmentConfig.skipAutoLogin) {
+        logger.i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
+      logger.d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
       // Development mode: skip auth and go directly to home with synthetic data
       if (mounted) {
         logger.d('SPLASH_SCREEN: Widget is mounted, navigating...');
@@ -64,6 +84,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     if (EnvironmentConfig.isStaging) {
+      if (EnvironmentConfig.skipAutoLogin) {
+        logger
+          ..i('🧪 SPLASH_SCREEN: Staging mode detected')
+          ..i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
+        if (mounted) {
+          context.go('/auth');
+        }
+        return;
+      }
       // Staging mode: auto-authenticate with interurban credentials from QR code
       logger
         ..i('🧪 SPLASH_SCREEN: Staging mode detected')
@@ -93,12 +122,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             (credentials['siteName'] as String?) ??
             fqdn;
         final issuedAt = DateTime.now().toUtc();
+        final apiKeyPreview = apiKey.isNotEmpty
+            ? apiKey.substring(0, 4)
+            : 'N/A';
 
         logger
           ..d('SPLASH_SCREEN: Decoded credentials from QR:')
           ..d('SPLASH_SCREEN:   FQDN: $fqdn')
           ..d('SPLASH_SCREEN:   Login: $login')
-          ..d('SPLASH_SCREEN:   API Key: ${apiKey.substring(0, 4)}...')
+          ..d('SPLASH_SCREEN:   API Key: $apiKeyPreview...')
           ..d('SPLASH_SCREEN:   Site Name: $siteName')
           ..d('SPLASH_SCREEN:   Full FQDN type: ${fqdn.runtimeType}')
           ..d('SPLASH_SCREEN:   Full Login type: ${login.runtimeType}');
@@ -215,6 +247,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         logger.w(
           'SPLASH_SCREEN: ⚠️ Failed to decode QR, using fallback credentials',
         );
+        if (EnvironmentConfig.apiBaseUrl.isEmpty ||
+            EnvironmentConfig.apiUsername.isEmpty ||
+            EnvironmentConfig.apiKey.isEmpty) {
+          logger.w(
+            'SPLASH_SCREEN: ⚠️ Fallback credentials not configured, navigating to /auth',
+          );
+          if (mounted) {
+            context.go('/auth');
+          }
+          return;
+        }
         // Use fallback credentials from EnvironmentConfig
         // Extract FQDN from the API URL (remove protocol)
         final fqdn = EnvironmentConfig.apiBaseUrl
@@ -226,12 +269,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         final apiKey = EnvironmentConfig.apiKey;
         final siteName = fqdn;
         final issuedAt = DateTime.now().toUtc();
+        final apiKeyPreview = apiKey.isNotEmpty
+            ? apiKey.substring(0, 4)
+            : 'N/A';
 
         logger
           ..d('Using fallback credentials:')
           ..d('FQDN: $fqdn')
           ..d('Login: $login')
-          ..d('API Key: ${apiKey.substring(0, 4)}...');
+          ..d('API Key: $apiKeyPreview...');
 
         try {
           await ref

@@ -1,7 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart';
+import 'package:rgnets_fdk/features/home/presentation/providers/home_screen_provider.dart';
+import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
+    hide notificationGenerationServiceProvider;
+import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
 /// Provides the base WebSocket configuration derived from the environment.
 final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
@@ -58,4 +70,55 @@ final webSocketAuthEventsProvider = StreamProvider<SocketMessage>((ref) {
   return service.messages.where(
     (message) => message.type.startsWith('auth.'),
   );
+});
+
+/// Handles WebSocket-driven cache hydration for devices/rooms/notifications.
+final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
+  ref,
+) {
+  final socketService = ref.watch(webSocketServiceProvider);
+  final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
+  final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
+  final notificationService = ref.watch(notificationGenerationServiceProvider);
+  final cacheManager = ref.watch(cacheManagerProvider);
+  final logger = ref.watch(loggerProvider);
+
+  final service = WebSocketDataSyncService(
+    socketService: socketService,
+    deviceLocalDataSource: deviceLocalDataSource,
+    roomLocalDataSource: roomLocalDataSource,
+    notificationService: notificationService,
+    cacheManager: cacheManager,
+    logger: logger,
+  );
+
+  ref.onDispose(() async {
+    await service.dispose();
+  });
+  return service;
+});
+
+/// Keeps WebSocket sync events wired to provider invalidation.
+final webSocketDataSyncListenerProvider = Provider<void>((ref) {
+  final service = ref.watch(webSocketDataSyncServiceProvider);
+  final logger = ref.watch(loggerProvider);
+  final subscription = service.events.listen((event) {
+    switch (event.type) {
+      case WebSocketDataSyncEventType.devicesCached:
+        logger.i('WebSocketDataSync: devices cached -> refreshing providers');
+        ref.refresh(devicesNotifierProvider);
+        ref.refresh(deviceNotificationsNotifierProvider);
+        ref.refresh(notificationsDomainNotifierProvider);
+        ref.refresh(homeScreenStatisticsProvider);
+        ref.refresh(dashboardStatsProvider);
+        break;
+      case WebSocketDataSyncEventType.roomsCached:
+        logger.i('WebSocketDataSync: rooms cached -> refreshing providers');
+        ref.refresh(roomsNotifierProvider);
+        break;
+    }
+  });
+
+  ref.onDispose(subscription.cancel);
+  return;
 });

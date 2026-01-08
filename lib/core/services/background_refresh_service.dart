@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
+import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
@@ -12,20 +13,22 @@ import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.da
 /// Periodically fetches fresh data without blocking the UI
 class BackgroundRefreshService {
   BackgroundRefreshService({
-    required this.deviceRemoteDataSource,
     required this.deviceLocalDataSource,
     required this.roomRepository,
     required this.notificationGenerationService,
     required this.storageService,
+    required this.webSocketService,
+    required this.webSocketDataSyncService,
   });
 
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
 
-  final DeviceDataSource deviceRemoteDataSource;
   final DeviceLocalDataSource deviceLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;
   final StorageService storageService;
+  final WebSocketService webSocketService;
+  final WebSocketDataSyncService webSocketDataSyncService;
 
   Timer? _refreshTimer;
   bool _isRefreshing = false;
@@ -79,8 +82,28 @@ class BackgroundRefreshService {
     
     _isRefreshing = true;
     _logger.d('BackgroundRefreshService: Starting background refresh');
-    
-    // Refresh devices and rooms in parallel
+
+    if (!webSocketService.isConnected) {
+      final message = 'WebSocket disconnected';
+      _logger.w('BackgroundRefreshService: $message');
+      _deviceRefreshController.add(RefreshStatus.error(message));
+      _roomRefreshController.add(RefreshStatus.error(message));
+      _isRefreshing = false;
+      return;
+    }
+
+    try {
+      await webSocketDataSyncService.syncInitialData();
+    } on Exception catch (e) {
+      final message = 'WebSocket sync failed: $e';
+      _logger.e('BackgroundRefreshService: $message');
+      _deviceRefreshController.add(RefreshStatus.error(message));
+      _roomRefreshController.add(RefreshStatus.error(message));
+      _isRefreshing = false;
+      return;
+    }
+
+    // Refresh devices and rooms in parallel from cache
     await Future.wait([
       _refreshDevices(),
       _refreshRooms(),
@@ -99,14 +122,11 @@ class BackgroundRefreshService {
       }
       _deviceRefreshController.add(RefreshStatus.refreshing);
       
-      // Fetch devices in background using compute for heavy processing
       final stopwatch = Stopwatch()..start();
       
-      // Fetch new data
-      final devices = await deviceRemoteDataSource.getDevices();
-      
-      // Cache the new data
-      await deviceLocalDataSource.cacheDevices(devices);
+      final devices = await deviceLocalDataSource.getCachedDevices(
+        allowStale: true,
+      );
       
       // Convert DeviceModel to Device entities and generate notifications
       final deviceEntities = devices.map((deviceModel) => deviceModel.toEntity()).toList();

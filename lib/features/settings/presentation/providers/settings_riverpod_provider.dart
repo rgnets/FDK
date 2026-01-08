@@ -1,5 +1,11 @@
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart'
+    show notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
+    hide notificationGenerationServiceProvider;
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:rgnets_fdk/features/settings/domain/entities/app_settings.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -45,7 +51,7 @@ class SettingsState {
 /// Main settings provider
 @riverpod
 class SettingsNotifier extends _$SettingsNotifier {
-  final Logger _logger = Logger();
+  final _logger = LoggerConfig.getLogger();
   AppSettings? _cachedSettings;
 
   @override
@@ -96,7 +102,19 @@ class SettingsNotifier extends _$SettingsNotifier {
     final repository = ref.read(settingsRepositoryProvider);
     state = const AsyncValue.loading();
     try {
+      // Clear SharedPreferences cache
       await repository.clearCache();
+
+      // Reset in-memory notification state (clears _notifications and _previousDeviceStates)
+      ref.read(notificationGenerationServiceProvider).reset();
+      _logger.d('Notification generation service reset');
+
+      // Invalidate data providers so they refetch fresh data on next access
+      ref
+        ..invalidate(devicesNotifierProvider)
+        ..invalidate(roomsNotifierProvider)
+        ..invalidate(deviceNotificationsNotifierProvider);
+
       final defaults = AppSettings.defaults();
       _cachedSettings = defaults;
       state = AsyncValue.data(_mapSettingsToState(defaults));

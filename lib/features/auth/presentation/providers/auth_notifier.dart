@@ -20,6 +20,8 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     as device_notifications;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
     as notifications_domain;
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart'
+    as rooms_providers;
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
@@ -38,6 +40,9 @@ class Auth extends _$Auth {
   @override
   Future<AuthStatus> build() async {
     _logger = ref.watch(loggerProvider);
+    if (EnvironmentConfig.useWebSockets) {
+      ref.watch(webSocketDataSyncListenerProvider);
+    }
     final storage = ref.read(storageServiceProvider);
     await storage.migrateLegacyCredentialsIfNeeded();
 
@@ -183,6 +188,7 @@ class Auth extends _$Auth {
               ..d('AUTH_NOTIFIER: Resolved user: ${resolvedUser.username}')
               ..d('AUTH_NOTIFIER: Display name: ${resolvedUser.displayName}');
 
+            await _syncWebSocketData();
             state = AsyncValue.data(AuthStatus.authenticated(resolvedUser));
           } on Exception catch (e, stack) {
             _logger
@@ -263,6 +269,7 @@ class Auth extends _$Auth {
     try {
       _logger.d('AUTH_NOTIFIER: Invalidating data providers after sign out');
       ref.invalidate(devices_providers.devicesNotifierProvider);
+      ref.invalidate(rooms_providers.roomsNotifierProvider);
       ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
       ref.invalidate(
         notifications_domain.notificationsDomainNotifierProvider,
@@ -278,10 +285,12 @@ class Auth extends _$Auth {
       final storage = ref.read(storageServiceProvider);
       final localDataSource = ref.read(authLocalDataSourceProvider);
       final notificationService = ref.read(notificationGenerationServiceProvider);
+      final syncService = ref.read(webSocketDataSyncServiceProvider);
 
       // Reset notification state to prevent memory leak on re-login
       notificationService.reset();
       _logger.d('AUTH_NOTIFIER: Notification state reset');
+      await syncService.stop();
 
       await Future.wait([
         storage.clearCredentials(),
@@ -291,6 +300,16 @@ class Auth extends _$Auth {
       _logger.d('AUTH_NOTIFIER: Storage cleared successfully');
     } on Exception catch (e) {
       _logger.w('AUTH_NOTIFIER: Storage clear timed out or failed: $e');
+    }
+  }
+
+  Future<void> _syncWebSocketData() async {
+    final syncService = ref.read(webSocketDataSyncServiceProvider);
+    try {
+      await syncService.syncInitialData();
+      _invalidateDataProviders();
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: WebSocket data sync failed: $e');
     }
   }
 
@@ -511,14 +530,14 @@ Uri _buildActionCableUri({
   required String fqdn,
   required String apiKey,
 }) {
-  final useBaseUri = EnvironmentConfig.isDevelopment;
-  final uri = useBaseUri
+  final shouldUseBaseUri = EnvironmentConfig.isDevelopment && fqdn.isEmpty;
+  final uri = shouldUseBaseUri
       ? baseUri
       : Uri(
-        scheme: 'wss',
-        host: fqdn,
-        path: '/cable',
-      );
+          scheme: 'wss',
+          host: fqdn,
+          path: '/cable',
+        );
 
   final queryParameters = Map<String, String>.from(uri.queryParameters);
   if (apiKey.isNotEmpty) {
@@ -528,6 +547,15 @@ Uri _buildActionCableUri({
   return uri.replace(
     queryParameters: queryParameters.isEmpty ? null : queryParameters,
   );
+}
+
+bool _isLocalHost(String host) {
+  final normalized = host.trim().toLowerCase();
+  return normalized.isEmpty ||
+      normalized == 'localhost' ||
+      normalized == '127.0.0.1' ||
+      normalized == '::1' ||
+      normalized == '10.0.2.2';
 }
 
 Map<String, dynamic> _buildAuthHeaders(String apiKey) {

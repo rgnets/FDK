@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/utils/foldable_camera_wrapper.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_result.dart'
     as scanner_entities;
@@ -520,8 +521,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
     return Stack(
       children: [
-        // Camera view
-        MobileScanner(
+        // Camera view (with foldable device rotation correction)
+        FoldableCameraWrapper(
           controller: _controller,
           onDetect: state.isScanning ? _handleBarcode : null,
         ),
@@ -594,8 +595,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
 
     return Stack(
       children: [
-        // Camera view
-        MobileScanner(
+        // Camera view (with foldable device rotation correction)
+        FoldableCameraWrapper(
           controller: _controller,
           onDetect: (capture) {
             final barcodes = capture.barcodes;

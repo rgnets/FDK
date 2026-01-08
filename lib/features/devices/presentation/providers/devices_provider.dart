@@ -1,4 +1,5 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
@@ -16,8 +17,8 @@ part 'devices_provider.g.dart';
 @Riverpod(keepAlive: true)
 class DevicesNotifier extends _$DevicesNotifier {
   static final _logger = LoggerConfig.getLogger();
-  late final AdaptiveRefreshManager _refreshManager;
-  late final CacheManager _cacheManager;
+  AdaptiveRefreshManager? _refreshManager;
+  CacheManager? _cacheManager;
 
   @override
   Future<List<Device>> build() async {
@@ -25,20 +26,23 @@ class DevicesNotifier extends _$DevicesNotifier {
     _refreshManager = ref.read(adaptiveRefreshManagerProvider);
     _cacheManager = ref.read(cacheManagerProvider);
     final storage = ref.read(storageServiceProvider);
+    final allowUnauthenticated = EnvironmentConfig.useSyntheticData;
 
     if (LoggerConfig.isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Loading devices');
     }
 
-    if (!storage.isAuthenticated) {
+    if (!storage.isAuthenticated && !allowUnauthenticated) {
       if (LoggerConfig.isVerboseLoggingEnabled) {
         _logger.i('DevicesProvider: Skipping load (not authenticated)');
       }
       return [];
     }
 
-    // Start sequential background refresh
-    _startBackgroundRefresh();
+    if (!EnvironmentConfig.useSyntheticData) {
+      // Start sequential background refresh only when using live data.
+      _startBackgroundRefresh();
+    }
 
     try {
       // Try to get from cache first with stale-while-revalidate
@@ -47,7 +51,7 @@ class DevicesNotifier extends _$DevicesNotifier {
         'devices_list',
         DeviceFieldSets.listFields,
       );
-      final devices = await _cacheManager.get<List<Device>>(
+      final devices = await _cacheManager!.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
           final getDevices = ref.read(getDevicesProvider);
@@ -101,7 +105,7 @@ class DevicesNotifier extends _$DevicesNotifier {
         'devices_list',
         DeviceFieldSets.listFields,
       );
-      final devices = await _cacheManager.get<List<Device>>(
+      final devices = await _cacheManager!.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
           final getDevices = ref.read(getDevicesProvider);
@@ -146,7 +150,7 @@ class DevicesNotifier extends _$DevicesNotifier {
       final cacheKey = DeviceFieldSets.getCacheKey('devices_list', fields);
 
       // Force refresh the cache with appropriate fields
-      final devices = await _cacheManager.get<List<Device>>(
+      final devices = await _cacheManager!.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
           final getDevices = ref.read(getDevicesProvider);
@@ -178,7 +182,7 @@ class DevicesNotifier extends _$DevicesNotifier {
 
   /// Start sequential background refresh
   void _startBackgroundRefresh() {
-    _refreshManager.startSequentialRefresh(
+    _refreshManager?.startSequentialRefresh(
       () => silentRefresh(context: 'list'),
     );
   }

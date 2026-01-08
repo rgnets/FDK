@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
@@ -20,7 +20,7 @@ class NotificationRepositoryImpl implements NotificationRepository {
   });
   final NotificationGenerationService notificationGenerationService;
   final DeviceRepository deviceRepository;
-  final Logger _logger = Logger();
+  final _logger = LoggerConfig.getLogger();
   
   @override
   Future<Either<Failure, List<AppNotification>>> getNotifications({
@@ -46,9 +46,9 @@ class NotificationRepositoryImpl implements NotificationRepository {
         },
       );
       
-      // If in development and no devices, use mock data
-      if (EnvironmentConfig.isDevelopment && allDevices.isEmpty) {
-        _logger.d('Development mode: Using mock devices');
+      // If using synthetic data and no devices, use mock data
+      if (EnvironmentConfig.useSyntheticData && allDevices.isEmpty) {
+        _logger.d('Synthetic data mode: Using mock devices');
         final mockDevices = MockDataService().getMockDevices();
         allDevices.addAll(mockDevices);
       }

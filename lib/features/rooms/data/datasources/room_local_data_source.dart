@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
 
 abstract class RoomLocalDataSource {
-  Future<List<RoomModel>> getCachedRooms();
+  Future<List<RoomModel>> getCachedRooms({bool allowStale = false});
   Future<void> cacheRooms(List<RoomModel> rooms);
   Future<RoomModel?> getCachedRoom(String id);
   Future<void> cacheRoom(RoomModel room);
@@ -21,7 +21,7 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
   });
 
   final StorageService storageService;
-  static final _logger = Logger();
+  static final _logger = LoggerConfig.getLogger();
   static const String _roomsKey = 'cached_rooms';
   static const String _roomKeyPrefix = 'cached_room_';
   static const String _cacheTimestampKey = 'rooms_cache_timestamp';
@@ -47,10 +47,10 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
   }
 
   @override
-  Future<List<RoomModel>> getCachedRooms() async {
+  Future<List<RoomModel>> getCachedRooms({bool allowStale = false}) async {
     try {
       // Check if cache is valid
-      if (!await isCacheValid()) {
+      if (!allowStale && !await isCacheValid()) {
         _logger.d('Room cache expired or invalid');
         return [];
       }
