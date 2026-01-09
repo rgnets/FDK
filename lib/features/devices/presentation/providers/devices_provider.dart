@@ -1,8 +1,10 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
+import 'package:rgnets_fdk/core/models/websocket_events.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/adaptive_refresh_manager.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
@@ -20,6 +22,9 @@ class DevicesNotifier extends _$DevicesNotifier {
   AdaptiveRefreshManager? _refreshManager;
   CacheManager? _cacheManager;
 
+  /// Internal Map for O(1) lookups/updates
+  final Map<String, Device> _byId = {};
+
   @override
   Future<List<Device>> build() async {
     // Initialize managers
@@ -27,6 +32,13 @@ class DevicesNotifier extends _$DevicesNotifier {
     _cacheManager = ref.read(cacheManagerProvider);
     final storage = ref.read(storageServiceProvider);
     final allowUnauthenticated = EnvironmentConfig.useSyntheticData;
+
+    // Listen to WebSocket device events for real-time updates
+    if (EnvironmentConfig.useWebSockets) {
+      ref.listen(webSocketDeviceEventsProvider, (_, next) {
+        next.whenData(_handleDeviceEvent);
+      });
+    }
 
     if (LoggerConfig.isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Loading devices');
@@ -79,7 +91,12 @@ class DevicesNotifier extends _$DevicesNotifier {
         ttl: const Duration(minutes: 5),
       );
 
-      return devices ?? [];
+      // Initialize internal map from loaded devices
+      _byId
+        ..clear()
+        ..addAll({for (final d in devices ?? <Device>[]) d.id: d});
+
+      return _byId.values.toList();
     } on Exception catch (e, stack) {
       _logger.e(
         'DevicesProvider: Exception in build(): $e',
@@ -89,6 +106,138 @@ class DevicesNotifier extends _$DevicesNotifier {
       rethrow;
     }
   }
+
+  // ===========================================================================
+  // WebSocket Event Handlers (O(1) dispatch via Freezed .when())
+  // ===========================================================================
+
+  /// Handle device events from WebSocket with O(1) dispatch
+  void _handleDeviceEvent(DeviceEvent event) {
+    event.when(
+      created: _addDevice,
+      updated: _updateDevice,
+      deleted: _removeDevice,
+      statusChanged: (id, status, online, lastSeen) => _updateDeviceStatus(
+        id: id,
+        status: status,
+        online: online,
+        lastSeen: lastSeen,
+      ),
+      batchUpdate: _updateMultiple,
+      snapshot: _handleSnapshot,
+    );
+  }
+
+  /// O(1) add a new device
+  void _addDevice(Device device) {
+    _byId[device.id] = device;
+    _emitList();
+    if (LoggerConfig.isVerboseLoggingEnabled) {
+      _logger.d('DevicesProvider: Added device ${device.id}');
+    }
+  }
+
+  /// O(1) update an existing device
+  void _updateDevice(Device device) {
+    _byId[device.id] = device;
+    _emitList();
+    if (LoggerConfig.isVerboseLoggingEnabled) {
+      _logger.d('DevicesProvider: Updated device ${device.id}');
+    }
+  }
+
+  /// O(1) remove a device
+  void _removeDevice(String id) {
+    _byId.remove(id);
+    _emitList();
+    if (LoggerConfig.isVerboseLoggingEnabled) {
+      _logger.d('DevicesProvider: Removed device $id');
+    }
+  }
+
+  /// O(1) update device status only (lightweight update)
+  void _updateDeviceStatus({
+    required String id,
+    required String status,
+    bool? online,
+    DateTime? lastSeen,
+  }) {
+    final existing = _byId[id];
+    if (existing != null) {
+      _byId[id] = Device(
+        id: existing.id,
+        name: existing.name,
+        type: existing.type,
+        status: status,
+        pmsRoom: existing.pmsRoom,
+        pmsRoomId: existing.pmsRoomId,
+        ipAddress: existing.ipAddress,
+        macAddress: existing.macAddress,
+        location: existing.location,
+        lastSeen: lastSeen ?? existing.lastSeen,
+        metadata: existing.metadata,
+        model: existing.model,
+        serialNumber: existing.serialNumber,
+        firmware: existing.firmware,
+        signalStrength: existing.signalStrength,
+        uptime: existing.uptime,
+        connectedClients: existing.connectedClients,
+        vlan: existing.vlan,
+        ssid: existing.ssid,
+        channel: existing.channel,
+        totalUpload: existing.totalUpload,
+        totalDownload: existing.totalDownload,
+        currentUpload: existing.currentUpload,
+        currentDownload: existing.currentDownload,
+        packetLoss: existing.packetLoss,
+        latency: existing.latency,
+        cpuUsage: existing.cpuUsage,
+        memoryUsage: existing.memoryUsage,
+        temperature: existing.temperature,
+        restartCount: existing.restartCount,
+        maxClients: existing.maxClients,
+        note: existing.note,
+        images: existing.images,
+      );
+      _emitList();
+      if (LoggerConfig.isVerboseLoggingEnabled) {
+        _logger.d('DevicesProvider: Status changed for $id -> $status');
+      }
+    }
+  }
+
+  /// Batch update multiple devices (O(n) but single emit)
+  void _updateMultiple(List<Device> devices) {
+    for (final d in devices) {
+      _byId[d.id] = d;
+    }
+    _emitList();
+    if (LoggerConfig.isVerboseLoggingEnabled) {
+      _logger.d('DevicesProvider: Batch updated ${devices.length} devices');
+    }
+  }
+
+  /// Handle full snapshot (replace all)
+  void _handleSnapshot(List<Device> devices) {
+    _byId
+      ..clear()
+      ..addAll({for (final d in devices) d.id: d});
+    _emitList();
+    if (LoggerConfig.isVerboseLoggingEnabled) {
+      _logger.d('DevicesProvider: Snapshot received with ${devices.length} devices');
+    }
+  }
+
+  /// Emit the current map as a list to UI
+  void _emitList() {
+    if (state.hasValue) {
+      state = AsyncValue.data(_byId.values.toList());
+    }
+  }
+
+  // ===========================================================================
+  // Public API (existing methods)
+  // ===========================================================================
 
   /// User-triggered refresh with loading state
   Future<void> userRefresh() async {

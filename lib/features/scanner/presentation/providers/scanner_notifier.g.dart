@@ -6,7 +6,7 @@ part of 'scanner_notifier.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$scannerNotifierHash() => r'c6c2b04bdf05ba480f2220c0a7e6199438a5aedf';
+String _$scannerNotifierHash() => r'2e194cc47721d71561ce2dd1478d7977de0e629a';
 
 /// Scanner notifier with AT&T-style accumulation and auto-detection.
 ///

@@ -46,7 +46,7 @@ final deviceWebSocketEventsProvider =
 
 typedef DeviceWebSocketEventsRef = AutoDisposeStreamProviderRef<SocketMessage>;
 String _$deviceRegistrationNotifierHash() =>
-    r'a57662ba1247f4901ec4a0b133e2f32f8dcdf11b';
+    r'a099fb7c59527a970114438268f457e4d8c87e70';
 
 /// Provider for device registration with WebSocket integration.
 /// Handles checking existing devices and registering new ones.

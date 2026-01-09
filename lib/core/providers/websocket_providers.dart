@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/models/websocket_events.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_message_router.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart';
@@ -122,3 +124,98 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   ref.onDispose(subscription.cancel);
   return;
 });
+
+// =============================================================================
+// TYPED EVENT PROVIDERS (New Architecture)
+// =============================================================================
+
+/// Provides the WebSocket message router for type-safe event dispatch.
+/// Parses raw messages ONCE and emits typed [WebSocketEvent] objects.
+final webSocketMessageRouterProvider = Provider<WebSocketMessageRouter>((ref) {
+  final socketService = ref.watch(webSocketServiceProvider);
+  final logger = ref.watch(loggerProvider);
+
+  final router = WebSocketMessageRouter(
+    socketService: socketService,
+    logger: logger,
+  );
+
+  // Start the router
+  router.start();
+
+  ref.onDispose(() async {
+    await router.dispose();
+  });
+
+  return router;
+});
+
+/// Stream of all typed WebSocket events (union type).
+/// Use `.when()` for O(1) pattern matching.
+final webSocketEventsProvider = StreamProvider<WebSocketEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.events;
+});
+
+/// Stream of device-specific events only.
+/// Emits [DeviceEvent] for created, updated, deleted, statusChanged, etc.
+final webSocketDeviceEventsProvider = StreamProvider<DeviceEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.deviceEvents;
+});
+
+/// Stream of room-specific events only.
+/// Emits [RoomEvent] for created, updated, deleted, etc.
+final webSocketRoomEventsProvider = StreamProvider<RoomEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.roomEvents;
+});
+
+/// Stream of notification events only.
+/// Emits [NotificationEvent] for received, read, cleared.
+final webSocketNotificationEventsProvider =
+    StreamProvider<NotificationEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.notificationEvents;
+});
+
+/// Stream of sync events only.
+/// Emits [SyncEvent] for started, completed, failed, delta.
+final webSocketSyncEventsProvider = StreamProvider<SyncEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.syncEvents;
+});
+
+/// Stream of connection events only.
+/// Emits [ConnectionEvent] for connected, disconnected, reconnecting, error.
+final webSocketConnectionEventsProvider =
+    StreamProvider<ConnectionEvent>((ref) {
+  final router = ref.watch(webSocketMessageRouterProvider);
+  return router.connectionEvents;
+});
+
+/// Connection status with staleness tracking.
+/// Combines connection state with last sync timestamp.
+final connectionStatusProvider = Provider<ConnectionStatus>((ref) {
+  final stateAsync = ref.watch(webSocketConnectionStateProvider);
+  final state = stateAsync.valueOrNull ?? SocketConnectionState.disconnected;
+
+  return ConnectionStatus(
+    state: state,
+    isConnected: state == SocketConnectionState.connected,
+    isReconnecting: state == SocketConnectionState.reconnecting,
+  );
+});
+
+/// Simple connection status model.
+class ConnectionStatus {
+  const ConnectionStatus({
+    required this.state,
+    required this.isConnected,
+    required this.isReconnecting,
+  });
+
+  final SocketConnectionState state;
+  final bool isConnected;
+  final bool isReconnecting;
+}
