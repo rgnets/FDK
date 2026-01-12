@@ -9,7 +9,7 @@ part of 'user_model.dart';
 _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
     _$UserModelImpl(
       username: json['username'] as String,
-      apiUrl: json['api_url'] as String,
+      siteUrl: json['site_url'] as String,
       displayName: json['display_name'] as String?,
       email: json['email'] as String?,
     );
@@ -17,7 +17,7 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) {
   final val = <String, dynamic>{
     'username': instance.username,
-    'api_url': instance.apiUrl,
+    'site_url': instance.siteUrl,
   };
 
   void writeNotNull(String key, dynamic value) {

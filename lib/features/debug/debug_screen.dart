@@ -30,7 +30,7 @@ class _DebugScreenState extends ConsumerState<DebugScreen> {
       ..writeln('isStaging: ${EnvironmentConfig.isStaging}')
       ..writeln('isProduction: ${EnvironmentConfig.isProduction}')
       ..writeln('useSyntheticData: ${EnvironmentConfig.useSyntheticData}')
-      ..writeln('API URL: ${EnvironmentConfig.apiBaseUrl}')
+      ..writeln('WebSocket URL: ${EnvironmentConfig.websocketBaseUrl}')
       ..writeln('')
       // Provider check
       ..writeln('=== RIVERPOD PROVIDERS ===');

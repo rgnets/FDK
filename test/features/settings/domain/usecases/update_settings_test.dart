@@ -61,7 +61,7 @@ void main() {
           expect(settings.scanTimeoutSeconds, 10);
           // Verify unchanged settings remain the same
           expect(settings.enableScanSound, tOriginalSettings.enableScanSound);
-          expect(settings.apiTimeoutSeconds, tOriginalSettings.apiTimeoutSeconds);
+          expect(settings.wsTimeoutSeconds, tOriginalSettings.wsTimeoutSeconds);
         },
       );
     });
@@ -153,7 +153,7 @@ void main() {
         scanTimeoutSeconds: 15,
         enableScanSound: false,
         enableContinuousScanning: true,
-        apiTimeoutSeconds: 60,
+        wsTimeoutSeconds: 60,
         enableOfflineMode: false,
         cacheExpirationHours: 24,
         enableNotifications: false,
@@ -184,7 +184,7 @@ void main() {
           expect(settings.scanTimeoutSeconds, 15);
           expect(settings.enableScanSound, false);
           expect(settings.enableContinuousScanning, true);
-          expect(settings.apiTimeoutSeconds, 60);
+          expect(settings.wsTimeoutSeconds, 60);
           expect(settings.enableOfflineMode, false);
           expect(settings.cacheExpirationHours, 24);
           expect(settings.enableNotifications, false);
@@ -216,7 +216,7 @@ void main() {
       // arrange
       final tExtremeSettings = tOriginalSettings.copyWith(
         scanTimeoutSeconds: 1, // minimum
-        apiTimeoutSeconds: 300, // maximum
+        wsTimeoutSeconds: 300, // maximum
         syncIntervalMinutes: 1, // minimum
         cacheExpirationHours: 168, // one week
       );
@@ -233,7 +233,7 @@ void main() {
         (failure) => fail('Should not return failure'),
         (settings) {
           expect(settings.scanTimeoutSeconds, 1);
-          expect(settings.apiTimeoutSeconds, 300);
+          expect(settings.wsTimeoutSeconds, 300);
           expect(settings.syncIntervalMinutes, 1);
           expect(settings.cacheExpirationHours, 168);
         },

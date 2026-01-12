@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
@@ -13,6 +14,7 @@ import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.da
 /// Periodically fetches fresh data without blocking the UI
 class BackgroundRefreshService {
   BackgroundRefreshService({
+    required this.deviceDataSource,
     required this.deviceLocalDataSource,
     required this.roomRepository,
     required this.notificationGenerationService,
@@ -23,6 +25,7 @@ class BackgroundRefreshService {
 
   static final _logger = LoggerConfig.getLogger();
 
+  final DeviceDataSource deviceDataSource;
   final DeviceLocalDataSource deviceLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;
@@ -123,11 +126,13 @@ class BackgroundRefreshService {
       _deviceRefreshController.add(RefreshStatus.refreshing);
       
       final stopwatch = Stopwatch()..start();
-      
-      final devices = await deviceLocalDataSource.getCachedDevices(
-        allowStale: true,
-      );
-      
+
+      // Fetch new data
+      final devices = await deviceDataSource.getDevices();
+
+      // Cache the new data
+      await deviceLocalDataSource.cacheDevices(devices);
+
       // Convert DeviceModel to Device entities and generate notifications
       final deviceEntities = devices.map((deviceModel) => deviceModel.toEntity()).toList();
       final newNotifications = notificationGenerationService.generateFromDevices(deviceEntities);

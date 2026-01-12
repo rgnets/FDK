@@ -25,24 +25,29 @@ mixin _$RoomModel {
   String? get building => throw _privateConstructorUsedError;
   String? get floor => throw _privateConstructorUsedError;
   String? get number => throw _privateConstructorUsedError;
+  List<String>? get deviceIds => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -75,7 +80,13 @@ abstract class $RoomModelCopyWith<$Res> {
       _$RoomModelCopyWithImpl<$Res, RoomModel>;
   @useResult
   $Res call(
-      {int id, String name, String? building, String? floor, String? number});
+      {int id,
+      String name,
+      String? building,
+      String? floor,
+      String? number,
+      List<String>? deviceIds,
+      Map<String, dynamic>? metadata});
 }
 
 /// @nodoc
@@ -96,6 +107,8 @@ class _$RoomModelCopyWithImpl<$Res, $Val extends RoomModel>
     Object? building = freezed,
     Object? floor = freezed,
     Object? number = freezed,
+    Object? deviceIds = freezed,
+    Object? metadata = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -118,6 +131,14 @@ class _$RoomModelCopyWithImpl<$Res, $Val extends RoomModel>
           ? _value.number
           : number // ignore: cast_nullable_to_non_nullable
               as String?,
+      deviceIds: freezed == deviceIds
+          ? _value.deviceIds
+          : deviceIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      metadata: freezed == metadata
+          ? _value.metadata
+          : metadata // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
     ) as $Val);
   }
 }
@@ -131,7 +152,13 @@ abstract class _$$RoomModelImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {int id, String name, String? building, String? floor, String? number});
+      {int id,
+      String name,
+      String? building,
+      String? floor,
+      String? number,
+      List<String>? deviceIds,
+      Map<String, dynamic>? metadata});
 }
 
 /// @nodoc
@@ -150,6 +177,8 @@ class __$$RoomModelImplCopyWithImpl<$Res>
     Object? building = freezed,
     Object? floor = freezed,
     Object? number = freezed,
+    Object? deviceIds = freezed,
+    Object? metadata = freezed,
   }) {
     return _then(_$RoomModelImpl(
       id: null == id
@@ -172,6 +201,14 @@ class __$$RoomModelImplCopyWithImpl<$Res>
           ? _value.number
           : number // ignore: cast_nullable_to_non_nullable
               as String?,
+      deviceIds: freezed == deviceIds
+          ? _value.deviceIds
+          : deviceIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      metadata: freezed == metadata
+          ? _value.metadata
+          : metadata // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
     ));
   }
 }
@@ -184,8 +221,12 @@ class _$RoomModelImpl extends _RoomModel {
       required this.name,
       this.building,
       this.floor,
-      this.number})
-      : super._();
+      this.number,
+      @JsonKey(name: 'device_ids') final List<String>? deviceIds,
+      final Map<String, dynamic>? metadata})
+      : _deviceIds = deviceIds,
+        _metadata = metadata,
+        super._();
 
   factory _$RoomModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoomModelImplFromJson(json);
@@ -200,10 +241,29 @@ class _$RoomModelImpl extends _RoomModel {
   final String? floor;
   @override
   final String? number;
+  final List<String>? _deviceIds;
+  @override
+  List<String>? get deviceIds {
+    final value = _deviceIds;
+    if (value == null) return null;
+    if (_deviceIds is EqualUnmodifiableListView) return _deviceIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  final Map<String, dynamic>? _metadata;
+  @override
+  Map<String, dynamic>? get metadata {
+    final value = _metadata;
+    if (value == null) return null;
+    if (_metadata is EqualUnmodifiableMapView) return _metadata;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
 
   @override
   String toString() {
-    return 'RoomModel(id: $id, name: $name, building: $building, floor: $floor, number: $number)';
+    return 'RoomModel(id: $id, name: $name, building: $building, floor: $floor, number: $number, deviceIds: $deviceIds, metadata: $metadata)';
   }
 
   @override
@@ -216,13 +276,25 @@ class _$RoomModelImpl extends _RoomModel {
             (identical(other.building, building) ||
                 other.building == building) &&
             (identical(other.floor, floor) || other.floor == floor) &&
-            (identical(other.number, number) || other.number == number));
+            (identical(other.number, number) || other.number == number) &&
+            const DeepCollectionEquality()
+                .equals(other._deviceIds, _deviceIds) &&
+            const DeepCollectionEquality().equals(other._metadata, _metadata));
   }
 
   @JsonKey(ignore: true)
   @override
   int get hashCode =>
-      Object.hash(runtimeType, id, name, building, floor, number);
+      Object.hash(
+        runtimeType,
+        id,
+        name,
+        building,
+        floor,
+        number,
+        const DeepCollectionEquality().hash(_deviceIds),
+        const DeepCollectionEquality().hash(_metadata),
+      );
 
   @JsonKey(ignore: true)
   @override
@@ -234,32 +306,35 @@ class _$RoomModelImpl extends _RoomModel {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)
         $default,
   ) {
-    return $default(id, name, building, floor, number);
+    return $default(id, name, building, floor, number, deviceIds, metadata);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)?
         $default,
   ) {
-    return $default?.call(id, name, building, floor, number);
+    return $default?.call(id, name, building, floor, number, deviceIds, metadata);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, List<String>? deviceIds,
+            Map<String, dynamic>? metadata)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(id, name, building, floor, number);
+      return $default(id, name, building, floor, number, deviceIds, metadata);
     }
     return orElse();
   }
@@ -306,7 +381,9 @@ abstract class _RoomModel extends RoomModel {
       required final String name,
       final String? building,
       final String? floor,
-      final String? number}) = _$RoomModelImpl;
+      final String? number,
+      @JsonKey(name: 'device_ids') final List<String>? deviceIds,
+      final Map<String, dynamic>? metadata}) = _$RoomModelImpl;
   const _RoomModel._() : super._();
 
   factory _RoomModel.fromJson(Map<String, dynamic> json) =
@@ -322,6 +399,10 @@ abstract class _RoomModel extends RoomModel {
   String? get floor;
   @override
   String? get number;
+  @override
+  List<String>? get deviceIds;
+  @override
+  Map<String, dynamic>? get metadata;
   @override
   @JsonKey(ignore: true)
   _$$RoomModelImplCopyWith<_$RoomModelImpl> get copyWith =>

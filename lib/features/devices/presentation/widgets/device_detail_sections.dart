@@ -1,17 +1,26 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:rgnets_fdk/core/widgets/section_card.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/copyable_field.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/image_viewer_dialog.dart';
 
 /// Widget for displaying all device fields in organized sections
 class DeviceDetailSections extends StatelessWidget {
-  const DeviceDetailSections({required this.device, super.key});
+  const DeviceDetailSections({
+    required this.device,
+    this.onImageDeleted,
+    super.key,
+  });
 
   final Device device;
+  final void Function(String imageUrl)? onImageDeleted;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildBasicInfoSection(context),
         const SizedBox(height: 16),
@@ -27,22 +36,17 @@ class DeviceDetailSections extends StatelessWidget {
         const SizedBox(height: 16),
         _buildSystemSection(context),
         const SizedBox(height: 16),
-        _buildHardwareSection(context),
-        const SizedBox(height: 16),
-        _buildNotesSection(context),
-        const SizedBox(height: 16),
         _buildImagesSection(context),
       ],
     );
   }
 
   Widget _buildBasicInfoSection(BuildContext context) {
-    return _SectionCard(
-      title: 'Basic Information',
+    return SectionCard(
+      title: 'Device Details',
       icon: Icons.info_outline,
       children: [
-        _DetailRow('ID', device.id),
-        _DetailRow('Name', device.name),
+        CopyableField(label: 'Name', value: device.name),
         _DetailRow('Type', device.type),
         _DetailRow(
           'Status',
@@ -60,7 +64,7 @@ class DeviceDetailSections extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Location',
       icon: Icons.location_on_outlined,
       children: [
@@ -80,15 +84,16 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildNetworkSection(BuildContext context) {
-    return _SectionCard(
+    return SectionCard(
       title: 'Network Configuration',
       icon: Icons.network_check,
       children: [
         if (device.ipAddress != null)
-          _DetailRow('IP Address', device.ipAddress!),
+          CopyableField(label: 'IP Address', value: device.ipAddress!),
         if (device.macAddress != null)
-          _DetailRow('MAC Address', device.macAddress!),
-        if (device.vlan != null) _DetailRow('VLAN', device.vlan.toString()),
+          CopyableField(label: 'MAC Address', value: device.macAddress!),
+        if (device.vlan != null)
+          _DetailRow('VLAN', device.vlan.toString()),
       ],
     );
   }
@@ -100,7 +105,7 @@ class DeviceDetailSections extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Wireless Configuration',
       icon: Icons.wifi,
       children: [
@@ -125,7 +130,7 @@ class DeviceDetailSections extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Performance',
       icon: Icons.speed,
       children: [
@@ -153,7 +158,7 @@ class DeviceDetailSections extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'Traffic Statistics',
       icon: Icons.swap_vert,
       children: [
@@ -183,53 +188,28 @@ class DeviceDetailSections extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return _SectionCard(
+    return SectionCard(
       title: 'System Information',
       icon: Icons.computer,
       children: [
-        if (device.model != null) _DetailRow('Model', device.model!),
+        if (device.model != null)
+          CopyableField(label: 'Model', value: device.model!),
         if (device.serialNumber != null)
-          _DetailRow('Serial Number', device.serialNumber!),
-        if (device.firmware != null) _DetailRow('Firmware', device.firmware!),
+          CopyableField(label: 'Serial Number', value: device.serialNumber!),
+        if (device.firmware != null)
+          _DetailRow('Firmware', device.firmware!),
         if (device.restartCount != null)
           _DetailRow('Restart Count', device.restartCount.toString()),
       ],
     );
   }
 
-  Widget _buildHardwareSection(BuildContext context) {
-    // Reserved for future hardware-specific fields
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildNotesSection(BuildContext context) {
-    if (device.note == null) {
-      return const SizedBox.shrink();
-    }
-
-    return _SectionCard(
-      title: 'Notes',
-      icon: Icons.note,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            device.note!,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Get valid image URLs from device
+  /// Filter to only valid HTTP/HTTPS image URLs
   List<String> get _validImages {
     final images = device.images;
     if (images == null || images.isEmpty) {
       return [];
     }
-
-    // Filter to only valid http/https URLs
     return images.where((url) {
       if (url.isEmpty) {
         return false;
@@ -240,169 +220,117 @@ class DeviceDetailSections extends StatelessWidget {
   }
 
   Widget _buildImagesSection(BuildContext context) {
-    final images = _validImages;
-    if (images.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final validImages = _validImages;
 
-    return _SectionCard(
-      title: 'Images',
+    return SectionCard(
+      title: validImages.isEmpty ? 'Images' : 'Images (${validImages.length})',
       icon: Icons.photo_library,
       children: [
         SizedBox(
           height: 120,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: images.length,
-            itemBuilder: (context, index) {
-              final imageUrl = images[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => _showEnlargedImage(context, imageUrl, index, images),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 120,
-                      height: 120,
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        cacheWidth: 240,
-                        cacheHeight: 240,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) {
-                            return child;
-                          }
-                          return Container(
-                            color: Colors.grey[800],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
-                                    : null,
-                                strokeWidth: 2,
+          child: validImages.isEmpty
+              ? _buildEmptyImagesPlaceholder(context)
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: validImages.length,
+                  itemBuilder: (context, index) {
+                    final imageUrl = validImages[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => _showImageViewer(
+                          context,
+                          validImages,
+                          index,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 120,
+                            height: 120,
+                            child: CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 240,
+                              memCacheHeight: 240,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child:
+                                        CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[300],
+                                child: const Icon(
+                                  Icons.broken_image,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.broken_image,
-                              size: 40,
-                              color: Colors.grey,
-                            ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
   }
 
-  void _showEnlargedImage(
+  Widget _buildEmptyImagesPlaceholder(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: Colors.grey[400]!,
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_photo_alternate_outlined,
+              size: 40,
+              color: Colors.grey[500],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No images',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImageViewer(
     BuildContext context,
-    String imageUrl,
-    int index,
     List<String> images,
+    int initialIndex,
   ) {
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Stack(
-          children: [
-            // Image with interactive viewer
-            Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: InteractiveViewer(
-                  minScale: 0.5,
-                  maxScale: 4,
-                  child: Image.network(
-                    imageUrl,
-                    fit: BoxFit.contain,
-                    loadingBuilder: (ctx, child, loadingProgress) {
-                      if (loadingProgress == null) {
-                        return child;
-                      }
-                      return Container(
-                        width: 300,
-                        height: 300,
-                        color: Colors.grey[900],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (ctx, error, stackTrace) {
-                      return Container(
-                        width: 300,
-                        height: 300,
-                        color: Colors.grey[900],
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                            SizedBox(height: 16),
-                            Text(
-                              'Failed to load image',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-            // Close button
-            Positioned(
-              top: 0,
-              right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                onPressed: () => Navigator.of(dialogContext).pop(),
-              ),
-            ),
-            // Image counter
-            if (images.length > 1)
-              Positioned(
-                bottom: 16,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      '${index + 1} / ${images.length}',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
+      barrierColor: Colors.black87,
+      builder: (context) => ImageViewerDialog(
+        images: images,
+        initialIndex: initialIndex,
+        onDelete: onImageDeleted,
       ),
     );
   }
@@ -464,46 +392,6 @@ class DeviceDetailSections extends StatelessWidget {
       default:
         return Colors.grey;
     }
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.children,
-  });
-
-  final String title;
-  final IconData icon;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 20, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
-      ),
-    );
   }
 }
 

@@ -1,0 +1,159 @@
+# API Trace Report (3-pass scan)
+
+Date: 2026-01-09T19:02:07Z
+
+Search patterns used:
+- Pass 1 (runtime): apiUrl, api_url, api_key, apiKey, api_token, Authorization, Bearer, /api/, API_URL, apiTimeout
+- Pass 2 (docs): api, API, /api/, api_key, apiUrl, apiKey, API_URL, Authorization, Bearer
+- Pass 3 (scripts/tests/tools/root): api, API, /api/, api_key, apiUrl, apiKey, API_URL, Authorization, Bearer, websocket, ActionCable
+
+## Pass 1 - Runtime source (lib)
+
+- `lib/core/widgets/connection_details_dialog.dart`
+- `lib/features/auth/presentation/widgets/credential_approval_sheet.dart`
+- `lib/core/services/storage_service.dart`
+- `lib/features/auth/presentation/screens/auth_screen.dart`
+- `lib/core/utils/qr_decoder.dart`
+- `lib/core/providers/repository_providers.dart`
+- `lib/features/auth/presentation/providers/auth_notifier.dart`
+- `lib/core/providers/websocket_providers.dart`
+- `lib/features/auth/domain/entities/user.freezed.dart`
+- `lib/features/home/presentation/widgets/welcome_card.dart`
+- `lib/features/splash/presentation/screens/splash_screen.dart`
+- `lib/features/auth/domain/usecases/authenticate_user.dart`
+- `lib/features/auth/domain/entities/user.dart`
+- `lib/features/home/presentation/screens/home_screen.dart`
+- `lib/core/services/mock_data_service.dart`
+- `lib/core/config/environment.dart`
+- `lib/features/auth/domain/repositories/auth_repository.dart`
+- `lib/core/config/app_config.dart`
+- `lib/features/auth/data/datasources/auth_local_data_source.dart`
+- `lib/features/auth/data/models/user_model.freezed.dart`
+- `lib/features/auth/data/models/user_model.g.dart`
+- `lib/features/auth/data/models/user_model.dart`
+- `lib/features/auth/data/repositories/auth_repository.dart`
+- `lib/features/settings/presentation/screens/settings_screen.dart`
+- `lib/features/settings/domain/entities/app_settings.freezed.dart`
+- `lib/features/settings/domain/entities/app_settings.dart`
+- `lib/features/settings/presentation/providers/settings_riverpod_provider.dart`
+- `lib/features/settings/data/repositories/settings_repository_impl.dart`
+- `lib/features/scanner/presentation/screens/scanner_screen.dart`
+- `lib/features/scanner/domain/usecases/process_qr_code.dart`
+- `lib/features/scanner/domain/usecases/process_auth_qr.dart`
+
+## Pass 2 - Docs (docs)
+
+- `docs/platform-strategy.md`
+- `docs/certificate-handling.md`
+- `docs/EXHAUSTIVE_VERIFICATION_REPORT.md`
+- `docs/ROOM_FIX_NO_FALLBACKS.md`
+- `docs/performance_optimization_implementation.md`
+- `docs/ROOM_DATA_FIXES.md`
+- `docs/implementation_questions_and_recommendations.md`
+- `docs/overview.md`
+- `docs/dependencies.md`
+- `docs/version-management.md`
+- `docs/data-flow-architecture.md`
+- `docs/FIX_IP_MAC_FIELD_NAMES.md`
+- `docs/COMPLETE_MOCK_DATA_ALIGNMENT_PLAN.md`
+- `docs/MOCK_DATA_ALIGNMENT_PLAN.md`
+- `docs/ARCHITECTURE.md`
+- `docs/testing-strategy.md`
+- `docs/image-handling-requirements.md`
+- `docs/ROOM_FIX_PROPAGATION_COMPLETE.md`
+- `docs/FINAL_ARCHITECTURE_SUMMARY.md`
+- `docs/authentication-flow.md`
+- `docs/HONEST_ASSESSMENT_OF_LAST_COMMIT.md`
+- `docs/performance_optimization_plan.md`
+- `docs/repo-index.md`
+- `docs/FINAL_IMPLEMENTATION_VERIFICATION.md`
+- `docs/APP_ENTRY_POINTS.md`
+- `docs/README_RUNNING_APP.md`
+- `docs/cicd-pipeline.md`
+- `docs/ARCHITECTURE_VERIFICATION.md`
+- `docs/REFACTORING_PLAN_PHASE_2.md`
+- `docs/REFACTORING_NEXT_STEPS.md`
+- `docs/SIMPLIFICATION_CHANGES.md`
+- `docs/setup.md`
+- `docs/data-models.md`
+- `docs/websocket-contracts.md`
+- `docs/room-readiness-logic.md`
+- `docs/ROOM_DISPLAY_FIX_COMPLETE.md`
+- `docs/IMPLEMENTATION_SUMMARY.md`
+- `docs/notification-system.md`
+- `docs/CONTRIBUTING.md`
+- `docs/UNIFIED_ARCHITECTURE_PLAN.md`
+- `docs/screen-specifications.md`
+- `docs/changes/2025-10-08-websocket-auth-progress.md`
+- `docs/changes/phase1-upgrade.md`
+
+## Pass 3 - Scripts, tests, tools, and root docs
+
+- `README.md`
+- `OldAppReport.txt`
+- `CLAUDE.md`
+- `ImplementationPlan.txt`
+- `tool/ws_auth_smoke.dart`
+- `test/parallel_error_handling_test.dart`
+- `test/fixtures/test_credentials.dart`
+- `scripts/STAGING_DIAGNOSIS_SUMMARY.md`
+- `test/integration/app_integration_test.dart`
+- `test/optimization_verification_test.dart`
+- `test/features/settings/domain/usecases/get_settings_test.dart`
+- `test/features/settings/domain/usecases/export_settings_test.dart`
+- `test/staging_auth_test.dart`
+- `test/performance_tests.dart`
+- `test/features/settings/domain/usecases/update_settings_test.dart`
+- `scripts/validate_architecture_compliance.py`
+- `test/features/settings/domain/usecases/import_settings_test.dart`
+- `test/features/auth/credential_sheets_test.dart`
+- `test/features/scanner/process_auth_qr_test.dart`
+- `test/features/auth/domain/usecases/get_current_user_test.dart`
+- `scripts/start_dev_server.sh`
+- `scripts/diagnose_device_entity_issues.dart`
+- `scripts/debug_staging_data.sh`
+- `scripts/test_staging_api_location.py`
+- `scripts/run_all_checks.sh`
+- `scripts/analyze_building_floor_usage_iteration3.dart`
+- `scripts/run_production.sh`
+- `scripts/test_architectural_decisions.py`
+- `scripts/final_implementation_validation.py`
+- `test/features/auth/domain/usecases/authenticate_user_test.dart`
+- `scripts/validate_caching_strategy.py`
+- `scripts/monitor_crash.sh`
+- `scripts/check_staging_devices.sh`
+- `scripts/test_browser_console.sh`
+- `scripts/validate_crash_fix.dart`
+- `scripts/comprehensive_device_type_analysis.dart`
+- `scripts/comprehensive_integration_test.dart`
+- `scripts/complete_room_fix_implementation.dart`
+- `scripts/analyze_room_data_architecture.dart`
+- `scripts/test_30_second_refresh_impact.py`
+- `scripts/test_web_scanner_actual.html`
+- `scripts/simulate_unified_room_structure.dart`
+- `scripts/plan_fix_ont_case_iteration2.dart`
+- `scripts/test_frontend_refresh_impact.py`
+- `scripts/design_comprehensive_detail_sections.py`
+- `scripts/room_display_fix_complete_plan.md`
+- `scripts/analyze_building_floor_usage_iteration2.dart`
+- `scripts/capture_staging_console.py`
+- `scripts/test_staging_run.sh`
+- `scripts/pubspec.yaml`
+- `scripts/plan_fix_ont_case_iteration3.dart`
+- `scripts/proposed_unified_flow.dart`
+- `scripts/run_staging.sh`
+- `scripts/room_fix_plan.dart`
+- `scripts/CRASH_DIAGNOSIS_SUMMARY.md`
+- `scripts/validate_cache_fix_iteration.dart`
+- `scripts/test_sequential_refresh_pattern.py`
+- `scripts/capture_console.py`
+- `scripts/analyze_building_floor_usage_iteration1.dart`
+- `scripts/verify_environments.sh`
+- `scripts/room_display_lines_summary.dart`
+- `scripts/analyze_room_display_lines.dart`
+- `scripts/design_subtle_refresh_animation.py`
+- `scripts/run_fake_gateway.sh`
+- `scripts/e2e_test.sh`
+- `scripts/plan_fix_ont_case_iteration1.dart`
+- `scripts/debug_staging.js`
+- `scripts/final_building_floor_plan.md`

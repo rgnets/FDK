@@ -8,9 +8,9 @@ class StorageService {
   StorageService(this._prefs);
   final SharedPreferences _prefs;
 
-  // Keys
-  static const String _keyApiUrl = 'api_url';
-  static const String _keyApiToken = 'api_token';
+  // Keys (WS-only semantics)
+  static const String _keySiteUrl = 'site_url';
+  static const String _keyToken = 'token';
   static const String _keyUsername = 'username';
   static const String _keySiteName = 'site_name';
   static const String _keyAuthIssuedAt = 'auth_issued_at';
@@ -24,18 +24,22 @@ class StorageService {
   static const String _keyAutoSync = 'auto_sync';
   static const String _keySyncInterval = 'sync_interval';
 
+  // Legacy keys for migration
+  static const String _legacyKeyApiUrl = 'api_url';
+  static const String _legacyKeyApiToken = 'api_token';
+
   // Auth
   Future<void> saveCredentials({
-    required String apiUrl,
-    required String apiToken,
+    required String siteUrl,
+    required String token,
     required String username,
     String? siteName,
     String? issuedAtIso,
     String? signature,
     bool markAuthenticated = false,
   }) async {
-    await _prefs.setString(_keyApiUrl, apiUrl);
-    await _prefs.setString(_keyApiToken, apiToken);
+    await _prefs.setString(_keySiteUrl, siteUrl);
+    await _prefs.setString(_keyToken, token);
     await _prefs.setString(_keyUsername, username);
     if (siteName != null) {
       await _prefs.setString(_keySiteName, siteName);
@@ -61,12 +65,15 @@ class StorageService {
   }
 
   Future<void> clearCredentials() async {
-    await _prefs.remove(_keyApiUrl);
-    await _prefs.remove(_keyApiToken);
+    await _prefs.remove(_keySiteUrl);
+    await _prefs.remove(_keyToken);
     await _prefs.remove(_keyUsername);
     await _prefs.remove(_keySiteName);
     await _prefs.remove(_keyAuthIssuedAt);
     await _prefs.remove(_keyAuthSignature);
+    // Also clear any legacy keys
+    await _prefs.remove(_legacyKeyApiUrl);
+    await _prefs.remove(_legacyKeyApiToken);
     await clearSession();
     await _prefs.setBool(_keyIsAuthenticated, false);
   }
@@ -80,36 +87,58 @@ class StorageService {
     await _prefs.remove(_keySessionExpiresAt);
   }
 
+  /// Migrates legacy credential storage formats to WS-only semantics.
+  /// Handles both att_fe_tool.* keys and api_url/api_token keys.
   Future<void> migrateLegacyCredentialsIfNeeded() async {
+    // Migration 1: ATT FE Tool legacy keys
     const legacyFqdnKey = 'att_fe_tool.fqdn';
     const legacyLoginKey = 'att_fe_tool.login';
     const legacyApiKey = 'att_fe_tool.api_key';
 
-    final hasLegacy = _prefs.containsKey(legacyFqdnKey) &&
+    final hasAttLegacy = _prefs.containsKey(legacyFqdnKey) &&
         _prefs.containsKey(legacyLoginKey) &&
         _prefs.containsKey(legacyApiKey);
-    if (!hasLegacy) {
-      return;
+
+    if (hasAttLegacy) {
+      final fqdn = _prefs.getString(legacyFqdnKey) ?? '';
+      final login = _prefs.getString(legacyLoginKey) ?? '';
+      final apiKey = _prefs.getString(legacyApiKey) ?? '';
+
+      if (fqdn.isNotEmpty && login.isNotEmpty && apiKey.isNotEmpty) {
+        await saveCredentials(
+          siteUrl: 'https://$fqdn',
+          token: apiKey,
+          username: login,
+          markAuthenticated: false,
+        );
+      }
+
+      await Future.wait<bool>([
+        _prefs.remove(legacyFqdnKey),
+        _prefs.remove(legacyLoginKey),
+        _prefs.remove(legacyApiKey),
+      ]);
     }
 
-    final fqdn = _prefs.getString(legacyFqdnKey) ?? '';
-    final login = _prefs.getString(legacyLoginKey) ?? '';
-    final apiKey = _prefs.getString(legacyApiKey) ?? '';
+    // Migration 2: api_url/api_token keys to site_url/token
+    final hasApiLegacy = _prefs.containsKey(_legacyKeyApiUrl) ||
+        _prefs.containsKey(_legacyKeyApiToken);
 
-    if (fqdn.isNotEmpty && login.isNotEmpty && apiKey.isNotEmpty) {
-      await saveCredentials(
-        apiUrl: 'https://$fqdn',
-        apiToken: apiKey,
-        username: login,
-        markAuthenticated: false,
-      );
+    if (hasApiLegacy && !_prefs.containsKey(_keySiteUrl)) {
+      final apiUrl = _prefs.getString(_legacyKeyApiUrl);
+      final apiToken = _prefs.getString(_legacyKeyApiToken);
+
+      if (apiUrl != null && apiUrl.isNotEmpty) {
+        await _prefs.setString(_keySiteUrl, apiUrl);
+      }
+      if (apiToken != null && apiToken.isNotEmpty) {
+        await _prefs.setString(_keyToken, apiToken);
+      }
+
+      // Remove legacy keys after migration
+      await _prefs.remove(_legacyKeyApiUrl);
+      await _prefs.remove(_legacyKeyApiToken);
     }
-
-    await Future.wait<bool>([
-      _prefs.remove(legacyFqdnKey),
-      _prefs.remove(legacyLoginKey),
-      _prefs.remove(legacyApiKey),
-    ]);
   }
 
   Future<void> logAuthAttempt(AuthAttempt attempt) async {
@@ -147,8 +176,8 @@ class StorageService {
     }
   }
 
-  String? get apiUrl => _prefs.getString(_keyApiUrl);
-  String? get apiToken => _prefs.getString(_keyApiToken);
+  String? get siteUrl => _prefs.getString(_keySiteUrl);
+  String? get token => _prefs.getString(_keyToken);
   String? get username => _prefs.getString(_keyUsername);
   String? get siteName => _prefs.getString(_keySiteName);
   String? get authIssuedAtIso => _prefs.getString(_keyAuthIssuedAt);

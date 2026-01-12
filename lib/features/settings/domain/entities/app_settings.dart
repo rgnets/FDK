@@ -16,7 +16,7 @@ class AppSettings with _$AppSettings {
     required bool enableContinuousScanning,
     
     // Network Settings
-    required int apiTimeoutSeconds,
+    required int wsTimeoutSeconds,
     required bool enableOfflineMode,
     required int cacheExpirationHours,
     
@@ -46,7 +46,7 @@ class AppSettings with _$AppSettings {
         scanTimeoutSeconds: 6,
         enableScanSound: true,
         enableContinuousScanning: false,
-        apiTimeoutSeconds: 30,
+        wsTimeoutSeconds: 30,
         enableOfflineMode: true,
         cacheExpirationHours: 12,
         enableNotifications: true,

@@ -395,7 +395,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen>
         Navigator.of(context).pop({
           'fqdn': credentials.fqdn,
           'login': credentials.login,
-          'apiKey': credentials.apiKey,
+          'token': credentials.token,
           'siteName': credentials.siteName,
           'issuedAt': credentials.issuedAt.toIso8601String(),
           if (credentials.signature != null) 'signature': credentials.signature,

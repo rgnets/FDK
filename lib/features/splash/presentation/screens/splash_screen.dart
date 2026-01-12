@@ -33,7 +33,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final logger = ref.read(loggerProvider)
       ..i('🚀 SPLASH_SCREEN: Navigation flow starting')
       ..d('SPLASH_SCREEN: Environment: ${EnvironmentConfig.name}')
-      ..d('SPLASH_SCREEN: API Base URL: ${EnvironmentConfig.apiBaseUrl}')
+      ..d('SPLASH_SCREEN: WebSocket URL: ${EnvironmentConfig.websocketBaseUrl}')
       ..d(
         'SPLASH_SCREEN: Use Synthetic Data: ${EnvironmentConfig.useSyntheticData}',
       );
@@ -51,27 +51,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (EnvironmentConfig.isDevelopment) {
       logger
         ..i('🔧 SPLASH_SCREEN: Development mode detected')
-        ..d('SPLASH_SCREEN: skipAutoLogin=${EnvironmentConfig.skipAutoLogin}')
-        ..d(
-          'SPLASH_SCREEN: useSyntheticData=${EnvironmentConfig.useSyntheticData}',
-        );
-
-      if (!EnvironmentConfig.useSyntheticData) {
-        logger.i('SPLASH_SCREEN: Dev remote mode, navigating to /auth');
-        if (mounted) {
-          context.go('/auth');
-        }
-        return;
-      }
-
-      if (EnvironmentConfig.skipAutoLogin) {
-        logger.i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
-        if (mounted) {
-          context.go('/auth');
-        }
-        return;
-      }
-      logger.d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
+        ..d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
       // Development mode: skip auth and go directly to home with synthetic data
       if (mounted) {
         logger.d('SPLASH_SCREEN: Widget is mounted, navigating...');
@@ -84,15 +64,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     if (EnvironmentConfig.isStaging) {
-      if (EnvironmentConfig.skipAutoLogin) {
-        logger
-          ..i('🧪 SPLASH_SCREEN: Staging mode detected')
-          ..i('SPLASH_SCREEN: Skipping auto-login, navigating to /auth');
-        if (mounted) {
-          context.go('/auth');
-        }
-        return;
-      }
       // Staging mode: auto-authenticate with interurban credentials from QR code
       logger
         ..i('🧪 SPLASH_SCREEN: Staging mode detected')
@@ -109,28 +80,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (credentials != null) {
         logger.i('SPLASH_SCREEN: ✅ QR credentials decoded successfully');
         final fqdn =
-            (credentials['fqdn'] as String?) ??
-            EnvironmentConfig.apiBaseUrl
-                .replaceFirst('https://', '')
-                .replaceFirst('http://', '');
+            (credentials['fqdn'] as String?) ?? EnvironmentConfig.host;
         final login =
             (credentials['login'] as String?) ?? EnvironmentConfig.apiUsername;
-        final apiKey =
-            (credentials['apiKey'] as String?) ?? EnvironmentConfig.apiKey;
+        // Accept 'token' or legacy 'apiKey' from QR credentials
+        final authToken =
+            (credentials['token'] as String?) ??
+            (credentials['apiKey'] as String?) ??
+            EnvironmentConfig.token;
         final siteName =
             (credentials['site_name'] as String?) ??
             (credentials['siteName'] as String?) ??
             fqdn;
         final issuedAt = DateTime.now().toUtc();
-        final apiKeyPreview = apiKey.isNotEmpty
-            ? apiKey.substring(0, 4)
-            : 'N/A';
 
         logger
           ..d('SPLASH_SCREEN: Decoded credentials from QR:')
           ..d('SPLASH_SCREEN:   FQDN: $fqdn')
           ..d('SPLASH_SCREEN:   Login: $login')
-          ..d('SPLASH_SCREEN:   API Key: $apiKeyPreview...')
+          ..d('SPLASH_SCREEN:   API Key: ${authToken.substring(0, 4)}...')
           ..d('SPLASH_SCREEN:   Site Name: $siteName')
           ..d('SPLASH_SCREEN:   Full FQDN type: ${fqdn.runtimeType}')
           ..d('SPLASH_SCREEN:   Full Login type: ${login.runtimeType}');
@@ -150,7 +118,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               .authenticate(
                 fqdn: fqdn,
                 login: login,
-                apiKey: apiKey,
+                token: authToken,
                 siteName: siteName,
                 issuedAt: issuedAt,
               )
@@ -191,7 +159,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   logger
                     ..i('SPLASH_SCREEN: ✅ User authenticated successfully')
                     ..d('SPLASH_SCREEN: User: ${user.username}')
-                    ..d('SPLASH_SCREEN: API URL: ${user.apiUrl}');
+                    ..d('SPLASH_SCREEN: API URL: ${user.siteUrl}');
                   return true;
                 },
                 orElse: () {
@@ -247,37 +215,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         logger.w(
           'SPLASH_SCREEN: ⚠️ Failed to decode QR, using fallback credentials',
         );
-        if (EnvironmentConfig.apiBaseUrl.isEmpty ||
-            EnvironmentConfig.apiUsername.isEmpty ||
-            EnvironmentConfig.apiKey.isEmpty) {
-          logger.w(
-            'SPLASH_SCREEN: ⚠️ Fallback credentials not configured, navigating to /auth',
-          );
-          if (mounted) {
-            context.go('/auth');
-          }
-          return;
-        }
         // Use fallback credentials from EnvironmentConfig
-        // Extract FQDN from the API URL (remove protocol)
-        final fqdn = EnvironmentConfig.apiBaseUrl
-            .replaceFirst('https://', '')
-            .replaceFirst('http://', '')
-            .split('/')
-            .first; // Get just the host part
+        final fqdn = EnvironmentConfig.host;
         final login = EnvironmentConfig.apiUsername;
-        final apiKey = EnvironmentConfig.apiKey;
+        final authToken = EnvironmentConfig.token;
         final siteName = fqdn;
         final issuedAt = DateTime.now().toUtc();
-        final apiKeyPreview = apiKey.isNotEmpty
-            ? apiKey.substring(0, 4)
-            : 'N/A';
 
         logger
           ..d('Using fallback credentials:')
           ..d('FQDN: $fqdn')
           ..d('Login: $login')
-          ..d('API Key: $apiKeyPreview...');
+          ..d('API Key: ${authToken.substring(0, 4)}...');
 
         try {
           await ref
@@ -285,7 +234,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               .authenticate(
                 fqdn: fqdn,
                 login: login,
-                apiKey: apiKey,
+                token: authToken,
                 siteName: siteName,
                 issuedAt: issuedAt,
               )
@@ -339,10 +288,67 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (mounted) {
       if (hasCredentials) {
-        logger.i(
-          'SPLASH_SCREEN: ✅ Stored credentials found, navigating to /home',
-        );
-        context.go('/home');
+        final siteUrl = storageService.siteUrl ?? '';
+        final authToken = storageService.token ?? '';
+        final login = storageService.username ?? '';
+        final siteName = storageService.siteName;
+
+        final parsed = Uri.tryParse(siteUrl);
+        final fqdn = parsed?.host ?? siteUrl.replaceFirst(RegExp(r'^https?://'), '');
+
+        if (authToken.isEmpty || login.isEmpty || fqdn.isEmpty) {
+          logger.w(
+            'SPLASH_SCREEN: Missing stored auth data; redirecting to /auth',
+          );
+          context.go('/auth');
+          return;
+        }
+
+        logger.i('SPLASH_SCREEN: ✅ Stored credentials found, re-authenticating');
+        try {
+          await ref
+              .read(authProvider.notifier)
+              .authenticate(
+                fqdn: fqdn,
+                login: login,
+                token: authToken,
+                siteName: siteName ?? fqdn,
+                issuedAt: DateTime.now().toUtc(),
+              )
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () {
+                  logger.e('Production authentication timeout');
+                  throw TimeoutException('Authentication timeout');
+                },
+              );
+
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          final authState = ref.read(authProvider).valueOrNull;
+          final isAuthenticated =
+              authState?.maybeWhen(
+                authenticated: (_) => true,
+                orElse: () => false,
+              ) ??
+              false;
+
+          if (isAuthenticated) {
+            logger.i(
+              'SPLASH_SCREEN: 🎉 Authentication successful, navigating to /home',
+            );
+            context.go('/home');
+          } else {
+            logger.e(
+              'SPLASH_SCREEN: ❌ Authentication failed, redirecting to /auth',
+            );
+            context.go('/auth');
+          }
+        } on Exception catch (e, stack) {
+          logger.e(
+            'SPLASH_SCREEN: 💥 Exception during production auth: $e\n$stack',
+          );
+          context.go('/auth');
+        }
       } else {
         logger.i(
           'SPLASH_SCREEN: 🔓 No stored credentials, navigating to /auth',

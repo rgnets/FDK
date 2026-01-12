@@ -21,24 +21,36 @@ mixin _$Room {
   String? get building => throw _privateConstructorUsedError;
   String? get floor => throw _privateConstructorUsedError;
   String? get number => throw _privateConstructorUsedError;
+  String? get description => throw _privateConstructorUsedError;
+  String? get location => throw _privateConstructorUsedError;
+  List<String>? get deviceIds => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
+  DateTime? get createdAt => throw _privateConstructorUsedError;
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -70,7 +82,17 @@ abstract class $RoomCopyWith<$Res> {
       _$RoomCopyWithImpl<$Res, Room>;
   @useResult
   $Res call(
-      {int id, String name, String? building, String? floor, String? number});
+      {int id,
+      String name,
+      String? building,
+      String? floor,
+      String? number,
+      String? description,
+      String? location,
+      List<String>? deviceIds,
+      Map<String, dynamic>? metadata,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -91,6 +113,12 @@ class _$RoomCopyWithImpl<$Res, $Val extends Room>
     Object? building = freezed,
     Object? floor = freezed,
     Object? number = freezed,
+    Object? description = freezed,
+    Object? location = freezed,
+    Object? deviceIds = freezed,
+    Object? metadata = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -113,6 +141,30 @@ class _$RoomCopyWithImpl<$Res, $Val extends Room>
           ? _value.number
           : number // ignore: cast_nullable_to_non_nullable
               as String?,
+      description: freezed == description
+          ? _value.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String?,
+      location: freezed == location
+          ? _value.location
+          : location // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deviceIds: freezed == deviceIds
+          ? _value.deviceIds
+          : deviceIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      metadata: freezed == metadata
+          ? _value.metadata
+          : metadata // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
@@ -125,7 +177,17 @@ abstract class _$$RoomImplCopyWith<$Res> implements $RoomCopyWith<$Res> {
   @override
   @useResult
   $Res call(
-      {int id, String name, String? building, String? floor, String? number});
+      {int id,
+      String name,
+      String? building,
+      String? floor,
+      String? number,
+      String? description,
+      String? location,
+      List<String>? deviceIds,
+      Map<String, dynamic>? metadata,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -143,6 +205,12 @@ class __$$RoomImplCopyWithImpl<$Res>
     Object? building = freezed,
     Object? floor = freezed,
     Object? number = freezed,
+    Object? description = freezed,
+    Object? location = freezed,
+    Object? deviceIds = freezed,
+    Object? metadata = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
   }) {
     return _then(_$RoomImpl(
       id: null == id
@@ -165,6 +233,30 @@ class __$$RoomImplCopyWithImpl<$Res>
           ? _value.number
           : number // ignore: cast_nullable_to_non_nullable
               as String?,
+      description: freezed == description
+          ? _value.description
+          : description // ignore: cast_nullable_to_non_nullable
+              as String?,
+      location: freezed == location
+          ? _value.location
+          : location // ignore: cast_nullable_to_non_nullable
+              as String?,
+      deviceIds: freezed == deviceIds
+          ? _value.deviceIds
+          : deviceIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      metadata: freezed == metadata
+          ? _value.metadata
+          : metadata // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -177,8 +269,16 @@ class _$RoomImpl extends _Room {
       required this.name,
       this.building,
       this.floor,
-      this.number})
-      : super._();
+      this.number,
+      this.description,
+      this.location,
+      final List<String>? deviceIds,
+      final Map<String, dynamic>? metadata,
+      this.createdAt,
+      this.updatedAt})
+      : _deviceIds = deviceIds,
+        _metadata = metadata,
+        super._();
 
   @override
   final int id;
@@ -190,10 +290,38 @@ class _$RoomImpl extends _Room {
   final String? floor;
   @override
   final String? number;
+  @override
+  final String? description;
+  @override
+  final String? location;
+  final List<String>? _deviceIds;
+  @override
+  List<String>? get deviceIds {
+    final value = _deviceIds;
+    if (value == null) return null;
+    if (_deviceIds is EqualUnmodifiableListView) return _deviceIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  final Map<String, dynamic>? _metadata;
+  @override
+  Map<String, dynamic>? get metadata {
+    final value = _metadata;
+    if (value == null) return null;
+    if (_metadata is EqualUnmodifiableMapView) return _metadata;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
+
+  @override
+  final DateTime? createdAt;
+  @override
+  final DateTime? updatedAt;
 
   @override
   String toString() {
-    return 'Room(id: $id, name: $name, building: $building, floor: $floor, number: $number)';
+    return 'Room(id: $id, name: $name, building: $building, floor: $floor, number: $number, description: $description, location: $location, deviceIds: $deviceIds, metadata: $metadata, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -206,12 +334,35 @@ class _$RoomImpl extends _Room {
             (identical(other.building, building) ||
                 other.building == building) &&
             (identical(other.floor, floor) || other.floor == floor) &&
-            (identical(other.number, number) || other.number == number));
+            (identical(other.number, number) || other.number == number) &&
+            (identical(other.description, description) ||
+                other.description == description) &&
+            (identical(other.location, location) ||
+                other.location == location) &&
+            const DeepCollectionEquality()
+                .equals(other._deviceIds, _deviceIds) &&
+            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
+            (identical(other.createdAt, createdAt) ||
+                other.createdAt == createdAt) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, name, building, floor, number);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        name,
+        building,
+        floor,
+        number,
+        description,
+        location,
+        const DeepCollectionEquality().hash(_deviceIds),
+        const DeepCollectionEquality().hash(_metadata),
+        createdAt,
+        updatedAt,
+      ]);
 
   @JsonKey(ignore: true)
   @override
@@ -223,32 +374,41 @@ class _$RoomImpl extends _Room {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)
         $default,
   ) {
-    return $default(id, name, building, floor, number);
+    return $default(id, name, building, floor, number, description, location,
+        deviceIds, metadata, createdAt, updatedAt);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)?
         $default,
   ) {
-    return $default?.call(id, name, building, floor, number);
+    return $default?.call(id, name, building, floor, number, description,
+        location, deviceIds, metadata, createdAt, updatedAt);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(int id, String name, String? building, String? floor,
-            String? number)?
+            String? number, String? description, String? location,
+            List<String>? deviceIds, Map<String, dynamic>? metadata,
+            DateTime? createdAt, DateTime? updatedAt)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(id, name, building, floor, number);
+      return $default(id, name, building, floor, number, description, location,
+          deviceIds, metadata, createdAt, updatedAt);
     }
     return orElse();
   }
@@ -288,7 +448,13 @@ abstract class _Room extends Room {
       required final String name,
       final String? building,
       final String? floor,
-      final String? number}) = _$RoomImpl;
+      final String? number,
+      final String? description,
+      final String? location,
+      final List<String>? deviceIds,
+      final Map<String, dynamic>? metadata,
+      final DateTime? createdAt,
+      final DateTime? updatedAt}) = _$RoomImpl;
   const _Room._() : super._();
 
   @override
@@ -301,6 +467,18 @@ abstract class _Room extends Room {
   String? get floor;
   @override
   String? get number;
+  @override
+  String? get description;
+  @override
+  String? get location;
+  @override
+  List<String>? get deviceIds;
+  @override
+  Map<String, dynamic>? get metadata;
+  @override
+  DateTime? get createdAt;
+  @override
+  DateTime? get updatedAt;
   @override
   @JsonKey(ignore: true)
   _$$RoomImplCopyWith<_$RoomImpl> get copyWith =>

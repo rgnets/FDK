@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -20,7 +22,7 @@ final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
   final uri = Uri.parse(EnvironmentConfig.websocketBaseUrl);
   return WebSocketConfig(
     baseUri: uri,
-    autoReconnect: EnvironmentConfig.useWebSockets,
+    autoReconnect: true, // Always enabled - WebSocket-only architecture
     initialReconnectDelay: EnvironmentConfig.webSocketInitialReconnectDelay,
     maxReconnectDelay: EnvironmentConfig.webSocketMaxReconnectDelay,
     heartbeatInterval: EnvironmentConfig.webSocketHeartbeatInterval,
@@ -32,7 +34,7 @@ final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
 /// Provides a singleton [WebSocketService] for the application lifecycle.
 final webSocketServiceProvider = Provider<WebSocketService>((ref) {
   final config = ref.watch(webSocketConfigProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
 
   final service = WebSocketService(config: config, logger: logger);
   final stateSub = service.connectionState.listen((state) {
@@ -81,7 +83,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
 
   final service = WebSocketDataSyncService(
     socketService: socketService,
@@ -101,7 +103,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
 /// Keeps WebSocket sync events wired to provider invalidation.
 final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   final service = ref.watch(webSocketDataSyncServiceProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
   final subscription = service.events.listen((event) {
     switch (event.type) {
       case WebSocketDataSyncEventType.devicesCached:
@@ -121,4 +123,49 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
 
   ref.onDispose(subscription.cancel);
   return;
+});
+
+/// Provides the WebSocket cache integration for device data.
+/// This keeps device caches in sync with WebSocket messages.
+final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
+  ref,
+) {
+  final webSocketService = ref.watch(webSocketServiceProvider);
+  final logger = LoggerConfig.getLogger();
+  final storageService = ref.watch(storageServiceProvider);
+
+  final integration = WebSocketCacheIntegration(
+    webSocketService: webSocketService,
+    imageBaseUrl: storageService.siteUrl,
+    logger: logger,
+  );
+
+  // Initialize the integration
+  integration.initialize();
+
+  ref.onDispose(() {
+    integration.dispose();
+  });
+
+  return integration;
+});
+
+/// Emits the last device-cache update time for WebSocket snapshots/updates.
+final webSocketDeviceLastUpdateProvider = StreamProvider<DateTime?>((ref) {
+  final integration = ref.watch(webSocketCacheIntegrationProvider);
+  final controller = StreamController<DateTime?>();
+
+  void listener() {
+    controller.add(integration.lastDeviceUpdate.value);
+  }
+
+  integration.lastDeviceUpdate.addListener(listener);
+  controller.add(integration.lastDeviceUpdate.value);
+
+  ref.onDispose(() {
+    integration.lastDeviceUpdate.removeListener(listener);
+    controller.close();
+  });
+
+  return controller.stream;
 });

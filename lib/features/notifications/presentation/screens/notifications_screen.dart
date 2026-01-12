@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/utils/list_item_helpers.dart';
 import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
@@ -205,7 +206,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
           status: ListItemHelpers.mapNotificationStatus(notification.priority),
           subtitleLines: subtitleLines,
           isUnread: !notification.isRead,
-          showChevron: notification.metadata != null,
+          showChevron: notification.deviceId != null || notification.metadata != null,
           onTap: () async {
             if (!notification.isRead) {
               await ref.read(deviceNotificationsNotifierProvider.notifier).markAsRead(notification.id);
@@ -219,10 +220,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     );
   }
   
-  void _showNotificationDetails(BuildContext context, AppNotification notification) {
+  void _showNotificationDetails(
+    BuildContext context,
+    AppNotification notification,
+  ) {
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Row(
           children: [
             _getNotificationIcon(notification.type.name),
@@ -246,19 +250,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Close'),
           ),
-          if (notification.metadata != null)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              final deviceId = notification.deviceId;
+              if (deviceId == null || deviceId.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Action will be implemented')),
+                  const SnackBar(content: Text('No device linked to this alert')),
                 );
-              },
-              child: const Text('View Details'),
-            ),
+                return;
+              }
+              context.go('/devices/$deviceId');
+            },
+            child: const Text('View Details'),
+          ),
         ],
       ),
     );

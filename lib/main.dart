@@ -8,6 +8,20 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+void _configureImageCache() {
+  const maxBytes = int.fromEnvironment(
+    'IMAGE_CACHE_MAX_BYTES',
+    defaultValue: 50 * 1024 * 1024,
+  );
+  const maxCount = int.fromEnvironment(
+    'IMAGE_CACHE_MAX_COUNT',
+    defaultValue: 200,
+  );
+  final cache = PaintingBinding.instance.imageCache;
+  cache.maximumSizeBytes = maxBytes;
+  cache.maximumSize = maxCount;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -34,6 +48,7 @@ void main() async {
 
   EnvironmentConfig.setEnvironment(env);
   LoggerService.configure();
+  _configureImageCache();
   // Environment configuration complete - details available via EnvironmentConfig getters
 
   // Initialize providers with error handling

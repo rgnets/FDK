@@ -30,7 +30,7 @@ void main() {
         (credentials) {
           expect(credentials.fqdn, 'vgw1-01.location.mdu.attwifi.com');
           expect(credentials.login, 'fieldtech');
-          expect(credentials.apiKey, 'secret-key');
+          expect(credentials.token, 'secret-key');
           expect(credentials.siteName, 'Dallas Interurban');
           expect(credentials.issuedAt, fixedNow);
           expect(credentials.signature, 'abc123');

@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:rgnets_fdk/core/errors/failures.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/usecases/usecase.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/complete_scan_session.dart';
+import 'package:rgnets_fdk/features/scanner/domain/usecases/get_current_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_barcode.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/start_scan_session.dart';
+import 'package:rgnets_fdk/features/scanner/domain/repositories/scanner_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'scanner_notifier.g.dart';
@@ -17,13 +19,27 @@ class ScannerNotifier extends _$ScannerNotifier {
   Timer? _sessionTimer;
   static const _sessionTimeout = Duration(seconds: 6);
 
+  ScannerRepository get _scannerRepository =>
+      ref.read(scannerRepositoryProvider);
+
+  GetCurrentSession get _getCurrentSession =>
+      GetCurrentSession(_scannerRepository);
+
+  StartScanSession get _startScanSession =>
+      StartScanSession(_scannerRepository);
+
+  ProcessBarcode get _processBarcode => ProcessBarcode(_scannerRepository);
+
+  CompleteScanSession get _completeScanSession =>
+      CompleteScanSession(_scannerRepository);
+
   @override
   Future<ScannerState> build() async {
     LoggerService.debug('🏁 ScannerNotifier: Building initial state', tag: 'ScannerNotifier');
     
     // Check if there's an existing session
-    final getCurrentSession = ref.read(getCurrentSessionProvider);
-    LoggerService.debug('📎 ScannerNotifier: Got getCurrentSessionProvider', tag: 'ScannerNotifier');
+    final getCurrentSession = _getCurrentSession;
+    LoggerService.debug('📎 ScannerNotifier: Got getCurrentSession use case', tag: 'ScannerNotifier');
     
     final result = await getCurrentSession(const NoParams());
     LoggerService.debug('📊 ScannerNotifier: GetCurrentSession result received', tag: 'ScannerNotifier');
@@ -48,8 +64,8 @@ class ScannerNotifier extends _$ScannerNotifier {
     LoggerService.debug('🚀 ScannerNotifier: Starting scan session for ${deviceType.name}', tag: 'ScannerNotifier');
     state = const AsyncValue.loading();
 
-    final startSession = ref.read(startScanSessionProvider);
-    LoggerService.debug('📎 ScannerNotifier: Got startScanSessionProvider', tag: 'ScannerNotifier');
+    final startSession = _startScanSession;
+    LoggerService.debug('📎 ScannerNotifier: Got startScanSession use case', tag: 'ScannerNotifier');
     
     final result = await startSession(
       StartScanSessionParams(deviceType: deviceType),
@@ -100,8 +116,8 @@ class ScannerNotifier extends _$ScannerNotifier {
       return;
     }
 
-    final processBarcode = ref.read(processBarcodeProvider);
-    LoggerService.debug('📎 ScannerNotifier: Got processBarcodeProvider', tag: 'ScannerNotifier');
+    final processBarcode = _processBarcode;
+    LoggerService.debug('📎 ScannerNotifier: Got processBarcode use case', tag: 'ScannerNotifier');
     
     final result = await processBarcode(
       ProcessBarcodeParams(
@@ -171,7 +187,7 @@ class ScannerNotifier extends _$ScannerNotifier {
       return;
     }
 
-    final completeSession = ref.read(completeScanSessionProvider);
+    final completeSession = _completeScanSession;
     final deviceData = {
       'serialNumber': session.serialNumber,
       'macAddress': session.macAddress,

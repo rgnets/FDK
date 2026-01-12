@@ -1,22 +1,27 @@
-import 'package:rgnets_fdk/core/config/logger_config.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/utils/logging_utils.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/rooms/domain/usecases/get_rooms.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'rooms_riverpod_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class RoomsNotifier extends _$RoomsNotifier {
-  static final _logger = LoggerConfig.getLogger();
-  
+  Logger get _logger => ref.read(loggerProvider);
+
+  GetRooms get _getRooms => GetRooms(ref.read(roomRepositoryProvider));
+
   @override
   Future<List<Room>> build() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('RoomsProvider: Loading rooms');
     }
     
     try {
-      final getRooms = ref.read(getRoomsProvider);
+      final getRooms = _getRooms;
       final result = await getRooms();
       
       return result.fold(
@@ -25,7 +30,7 @@ class RoomsNotifier extends _$RoomsNotifier {
           throw Exception(failure.message);
         },
         (rooms) {
-          if (LoggerConfig.isVerboseLoggingEnabled) {
+          if (isVerboseLoggingEnabled) {
             _logger.i('RoomsProvider: Successfully loaded ${rooms.length} rooms');
           }
           return rooms;
@@ -38,7 +43,7 @@ class RoomsNotifier extends _$RoomsNotifier {
   }
 
   Future<void> refresh() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('RoomsProvider: Refreshing rooms');
     }
     
@@ -107,7 +112,11 @@ Room? roomById(RoomByIdRef ref, String roomId) {
   
   return rooms.when(
     data: (roomList) {
-      final matchingRooms = roomList.where((room) => room.id == roomId);
+      final parsedId = int.tryParse(roomId);
+      if (parsedId == null) {
+        return null;
+      }
+      final matchingRooms = roomList.where((room) => room.id == parsedId);
       return matchingRooms.isNotEmpty ? matchingRooms.first : null;
     },
     loading: () => null,

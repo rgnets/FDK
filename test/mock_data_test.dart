@@ -42,7 +42,7 @@ void main() {
       expect(rooms.length, equals(5));
       
       for (final room in rooms) {
-        expect(room.id, isNotEmpty);
+        expect(room.id, greaterThan(0));
         expect(room.name, isNotEmpty);
         expect(room.metadata, isNotNull);
         expect(room.metadata!['area_sqft'], isNotNull);

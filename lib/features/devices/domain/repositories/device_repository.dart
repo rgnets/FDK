@@ -16,4 +16,8 @@ abstract class DeviceRepository {
   Future<Either<Failure, Device>> updateDevice(Device device);
   Future<Either<Failure, void>> rebootDevice(String deviceId);
   Future<Either<Failure, void>> resetDevice(String deviceId);
+  Future<Either<Failure, Device>> deleteDeviceImage(
+    String deviceId,
+    String imageUrl,
+  );
 }
