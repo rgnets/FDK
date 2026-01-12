@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/led_control_section.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/light_indicator_reference.dart';
 
 /// Widget for displaying all device fields in organized sections
 class DeviceDetailSections extends StatelessWidget {
   final Device device;
-  
+
   const DeviceDetailSections({
     super.key,
     required this.device,
@@ -13,6 +16,8 @@ class DeviceDetailSections extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAccessPoint = device.type == DeviceTypes.accessPoint;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -24,6 +29,13 @@ class DeviceDetailSections extends StatelessWidget {
         const SizedBox(height: 16),
         _buildWirelessSection(context),
         const SizedBox(height: 16),
+        // LED Controls - only for Access Points
+        if (isAccessPoint) ...[
+          LedControlSection(deviceId: device.id),
+          const SizedBox(height: 16),
+          const LightIndicatorReference(),
+          const SizedBox(height: 16),
+        ],
         _buildPerformanceSection(context),
         const SizedBox(height: 16),
         _buildTrafficSection(context),

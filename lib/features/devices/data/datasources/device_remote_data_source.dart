@@ -540,4 +540,27 @@ class DeviceRemoteDataSourceImpl implements DeviceRemoteDataSource {
       throw Exception('Failed to reset device: $e');
     }
   }
+
+  @override
+  Future<void> controlLed(String deviceId, String action) async {
+    try {
+      // Validate action
+      final validActions = {'on', 'off', 'blink'};
+      final normalizedAction = action.toLowerCase().trim();
+      if (!validActions.contains(normalizedAction)) {
+        throw Exception('Invalid LED action: $action. Use on, off, or blink.');
+      }
+
+      // Extract the numeric ID from the prefixed device ID (e.g., 'ap_123' -> '123')
+      final numericId = deviceId.replaceFirst(RegExp(r'^ap_'), '');
+
+      // Call the AP LED control endpoint
+      await apiService.post<void>(
+        '/api/access_points/$numericId/led.json',
+        data: {'action': normalizedAction},
+      );
+    } on Exception catch (e) {
+      throw Exception('Failed to control LED: $e');
+    }
+  }
 }

@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_s
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 
 class DeviceRepositoryImpl implements DeviceRepository {
   DeviceRepositoryImpl({
@@ -269,7 +270,17 @@ class DeviceRepositoryImpl implements DeviceRepository {
       return Left(DeviceFailure(message: 'Failed to reset device: $e'));
     }
   }
-  
+
+  @override
+  Future<Either<Failure, void>> controlLed(String deviceId, LedAction action) async {
+    try {
+      await dataSource.controlLed(deviceId, action.value);
+      return const Right(null);
+    } on Exception catch (e) {
+      return Left(DeviceFailure(message: 'Failed to control LED: $e'));
+    }
+  }
+
   /// Dispose resources
   void dispose() {
     _paginationService.dispose();

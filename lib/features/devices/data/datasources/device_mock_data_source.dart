@@ -92,6 +92,22 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
     await Future<void>.delayed(const Duration(seconds: 2));
   }
 
+  @override
+  Future<void> controlLed(String deviceId, String action) async {
+    // Mock LED control - verify device exists and is an access point
+    final device = await getDevice(deviceId);
+    if (device.type != 'access_point') {
+      throw Exception('LED control is only available for access points');
+    }
+    // Validate action
+    final validActions = {'on', 'off', 'blink'};
+    if (!validActions.contains(action.toLowerCase())) {
+      throw Exception('Invalid LED action: $action. Use on, off, or blink.');
+    }
+    // Simulate API delay
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  }
+
   /// Parse access points from JSON
   List<DeviceModel> _parseAccessPoints(Map<String, dynamic> json) {
     final results = json['results'] as List<dynamic>? ?? [];

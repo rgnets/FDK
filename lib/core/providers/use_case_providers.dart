@@ -4,6 +4,7 @@ import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart'
 import 'package:rgnets_fdk/features/auth/domain/usecases/check_auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/get_current_user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/sign_out_user.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_device.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/reboot_device.dart';
@@ -72,6 +73,11 @@ final searchDevicesProvider = Provider<SearchDevices>((ref) {
 final rebootDeviceProvider = Provider<RebootDevice>((ref) {
   final repository = ref.watch(deviceRepositoryProvider);
   return RebootDevice(repository);
+});
+
+final controlLedProvider = Provider<ControlLed>((ref) {
+  final repository = ref.watch(deviceRepositoryProvider);
+  return ControlLed(repository);
 });
 
 // ============================================================================

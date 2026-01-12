@@ -28,4 +28,9 @@ abstract class DeviceDataSource {
   
   /// Resets a device to factory defaults
   Future<void> resetDevice(String deviceId);
+
+  /// Controls the LED on an access point device
+  /// [deviceId] - The ID of the AP device
+  /// [action] - The LED action string ('on', 'off', 'blink')
+  Future<void> controlLed(String deviceId, String action);
 }
