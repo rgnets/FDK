@@ -8,6 +8,8 @@ import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -18,6 +20,8 @@ class MockDeviceDataSource extends Mock implements DeviceDataSource {}
 class MockDeviceLocalDataSource extends Mock implements DeviceLocalDataSource {}
 class MockRoomRepository extends Mock implements RoomRepository {}
 class MockStorageService extends Mock implements StorageService {}
+class MockWebSocketService extends Mock implements WebSocketService {}
+class MockWebSocketDataSyncService extends Mock implements WebSocketDataSyncService {}
 
 void main() {
   group('Performance Optimization Verification Tests', () {
@@ -181,6 +185,8 @@ void main() {
       late MockDeviceLocalDataSource mockLocalDataSource;
       late MockRoomRepository mockRoomRepository;
       late MockStorageService mockStorageService;
+      late MockWebSocketService mockWebSocketService;
+      late MockWebSocketDataSyncService mockWebSocketDataSyncService;
       late NotificationGenerationService notificationGenerationService;
       late BackgroundRefreshService backgroundRefreshService;
 
@@ -189,6 +195,8 @@ void main() {
         mockLocalDataSource = MockDeviceLocalDataSource();
         mockRoomRepository = MockRoomRepository();
         mockStorageService = MockStorageService();
+        mockWebSocketService = MockWebSocketService();
+        mockWebSocketDataSyncService = MockWebSocketDataSyncService();
         notificationGenerationService = NotificationGenerationService();
 
         when(() => mockStorageService.isAuthenticated).thenReturn(true);
@@ -199,6 +207,8 @@ void main() {
           roomRepository: mockRoomRepository,
           notificationGenerationService: notificationGenerationService,
           storageService: mockStorageService,
+          webSocketService: mockWebSocketService,
+          webSocketDataSyncService: mockWebSocketDataSyncService,
         );
       });
 

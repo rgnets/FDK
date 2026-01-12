@@ -14,7 +14,10 @@ import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_s
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
+
 // Mock classes
+class MockDeviceDataSource extends Mock implements DeviceDataSource {}
 class MockDeviceLocalDataSource extends Mock implements DeviceLocalDataSource {}
 class MockRoomRepository extends Mock implements RoomRepository {}
 class MockNotificationGenerationService extends Mock implements NotificationGenerationService {}
@@ -24,6 +27,7 @@ class MockWebSocketService extends Mock implements WebSocketService {}
 
 void main() {
   group('Performance Optimization Tests', () {
+    late MockDeviceDataSource mockDeviceDataSource;
     late MockDeviceLocalDataSource mockLocalDataSource;
     late MockRoomRepository mockRoomRepository;
     late MockNotificationGenerationService mockNotificationService;
@@ -34,6 +38,7 @@ void main() {
     late PerformanceMonitorService performanceMonitor;
 
     setUp(() {
+      mockDeviceDataSource = MockDeviceDataSource();
       mockLocalDataSource = MockDeviceLocalDataSource();
       mockRoomRepository = MockRoomRepository();
       mockNotificationService = MockNotificationGenerationService();
@@ -43,6 +48,7 @@ void main() {
       performanceMonitor = PerformanceMonitorService.instance;
 
       backgroundRefreshService = BackgroundRefreshService(
+        deviceDataSource: mockDeviceDataSource,
         deviceLocalDataSource: mockLocalDataSource,
         roomRepository: mockRoomRepository,
         notificationGenerationService: mockNotificationService,

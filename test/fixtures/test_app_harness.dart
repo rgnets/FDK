@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,6 +14,8 @@ class NoopBackgroundRefreshService extends BackgroundRefreshService {
     required super.roomRepository,
     required super.notificationGenerationService,
     required super.storageService,
+    required super.webSocketService,
+    required super.webSocketDataSyncService,
   });
 
   @override
@@ -37,6 +40,8 @@ ProviderContainer createTestContainer({
           notificationGenerationService:
               ref.watch(notificationGenerationServiceProvider),
           storageService: ref.watch(storageServiceProvider),
+          webSocketService: ref.watch(webSocketServiceProvider),
+          webSocketDataSyncService: ref.watch(webSocketDataSyncServiceProvider),
         );
 
         ref.onDispose(service.dispose);
