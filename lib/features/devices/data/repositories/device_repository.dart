@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -19,18 +20,23 @@ class DeviceRepositoryImpl implements DeviceRepository {
     required this.dataSource,
     required this.localDataSource,
     required this.storageService,
+    this.webSocketCacheIntegration,
   }) {
     _logger.i('DEVICE_REPOSITORY: Constructor called');
-    
+
     // Initialize pagination service for incremental loading
     _initializePaginationService();
+
+    // Listen to WebSocket device updates
+    _setupWebSocketListener();
   }
-  
+
   static final _logger = Logger();
-  
+
   final DeviceDataSource dataSource;
   final DeviceLocalDataSource localDataSource;
   final StorageService storageService;
+  final WebSocketCacheIntegration? webSocketCacheIntegration;
   
   
   // Pagination service for efficient loading
@@ -65,6 +71,28 @@ class DeviceRepositoryImpl implements DeviceRepository {
     });
   }
 
+  void _setupWebSocketListener() {
+    webSocketCacheIntegration?.onDeviceData((resourceType, devices) {
+      _logger.i(
+        'DeviceRepositoryImpl: Received $resourceType data via WebSocket: ${devices.length} devices',
+      );
+
+      // Convert to Device entities and update stream
+      final allModels = webSocketCacheIntegration!.getAllCachedDeviceModels();
+      final allDevices = allModels.map((model) => model.toEntity()).toList();
+
+      _logger.i(
+        'DeviceRepositoryImpl: Total devices from WebSocket cache: ${allDevices.length}',
+      );
+
+      // Update the stream with new data
+      _devicesStreamController.add(allDevices);
+
+      // Also cache locally for offline access
+      unawaited(localDataSource.cacheDevices(allModels));
+    });
+  }
+
   @override
   Future<Either<Failure, List<Device>>> getDevices({
     List<String>? fields,
@@ -86,14 +114,19 @@ class DeviceRepositoryImpl implements DeviceRepository {
         return const Right(<Device>[]);
       }
 
-      if (!EnvironmentConfig.enableRestFallback) {
-        _logger
-          ..w('DeviceRepositoryImpl: REST fallback disabled; skipping remote fetch')
-          ..w('DeviceRepositoryImpl: Returning empty device list until WebSocket feeds are wired');
-        await localDataSource.clearCache();
-        return const Right(<Device>[]);
+      // Try WebSocket cache first
+      if (webSocketCacheIntegration != null) {
+        final wsModels = webSocketCacheIntegration!.getAllCachedDeviceModels();
+        if (wsModels.isNotEmpty) {
+          _logger.i(
+            'DeviceRepositoryImpl: Using ${wsModels.length} devices from WebSocket cache',
+          );
+          final devices = wsModels.map((model) => model.toEntity()).toList();
+          return Right(devices);
+        }
+        _logger.d('DeviceRepositoryImpl: WebSocket cache empty, trying other sources');
       }
-      
+
       // Try to use cached data first if valid
       if (await localDataSource.isCacheValid()) {
         _logger.i('DeviceRepositoryImpl: Cache is valid, loading from cache');
@@ -127,21 +160,12 @@ class DeviceRepositoryImpl implements DeviceRepository {
       ));
       
       final devices = deviceModels.map((model) => model.toEntity()).toList();
-      
-      // DEBUG: Count switches
-      final switchCount = devices.where((d) => d.type == 'switch').length;
-      _logger.i('🔍 REPOSITORY DEBUG: Total devices: ${devices.length}, Switches: $switchCount');
-      if (switchCount > 0) {
-        final switches = devices.where((d) => d.type == 'switch').toList();
-        for (final sw in switches) {
-          _logger.i('  Repository Switch: ID=${sw.id}, Name=${sw.name}');
-        }
-      }
-      
+
       _logger.i('DeviceRepositoryImpl: Successfully converted to ${devices.length} Device entities');
       
       return Right(devices);
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // Catch both Exception and Error (e.g., StateError from WebSocket)
       _logger
         ..e('DeviceRepositoryImpl: Data source failed - $e')
         ..d('DeviceRepositoryImpl: Trying cache fallback');
@@ -151,7 +175,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
         final devices = cachedModels.map((model) => model.toEntity()).toList();
         _logger.i('DeviceRepositoryImpl: Fallback successful, returning ${devices.length} cached devices');
         return Right(devices);
-      } on Exception {
+      } on Object {
         _logger.e('DeviceRepositoryImpl: Cache fallback also failed');
         return Left(DeviceFailure(message: 'Failed to get devices: $e'));
       }
@@ -163,12 +187,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
     try {
       if (!_isAuthenticated()) {
         _logger.d('DeviceRepositoryImpl: Skipping background refresh (not authenticated)');
-        return;
-      }
-      if (!EnvironmentConfig.enableRestFallback) {
-        _logger.d(
-          'DeviceRepositoryImpl: Skipping background refresh (REST fallback disabled)',
-        );
         return;
       }
       _logger.d('DeviceRepositoryImpl: Starting background refresh');
@@ -198,15 +216,18 @@ class DeviceRepositoryImpl implements DeviceRepository {
       final deviceModel = await dataSource.getDevice(id, fields: fields);
       await localDataSource.cacheDevice(deviceModel);
       return Right(deviceModel.toEntity());
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // Catch both Exception and Error (e.g., StateError from WebSocket)
+      _logger.w('DeviceRepositoryImpl: getDevice failed, trying cache fallback: $e');
       try {
         // Fallback to cached data
         final cachedModel = await localDataSource.getCachedDevice(id);
         if (cachedModel != null) {
+          _logger.i('DeviceRepositoryImpl: Found device $id in local cache');
           return Right(cachedModel.toEntity());
         }
         return Left(DeviceFailure(message: 'Device not found: $id'));
-      } on Exception {
+      } on Object {
         return Left(DeviceFailure(message: 'Failed to get device: $e'));
       }
     }
@@ -305,7 +326,27 @@ class DeviceRepositoryImpl implements DeviceRepository {
       return Left(DeviceFailure(message: 'Failed to reset device: $e'));
     }
   }
-  
+
+  @override
+  Future<Either<Failure, Device>> deleteDeviceImage(
+    String deviceId,
+    String imageUrl,
+  ) async {
+    try {
+      if (!_isAuthenticated()) {
+        return const Left(DeviceFailure(message: 'Not authenticated'));
+      }
+      final updatedModel = await dataSource.deleteDeviceImage(
+        deviceId,
+        imageUrl,
+      );
+      await localDataSource.cacheDevice(updatedModel);
+      return Right(updatedModel.toEntity());
+    } on Exception catch (e) {
+      return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
+    }
+  }
+
   /// Dispose resources
   void dispose() {
     _paginationService.dispose();

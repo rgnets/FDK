@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 
 abstract class RoomLocalDataSource {
   Future<List<RoomModel>> getCachedRooms();
@@ -58,7 +58,9 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
       // Try to load from indexed cache first (more efficient)
       final indexJson = storageService.getString(_roomIndexKey);
       if (indexJson != null) {
-        final index = json.decode(indexJson) as List<dynamic>;
+        final index = (json.decode(indexJson) as List<dynamic>)
+            .map((id) => id.toString())
+            .toList();
         final rooms = <RoomModel>[];
         
         // Load rooms in batches to avoid memory issues
@@ -106,7 +108,7 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
       );
       
       // Store room index for efficient loading
-      final index = rooms.map((r) => r.id).toList();
+      final index = rooms.map((r) => r.id.toString()).toList();
       await storageService.setString(_roomIndexKey, json.encode(index));
       
       // Store rooms individually for better performance
@@ -115,8 +117,9 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
       for (var i = 0; i < rooms.length; i += batchSize) {
         final batch = rooms.skip(i).take(batchSize);
         final futures = batch.map((room) async {
+          final roomId = room.id.toString();
           final roomJson = json.encode(room.toJson());
-          await storageService.setString('$_roomKeyPrefix${room.id}', roomJson);
+          await storageService.setString('$_roomKeyPrefix$roomId', roomJson);
         });
         await Future.wait(futures);
       }
@@ -132,18 +135,21 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
     try {
       // Get existing index
       final indexJson = storageService.getString(_roomIndexKey);
-      final index = indexJson != null 
-          ? (json.decode(indexJson) as List<dynamic>).cast<String>()
+      final index = indexJson != null
+          ? (json.decode(indexJson) as List<dynamic>)
+              .map((id) => id.toString())
+              .toList()
           : <String>[];
       
       // Update index with new rooms
       for (final room in rooms) {
-        if (!index.contains(room.id)) {
-          index.add(room.id);
+        final roomId = room.id.toString();
+        if (!index.contains(roomId)) {
+          index.add(roomId);
         }
         // Store room
         final roomJson = json.encode(room.toJson());
-        await storageService.setString('$_roomKeyPrefix${room.id}', roomJson);
+        await storageService.setString('$_roomKeyPrefix$roomId', roomJson);
       }
       
       // Update index
@@ -177,7 +183,9 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
         return [];
       }
       
-      final index = (json.decode(indexJson) as List<dynamic>).cast<String>();
+      final index = (json.decode(indexJson) as List<dynamic>)
+          .map((id) => id.toString())
+          .toList();
       
       // Get page of rooms
       final pageIds = index.skip(offset).take(limit);
@@ -218,14 +226,17 @@ class RoomLocalDataSourceImpl implements RoomLocalDataSource {
   Future<void> cacheRoom(RoomModel room) async {
     try {
       final roomJson = json.encode(room.toJson());
-      await storageService.setString('$_roomKeyPrefix${room.id}', roomJson);
+      final roomId = room.id.toString();
+      await storageService.setString('$_roomKeyPrefix$roomId', roomJson);
       
       // Update index if needed
       final indexJson = storageService.getString(_roomIndexKey);
       if (indexJson != null) {
-        final index = (json.decode(indexJson) as List<dynamic>).cast<String>();
-        if (!index.contains(room.id)) {
-          index.add(room.id);
+        final index = (json.decode(indexJson) as List<dynamic>)
+            .map((id) => id.toString())
+            .toList();
+        if (!index.contains(roomId)) {
+          index.add(roomId);
           await storageService.setString(_roomIndexKey, json.encode(index));
         }
       }

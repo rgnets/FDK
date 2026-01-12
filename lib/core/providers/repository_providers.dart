@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
@@ -10,7 +11,7 @@ import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dar
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_mock_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_websocket_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
     as device_impl;
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
@@ -19,7 +20,7 @@ import 'package:rgnets_fdk/features/notifications/data/repositories/notification
 import 'package:rgnets_fdk/features/notifications/domain/repositories/notification_repository.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_mock_data_source.dart';
-import 'package:rgnets_fdk/features/rooms/data/datasources/room_remote_data_source.dart';
+import 'package:rgnets_fdk/features/rooms/data/datasources/room_websocket_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/repositories/room_repository_impl.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 import 'package:rgnets_fdk/features/scanner/data/datasources/scanner_local_data_source.dart';
@@ -51,9 +52,13 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
     final mockDataService = ref.watch(mockDataServiceProvider);
     return DeviceMockDataSourceImpl(mockDataService: mockDataService);
   } else {
-    // Use remote data source in staging/production
-    final apiService = ref.watch(apiServiceProvider);
-    return DeviceRemoteDataSourceImpl(apiService: apiService);
+    // Use WebSocket data source in staging/production
+    final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
+    final storageService = ref.watch(storageServiceProvider);
+    return DeviceWebSocketDataSource(
+      webSocketCacheIntegration: webSocketCacheIntegration,
+      imageBaseUrl: storageService.siteUrl,
+    );
   }
 });
 
@@ -68,10 +73,12 @@ final roomLocalDataSourceProvider = Provider<RoomLocalDataSource>((ref) {
   return RoomLocalDataSourceImpl(storageService: storage);
 });
 
-/// Room remote data source provider
-final roomRemoteDataSourceProvider = Provider<RoomRemoteDataSource>((ref) {
-  final apiService = ref.watch(apiServiceProvider);
-  return RoomRemoteDataSourceImpl(apiService: apiService);
+/// Room WebSocket data source provider
+final roomWebSocketDataSourceProvider = Provider<RoomDataSource>((ref) {
+  final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
+  return RoomWebSocketDataSource(
+    webSocketCacheIntegration: webSocketCacheIntegration,
+  );
 });
 
 /// Room mock data source provider
@@ -100,22 +107,24 @@ final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
   final dataSource = ref.watch(deviceDataSourceProvider);
   final localDataSource = ref.watch(deviceLocalDataSourceProvider);
   final storageService = ref.watch(storageServiceProvider);
+  final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
 
   return device_impl.DeviceRepositoryImpl(
     dataSource: dataSource,
     localDataSource: localDataSource,
     storageService: storageService,
+    webSocketCacheIntegration: webSocketCacheIntegration,
   );
 });
 
 /// Room repository provider
 final roomRepositoryProvider = Provider<RoomRepository>((ref) {
-  final remoteDataSource = ref.watch(roomRemoteDataSourceProvider);
+  final dataSource = ref.watch(roomWebSocketDataSourceProvider);
   final mockDataSource = ref.watch(roomMockDataSourceProvider);
   final localDataSource = ref.watch(roomLocalDataSourceProvider);
 
   return RoomRepositoryImpl(
-    remoteDataSource: remoteDataSource,
+    dataSource: dataSource,
     mockDataSource: mockDataSource,
     localDataSource: localDataSource,
   );
@@ -162,14 +171,14 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>((
   ref,
 ) {
-  final deviceRemoteDataSource = ref.watch(deviceRemoteDataSourceProvider);
+  final deviceDataSource = ref.watch(deviceDataSourceProvider);
   final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
   final roomRepository = ref.watch(roomRepositoryProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
   final storageService = ref.watch(storageServiceProvider);
 
   return BackgroundRefreshService(
-    deviceRemoteDataSource: deviceRemoteDataSource,
+    deviceDataSource: deviceDataSource,
     deviceLocalDataSource: deviceLocalDataSource,
     roomRepository: roomRepository,
     notificationGenerationService: notificationService,

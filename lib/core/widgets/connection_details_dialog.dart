@@ -143,7 +143,7 @@ class _ConnectionDetailsDialogState
             _buildDetailRow(
               'Server',
               auth.maybeWhen(
-                authenticated: (user) => user.apiUrl,
+                authenticated: (user) => user.siteUrl,
                 orElse: () => 'Not configured',
               ),
               null,

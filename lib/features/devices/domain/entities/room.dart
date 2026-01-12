@@ -12,6 +12,12 @@ class Room with _$Room {
     String? building,
     String? floor,
     String? number,
+    String? description,
+    String? location,
+    List<String>? deviceIds,
+    Map<String, dynamic>? metadata,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) = _Room;
 
   const Room._();

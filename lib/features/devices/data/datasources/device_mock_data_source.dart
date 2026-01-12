@@ -92,6 +92,22 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
     await Future<void>.delayed(const Duration(seconds: 2));
   }
 
+  @override
+  Future<DeviceModel> deleteDeviceImage(
+    String deviceId,
+    String imageUrl,
+  ) async {
+    final device = await getDevice(deviceId);
+    final currentImages = device.images ?? const [];
+    if (currentImages.isEmpty) {
+      return device;
+    }
+
+    final updatedImages =
+        currentImages.where((image) => image != imageUrl).toList();
+    return device.copyWith(images: updatedImages);
+  }
+
   /// Parse access points from JSON
   List<DeviceModel> _parseAccessPoints(Map<String, dynamic> json) {
     final results = json['results'] as List<dynamic>? ?? [];

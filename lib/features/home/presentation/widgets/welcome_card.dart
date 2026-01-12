@@ -54,7 +54,7 @@ class WelcomeCard extends ConsumerWidget {
                   Text(
                     authAsync.when(
                       data: (auth) => auth.maybeWhen(
-                        authenticated: (user) => 'Connected to: ${user.apiUrl.replaceAll('https://', '')}',
+                        authenticated: (user) => 'Connected to: ${user.siteUrl.replaceAll('https://', '')}',
                         orElse: () => 'Connected to: Test System',
                       ),
                       loading: () => 'Connecting...',

@@ -4,7 +4,7 @@ class CredentialApprovalSheet extends StatefulWidget {
   const CredentialApprovalSheet({
     required this.fqdn,
     required this.login,
-    required this.apiKey,
+    required this.token,
     this.siteName,
     this.issuedAt,
     this.signature,
@@ -13,7 +13,7 @@ class CredentialApprovalSheet extends StatefulWidget {
 
   final String fqdn;
   final String login;
-  final String apiKey;
+  final String token;
   final String? siteName;
   final DateTime? issuedAt;
   final String? signature;
@@ -29,7 +29,7 @@ class _CredentialApprovalSheetState extends State<CredentialApprovalSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final keyDisplay = _obscureKey ? _obscure(widget.apiKey) : widget.apiKey;
+    final keyDisplay = _obscureKey ? _obscure(widget.token) : widget.token;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -67,13 +67,13 @@ class _CredentialApprovalSheetState extends State<CredentialApprovalSheet> {
             children: [
               Expanded(
                 child: _DetailRow(
-                  label: 'API Key',
+                  label: 'Token',
                   value: keyDisplay,
                   selectable: !_obscureKey,
                 ),
               ),
               IconButton(
-                tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
+                tooltip: _obscureKey ? 'Show token' : 'Hide token',
                 onPressed: () {
                   setState(() {
                     _obscureKey = !_obscureKey;
@@ -141,14 +141,14 @@ class _ManualCredentialEntrySheetState
   final _formKey = GlobalKey<FormState>();
   final _fqdnController = TextEditingController();
   final _loginController = TextEditingController();
-  final _apiKeyController = TextEditingController();
+  final _tokenController = TextEditingController();
   final _siteController = TextEditingController();
 
   @override
   void dispose() {
     _fqdnController.dispose();
     _loginController.dispose();
-    _apiKeyController.dispose();
+    _tokenController.dispose();
     _siteController.dispose();
     super.dispose();
   }
@@ -220,19 +220,19 @@ class _ManualCredentialEntrySheetState
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _apiKeyController,
+              controller: _tokenController,
               decoration: const InputDecoration(
-                labelText: 'API Key',
+                labelText: 'Token',
                 hintText: 'Paste or scan key',
               ),
               autofillHints: const [AutofillHints.password],
               obscureText: true,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'API key is required';
+                  return 'token is required';
                 }
                 if (value.trim().length < 10) {
-                  return 'API key looks too short';
+                  return 'token looks too short';
                 }
                 return null;
               },
@@ -263,7 +263,7 @@ class _ManualCredentialEntrySheetState
                       Navigator.of(context).pop(<String, String>{
                         'fqdn': _fqdnController.text.trim(),
                         'login': _loginController.text.trim(),
-                        'apiKey': _apiKeyController.text.trim(),
+                        'token': _tokenController.text.trim(),
                         'siteName': _siteController.text.trim(),
                       });
                     },

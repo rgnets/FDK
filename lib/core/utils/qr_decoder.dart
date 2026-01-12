@@ -15,17 +15,12 @@ class QrDecoder {
 
       if (EnvironmentConfig.isStaging || EnvironmentConfig.isDevelopment) {
         // Use environment-configured credentials
-        final apiUrl = EnvironmentConfig.apiBaseUrl;
-        final fqdn = apiUrl
-            .replaceFirst('https://', '')
-            .replaceFirst('http://', '')
-            .split('/')
-            .first;
+        final fqdn = EnvironmentConfig.host;
 
         return {
           'fqdn': fqdn,
           'login': EnvironmentConfig.apiUsername,
-          'apiKey': EnvironmentConfig.apiKey,
+          'token': EnvironmentConfig.token,
           'site_name': fqdn,
           'timestamp': DateTime.now().toUtc().toIso8601String(),
         };

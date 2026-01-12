@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 import 'package:rgnets_fdk/features/rooms/domain/usecases/get_rooms.dart';
 
@@ -20,9 +20,9 @@ void main() {
   group('GetRooms', () {
     final tRoomsList = [
       Room(
-        id: 'room-1',
+        id: 1,
         name: '(Building A) Main Office',
-        roomNumber: '101',
+        number: '101',
         description: 'Primary office space',
         location: 'Ground Floor',
         deviceIds: const ['device-1', 'device-2'],
@@ -31,9 +31,9 @@ void main() {
         updatedAt: DateTime(2024, 1, 2, 10, 0, 0),
       ),
       Room(
-        id: 'room-2',
+        id: 2,
         name: '(Building A) Conference Room A',
-        roomNumber: '201',
+        number: '201',
         description: 'Large conference room',
         location: 'First Floor',
         deviceIds: const ['device-3', 'device-4', 'device-5'],
@@ -201,14 +201,14 @@ void main() {
       result.fold(
         (failure) => fail('Should not return failure'),
         (rooms) {
-          expect(rooms.first.id, 'room-1');
+          expect(rooms.first.id, 1);
           expect(rooms.first.name, '(Building A) Main Office');
-          expect(rooms.first.roomNumber, '101');
+          expect(rooms.first.number, '101');
           expect(rooms.first.deviceIds, const ['device-1', 'device-2']);
           
-          expect(rooms.last.id, 'room-2');
+          expect(rooms.last.id, 2);
           expect(rooms.last.name, '(Building A) Conference Room A');
-          expect(rooms.last.roomNumber, '201');
+          expect(rooms.last.number, '201');
           expect(rooms.last.deviceIds, const ['device-3', 'device-4', 'device-5']);
         },
       );

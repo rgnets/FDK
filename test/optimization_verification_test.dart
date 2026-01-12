@@ -7,16 +7,17 @@ import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/pagination_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 // Mock classes
-class MockDeviceRemoteDataSource extends Mock implements DeviceRemoteDataSource {}
+class MockDeviceDataSource extends Mock implements DeviceDataSource {}
 class MockDeviceLocalDataSource extends Mock implements DeviceLocalDataSource {}
 class MockRoomRepository extends Mock implements RoomRepository {}
-class MockNotificationGenerationService extends Mock implements NotificationGenerationService {}
+class MockStorageService extends Mock implements StorageService {}
 
 void main() {
   group('Performance Optimization Verification Tests', () {
@@ -28,6 +29,7 @@ void main() {
         type: 'access_point',
         status: 'online',
       ));
+      registerFallbackValue(<DeviceModel>[]);
     });
 
     group('Service Registration Verification', () {
@@ -175,25 +177,42 @@ void main() {
     });
 
     group('Background Refresh Service Verification', () {
-      test('should refresh multiple data sources in parallel', () async {
-        final mockRemoteDataSource = MockDeviceRemoteDataSource();
-        final mockLocalDataSource = MockDeviceLocalDataSource();
-        final mockRoomRepository = MockRoomRepository();
-        
-        final mockNotificationService = MockNotificationGenerationService();
-        final backgroundRefreshService = BackgroundRefreshService(
-          deviceRemoteDataSource: mockRemoteDataSource,
+      late MockDeviceDataSource mockDeviceDataSource;
+      late MockDeviceLocalDataSource mockLocalDataSource;
+      late MockRoomRepository mockRoomRepository;
+      late MockStorageService mockStorageService;
+      late NotificationGenerationService notificationGenerationService;
+      late BackgroundRefreshService backgroundRefreshService;
+
+      setUp(() {
+        mockDeviceDataSource = MockDeviceDataSource();
+        mockLocalDataSource = MockDeviceLocalDataSource();
+        mockRoomRepository = MockRoomRepository();
+        mockStorageService = MockStorageService();
+        notificationGenerationService = NotificationGenerationService();
+
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+
+        backgroundRefreshService = BackgroundRefreshService(
+          deviceDataSource: mockDeviceDataSource,
           deviceLocalDataSource: mockLocalDataSource,
           roomRepository: mockRoomRepository,
-          notificationGenerationService: mockNotificationService,
+          notificationGenerationService: notificationGenerationService,
+          storageService: mockStorageService,
         );
-        
+      });
+
+      tearDown(() {
+        backgroundRefreshService.dispose();
+      });
+
+      test('should refresh multiple data sources in parallel', () async {
         final testDevices = [
           const DeviceModel(id: '1', name: 'Test Device', type: 'access_point', status: 'online'),
         ];
         
         // Setup mocks
-        when(mockRemoteDataSource.getDevices).thenAnswer((_) async => testDevices);
+        when(() => mockDeviceDataSource.getDevices()).thenAnswer((_) async => testDevices);
         when(() => mockLocalDataSource.cacheDevices(any())).thenAnswer((_) async {});
         when(mockRoomRepository.getRooms).thenAnswer((_) async => const Right([]));
         
@@ -218,25 +237,11 @@ void main() {
         // Verify both data sources were refreshed (success or error)
         expect(deviceEvents.where((e) => e.isSuccess || e.isError).length, equals(1));
         expect(roomEvents.where((e) => e.isSuccess || e.isError).length, equals(1));
-        
-        backgroundRefreshService.dispose();
       });
 
       test('should handle refresh errors without stopping other operations', () async {
-        final mockRemoteDataSource = MockDeviceRemoteDataSource();
-        final mockLocalDataSource = MockDeviceLocalDataSource();
-        final mockRoomRepository = MockRoomRepository();
-        
-        final mockNotificationService = MockNotificationGenerationService();
-        final backgroundRefreshService = BackgroundRefreshService(
-          deviceRemoteDataSource: mockRemoteDataSource,
-          deviceLocalDataSource: mockLocalDataSource,
-          roomRepository: mockRoomRepository,
-          notificationGenerationService: mockNotificationService,
-        );
-        
         // Setup mocks - devices fail, rooms succeed
-        when(mockRemoteDataSource.getDevices).thenThrow(Exception('Device API error'));
+        when(() => mockDeviceDataSource.getDevices()).thenThrow(Exception('Device API error'));
         when(mockRoomRepository.getRooms).thenAnswer((_) async => const Right([]));
         
         final deviceEvents = <RefreshStatus>[];
@@ -252,8 +257,6 @@ void main() {
         // Devices should have error, rooms should succeed
         expect(deviceEvents.where((e) => e.isError).length, equals(1));
         expect(roomEvents.where((e) => e.isSuccess).length, equals(1));
-        
-        backgroundRefreshService.dispose();
       });
     });
 

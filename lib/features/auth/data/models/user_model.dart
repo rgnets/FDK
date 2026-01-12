@@ -9,7 +9,7 @@ part 'user_model.g.dart';
 class UserModel with _$UserModel {
   const factory UserModel({
     required String username,
-    @JsonKey(name: 'api_url') required String apiUrl,
+    @JsonKey(name: 'site_url') required String siteUrl,
     @JsonKey(name: 'display_name') String? displayName,
     String? email,
   }) = _UserModel;
@@ -22,7 +22,7 @@ extension UserModelX on UserModel {
   User toEntity() {
     return User(
       username: username,
-      apiUrl: apiUrl,
+      siteUrl: siteUrl,
       displayName: displayName,
       email: email,
     );

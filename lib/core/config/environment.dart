@@ -14,7 +14,6 @@ class EnvironmentConfig {
       ..i(
         '🔧 EnvironmentConfig: Environment set, isDevelopment=$isDevelopment, isStaging=$isStaging, isProduction=$isProduction',
       )
-      ..i('🔧 EnvironmentConfig: API Base URL will be: $apiBaseUrl')
       ..i('🔧 EnvironmentConfig: WebSocket URL will be: $websocketBaseUrl')
       ..i('🔧 EnvironmentConfig: useSyntheticData=$useSyntheticData');
   }
@@ -27,25 +26,10 @@ class EnvironmentConfig {
   static bool get isStaging => _environment == Environment.staging;
   static bool get isProduction => _environment == Environment.production;
 
-  /// API Configuration
-  static String get apiBaseUrl {
-    switch (_environment) {
-      case Environment.development:
-        // Development uses synthetic/mock data, no real API
-        return const String.fromEnvironment(
-          'DEV_API_URL',
-          defaultValue: 'http://mock-api.local',
-        );
-      case Environment.staging:
-        // Staging uses the interurban test environment
-        return 'https://vgw1-01.dal-interurban.mdu.attwifi.com';
-      case Environment.production:
-        // Production will use real customer URL (provided at runtime)
-        return const String.fromEnvironment(
-          'API_URL',
-          defaultValue: 'https://api.rgnets.com',
-        );
-    }
+  /// Get the host (FQDN) from the WebSocket URL for authentication purposes.
+  static String get host {
+    final wsUri = Uri.parse(websocketBaseUrl);
+    return wsUri.host;
   }
 
   /// WebSocket configuration
@@ -67,19 +51,6 @@ class EnvironmentConfig {
           defaultValue: 'wss://zew.netlab.ninja/ws',
         );
     }
-  }
-
-  static bool get useWebSockets {
-    const envFlag = bool.fromEnvironment('USE_WEBSOCKETS', defaultValue: true);
-    return envFlag;
-  }
-
-  static bool get enableRestFallback {
-    const envFlag = bool.fromEnvironment(
-      'USE_REST_FALLBACK',
-      defaultValue: true,
-    );
-    return envFlag;
   }
 
   static Duration get webSocketInitialReconnectDelay => const Duration(
@@ -124,25 +95,26 @@ class EnvironmentConfig {
     }
   }
 
-  static String get apiKey {
+  /// Authentication token for WebSocket connections.
+  static String get token {
     switch (_environment) {
       case Environment.development:
-        return 'synthetic_key'; // Not used with synthetic data
+        return 'synthetic_token'; // Not used with synthetic data
       case Environment.staging:
-        // For staging, use environment variable with fallback to known staging key
+        // For staging, use environment variable with fallback to known staging token
         // This ensures staging works even without explicit environment variables
-        const stagingKey = String.fromEnvironment(
-          'STAGING_API_KEY',
+        const stagingToken = String.fromEnvironment(
+          'STAGING_TOKEN',
           defaultValue:
               'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r',
         );
-        return stagingKey;
+        return stagingToken;
       case Environment.production:
-        const key = String.fromEnvironment('API_KEY', defaultValue: '');
-        if (key.isEmpty) {
-          throw Exception('API_KEY not provided for production');
+        const tok = String.fromEnvironment('WS_TOKEN', defaultValue: '');
+        if (tok.isEmpty) {
+          throw Exception('WS_TOKEN not provided for production');
         }
-        return key;
+        return tok;
     }
   }
 

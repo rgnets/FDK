@@ -20,16 +20,16 @@ void main() {
   group('AuthenticateUser', () {
     const tFqdn = 'test.rgnets.com';
     const tLogin = 'testuser';
-    const tApiKey = 'test-api-key-123';
+    const tToken = 'test-token-123';
     const tParams = AuthenticateUserParams(
       fqdn: tFqdn,
       login: tLogin,
-      apiKey: tApiKey,
+      token: tToken,
     );
     
     const tUser = User(
       username: tLogin,
-      apiUrl: 'https://$tFqdn/api',
+      siteUrl: 'https://$tFqdn',
       displayName: 'Test User',
       email: 'test@example.com',
     );
@@ -39,7 +39,10 @@ void main() {
       when(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).thenAnswer((_) async => const Right<Failure, User>(tUser));
 
       // act
@@ -50,7 +53,10 @@ void main() {
       verify(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -64,7 +70,10 @@ void main() {
       when(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).thenAnswer((_) async => const Left<Failure, User>(tFailure));
 
       // act
@@ -75,7 +84,10 @@ void main() {
       verify(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -89,7 +101,10 @@ void main() {
       when(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).thenAnswer((_) async => const Left<Failure, User>(tFailure));
 
       // act
@@ -100,7 +115,10 @@ void main() {
       verify(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -114,7 +132,10 @@ void main() {
       when(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).thenAnswer((_) async => const Left<Failure, User>(tFailure));
 
       // act
@@ -125,7 +146,10 @@ void main() {
       verify(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).called(1);
       verifyNoMoreInteractions(mockRepository);
     });
@@ -135,7 +159,10 @@ void main() {
       when(() => mockRepository.authenticate(
         fqdn: any(named: 'fqdn'),
         login: any(named: 'login'),
-        apiKey: any(named: 'apiKey'),
+        token: any(named: 'token'),
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).thenAnswer((_) async => const Right<Failure, User>(tUser));
 
       // act
@@ -145,7 +172,10 @@ void main() {
       verify(() => mockRepository.authenticate(
         fqdn: tFqdn,
         login: tLogin,
-        apiKey: tApiKey,
+        token: tToken,
+        siteName: null,
+        issuedAt: null,
+        signature: null,
       )).called(1);
     });
 
@@ -155,23 +185,23 @@ void main() {
         const params1 = AuthenticateUserParams(
           fqdn: tFqdn,
           login: tLogin,
-          apiKey: tApiKey,
+          token: tToken,
         );
         const params2 = AuthenticateUserParams(
           fqdn: tFqdn,
           login: tLogin,
-          apiKey: tApiKey,
+          token: tToken,
         );
         const params3 = AuthenticateUserParams(
           fqdn: 'different.com',
           login: tLogin,
-          apiKey: tApiKey,
+          token: tToken,
         );
 
         // assert
         expect(params1, equals(params2));
         expect(params1, isNot(equals(params3)));
-        expect(params1.props, [tFqdn, tLogin, tApiKey]);
+        expect(params1.props, [tFqdn, tLogin, tToken, null, null, null]);
       });
     });
   });

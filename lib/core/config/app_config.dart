@@ -1,5 +1,5 @@
 /// Application configuration
-/// Handles environment-specific settings and API configuration
+/// Handles environment-specific settings and WebSocket configuration
 class AppConfig {
   // NOTE: Do NOT use this for environment detection! Use EnvironmentConfig instead.
   // This is only for backwards compatibility and will be removed.
@@ -16,32 +16,8 @@ class AppConfig {
           defaultValue: 'vgw1-01.dal-interurban.mdu.attwifi.com'),
       'login': const String.fromEnvironment('TEST_API_LOGIN', 
           defaultValue: 'fetoolreadonly'),
-      'apiKey': const String.fromEnvironment('TEST_API_KEY', 
+      'token': const String.fromEnvironment('TEST_TOKEN',
           defaultValue: 'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r'),
-    };
-  }
-  
-  /// Get the API base URL
-  static String get apiBaseUrl {
-    // This is deprecated - use EnvironmentConfig.apiBaseUrl instead
-    final fqdn = testCredentials['fqdn'] ?? 'api.example.com';
-    return 'https://$fqdn';
-  }
-  
-  /// Get API headers for requests
-  static Map<String, String> getApiHeaders({
-    String? login,
-    String? apiKey,
-  }) {
-    // Use provided credentials or fall back to test credentials
-    final useLogin = login ?? testCredentials['login'] ?? '';
-    final useApiKey = apiKey ?? testCredentials['apiKey'] ?? '';
-    
-    return {
-      'X-API-Login': useLogin,
-      'X-API-Key': useApiKey,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
     };
   }
   
@@ -53,15 +29,6 @@ class AppConfig {
   static const bool enableMockData = false; // Set to false to use real API
   static const bool enableLogging = true;
   static const bool allowSelfSignedCerts = bool.fromEnvironment('ALLOW_SELF_SIGNED_CERTS', defaultValue: false);
-  
-  /// API endpoints
-  static const String apiVersion = '/api/v1';
-  
-  // Device endpoints
-  static const String accessPointsEndpoint = '/access_points';
-  static const String ontsEndpoint = '/media_converters';
-  static const String switchesEndpoint = '/switch_devices';
-  static const String pmsRoomsEndpoint = '/pms_rooms';
   
   /// Timeouts
   static const Duration apiTimeout = Duration(seconds: 30);

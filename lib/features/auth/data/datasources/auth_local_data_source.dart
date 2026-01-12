@@ -9,8 +9,8 @@ abstract class AuthLocalDataSource {
   Future<void> clearUser();
   Future<bool> isAuthenticated();
   Future<void> saveCredentials({
-    required String apiUrl,
-    required String apiToken,
+    required String siteUrl,
+    required String token,
     required String username,
     String? siteName,
     DateTime? issuedAt,
@@ -75,8 +75,8 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
 
   @override
   Future<void> saveCredentials({
-    required String apiUrl,
-    required String apiToken,
+    required String siteUrl,
+    required String token,
     required String username,
     String? siteName,
     DateTime? issuedAt,
@@ -85,8 +85,8 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   }) async {
     try {
       await storageService.saveCredentials(
-        apiUrl: apiUrl,
-        apiToken: apiToken,
+        siteUrl: siteUrl,
+        token: token,
         username: username,
         siteName: siteName,
         issuedAtIso: issuedAt?.toUtc().toIso8601String(),

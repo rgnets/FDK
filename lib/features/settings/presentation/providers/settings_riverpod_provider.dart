@@ -13,7 +13,7 @@ class SettingsState {
     required this.autoSync,
     required this.syncInterval,
     this.username,
-    this.apiUrl,
+    this.siteUrl,
   });
 
   final String themeMode;
@@ -21,7 +21,7 @@ class SettingsState {
   final bool autoSync;
   final int syncInterval;
   final String? username;
-  final String? apiUrl;
+  final String? siteUrl;
 
   SettingsState copyWith({
     String? themeMode,
@@ -29,7 +29,7 @@ class SettingsState {
     bool? autoSync,
     int? syncInterval,
     String? username,
-    String? apiUrl,
+    String? siteUrl,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
@@ -37,7 +37,7 @@ class SettingsState {
       autoSync: autoSync ?? this.autoSync,
       syncInterval: syncInterval ?? this.syncInterval,
       username: username ?? this.username,
-      apiUrl: apiUrl ?? this.apiUrl,
+      siteUrl: siteUrl ?? this.siteUrl,
     );
   }
 }
@@ -154,7 +154,7 @@ class SettingsNotifier extends _$SettingsNotifier {
       autoSync: settings.autoSync,
       syncInterval: settings.syncIntervalMinutes,
       username: previousState?.username,
-      apiUrl: previousState?.apiUrl,
+      siteUrl: previousState?.siteUrl,
     );
   }
 

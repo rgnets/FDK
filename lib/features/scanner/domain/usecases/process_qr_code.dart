@@ -34,7 +34,8 @@ final class ProcessQrCode extends UseCase<ProcessQrCodeResult, ProcessQrCodePara
   }
   
   bool _isAuthCode(String code) {
-    return code.contains('fqdn') && code.contains('apiKey') ||
+    // Accept 'token' or legacy 'apiKey' for backward compatibility
+    return code.contains('fqdn') && (code.contains('token') || code.contains('apiKey')) ||
            code.startsWith('{') && code.contains('"fqdn"');
   }
   
@@ -60,7 +61,8 @@ final class ProcessQrCode extends UseCase<ProcessQrCodeResult, ProcessQrCodePara
         }
       }
       
-      if (result.containsKey('fqdn') && result.containsKey('apiKey')) {
+      // Accept 'token' or legacy 'apiKey' for backward compatibility
+      if (result.containsKey('fqdn') && (result.containsKey('token') || result.containsKey('apiKey'))) {
         return result;
       }
       

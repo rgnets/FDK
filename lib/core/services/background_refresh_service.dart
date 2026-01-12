@@ -12,7 +12,7 @@ import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.da
 /// Periodically fetches fresh data without blocking the UI
 class BackgroundRefreshService {
   BackgroundRefreshService({
-    required this.deviceRemoteDataSource,
+    required this.deviceDataSource,
     required this.deviceLocalDataSource,
     required this.roomRepository,
     required this.notificationGenerationService,
@@ -21,7 +21,7 @@ class BackgroundRefreshService {
 
   static final _logger = Logger();
 
-  final DeviceDataSource deviceRemoteDataSource;
+  final DeviceDataSource deviceDataSource;
   final DeviceLocalDataSource deviceLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;
@@ -103,7 +103,7 @@ class BackgroundRefreshService {
       final stopwatch = Stopwatch()..start();
       
       // Fetch new data
-      final devices = await deviceRemoteDataSource.getDevices();
+      final devices = await deviceDataSource.getDevices();
       
       // Cache the new data
       await deviceLocalDataSource.cacheDevices(devices);

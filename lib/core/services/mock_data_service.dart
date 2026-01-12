@@ -1,16 +1,24 @@
 import 'dart:math';
+
 import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/config/mock_network_config.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/notifications/domain/entities/notification.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 
 /// Service that provides mock/synthetic data for development mode
 class MockDataService {
   factory MockDataService() => _instance;
   MockDataService._internal() {
-    _generateNetworkTopology();
+    if (EnvironmentConfig.isDevelopment) {
+      _generateNetworkTopology();
+    } else {
+      _rooms = const [];
+      _devices = const [];
+      _notifications = const [];
+    }
   }
   static final MockDataService _instance = MockDataService._internal();
 
@@ -19,7 +27,7 @@ class MockDataService {
   late final List<Room> _rooms;
   late final List<Device> _devices;
   late final List<AppNotification> _notifications;
-  final Map<String, List<String>> _roomDeviceIds = {}; // Track device IDs per room
+  final Map<int, List<String>> _roomDeviceIds = {}; // Track device IDs per room
 
   /// Generate the entire network topology once
   void _generateNetworkTopology() {
@@ -44,7 +52,7 @@ class MockDataService {
   User getMockUser() {
     return const User(
       username: 'developer',
-      apiUrl: 'https://dev.local',
+      siteUrl: 'https://dev.local',
       displayName: 'Developer User',
       email: 'dev@example.com',
     );
@@ -69,7 +77,7 @@ class MockDataService {
             break;
           }
           
-          final roomId = roomIdCounter.toString(); // Use integer ID as string
+          final roomId = roomIdCounter;
           final roomName = '${building.substring(0, 2).toUpperCase()}-$floor${roomNum.toString().padLeft(2, '0')}';
           final displayLocation = '($building) $floor${roomNum.toString().padLeft(2, '0')}';
           
@@ -278,18 +286,17 @@ class MockDataService {
     return devices;
   }
 
-  Device _createAccessPoint(int id, String roomId, String roomLocation, int apNumber, int totalAPs) {
+  Device _createAccessPoint(int id, int roomId, String roomLocation, int apNumber, int totalAPs) {
     final isOnline = _random.nextDouble() > 0.15; // 85% online
     final suffix = totalAPs > 1 ? '-${String.fromCharCode(64 + apNumber)}' : ''; // A, B, C...
     
-    // roomId should already be a numeric string
-    final pmsRoomId = int.tryParse(roomId);
+    final pmsRoomId = roomId;
     
     // Extract building and room info for production-like naming
     final buildingNum = _getBuildingNumber(roomLocation);
     final roomNumber = roomLocation.contains(') ') 
         ? roomLocation.split(') ').last 
-        : roomId;
+        : roomId.toString();
     
     // Parse room number to get floor and room
     final roomInt = int.tryParse(roomNumber) ?? 101;
@@ -324,18 +331,17 @@ class MockDataService {
     );
   }
 
-  Device _createONT(int id, String roomId, String roomLocation, int ontNumber, int totalONTs) {
+  Device _createONT(int id, int roomId, String roomLocation, int ontNumber, int totalONTs) {
     final isOnline = _random.nextDouble() > 0.1; // 90% online
     final suffix = totalONTs > 1 ? '-$ontNumber' : '';
     
-    // roomId should already be a numeric string
-    final pmsRoomId = int.tryParse(roomId);
+    final pmsRoomId = roomId;
     
     // Extract building and room info for production-like naming
     final buildingNum = _getBuildingNumber(roomLocation);
     final roomNumber = roomLocation.contains(') ') 
         ? roomLocation.split(') ').last 
-        : roomId;
+        : roomId.toString();
     
     // Parse room number to get floor
     final roomInt = int.tryParse(roomNumber) ?? 101;
@@ -368,19 +374,18 @@ class MockDataService {
     );
   }
 
-  Device _createSwitch(int id, String roomId, String roomLocation, String name, String model, String switchType, bool isOnline) {
+  Device _createSwitch(int id, int roomId, String roomLocation, String name, String model, String switchType, bool isOnline) {
     final portCount = switchType == 'core' ? 48 : 
                      switchType == 'distribution' ? 48 :
                      switchType == 'idf' ? 24 : 8;
     
-    // roomId should already be a numeric string
-    final pmsRoomId = int.tryParse(roomId);
+    final pmsRoomId = roomId;
     
     // Extract building and room info for production-like naming
     final buildingNum = _getBuildingNumber(roomLocation);
     final roomNumber = roomLocation.contains(') ') 
         ? roomLocation.split(') ').last 
-        : roomId;
+        : roomId.toString();
     
     // Parse room number to get floor
     final roomInt = int.tryParse(roomNumber) ?? 101;
@@ -618,10 +623,7 @@ class MockDataService {
     var partiallyReadyRooms = 0;
     
     for (final room in _rooms) {
-      final roomIdInt = int.tryParse(room.id);
-      final roomDevices = roomIdInt != null 
-          ? _devices.where((d) => d.pmsRoomId == roomIdInt).toList()
-          : <Device>[];
+      final roomDevices = _devices.where((d) => d.pmsRoomId == room.id).toList();
       if (roomDevices.isEmpty) {
         continue;
       }
@@ -695,7 +697,7 @@ class MockDataService {
       final roomNumber = locationParts.length > 1 ? locationParts[1].trim() : room.name.split('-').last;
       
       pmsRooms.add({
-        'id': int.parse(room.id), // Convert string ID to integer (will be 1040+)
+        'id': room.id,
         'room': roomNumber, // Just the room number, e.g., "101"
         'pms_property': {
           'id': 1,
@@ -849,7 +851,7 @@ class MockDataService {
     
     for (int i = 0; i < apDevices.length; i++) {
       final device = apDevices[i];
-      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId?.toString(), 
+      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId, 
         orElse: () => _rooms.first);
       
       aps.add({
@@ -863,7 +865,7 @@ class MockDataService {
         'firmware': device.firmware,
         'last_seen': device.lastSeen?.toIso8601String(),
         'pms_room': i < devicesWithRoom ? {
-          'id': int.parse(room.id),
+          'id': room.id,
           'name': room.location,
           'room_number': room.name.split('-').last,
         } : null, // 0.5% have null pms_room
@@ -890,7 +892,7 @@ class MockDataService {
     
     for (int i = 0; i < switchDevices.length; i++) {
       final device = switchDevices[i];
-      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId?.toString(),
+      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId,
         orElse: () => _rooms.first);
       
       switches.add({
@@ -904,7 +906,7 @@ class MockDataService {
         'firmware': device.firmware,
         'last_seen': device.lastSeen?.toIso8601String(),
         'pms_room': i < devicesWithRoom ? {
-          'id': int.parse(room.id),
+          'id': room.id,
           'name': room.location,
           'room_number': room.name.split('-').last,
         } : null, // 0.5% have null pms_room
@@ -933,7 +935,7 @@ class MockDataService {
     
     for (int i = 0; i < ontDevices.length; i++) {
       final device = ontDevices[i];
-      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId?.toString(),
+      final room = _rooms.firstWhere((r) => r.id == device.pmsRoomId,
         orElse: () => _rooms.first);
       
       onts.add({
@@ -947,7 +949,7 @@ class MockDataService {
         'firmware': device.firmware,
         'last_seen': device.lastSeen?.toIso8601String(),
         'pms_room': i < devicesWithRoom ? {
-          'id': int.parse(room.id),
+          'id': room.id,
           'name': room.location,
           'room_number': room.name.split('-').last,
         } : null, // 0.5% have null pms_room
@@ -975,7 +977,7 @@ class MockDataService {
       final devices = emptyRoomIndices.contains(i) 
         ? <Map<String, dynamic>>[] // Empty room
         : _devices
-            .where((d) => d.pmsRoomId?.toString() == room.id)
+            .where((d) => d.pmsRoomId == room.id)
             .map((d) => {
               'id': int.tryParse(d.id) ?? _extractIdNumber(d.id),
               'name': d.name,
@@ -985,7 +987,7 @@ class MockDataService {
             .toList();
       
       roomsJson.add({
-        'id': int.parse(room.id),
+        'id': room.id,
         'name': room.location, // Use location format
         'room_number': room.name.split('-').last,
         'description': room.description,

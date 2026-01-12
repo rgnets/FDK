@@ -6,20 +6,20 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_mock_data_source.dart';
-import 'package:rgnets_fdk/features/rooms/data/datasources/room_remote_data_source.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/rooms/data/datasources/room_websocket_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 class RoomRepositoryImpl implements RoomRepository {
   const RoomRepositoryImpl({
-    required this.remoteDataSource,
+    required this.dataSource,
     required this.mockDataSource,
     this.localDataSource,
   });
-  
+
   static final _logger = Logger();
-  final RoomRemoteDataSource remoteDataSource;
+  final RoomDataSource dataSource;
   final RoomMockDataSource mockDataSource;
   final RoomLocalDataSource? localDataSource;
   
@@ -57,7 +57,7 @@ class RoomRepositoryImpl implements RoomRepository {
       
       // Staging/Production: use real API
       _logger.i('RoomRepositoryImpl: Using ${EnvironmentConfig.name.toUpperCase()} MODE - calling API');
-      final roomModels = await remoteDataSource.getRooms();
+      final roomModels = await dataSource.getRooms();
       _logger.i('RoomRepositoryImpl: Got ${roomModels.length} room models from API');
       
       // Cache the results in background
@@ -68,9 +68,10 @@ class RoomRepositoryImpl implements RoomRepository {
       final rooms = _convertRoomModelsToEntities(roomModels);
       _logger.i('RoomRepositoryImpl: Successfully converted to ${rooms.length} Room entities');
       return Right(rooms);
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // Catch both Exception and Error (e.g., StateError from WebSocket)
       _logger.e('RoomRepositoryImpl: ERROR - $e');
-      
+
       // Try to return cached data as fallback (except in staging)
       if (localDataSource != null && !EnvironmentConfig.isStaging) {
         try {
@@ -79,12 +80,12 @@ class RoomRepositoryImpl implements RoomRepository {
             _logger.w('RoomRepositoryImpl: Returning stale cached data due to error');
             return Right(_convertRoomModelsToEntities(cachedRooms));
           }
-        } on Exception catch (cacheError) {
+        } on Object catch (cacheError) {
           _logger.e('RoomRepositoryImpl: Cache fallback also failed: $cacheError');
         }
       }
-      
-      return Left(_mapExceptionToFailure(e));
+
+      return Left(_mapExceptionToFailure(e is Exception ? e : Exception(e.toString())));
     }
   }
   
@@ -111,7 +112,7 @@ class RoomRepositoryImpl implements RoomRepository {
       
       // Staging/Production: use real API
       _logger.i('RoomRepositoryImpl: Fetching room $id from API');
-      final roomModel = await remoteDataSource.getRoom(id);
+      final roomModel = await dataSource.getRoom(id);
       
       // Cache the result
       if (localDataSource != null) {
@@ -119,22 +120,27 @@ class RoomRepositoryImpl implements RoomRepository {
       }
       
       return Right(_convertRoomModelToEntity(roomModel));
-    } on Exception catch (e) {
+    } on Object catch (e) {
+      // Catch both Exception and Error (e.g., StateError from WebSocket)
       _logger.e('RoomRepositoryImpl: Error getting room $id: $e');
-      
+
       // Try cached fallback (except in staging)
       if (localDataSource != null && !EnvironmentConfig.isStaging) {
-        final cachedRoom = await localDataSource!.getCachedRoom(id);
-        if (cachedRoom != null) {
-          _logger.w('RoomRepositoryImpl: Returning cached room $id due to error');
-          return Right(_convertRoomModelToEntity(cachedRoom));
+        try {
+          final cachedRoom = await localDataSource!.getCachedRoom(id);
+          if (cachedRoom != null) {
+            _logger.w('RoomRepositoryImpl: Returning cached room $id due to error');
+            return Right(_convertRoomModelToEntity(cachedRoom));
+          }
+        } on Object catch (cacheError) {
+          _logger.e('RoomRepositoryImpl: Cache fallback for room $id also failed: $cacheError');
         }
       }
-      
-      return Left(_mapExceptionToFailure(e));
+
+      return Left(_mapExceptionToFailure(e is Exception ? e : Exception(e.toString())));
     }
   }
-  
+
   @override
   Future<Either<Failure, Room>> createRoom(Room room) async {
     try {
@@ -149,7 +155,7 @@ class RoomRepositoryImpl implements RoomRepository {
       }
       
       // Staging/Production: use real API
-      final createdRoom = await remoteDataSource.createRoom(roomModel);
+      final createdRoom = await dataSource.createRoom(roomModel);
       
       // Update cache
       if (localDataSource != null) {
@@ -177,7 +183,7 @@ class RoomRepositoryImpl implements RoomRepository {
       }
       
       // Staging/Production: use real API
-      final updatedRoom = await remoteDataSource.updateRoom(roomModel);
+      final updatedRoom = await dataSource.updateRoom(roomModel);
       
       // Update cache
       if (localDataSource != null) {
@@ -203,7 +209,7 @@ class RoomRepositoryImpl implements RoomRepository {
       }
       
       // Staging/Production: use real API
-      await remoteDataSource.deleteRoom(id);
+      await dataSource.deleteRoom(id);
       
       // Remove from cache
       if (localDataSource != null) {
@@ -222,23 +228,12 @@ class RoomRepositoryImpl implements RoomRepository {
   
   /// Convert RoomModel list to Room entity list
   List<Room> _convertRoomModelsToEntities(List<RoomModel> models) {
-    return models.map(_convertRoomModelToEntity).toList();
+    return models.map((model) => model.toEntity()).toList();
   }
   
   /// Convert RoomModel to Room entity
   Room _convertRoomModelToEntity(RoomModel model) {
-    return Room(
-      id: model.id,
-      name: model.name,
-      roomNumber: model.roomNumber,
-      description: model.metadata?['description'] as String?,
-      location: model.metadata?['location'] as String?,
-      deviceIds: model.deviceIds,
-      metadata: model.metadata,
-      updatedAt: model.metadata?['updatedAt'] != null 
-          ? DateTime.tryParse(model.metadata!['updatedAt'] as String)
-          : null,
-    );
+    return model.toEntity();
   }
   
   /// Convert Room entity to RoomModel
@@ -246,7 +241,9 @@ class RoomRepositoryImpl implements RoomRepository {
     return RoomModel(
       id: room.id,
       name: room.name,
-      roomNumber: room.roomNumber,
+      building: room.building,
+      floor: room.floor,
+      number: room.number,
       deviceIds: room.deviceIds,
       metadata: {
         if (room.description != null) 'description': room.description,
@@ -282,7 +279,7 @@ class RoomRepositoryImpl implements RoomRepository {
     // Don't await - this runs in background
     (() async {
       try {
-        final roomModels = await remoteDataSource.getRooms();
+        final roomModels = await dataSource.getRooms();
         if (localDataSource != null) {
           await localDataSource!.cacheRooms(roomModels);
         }

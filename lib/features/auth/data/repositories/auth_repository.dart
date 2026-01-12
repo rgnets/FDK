@@ -21,7 +21,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, User>> authenticate({
     required String fqdn,
     required String login,
-    required String apiKey,
+    required String token,
     String? siteName,
     DateTime? issuedAt,
     String? signature,
@@ -33,19 +33,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
         // Save mock user locally for consistency
         await localDataSource.saveCredentials(
-          apiUrl: 'https://dev.local',
-        apiToken: 'dev-api-key',
-        username: 'developer',
-        siteName: siteName ?? 'Development',
-        issuedAt: issuedAt ?? DateTime.now().toUtc(),
-        signature: signature,
-        markAuthenticated: true,
-      );
+          siteUrl: 'https://dev.local',
+          token: 'dev-token',
+          username: 'developer',
+          siteName: siteName ?? 'Development',
+          issuedAt: issuedAt ?? DateTime.now().toUtc(),
+          signature: signature,
+          markAuthenticated: true,
+        );
 
         // Convert to UserModel and save
         final userModel = UserModel(
           username: mockUser.username,
-          apiUrl: mockUser.apiUrl,
+          siteUrl: mockUser.siteUrl,
           displayName: mockUser.displayName,
           email: mockUser.email,
         );
@@ -54,11 +54,11 @@ class AuthRepositoryImpl implements AuthRepository {
         return Right(mockUser);
       }
 
-      // Staging/Production: use real API
+      // Staging/Production: use WebSocket authentication
       // Save credentials locally; WebSocket handshake will validate and enrich
       await localDataSource.saveCredentials(
-        apiUrl: 'https://$fqdn',
-        apiToken: apiKey,
+        siteUrl: 'https://$fqdn',
+        token: token,
         username: login,
         siteName: siteName,
         issuedAt: issuedAt,
@@ -68,7 +68,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
       final userModel = UserModel(
         username: login,
-        apiUrl: 'https://$fqdn',
+        siteUrl: 'https://$fqdn',
         displayName: siteName ?? login,
       );
 

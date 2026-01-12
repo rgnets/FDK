@@ -11,6 +11,23 @@ import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
 /// Connection states emitted by [WebSocketService].
 enum SocketConnectionState { disconnected, connecting, connected, reconnecting }
 
+/// Represents a pending request waiting for a response.
+class _PendingRequest {
+  _PendingRequest({
+    required this.completer,
+    required this.timeout,
+    required this.requestId,
+  });
+
+  final Completer<SocketMessage> completer;
+  final Timer timeout;
+  final String requestId;
+
+  void cancel() {
+    timeout.cancel();
+  }
+}
+
 /// Configuration for the core WebSocket service.
 class WebSocketConfig {
   const WebSocketConfig({
@@ -80,6 +97,7 @@ class WebSocketService {
 
   final _stateController = StreamController<SocketConnectionState>.broadcast();
   final _messageController = StreamController<SocketMessage>.broadcast();
+  final Map<String, _PendingRequest> _pendingRequests = {};
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
   WebSocketConnectionParams? _currentParams;
@@ -142,6 +160,77 @@ class WebSocketService {
       if (payload != null) 'payload': payload,
       if (headers != null) 'headers': headers,
     });
+  }
+
+  /// Generates a unique request ID.
+  String _generateRequestId() {
+    return '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(100000)}';
+  }
+
+  /// Sends a request and waits for a response with matching request_id.
+  /// Returns the response message or throws on timeout.
+  Future<SocketMessage> request(
+    Map<String, dynamic> message, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    if (_channel == null) {
+      throw StateError('WebSocket not connected');
+    }
+
+    final requestId = message['request_id']?.toString() ?? _generateRequestId();
+    final messageWithId = Map<String, dynamic>.from(message)
+      ..['request_id'] = requestId;
+
+    final completer = Completer<SocketMessage>();
+    final timeoutTimer = Timer(timeout, () {
+      final pending = _pendingRequests.remove(requestId);
+      if (pending != null && !pending.completer.isCompleted) {
+        pending.completer.completeError(
+          TimeoutException('Request timed out: $requestId'),
+        );
+      }
+    });
+
+    _pendingRequests[requestId] = _PendingRequest(
+      completer: completer,
+      timeout: timeoutTimer,
+      requestId: requestId,
+    );
+
+    try {
+      send(messageWithId);
+      return await completer.future;
+    } catch (e) {
+      _pendingRequests.remove(requestId)?.cancel();
+      rethrow;
+    }
+  }
+
+  /// Sends an ActionCable formatted request and waits for a response.
+  Future<SocketMessage> requestActionCable({
+    required String action,
+    required String resourceType,
+    String channelIdentifier = '{"channel":"RxgChannel"}',
+    Map<String, dynamic>? additionalData,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final requestId = 'req-$resourceType-${_generateRequestId()}';
+
+    final data = <String, dynamic>{
+      'action': action,
+      'resource_type': resourceType,
+      'request_id': requestId,
+      if (additionalData != null) ...additionalData,
+    };
+
+    final message = {
+      'command': 'message',
+      'identifier': channelIdentifier,
+      'data': jsonEncode(data),
+      'request_id': requestId,
+    };
+
+    return request(message, timeout: timeout);
   }
 
   Future<void> _open(WebSocketConnectionParams params) async {
@@ -236,20 +325,25 @@ class WebSocketService {
         _lastHeartbeat = DateTime.now();
       }
 
-      _messageController.add(
-        SocketMessage(
-          type: type,
-          payload: payload,
-          headers: headers,
-          raw: decoded,
-        ),
-      );
-      _lastMessage = SocketMessage(
+      final message = SocketMessage(
         type: type,
         payload: payload,
         headers: headers,
         raw: decoded,
       );
+
+      // Check if this is a response to a pending request
+      final requestId = _extractRequestId(decoded, payload);
+      if (requestId != null && _pendingRequests.containsKey(requestId)) {
+        final pending = _pendingRequests.remove(requestId);
+        if (pending != null && !pending.completer.isCompleted) {
+          pending.cancel();
+          pending.completer.complete(message);
+        }
+      }
+
+      _messageController.add(message);
+      _lastMessage = message;
     } on Object catch (e, stack) {
       _logger.e(
         'WebSocketService: Failed to parse message',
@@ -257,6 +351,27 @@ class WebSocketService {
         stackTrace: stack,
       );
     }
+  }
+
+  /// Extracts request_id from message for request/response correlation.
+  String? _extractRequestId(
+    Map<String, dynamic> decoded,
+    Map<String, dynamic> payload,
+  ) {
+    // Check various locations where request_id might be
+    if (decoded['request_id'] != null) {
+      return decoded['request_id'].toString();
+    }
+    if (payload['request_id'] != null) {
+      return payload['request_id'].toString();
+    }
+    // Check in message field for ActionCable responses
+    final messageField = decoded['message'];
+    if (messageField is Map<String, dynamic> &&
+        messageField['request_id'] != null) {
+      return messageField['request_id'].toString();
+    }
+    return null;
   }
 
   Future<void> _scheduleReconnect() async {
@@ -350,6 +465,17 @@ class WebSocketService {
 
   /// Releases resources. Call when the service is no longer needed.
   Future<void> dispose() async {
+    // Cancel all pending requests
+    for (final pending in _pendingRequests.values) {
+      pending.cancel();
+      if (!pending.completer.isCompleted) {
+        pending.completer.completeError(
+          StateError('WebSocket service disposed'),
+        );
+      }
+    }
+    _pendingRequests.clear();
+
     await disconnect();
     await _stateController.close();
     await _messageController.close();

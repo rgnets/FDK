@@ -17,27 +17,27 @@ final _privateConstructorUsedError = UnsupportedError(
 /// @nodoc
 mixin _$User {
   String get username => throw _privateConstructorUsedError;
-  String get apiUrl => throw _privateConstructorUsedError;
+  String get siteUrl => throw _privateConstructorUsedError;
   String? get displayName => throw _privateConstructorUsedError;
   String? get email => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            String username, String apiUrl, String? displayName, String? email)
+            String username, String siteUrl, String? displayName, String? email)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(
-            String username, String apiUrl, String? displayName, String? email)?
+    TResult? Function(String username, String siteUrl, String? displayName,
+            String? email)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(
-            String username, String apiUrl, String? displayName, String? email)?
+    TResult Function(String username, String siteUrl, String? displayName,
+            String? email)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -69,7 +69,7 @@ abstract class $UserCopyWith<$Res> {
       _$UserCopyWithImpl<$Res, User>;
   @useResult
   $Res call(
-      {String username, String apiUrl, String? displayName, String? email});
+      {String username, String siteUrl, String? displayName, String? email});
 }
 
 /// @nodoc
@@ -86,7 +86,7 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
   @override
   $Res call({
     Object? username = null,
-    Object? apiUrl = null,
+    Object? siteUrl = null,
     Object? displayName = freezed,
     Object? email = freezed,
   }) {
@@ -95,9 +95,9 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.username
           : username // ignore: cast_nullable_to_non_nullable
               as String,
-      apiUrl: null == apiUrl
-          ? _value.apiUrl
-          : apiUrl // ignore: cast_nullable_to_non_nullable
+      siteUrl: null == siteUrl
+          ? _value.siteUrl
+          : siteUrl // ignore: cast_nullable_to_non_nullable
               as String,
       displayName: freezed == displayName
           ? _value.displayName
@@ -119,7 +119,7 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
   @override
   @useResult
   $Res call(
-      {String username, String apiUrl, String? displayName, String? email});
+      {String username, String siteUrl, String? displayName, String? email});
 }
 
 /// @nodoc
@@ -133,7 +133,7 @@ class __$$UserImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? username = null,
-    Object? apiUrl = null,
+    Object? siteUrl = null,
     Object? displayName = freezed,
     Object? email = freezed,
   }) {
@@ -142,9 +142,9 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.username
           : username // ignore: cast_nullable_to_non_nullable
               as String,
-      apiUrl: null == apiUrl
-          ? _value.apiUrl
-          : apiUrl // ignore: cast_nullable_to_non_nullable
+      siteUrl: null == siteUrl
+          ? _value.siteUrl
+          : siteUrl // ignore: cast_nullable_to_non_nullable
               as String,
       displayName: freezed == displayName
           ? _value.displayName
@@ -163,14 +163,14 @@ class __$$UserImplCopyWithImpl<$Res>
 class _$UserImpl implements _User {
   const _$UserImpl(
       {required this.username,
-      required this.apiUrl,
+      required this.siteUrl,
       this.displayName,
       this.email});
 
   @override
   final String username;
   @override
-  final String apiUrl;
+  final String siteUrl;
   @override
   final String? displayName;
   @override
@@ -178,7 +178,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(username: $username, apiUrl: $apiUrl, displayName: $displayName, email: $email)';
+    return 'User(username: $username, siteUrl: $siteUrl, displayName: $displayName, email: $email)';
   }
 
   @override
@@ -188,7 +188,7 @@ class _$UserImpl implements _User {
             other is _$UserImpl &&
             (identical(other.username, username) ||
                 other.username == username) &&
-            (identical(other.apiUrl, apiUrl) || other.apiUrl == apiUrl) &&
+            (identical(other.siteUrl, siteUrl) || other.siteUrl == siteUrl) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName) &&
             (identical(other.email, email) || other.email == email));
@@ -196,7 +196,7 @@ class _$UserImpl implements _User {
 
   @override
   int get hashCode =>
-      Object.hash(runtimeType, username, apiUrl, displayName, email);
+      Object.hash(runtimeType, username, siteUrl, displayName, email);
 
   @JsonKey(ignore: true)
   @override
@@ -208,32 +208,32 @@ class _$UserImpl implements _User {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            String username, String apiUrl, String? displayName, String? email)
+            String username, String siteUrl, String? displayName, String? email)
         $default,
   ) {
-    return $default(username, apiUrl, displayName, email);
+    return $default(username, siteUrl, displayName, email);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(
-            String username, String apiUrl, String? displayName, String? email)?
+    TResult? Function(String username, String siteUrl, String? displayName,
+            String? email)?
         $default,
   ) {
-    return $default?.call(username, apiUrl, displayName, email);
+    return $default?.call(username, siteUrl, displayName, email);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(
-            String username, String apiUrl, String? displayName, String? email)?
+    TResult Function(String username, String siteUrl, String? displayName,
+            String? email)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(username, apiUrl, displayName, email);
+      return $default(username, siteUrl, displayName, email);
     }
     return orElse();
   }
@@ -270,14 +270,14 @@ class _$UserImpl implements _User {
 abstract class _User implements User {
   const factory _User(
       {required final String username,
-      required final String apiUrl,
+      required final String siteUrl,
       final String? displayName,
       final String? email}) = _$UserImpl;
 
   @override
   String get username;
   @override
-  String get apiUrl;
+  String get siteUrl;
   @override
   String? get displayName;
   @override

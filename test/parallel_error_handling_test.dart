@@ -1,19 +1,27 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_remote_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 
 // Mock classes for testing error scenarios
-class MockDeviceRemoteDataSource extends Mock implements DeviceRemoteDataSource {}
+class MockDeviceDataSource extends Mock implements DeviceDataSource {}
 
 void main() {
   group('Parallel Operations Error Handling Tests', () {
-    late MockDeviceRemoteDataSource mockDataSource;
+    late MockDeviceDataSource mockDataSource;
     late PerformanceMonitorService performanceMonitor;
+    void expectGetDevicesThrows(String message, {String? contains}) {
+      when(() => mockDataSource.getDevices()).thenThrow(Exception(message));
+
+      expect(
+        () => mockDataSource.getDevices(),
+        throwsA(predicate((e) => e.toString().contains(contains ?? message))),
+      );
+    }
 
     setUp(() {
-      mockDataSource = MockDeviceRemoteDataSource();
+      mockDataSource = MockDeviceDataSource();
       performanceMonitor = PerformanceMonitorService.instance
         ..clearMetrics();
     });
@@ -24,15 +32,8 @@ void main() {
 
     group('Network Error Scenarios', () {
       test('should handle timeout errors gracefully', () async {
-        // Arrange - simulate timeout
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('Connection timeout'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Connection timeout'))),
-        );
+        // Arrange, Act & Assert - simulate timeout
+        expectGetDevicesThrows('Connection timeout');
       });
 
       test('should handle intermittent network failures', () async {
@@ -66,40 +67,28 @@ void main() {
       });
 
       test('should handle authentication errors in parallel calls', () async {
-        // Arrange
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('Authentication failed - 401'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Authentication failed'))),
+        // Arrange, Act & Assert
+        expectGetDevicesThrows(
+          'Authentication failed - 401',
+          contains: 'Authentication failed',
         );
       });
 
       test('should handle server errors (5xx) with proper error messages', () async {
-        // Arrange
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('Internal server error - 500'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Internal server error'))),
+        // Arrange, Act & Assert
+        expectGetDevicesThrows(
+          'Internal server error - 500',
+          contains: 'Internal server error',
         );
       });
     });
 
     group('Data Validation Error Scenarios', () {
       test('should handle malformed JSON responses', () async {
-        // Arrange
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('FormatException: Invalid JSON'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Invalid JSON'))),
+        // Arrange, Act & Assert
+        expectGetDevicesThrows(
+          'FormatException: Invalid JSON',
+          contains: 'Invalid JSON',
         );
       });
 
@@ -107,26 +96,18 @@ void main() {
         // This would typically be handled in the actual implementation
         // where DeviceModel.fromJson would throw if required fields are missing
         
-        // Arrange
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('Missing required field: id'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Missing required field'))),
+        // Arrange, Act & Assert
+        expectGetDevicesThrows(
+          'Missing required field: id',
+          contains: 'Missing required field',
         );
       });
 
       test('should handle unexpected data types', () async {
-        // Arrange
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('TypeError: Expected String, got int'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('TypeError'))),
+        // Arrange, Act & Assert
+        expectGetDevicesThrows(
+          'TypeError: Expected String, got int',
+          contains: 'TypeError',
         );
       });
     });
@@ -134,7 +115,7 @@ void main() {
     group('Parallel Operation Failure Patterns', () {
       test('should handle partial failures in parallel API calls', () async {
         // This test simulates what happens when some parallel API calls succeed
-        // and others fail (as implemented in DeviceRemoteDataSourceImpl)
+        // and others fail (as implemented in a DeviceDataSource implementation)
         
         final results = <Future<List<DeviceModel>>>[Future.value([
             const DeviceModel(id: '1', name: 'AP1', type: 'access_point', status: 'online')
@@ -303,13 +284,9 @@ void main() {
 
       test('should handle thread pool exhaustion', () async {
         // Simulate thread pool exhaustion
-        when(() => mockDataSource.getDevices())
-            .thenThrow(Exception('ThreadPoolExecutor: Thread pool exhausted'));
-
-        // Act & Assert
-        expect(
-          () => mockDataSource.getDevices(),
-          throwsA(predicate((e) => e.toString().contains('Thread pool exhausted'))),
+        expectGetDevicesThrows(
+          'ThreadPoolExecutor: Thread pool exhausted',
+          contains: 'Thread pool exhausted',
         );
       });
     });
