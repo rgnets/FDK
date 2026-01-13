@@ -9,13 +9,11 @@ import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_message_router.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/home_screen_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
     hide notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
-import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
 /// Provides the base WebSocket configuration derived from the environment.
 final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
@@ -101,22 +99,26 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
 });
 
 /// Keeps WebSocket sync events wired to provider invalidation.
+/// Note: devicesNotifierProvider and roomsNotifierProvider now use direct
+/// ref.listen() to webSocketDeviceEventsProvider/webSocketRoomEventsProvider
+/// for O(1) state updates, so they don't need ref.refresh() here.
 final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   final service = ref.watch(webSocketDataSyncServiceProvider);
   final logger = ref.watch(loggerProvider);
   final subscription = service.events.listen((event) {
     switch (event.type) {
       case WebSocketDataSyncEventType.devicesCached:
-        logger.i('WebSocketDataSync: devices cached -> refreshing providers');
-        ref.refresh(devicesNotifierProvider);
+        logger.i('WebSocketDataSync: devices cached -> refreshing derived providers');
+        // DevicesNotifier updates via ref.listen(webSocketDeviceEventsProvider)
+        // Only refresh derived providers that don't watch devicesNotifierProvider
         ref.refresh(deviceNotificationsNotifierProvider);
         ref.refresh(notificationsDomainNotifierProvider);
         ref.refresh(homeScreenStatisticsProvider);
         ref.refresh(dashboardStatsProvider);
         break;
       case WebSocketDataSyncEventType.roomsCached:
-        logger.i('WebSocketDataSync: rooms cached -> refreshing providers');
-        ref.refresh(roomsNotifierProvider);
+        logger.i('WebSocketDataSync: rooms cached');
+        // RoomsNotifier updates via ref.listen(webSocketRoomEventsProvider)
         break;
     }
   });

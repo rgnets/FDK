@@ -164,40 +164,9 @@ class DevicesNotifier extends _$DevicesNotifier {
   }) {
     final existing = _byId[id];
     if (existing != null) {
-      _byId[id] = Device(
-        id: existing.id,
-        name: existing.name,
-        type: existing.type,
+      _byId[id] = existing.copyWith(
         status: status,
-        pmsRoom: existing.pmsRoom,
-        pmsRoomId: existing.pmsRoomId,
-        ipAddress: existing.ipAddress,
-        macAddress: existing.macAddress,
-        location: existing.location,
         lastSeen: lastSeen ?? existing.lastSeen,
-        metadata: existing.metadata,
-        model: existing.model,
-        serialNumber: existing.serialNumber,
-        firmware: existing.firmware,
-        signalStrength: existing.signalStrength,
-        uptime: existing.uptime,
-        connectedClients: existing.connectedClients,
-        vlan: existing.vlan,
-        ssid: existing.ssid,
-        channel: existing.channel,
-        totalUpload: existing.totalUpload,
-        totalDownload: existing.totalDownload,
-        currentUpload: existing.currentUpload,
-        currentDownload: existing.currentDownload,
-        packetLoss: existing.packetLoss,
-        latency: existing.latency,
-        cpuUsage: existing.cpuUsage,
-        memoryUsage: existing.memoryUsage,
-        temperature: existing.temperature,
-        restartCount: existing.restartCount,
-        maxClients: existing.maxClients,
-        note: existing.note,
-        images: existing.images,
       );
       _emitList();
       if (LoggerConfig.isVerboseLoggingEnabled) {
