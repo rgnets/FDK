@@ -107,7 +107,10 @@ flutter:
     
     # Onboarding screens
     - assets/images/onboarding/
-    
+
+    # Speed test indicator images
+    - assets/speed_test_indicator_img/
+
     # Icon directories (when populated)
     # - assets/icons/navigation/
     # - assets/icons/status/
