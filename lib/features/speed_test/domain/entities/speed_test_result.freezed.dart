@@ -27,7 +27,25 @@ mixin _$SpeedTestResult {
   bool get hasError => throw _privateConstructorUsedError;
   String? get errorMessage => throw _privateConstructorUsedError;
   String? get localIpAddress => throw _privateConstructorUsedError;
-  String? get serverHost => throw _privateConstructorUsedError;
+  String? get serverHost =>
+      throw _privateConstructorUsedError; // PMS Room integration fields
+  int? get id => throw _privateConstructorUsedError; // Result ID from API
+  int? get speedTestId =>
+      throw _privateConstructorUsedError; // Which speed test config
+  int? get pmsRoomId => throw _privateConstructorUsedError; // PMS room ID
+  String? get roomType =>
+      throw _privateConstructorUsedError; // Coverage type (e.g., "master bedroom")
+  int? get accessPointId => throw _privateConstructorUsedError; // Target AP
+  int? get testedViaAccessPointId =>
+      throw _privateConstructorUsedError; // AP used for testing
+  int? get testedViaMediaConverterId =>
+      throw _privateConstructorUsedError; // Media converter used for testing
+  int? get uplinkId => throw _privateConstructorUsedError; // Uplink ID
+  bool get isApplicable =>
+      throw _privateConstructorUsedError; // For "Not Applicable" marking
+  bool? get passed =>
+      throw _privateConstructorUsedError; // Explicit pass/fail status
+  DateTime? get completedAt => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -38,7 +56,18 @@ mixin _$SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -52,7 +81,18 @@ mixin _$SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)?
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -66,7 +106,18 @@ mixin _$SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)?
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -107,7 +158,18 @@ abstract class $SpeedTestResultCopyWith<$Res> {
       bool hasError,
       String? errorMessage,
       String? localIpAddress,
-      String? serverHost});
+      String? serverHost,
+      int? id,
+      int? speedTestId,
+      int? pmsRoomId,
+      String? roomType,
+      int? accessPointId,
+      int? testedViaAccessPointId,
+      int? testedViaMediaConverterId,
+      int? uplinkId,
+      bool isApplicable,
+      bool? passed,
+      DateTime? completedAt});
 }
 
 /// @nodoc
@@ -131,6 +193,17 @@ class _$SpeedTestResultCopyWithImpl<$Res, $Val extends SpeedTestResult>
     Object? errorMessage = freezed,
     Object? localIpAddress = freezed,
     Object? serverHost = freezed,
+    Object? id = freezed,
+    Object? speedTestId = freezed,
+    Object? pmsRoomId = freezed,
+    Object? roomType = freezed,
+    Object? accessPointId = freezed,
+    Object? testedViaAccessPointId = freezed,
+    Object? testedViaMediaConverterId = freezed,
+    Object? uplinkId = freezed,
+    Object? isApplicable = null,
+    Object? passed = freezed,
+    Object? completedAt = freezed,
   }) {
     return _then(_value.copyWith(
       downloadSpeed: null == downloadSpeed
@@ -165,6 +238,50 @@ class _$SpeedTestResultCopyWithImpl<$Res, $Val extends SpeedTestResult>
           ? _value.serverHost
           : serverHost // ignore: cast_nullable_to_non_nullable
               as String?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as int?,
+      speedTestId: freezed == speedTestId
+          ? _value.speedTestId
+          : speedTestId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      pmsRoomId: freezed == pmsRoomId
+          ? _value.pmsRoomId
+          : pmsRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      roomType: freezed == roomType
+          ? _value.roomType
+          : roomType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      accessPointId: freezed == accessPointId
+          ? _value.accessPointId
+          : accessPointId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      testedViaAccessPointId: freezed == testedViaAccessPointId
+          ? _value.testedViaAccessPointId
+          : testedViaAccessPointId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      testedViaMediaConverterId: freezed == testedViaMediaConverterId
+          ? _value.testedViaMediaConverterId
+          : testedViaMediaConverterId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      uplinkId: freezed == uplinkId
+          ? _value.uplinkId
+          : uplinkId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      isApplicable: null == isApplicable
+          ? _value.isApplicable
+          : isApplicable // ignore: cast_nullable_to_non_nullable
+              as bool,
+      passed: freezed == passed
+          ? _value.passed
+          : passed // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
@@ -185,7 +302,18 @@ abstract class _$$SpeedTestResultImplCopyWith<$Res>
       bool hasError,
       String? errorMessage,
       String? localIpAddress,
-      String? serverHost});
+      String? serverHost,
+      int? id,
+      int? speedTestId,
+      int? pmsRoomId,
+      String? roomType,
+      int? accessPointId,
+      int? testedViaAccessPointId,
+      int? testedViaMediaConverterId,
+      int? uplinkId,
+      bool isApplicable,
+      bool? passed,
+      DateTime? completedAt});
 }
 
 /// @nodoc
@@ -207,6 +335,17 @@ class __$$SpeedTestResultImplCopyWithImpl<$Res>
     Object? errorMessage = freezed,
     Object? localIpAddress = freezed,
     Object? serverHost = freezed,
+    Object? id = freezed,
+    Object? speedTestId = freezed,
+    Object? pmsRoomId = freezed,
+    Object? roomType = freezed,
+    Object? accessPointId = freezed,
+    Object? testedViaAccessPointId = freezed,
+    Object? testedViaMediaConverterId = freezed,
+    Object? uplinkId = freezed,
+    Object? isApplicable = null,
+    Object? passed = freezed,
+    Object? completedAt = freezed,
   }) {
     return _then(_$SpeedTestResultImpl(
       downloadSpeed: null == downloadSpeed
@@ -241,6 +380,50 @@ class __$$SpeedTestResultImplCopyWithImpl<$Res>
           ? _value.serverHost
           : serverHost // ignore: cast_nullable_to_non_nullable
               as String?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as int?,
+      speedTestId: freezed == speedTestId
+          ? _value.speedTestId
+          : speedTestId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      pmsRoomId: freezed == pmsRoomId
+          ? _value.pmsRoomId
+          : pmsRoomId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      roomType: freezed == roomType
+          ? _value.roomType
+          : roomType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      accessPointId: freezed == accessPointId
+          ? _value.accessPointId
+          : accessPointId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      testedViaAccessPointId: freezed == testedViaAccessPointId
+          ? _value.testedViaAccessPointId
+          : testedViaAccessPointId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      testedViaMediaConverterId: freezed == testedViaMediaConverterId
+          ? _value.testedViaMediaConverterId
+          : testedViaMediaConverterId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      uplinkId: freezed == uplinkId
+          ? _value.uplinkId
+          : uplinkId // ignore: cast_nullable_to_non_nullable
+              as int?,
+      isApplicable: null == isApplicable
+          ? _value.isApplicable
+          : isApplicable // ignore: cast_nullable_to_non_nullable
+              as bool,
+      passed: freezed == passed
+          ? _value.passed
+          : passed // ignore: cast_nullable_to_non_nullable
+              as bool?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -256,7 +439,18 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
       this.hasError = false,
       this.errorMessage,
       this.localIpAddress,
-      this.serverHost})
+      this.serverHost,
+      this.id,
+      this.speedTestId,
+      this.pmsRoomId,
+      this.roomType,
+      this.accessPointId,
+      this.testedViaAccessPointId,
+      this.testedViaMediaConverterId,
+      this.uplinkId,
+      this.isApplicable = true,
+      this.passed,
+      this.completedAt})
       : super._();
 
   factory _$SpeedTestResultImpl.fromJson(Map<String, dynamic> json) =>
@@ -279,10 +473,44 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   final String? localIpAddress;
   @override
   final String? serverHost;
+// PMS Room integration fields
+  @override
+  final int? id;
+// Result ID from API
+  @override
+  final int? speedTestId;
+// Which speed test config
+  @override
+  final int? pmsRoomId;
+// PMS room ID
+  @override
+  final String? roomType;
+// Coverage type (e.g., "master bedroom")
+  @override
+  final int? accessPointId;
+// Target AP
+  @override
+  final int? testedViaAccessPointId;
+// AP used for testing
+  @override
+  final int? testedViaMediaConverterId;
+// Media converter used for testing
+  @override
+  final int? uplinkId;
+// Uplink ID
+  @override
+  @JsonKey()
+  final bool isApplicable;
+// For "Not Applicable" marking
+  @override
+  final bool? passed;
+// Explicit pass/fail status
+  @override
+  final DateTime? completedAt;
 
   @override
   String toString() {
-    return 'SpeedTestResult(downloadSpeed: $downloadSpeed, uploadSpeed: $uploadSpeed, latency: $latency, timestamp: $timestamp, hasError: $hasError, errorMessage: $errorMessage, localIpAddress: $localIpAddress, serverHost: $serverHost)';
+    return 'SpeedTestResult(downloadSpeed: $downloadSpeed, uploadSpeed: $uploadSpeed, latency: $latency, timestamp: $timestamp, hasError: $hasError, errorMessage: $errorMessage, localIpAddress: $localIpAddress, serverHost: $serverHost, id: $id, speedTestId: $speedTestId, pmsRoomId: $pmsRoomId, roomType: $roomType, accessPointId: $accessPointId, testedViaAccessPointId: $testedViaAccessPointId, testedViaMediaConverterId: $testedViaMediaConverterId, uplinkId: $uplinkId, isApplicable: $isApplicable, passed: $passed, completedAt: $completedAt)';
   }
 
   @override
@@ -304,13 +532,54 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             (identical(other.localIpAddress, localIpAddress) ||
                 other.localIpAddress == localIpAddress) &&
             (identical(other.serverHost, serverHost) ||
-                other.serverHost == serverHost));
+                other.serverHost == serverHost) &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.speedTestId, speedTestId) ||
+                other.speedTestId == speedTestId) &&
+            (identical(other.pmsRoomId, pmsRoomId) ||
+                other.pmsRoomId == pmsRoomId) &&
+            (identical(other.roomType, roomType) ||
+                other.roomType == roomType) &&
+            (identical(other.accessPointId, accessPointId) ||
+                other.accessPointId == accessPointId) &&
+            (identical(other.testedViaAccessPointId, testedViaAccessPointId) ||
+                other.testedViaAccessPointId == testedViaAccessPointId) &&
+            (identical(other.testedViaMediaConverterId,
+                    testedViaMediaConverterId) ||
+                other.testedViaMediaConverterId == testedViaMediaConverterId) &&
+            (identical(other.uplinkId, uplinkId) ||
+                other.uplinkId == uplinkId) &&
+            (identical(other.isApplicable, isApplicable) ||
+                other.isApplicable == isApplicable) &&
+            (identical(other.passed, passed) || other.passed == passed) &&
+            (identical(other.completedAt, completedAt) ||
+                other.completedAt == completedAt));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, downloadSpeed, uploadSpeed,
-      latency, timestamp, hasError, errorMessage, localIpAddress, serverHost);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        downloadSpeed,
+        uploadSpeed,
+        latency,
+        timestamp,
+        hasError,
+        errorMessage,
+        localIpAddress,
+        serverHost,
+        id,
+        speedTestId,
+        pmsRoomId,
+        roomType,
+        accessPointId,
+        testedViaAccessPointId,
+        testedViaMediaConverterId,
+        uplinkId,
+        isApplicable,
+        passed,
+        completedAt
+      ]);
 
   @JsonKey(ignore: true)
   @override
@@ -330,11 +599,40 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)
         $default,
   ) {
-    return $default(downloadSpeed, uploadSpeed, latency, timestamp, hasError,
-        errorMessage, localIpAddress, serverHost);
+    return $default(
+        downloadSpeed,
+        uploadSpeed,
+        latency,
+        timestamp,
+        hasError,
+        errorMessage,
+        localIpAddress,
+        serverHost,
+        id,
+        speedTestId,
+        pmsRoomId,
+        roomType,
+        accessPointId,
+        testedViaAccessPointId,
+        testedViaMediaConverterId,
+        uplinkId,
+        isApplicable,
+        passed,
+        completedAt);
   }
 
   @override
@@ -348,11 +646,40 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)?
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)?
         $default,
   ) {
-    return $default?.call(downloadSpeed, uploadSpeed, latency, timestamp,
-        hasError, errorMessage, localIpAddress, serverHost);
+    return $default?.call(
+        downloadSpeed,
+        uploadSpeed,
+        latency,
+        timestamp,
+        hasError,
+        errorMessage,
+        localIpAddress,
+        serverHost,
+        id,
+        speedTestId,
+        pmsRoomId,
+        roomType,
+        accessPointId,
+        testedViaAccessPointId,
+        testedViaMediaConverterId,
+        uplinkId,
+        isApplicable,
+        passed,
+        completedAt);
   }
 
   @override
@@ -366,13 +693,42 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             bool hasError,
             String? errorMessage,
             String? localIpAddress,
-            String? serverHost)?
+            String? serverHost,
+            int? id,
+            int? speedTestId,
+            int? pmsRoomId,
+            String? roomType,
+            int? accessPointId,
+            int? testedViaAccessPointId,
+            int? testedViaMediaConverterId,
+            int? uplinkId,
+            bool isApplicable,
+            bool? passed,
+            DateTime? completedAt)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(downloadSpeed, uploadSpeed, latency, timestamp, hasError,
-          errorMessage, localIpAddress, serverHost);
+      return $default(
+          downloadSpeed,
+          uploadSpeed,
+          latency,
+          timestamp,
+          hasError,
+          errorMessage,
+          localIpAddress,
+          serverHost,
+          id,
+          speedTestId,
+          pmsRoomId,
+          roomType,
+          accessPointId,
+          testedViaAccessPointId,
+          testedViaMediaConverterId,
+          uplinkId,
+          isApplicable,
+          passed,
+          completedAt);
     }
     return orElse();
   }
@@ -422,7 +778,18 @@ abstract class _SpeedTestResult extends SpeedTestResult {
       final bool hasError,
       final String? errorMessage,
       final String? localIpAddress,
-      final String? serverHost}) = _$SpeedTestResultImpl;
+      final String? serverHost,
+      final int? id,
+      final int? speedTestId,
+      final int? pmsRoomId,
+      final String? roomType,
+      final int? accessPointId,
+      final int? testedViaAccessPointId,
+      final int? testedViaMediaConverterId,
+      final int? uplinkId,
+      final bool isApplicable,
+      final bool? passed,
+      final DateTime? completedAt}) = _$SpeedTestResultImpl;
   const _SpeedTestResult._() : super._();
 
   factory _SpeedTestResult.fromJson(Map<String, dynamic> json) =
@@ -444,6 +811,28 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   String? get localIpAddress;
   @override
   String? get serverHost;
+  @override // PMS Room integration fields
+  int? get id;
+  @override // Result ID from API
+  int? get speedTestId;
+  @override // Which speed test config
+  int? get pmsRoomId;
+  @override // PMS room ID
+  String? get roomType;
+  @override // Coverage type (e.g., "master bedroom")
+  int? get accessPointId;
+  @override // Target AP
+  int? get testedViaAccessPointId;
+  @override // AP used for testing
+  int? get testedViaMediaConverterId;
+  @override // Media converter used for testing
+  int? get uplinkId;
+  @override // Uplink ID
+  bool get isApplicable;
+  @override // For "Not Applicable" marking
+  bool? get passed;
+  @override // Explicit pass/fail status
+  DateTime? get completedAt;
   @override
   @JsonKey(ignore: true)
   _$$SpeedTestResultImplCopyWith<_$SpeedTestResultImpl> get copyWith =>

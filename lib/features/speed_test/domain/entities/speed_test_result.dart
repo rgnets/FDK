@@ -14,6 +14,18 @@ class SpeedTestResult with _$SpeedTestResult {
     String? errorMessage,
     String? localIpAddress,
     String? serverHost,
+    // PMS Room integration fields
+    int? id,                          // Result ID from API
+    int? speedTestId,                 // Which speed test config
+    int? pmsRoomId,                   // PMS room ID
+    String? roomType,                 // Coverage type (e.g., "master bedroom")
+    int? accessPointId,               // Target AP
+    int? testedViaAccessPointId,      // AP used for testing
+    int? testedViaMediaConverterId,   // Media converter used for testing
+    int? uplinkId,                    // Uplink ID
+    @Default(true) bool isApplicable, // For "Not Applicable" marking
+    bool? passed,                     // Explicit pass/fail status
+    DateTime? completedAt,            // When test completed
   }) = _SpeedTestResult;
 
   const SpeedTestResult._();
