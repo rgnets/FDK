@@ -29,6 +29,7 @@ import 'package:rgnets_fdk/features/scanner/data/repositories/scanner_repository
 import 'package:rgnets_fdk/features/scanner/domain/repositories/scanner_repository.dart';
 import 'package:rgnets_fdk/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:rgnets_fdk/features/settings/domain/repositories/settings_repository.dart';
+import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_local_data_source.dart';
 
 // ============================================================================
 // Data Sources
@@ -80,6 +81,12 @@ final deviceRemoteDataSourceProvider = Provider<DeviceDataSource>((ref) {
 final roomLocalDataSourceProvider = Provider<RoomLocalDataSource>((ref) {
   final storage = ref.watch(storageServiceProvider);
   return RoomLocalDataSourceImpl(storageService: storage);
+});
+
+/// Speed test local data source provider
+final speedTestLocalDataSourceProvider = Provider<SpeedTestLocalDataSource>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return SpeedTestLocalDataSourceImpl(storageService: storage);
 });
 
 /// Room WebSocket data source provider

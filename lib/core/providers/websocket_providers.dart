@@ -16,6 +16,7 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     hide notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_provider.dart';
 
 /// Provides the base WebSocket configuration derived from the environment.
 final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
@@ -85,10 +86,13 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   final cacheManager = ref.watch(cacheManagerProvider);
   final logger = LoggerConfig.getLogger();
 
+  final speedTestLocalDataSource = ref.watch(speedTestLocalDataSourceProvider);
+
   final service = WebSocketDataSyncService(
     socketService: socketService,
     deviceLocalDataSource: deviceLocalDataSource,
     roomLocalDataSource: roomLocalDataSource,
+    speedTestLocalDataSource: speedTestLocalDataSource,
     notificationService: notificationService,
     cacheManager: cacheManager,
     logger: logger,
@@ -117,6 +121,14 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
       case WebSocketDataSyncEventType.roomsCached:
         logger.i('WebSocketDataSync: rooms cached -> refreshing providers');
         ref.refresh(roomsNotifierProvider);
+        break;
+      case WebSocketDataSyncEventType.speedTestConfigsCached:
+        logger.i('WebSocketDataSync: speed test configs cached (${event.count})');
+        ref.invalidate(speedTestConfigsProvider);
+        break;
+      case WebSocketDataSyncEventType.speedTestResultsCached:
+        logger.i('WebSocketDataSync: speed test results cached (${event.count})');
+        ref.invalidate(speedTestResultsProvider);
         break;
     }
   });
@@ -164,6 +176,26 @@ final webSocketDeviceLastUpdateProvider = StreamProvider<DateTime?>((ref) {
 
   ref.onDispose(() {
     integration.lastDeviceUpdate.removeListener(listener);
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+/// Emits the last cache update time for any WebSocket data (including speed tests).
+final webSocketLastUpdateProvider = StreamProvider<DateTime?>((ref) {
+  final integration = ref.watch(webSocketCacheIntegrationProvider);
+  final controller = StreamController<DateTime?>();
+
+  void listener() {
+    controller.add(integration.lastUpdate.value);
+  }
+
+  integration.lastUpdate.addListener(listener);
+  controller.add(integration.lastUpdate.value);
+
+  ref.onDispose(() {
+    integration.lastUpdate.removeListener(listener);
     controller.close();
   });
 

@@ -25,7 +25,7 @@ final unreadNotificationCountProvider = AutoDisposeFutureProvider<int>.internal(
 
 typedef UnreadNotificationCountRef = AutoDisposeFutureProviderRef<int>;
 String _$notificationsDomainNotifierHash() =>
-    r'742f2908128beb5ba48c6e0d4d99a71c65bf36a3';
+    r'6d57267ab1aa99311f0bb568826b2b88e7ba2d57';
 
 /// Main notifications provider using domain layer
 ///

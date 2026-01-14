@@ -20,33 +20,50 @@ RoomModel _$RoomModelFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$RoomModel {
+  @JsonKey(fromJson: parseRoomId)
   int get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   String? get building => throw _privateConstructorUsedError;
   String? get floor => throw _privateConstructorUsedError;
   String? get number => throw _privateConstructorUsedError;
+  @JsonKey(name: 'device_ids')
   List<String>? get deviceIds => throw _privateConstructorUsedError;
   Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult? Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)?
         $default, {
     required TResult orElse(),
@@ -80,12 +97,12 @@ abstract class $RoomModelCopyWith<$Res> {
       _$RoomModelCopyWithImpl<$Res, RoomModel>;
   @useResult
   $Res call(
-      {int id,
+      {@JsonKey(fromJson: parseRoomId) int id,
       String name,
       String? building,
       String? floor,
       String? number,
-      List<String>? deviceIds,
+      @JsonKey(name: 'device_ids') List<String>? deviceIds,
       Map<String, dynamic>? metadata});
 }
 
@@ -152,12 +169,12 @@ abstract class _$$RoomModelImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {int id,
+      {@JsonKey(fromJson: parseRoomId) int id,
       String name,
       String? building,
       String? floor,
       String? number,
-      List<String>? deviceIds,
+      @JsonKey(name: 'device_ids') List<String>? deviceIds,
       Map<String, dynamic>? metadata});
 }
 
@@ -202,11 +219,11 @@ class __$$RoomModelImplCopyWithImpl<$Res>
           : number // ignore: cast_nullable_to_non_nullable
               as String?,
       deviceIds: freezed == deviceIds
-          ? _value.deviceIds
+          ? _value._deviceIds
           : deviceIds // ignore: cast_nullable_to_non_nullable
               as List<String>?,
       metadata: freezed == metadata
-          ? _value.metadata
+          ? _value._metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
     ));
@@ -217,7 +234,7 @@ class __$$RoomModelImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$RoomModelImpl extends _RoomModel {
   const _$RoomModelImpl(
-      {required this.id,
+      {@JsonKey(fromJson: parseRoomId) required this.id,
       required this.name,
       this.building,
       this.floor,
@@ -232,6 +249,7 @@ class _$RoomModelImpl extends _RoomModel {
       _$$RoomModelImplFromJson(json);
 
   @override
+  @JsonKey(fromJson: parseRoomId)
   final int id;
   @override
   final String name;
@@ -243,6 +261,7 @@ class _$RoomModelImpl extends _RoomModel {
   final String? number;
   final List<String>? _deviceIds;
   @override
+  @JsonKey(name: 'device_ids')
   List<String>? get deviceIds {
     final value = _deviceIds;
     if (value == null) return null;
@@ -284,17 +303,15 @@ class _$RoomModelImpl extends _RoomModel {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(
-        runtimeType,
-        id,
-        name,
-        building,
-        floor,
-        number,
-        const DeepCollectionEquality().hash(_deviceIds),
-        const DeepCollectionEquality().hash(_metadata),
-      );
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      name,
+      building,
+      floor,
+      number,
+      const DeepCollectionEquality().hash(_deviceIds),
+      const DeepCollectionEquality().hash(_metadata));
 
   @JsonKey(ignore: true)
   @override
@@ -305,8 +322,13 @@ class _$RoomModelImpl extends _RoomModel {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)
         $default,
   ) {
@@ -316,19 +338,30 @@ class _$RoomModelImpl extends _RoomModel {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult? Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)?
         $default,
   ) {
-    return $default?.call(id, name, building, floor, number, deviceIds, metadata);
+    return $default?.call(
+        id, name, building, floor, number, deviceIds, metadata);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, List<String>? deviceIds,
+    TResult Function(
+            @JsonKey(fromJson: parseRoomId) int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            @JsonKey(name: 'device_ids') List<String>? deviceIds,
             Map<String, dynamic>? metadata)?
         $default, {
     required TResult orElse(),
@@ -377,7 +410,7 @@ class _$RoomModelImpl extends _RoomModel {
 
 abstract class _RoomModel extends RoomModel {
   const factory _RoomModel(
-      {required final int id,
+      {@JsonKey(fromJson: parseRoomId) required final int id,
       required final String name,
       final String? building,
       final String? floor,
@@ -390,6 +423,7 @@ abstract class _RoomModel extends RoomModel {
       _$RoomModelImpl.fromJson;
 
   @override
+  @JsonKey(fromJson: parseRoomId)
   int get id;
   @override
   String get name;
@@ -400,6 +434,7 @@ abstract class _RoomModel extends RoomModel {
   @override
   String? get number;
   @override
+  @JsonKey(name: 'device_ids')
   List<String>? get deviceIds;
   @override
   Map<String, dynamic>? get metadata;

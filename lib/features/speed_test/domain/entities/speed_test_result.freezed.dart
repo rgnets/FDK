@@ -32,7 +32,10 @@ mixin _$SpeedTestResult {
   int? get id => throw _privateConstructorUsedError; // Result ID from API
   int? get speedTestId =>
       throw _privateConstructorUsedError; // Which speed test config
-  int? get pmsRoomId => throw _privateConstructorUsedError; // PMS room ID
+  int? get pmsRoomId =>
+      throw _privateConstructorUsedError; // PMS room ID (may be null)
+  String? get roomName =>
+      throw _privateConstructorUsedError; // Room name/number for matching
   String? get roomType =>
       throw _privateConstructorUsedError; // Coverage type (e.g., "master bedroom")
   int? get accessPointId => throw _privateConstructorUsedError; // Target AP
@@ -60,6 +63,7 @@ mixin _$SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -85,6 +89,7 @@ mixin _$SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -110,6 +115,7 @@ mixin _$SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -162,6 +168,7 @@ abstract class $SpeedTestResultCopyWith<$Res> {
       int? id,
       int? speedTestId,
       int? pmsRoomId,
+      String? roomName,
       String? roomType,
       int? accessPointId,
       int? testedViaAccessPointId,
@@ -196,6 +203,7 @@ class _$SpeedTestResultCopyWithImpl<$Res, $Val extends SpeedTestResult>
     Object? id = freezed,
     Object? speedTestId = freezed,
     Object? pmsRoomId = freezed,
+    Object? roomName = freezed,
     Object? roomType = freezed,
     Object? accessPointId = freezed,
     Object? testedViaAccessPointId = freezed,
@@ -250,6 +258,10 @@ class _$SpeedTestResultCopyWithImpl<$Res, $Val extends SpeedTestResult>
           ? _value.pmsRoomId
           : pmsRoomId // ignore: cast_nullable_to_non_nullable
               as int?,
+      roomName: freezed == roomName
+          ? _value.roomName
+          : roomName // ignore: cast_nullable_to_non_nullable
+              as String?,
       roomType: freezed == roomType
           ? _value.roomType
           : roomType // ignore: cast_nullable_to_non_nullable
@@ -306,6 +318,7 @@ abstract class _$$SpeedTestResultImplCopyWith<$Res>
       int? id,
       int? speedTestId,
       int? pmsRoomId,
+      String? roomName,
       String? roomType,
       int? accessPointId,
       int? testedViaAccessPointId,
@@ -338,6 +351,7 @@ class __$$SpeedTestResultImplCopyWithImpl<$Res>
     Object? id = freezed,
     Object? speedTestId = freezed,
     Object? pmsRoomId = freezed,
+    Object? roomName = freezed,
     Object? roomType = freezed,
     Object? accessPointId = freezed,
     Object? testedViaAccessPointId = freezed,
@@ -392,6 +406,10 @@ class __$$SpeedTestResultImplCopyWithImpl<$Res>
           ? _value.pmsRoomId
           : pmsRoomId // ignore: cast_nullable_to_non_nullable
               as int?,
+      roomName: freezed == roomName
+          ? _value.roomName
+          : roomName // ignore: cast_nullable_to_non_nullable
+              as String?,
       roomType: freezed == roomType
           ? _value.roomType
           : roomType // ignore: cast_nullable_to_non_nullable
@@ -443,6 +461,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
       this.id,
       this.speedTestId,
       this.pmsRoomId,
+      this.roomName,
       this.roomType,
       this.accessPointId,
       this.testedViaAccessPointId,
@@ -482,7 +501,10 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
 // Which speed test config
   @override
   final int? pmsRoomId;
-// PMS room ID
+// PMS room ID (may be null)
+  @override
+  final String? roomName;
+// Room name/number for matching
   @override
   final String? roomType;
 // Coverage type (e.g., "master bedroom")
@@ -510,7 +532,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
 
   @override
   String toString() {
-    return 'SpeedTestResult(downloadSpeed: $downloadSpeed, uploadSpeed: $uploadSpeed, latency: $latency, timestamp: $timestamp, hasError: $hasError, errorMessage: $errorMessage, localIpAddress: $localIpAddress, serverHost: $serverHost, id: $id, speedTestId: $speedTestId, pmsRoomId: $pmsRoomId, roomType: $roomType, accessPointId: $accessPointId, testedViaAccessPointId: $testedViaAccessPointId, testedViaMediaConverterId: $testedViaMediaConverterId, uplinkId: $uplinkId, isApplicable: $isApplicable, passed: $passed, completedAt: $completedAt)';
+    return 'SpeedTestResult(downloadSpeed: $downloadSpeed, uploadSpeed: $uploadSpeed, latency: $latency, timestamp: $timestamp, hasError: $hasError, errorMessage: $errorMessage, localIpAddress: $localIpAddress, serverHost: $serverHost, id: $id, speedTestId: $speedTestId, pmsRoomId: $pmsRoomId, roomName: $roomName, roomType: $roomType, accessPointId: $accessPointId, testedViaAccessPointId: $testedViaAccessPointId, testedViaMediaConverterId: $testedViaMediaConverterId, uplinkId: $uplinkId, isApplicable: $isApplicable, passed: $passed, completedAt: $completedAt)';
   }
 
   @override
@@ -538,6 +560,8 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
                 other.speedTestId == speedTestId) &&
             (identical(other.pmsRoomId, pmsRoomId) ||
                 other.pmsRoomId == pmsRoomId) &&
+            (identical(other.roomName, roomName) ||
+                other.roomName == roomName) &&
             (identical(other.roomType, roomType) ||
                 other.roomType == roomType) &&
             (identical(other.accessPointId, accessPointId) ||
@@ -571,6 +595,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
         id,
         speedTestId,
         pmsRoomId,
+        roomName,
         roomType,
         accessPointId,
         testedViaAccessPointId,
@@ -603,6 +628,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -625,6 +651,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
         id,
         speedTestId,
         pmsRoomId,
+        roomName,
         roomType,
         accessPointId,
         testedViaAccessPointId,
@@ -650,6 +677,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -672,6 +700,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
         id,
         speedTestId,
         pmsRoomId,
+        roomName,
         roomType,
         accessPointId,
         testedViaAccessPointId,
@@ -697,6 +726,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             int? id,
             int? speedTestId,
             int? pmsRoomId,
+            String? roomName,
             String? roomType,
             int? accessPointId,
             int? testedViaAccessPointId,
@@ -721,6 +751,7 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
           id,
           speedTestId,
           pmsRoomId,
+          roomName,
           roomType,
           accessPointId,
           testedViaAccessPointId,
@@ -782,6 +813,7 @@ abstract class _SpeedTestResult extends SpeedTestResult {
       final int? id,
       final int? speedTestId,
       final int? pmsRoomId,
+      final String? roomName,
       final String? roomType,
       final int? accessPointId,
       final int? testedViaAccessPointId,
@@ -817,7 +849,9 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   int? get speedTestId;
   @override // Which speed test config
   int? get pmsRoomId;
-  @override // PMS room ID
+  @override // PMS room ID (may be null)
+  String? get roomName;
+  @override // Room name/number for matching
   String? get roomType;
   @override // Coverage type (e.g., "master bedroom")
   int? get accessPointId;

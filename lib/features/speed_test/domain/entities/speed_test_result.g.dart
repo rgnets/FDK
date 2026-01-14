@@ -20,6 +20,7 @@ _$SpeedTestResultImpl _$$SpeedTestResultImplFromJson(
       id: (json['id'] as num?)?.toInt(),
       speedTestId: (json['speed_test_id'] as num?)?.toInt(),
       pmsRoomId: (json['pms_room_id'] as num?)?.toInt(),
+      roomName: json['room_name'] as String?,
       roomType: json['room_type'] as String?,
       accessPointId: (json['access_point_id'] as num?)?.toInt(),
       testedViaAccessPointId:
@@ -56,6 +57,7 @@ Map<String, dynamic> _$$SpeedTestResultImplToJson(
   writeNotNull('id', instance.id);
   writeNotNull('speed_test_id', instance.speedTestId);
   writeNotNull('pms_room_id', instance.pmsRoomId);
+  writeNotNull('room_name', instance.roomName);
   writeNotNull('room_type', instance.roomType);
   writeNotNull('access_point_id', instance.accessPointId);
   writeNotNull('tested_via_access_point_id', instance.testedViaAccessPointId);
