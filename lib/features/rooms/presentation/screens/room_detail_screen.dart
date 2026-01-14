@@ -305,6 +305,9 @@ class _OverviewTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Parse room ID as int for speed test selector
     final roomIdInt = int.tryParse(roomVm.id) ?? 0;
+    // Use room number for matching speed test results (falls back to name if null)
+    final roomNameForMatch = roomVm.roomNumber ?? roomVm.name;
+    print('>>> _OverviewTab: roomVm.id="${roomVm.id}", roomNumber="${roomVm.roomNumber}", roomNameForMatch="$roomNameForMatch"');
 
     // Get devices for this room to extract AP IDs and stats
     final roomDeviceState = ref.watch(roomDeviceNotifierProvider(roomVm.id));
@@ -323,7 +326,7 @@ class _OverviewTab extends ConsumerWidget {
           // Speed Test Section
           RoomSpeedTestSelector(
             pmsRoomId: roomIdInt,
-            roomName: roomVm.name,
+            roomName: roomNameForMatch,
             roomType: roomVm.metadata?['room_type'] as String?,
             apIds: apIds,
             onResultSubmitted: (result) {

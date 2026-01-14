@@ -17,7 +17,8 @@ class SpeedTestResult with _$SpeedTestResult {
     // PMS Room integration fields
     int? id,                          // Result ID from API
     int? speedTestId,                 // Which speed test config
-    int? pmsRoomId,                   // PMS room ID
+    int? pmsRoomId,                   // PMS room ID (may be null)
+    String? roomName,                 // Room name/number for matching
     String? roomType,                 // Coverage type (e.g., "master bedroom")
     int? accessPointId,               // Target AP
     int? testedViaAccessPointId,      // AP used for testing

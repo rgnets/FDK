@@ -10,18 +10,23 @@ import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_s
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
+import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_local_data_source.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
     required WebSocketService socketService,
     required DeviceLocalDataSource deviceLocalDataSource,
     required RoomLocalDataSource roomLocalDataSource,
+    required SpeedTestLocalDataSource speedTestLocalDataSource,
     required NotificationGenerationService notificationService,
     required CacheManager cacheManager,
     Logger? logger,
   }) : _socketService = socketService,
        _deviceLocalDataSource = deviceLocalDataSource,
        _roomLocalDataSource = roomLocalDataSource,
+       _speedTestLocalDataSource = speedTestLocalDataSource,
        _notificationService = notificationService,
        _cacheManager = cacheManager,
        _logger = logger ?? Logger();
@@ -34,10 +39,15 @@ class WebSocketDataSyncService {
     'wlan_devices',
   ];
   static const List<String> _roomResources = ['pms_rooms'];
+  static const List<String> _speedTestResources = [
+    'speed_tests',
+    'speed_test_results',
+  ];
 
   final WebSocketService _socketService;
   final DeviceLocalDataSource _deviceLocalDataSource;
   final RoomLocalDataSource _roomLocalDataSource;
+  final SpeedTestLocalDataSource _speedTestLocalDataSource;
   final NotificationGenerationService _notificationService;
   final CacheManager _cacheManager;
   final Logger _logger;
@@ -48,10 +58,14 @@ class WebSocketDataSyncService {
 
   final Map<String, List<DeviceModel>> _deviceSnapshots = {};
   final Map<String, List<RoomModel>> _roomSnapshots = {};
+  final Map<String, List<SpeedTestConfig>> _speedTestConfigSnapshots = {};
+  final Map<String, List<SpeedTestResult>> _speedTestResultSnapshots = {};
   final Set<String> _pendingSnapshots = {};
   Completer<void>? _initialSyncCompleter;
   Future<void>? _pendingDeviceCache;
   Future<void>? _pendingRoomCache;
+  Future<void>? _pendingSpeedTestConfigCache;
+  Future<void>? _pendingSpeedTestResultCache;
   final _eventController = StreamController<WebSocketDataSyncEvent>.broadcast();
 
   bool get isRunning => _started;
@@ -80,6 +94,8 @@ class WebSocketDataSyncService {
     _pendingSnapshots.clear();
     _deviceSnapshots.clear();
     _roomSnapshots.clear();
+    _speedTestConfigSnapshots.clear();
+    _speedTestResultSnapshots.clear();
     _initialSyncCompleter = null;
   }
 
@@ -95,9 +111,12 @@ class WebSocketDataSyncService {
     _pendingSnapshots
       ..clear()
       ..addAll(_deviceResources)
-      ..addAll(_roomResources);
+      ..addAll(_roomResources)
+      ..addAll(_speedTestResources);
     _pendingDeviceCache = null;
     _pendingRoomCache = null;
+    _pendingSpeedTestConfigCache = null;
+    _pendingSpeedTestResultCache = null;
 
     _initialSyncCompleter = Completer<void>();
     _requestSnapshots();
@@ -117,6 +136,12 @@ class WebSocketDataSyncService {
     }
     if (_pendingRoomCache != null) {
       pendingCaches.add(_pendingRoomCache!);
+    }
+    if (_pendingSpeedTestConfigCache != null) {
+      pendingCaches.add(_pendingSpeedTestConfigCache!);
+    }
+    if (_pendingSpeedTestResultCache != null) {
+      pendingCaches.add(_pendingSpeedTestResultCache!);
     }
     if (pendingCaches.isNotEmpty) {
       _logger.i('WebSocketDataSync: Waiting for cache operations to complete');
@@ -150,6 +175,12 @@ class WebSocketDataSyncService {
     }
 
     for (final resource in _roomResources) {
+      _sendSubscribe(resource);
+      _sendSnapshotRequest(resource);
+    }
+
+    for (final resource in _speedTestResources) {
+      _logger.i('WebSocketDataSync: Subscribing to speed test resource: $resource');
       _sendSubscribe(resource);
       _sendSnapshotRequest(resource);
     }
@@ -187,14 +218,40 @@ class WebSocketDataSyncService {
   String _channelIdentifier() => jsonEncode(const {'channel': _channelName});
 
   void _handleMessage(SocketMessage message) {
+    // Log all incoming messages at info level for visibility
+    final payloadResourceType = message.payload['resource_type']?.toString() ?? 'null';
+    _logger.i('WebSocketDataSync: Received message type=${message.type}, resource_type=$payloadResourceType');
+
+    // Extra logging for speed test related messages
+    if (payloadResourceType.contains('speed') || message.type.contains('speed')) {
+      _logger.i('WebSocketDataSync: SPEED TEST MESSAGE - payload keys: ${message.payload.keys.toList()}');
+      _logger.i('WebSocketDataSync: SPEED TEST MESSAGE - payload: ${message.payload}');
+    }
+
     final resourceType = _resolveResourceType(message);
     if (resourceType == null) {
+      _logger.i('WebSocketDataSync: Could not resolve resource type for message type=${message.type}');
       return;
     }
 
+    _logger.i('WebSocketDataSync: Resolved resource type=$resourceType');
+
     final snapshotItems = _extractSnapshotItems(message);
     if (snapshotItems == null) {
+      _logger.i('WebSocketDataSync: No snapshot items found for resource type=$resourceType');
+      // For speed test debugging, log the payload structure
+      if (resourceType.contains('speed')) {
+        _logger.i('WebSocketDataSync: SPEED TEST - No items. Payload structure: ${message.payload.keys.toList()}');
+        _logger.i('WebSocketDataSync: SPEED TEST - results=${message.payload['results']?.runtimeType}, data=${message.payload['data']?.runtimeType}, items=${message.payload['items']?.runtimeType}');
+      }
       return;
+    }
+
+    _logger.i('WebSocketDataSync: Processing $resourceType with ${snapshotItems.length} items');
+
+    // Extra logging for speed test processing
+    if (resourceType.contains('speed')) {
+      _logger.i('WebSocketDataSync: SPEED TEST - Found ${snapshotItems.length} items to process');
     }
 
     if (resourceType == 'devices.summary') {
@@ -222,7 +279,25 @@ class WebSocketDataSyncService {
       _handleRoomSnapshot(snapshotItems, resourceType: resourceType);
       _pendingSnapshots.remove(resourceType);
       _markSnapshotHandled();
+      return;
     }
+
+    if (resourceType == 'speed_tests') {
+      _handleSpeedTestConfigSnapshot(snapshotItems);
+      _pendingSnapshots.remove(resourceType);
+      _markSnapshotHandled();
+      return;
+    }
+
+    if (resourceType == 'speed_test_results') {
+      _handleSpeedTestResultSnapshot(snapshotItems);
+      _pendingSnapshots.remove(resourceType);
+      _markSnapshotHandled();
+      return;
+    }
+
+    // Log unhandled resource types for debugging
+    _logger.w('WebSocketDataSync: Unhandled resource type=$resourceType with ${snapshotItems.length} items');
   }
 
   String? _resolveResourceType(SocketMessage message) {
@@ -231,6 +306,7 @@ class WebSocketDataSyncService {
     if (resourceType != null && resourceType.isNotEmpty) {
       return resourceType;
     }
+    // Handle .summary type messages
     if (message.type == 'devices.summary') {
       return 'devices.summary';
     }
@@ -356,6 +432,150 @@ class WebSocketDataSyncService {
     await _roomLocalDataSource.cacheRooms(rooms);
     _eventController.add(
       WebSocketDataSyncEvent.roomsCached(count: rooms.length),
+    );
+  }
+
+  void _handleSpeedTestConfigSnapshot(List<Map<String, dynamic>> items) {
+    final configs = <SpeedTestConfig>[];
+    for (final item in items) {
+      try {
+        configs.add(_buildSpeedTestConfig(item));
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse speed test config: $e');
+      }
+    }
+
+    _speedTestConfigSnapshots['speed_tests'] = configs;
+    _pendingSpeedTestConfigCache = _cacheSpeedTestConfigs(configs);
+    unawaited(_pendingSpeedTestConfigCache!);
+  }
+
+  SpeedTestConfig _buildSpeedTestConfig(Map<String, dynamic> data) {
+    // Parse DateTime safely
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return null;
+      return DateTime.tryParse(value.toString());
+    }
+
+    return SpeedTestConfig(
+      id: _parseInt(data['id']),
+      name: data['name']?.toString(),
+      testType: data['test_type']?.toString(),
+      target: data['target']?.toString(),
+      port: _parseInt(data['port']),
+      iperfProtocol: data['iperf_protocol']?.toString(),
+      minDownloadMbps: _parseDouble(data['min_download_mbps'], defaultValue: 0.0),
+      minUploadMbps: _parseDouble(data['min_upload_mbps'], defaultValue: 0.0),
+      period: _parseInt(data['period']),
+      periodUnit: data['period_unit']?.toString(),
+      startsAt: parseDateTime(data['starts_at']),
+      nextCheckAt: parseDateTime(data['next_check_at']),
+      lastCheckedAt: parseDateTime(data['last_checked_at']),
+      passing: _parseBool(data['passing']) ?? false,
+      lastResult: data['last_result']?.toString(),
+      maxFailures: _parseInt(data['max_failures']),
+      disableUplinkOnFailure: _parseBool(data['disable_uplink_on_failure']) ?? false,
+      sampleSizePct: _parseInt(data['sample_size_pct']),
+      pskOverride: data['psk_override']?.toString(),
+      wlanId: _parseInt(data['wlan_id']),
+      note: data['note']?.toString(),
+      scratch: data['scratch']?.toString(),
+      createdBy: data['created_by']?.toString(),
+      updatedBy: data['updated_by']?.toString(),
+      createdAt: parseDateTime(data['created_at']),
+      updatedAt: parseDateTime(data['updated_at']),
+    );
+  }
+
+  Future<void> _cacheSpeedTestConfigs(List<SpeedTestConfig> configs) async {
+    _logger.i('WebSocketDataSync: Caching ${configs.length} speed test configs');
+    await _speedTestLocalDataSource.cacheConfigs(configs);
+    _eventController.add(
+      WebSocketDataSyncEvent.speedTestConfigsCached(count: configs.length),
+    );
+  }
+
+  void _handleSpeedTestResultSnapshot(List<Map<String, dynamic>> items) {
+    final results = <SpeedTestResult>[];
+    for (final item in items) {
+      try {
+        results.add(_buildSpeedTestResult(item));
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse speed test result: $e');
+      }
+    }
+
+    _speedTestResultSnapshots['speed_test_results'] = results;
+    _pendingSpeedTestResultCache = _cacheSpeedTestResults(results);
+    unawaited(_pendingSpeedTestResultCache!);
+  }
+
+  /// Safely parse an int from dynamic value (handles String, num, null)
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  /// Safely parse a double from dynamic value (handles String, num, null)
+  double _parseDouble(dynamic value, {double defaultValue = 0.0}) {
+    if (value == null) return defaultValue;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
+  /// Safely parse a bool from dynamic value (handles String, bool, int, null)
+  bool? _parseBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is String) {
+      if (value.toLowerCase() == 'true') return true;
+      if (value.toLowerCase() == 'false') return false;
+    }
+    if (value is int) return value != 0;
+    return null;
+  }
+
+  SpeedTestResult _buildSpeedTestResult(Map<String, dynamic> data) {
+    // Log raw data for debugging pms_room_id
+    _logger.i('WebSocketDataSync: SpeedTestResult raw data keys: ${data.keys.toList()}');
+    _logger.i('WebSocketDataSync: SpeedTestResult pms_room_id=${data['pms_room_id']}, id=${data['id']}');
+
+    // Map API fields to SpeedTestResult fields - handle String/num type flexibility
+    return SpeedTestResult(
+      id: _parseInt(data['id']),
+      speedTestId: _parseInt(data['speed_test_id']),
+      pmsRoomId: _parseInt(data['pms_room_id']),
+      roomType: data['room_type']?.toString(),
+      accessPointId: _parseInt(data['access_point_id']),
+      testedViaAccessPointId: _parseInt(data['tested_via_access_point_id']),
+      testedViaMediaConverterId: _parseInt(data['tested_via_media_converter_id']),
+      uplinkId: _parseInt(data['uplink_id']),
+      downloadSpeed: _parseDouble(data['download_mbps']),
+      uploadSpeed: _parseDouble(data['upload_mbps']),
+      latency: _parseDouble(data['rtt']),
+      timestamp: data['created_at'] != null
+          ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      completedAt: data['completed_at'] != null
+          ? DateTime.tryParse(data['completed_at'].toString())
+          : null,
+      isApplicable: _parseBool(data['is_applicable']) ?? true,
+      passed: _parseBool(data['passed']),
+      localIpAddress: data['local_ip_address']?.toString(),
+      serverHost: data['server_host']?.toString(),
+    );
+  }
+
+  Future<void> _cacheSpeedTestResults(List<SpeedTestResult> results) async {
+    _logger.i('WebSocketDataSync: Caching ${results.length} speed test results');
+    await _speedTestLocalDataSource.cacheResults(results);
+    _eventController.add(
+      WebSocketDataSyncEvent.speedTestResultsCached(count: results.length),
     );
   }
 
@@ -687,6 +907,19 @@ class WebSocketDataSyncEvent {
         type: WebSocketDataSyncEventType.roomsCached,
         count: count,
       );
+
+  factory WebSocketDataSyncEvent.speedTestConfigsCached({required int count}) =>
+      WebSocketDataSyncEvent._(
+        type: WebSocketDataSyncEventType.speedTestConfigsCached,
+        count: count,
+      );
+
+  factory WebSocketDataSyncEvent.speedTestResultsCached({required int count}) =>
+      WebSocketDataSyncEvent._(
+        type: WebSocketDataSyncEventType.speedTestResultsCached,
+        count: count,
+      );
+
   const WebSocketDataSyncEvent._({
     required this.type,
     required this.count,
@@ -699,4 +932,6 @@ class WebSocketDataSyncEvent {
 enum WebSocketDataSyncEventType {
   devicesCached,
   roomsCached,
+  speedTestConfigsCached,
+  speedTestResultsCached,
 }

@@ -1,19 +1,22 @@
-import 'package:att_fe_tool/models/speed_test_model.dart';
-import 'package:att_fe_tool/models/speed_test_result_model.dart';
-import 'package:att_fe_tool/rxg_api/rxg_api.dart';
-import 'package:att_fe_tool/services/logger_service.dart';
-import 'package:att_fe_tool/widgets/speed_test_popup.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
 /// Widget that displays individual speed test cards for a PMS room
 ///
 /// Shows a card for each unique speed_test_id that has results for this room.
 /// Each card displays the test configuration and allows running the test.
-class RoomSpeedTestSelector extends StatefulWidget {
+class RoomSpeedTestSelector extends ConsumerStatefulWidget {
   final int pmsRoomId;
   final String roomName;
   final String? roomType;
   final List<int> apIds; // List of AP IDs in this room
+  final void Function(SpeedTestResult result)? onResultSubmitted;
 
   const RoomSpeedTestSelector({
     super.key,
@@ -21,16 +24,18 @@ class RoomSpeedTestSelector extends StatefulWidget {
     required this.roomName,
     this.roomType,
     this.apIds = const [],
+    this.onResultSubmitted,
   });
 
   @override
-  State<RoomSpeedTestSelector> createState() => _RoomSpeedTestSelectorState();
+  ConsumerState<RoomSpeedTestSelector> createState() =>
+      _RoomSpeedTestSelectorState();
 }
 
 /// Helper class to group test configuration with its results
 class SpeedTestWithResults {
-  final SpeedTest config;
-  final List<SpeedTestResultModel> results;
+  final SpeedTestConfig config;
+  final List<SpeedTestResult> results;
 
   SpeedTestWithResults({
     required this.config,
@@ -38,11 +43,11 @@ class SpeedTestWithResults {
   });
 }
 
-class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
+class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
   List<SpeedTestWithResults> _speedTests = [];
   bool _isLoading = true;
   String? _errorMessage;
-  SpeedTestResultModel? _selectedResult;  // Track selected result across all tests
+  SpeedTestResult? _selectedResult; // Track selected result across all tests
 
   @override
   void initState() {
@@ -58,21 +63,27 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         _errorMessage = null;
       });
 
-      // Step 1: Get speed test RESULTS (refresh from API if needed)
-      final speedTestResultsData =
-          await RxgApiClient.getAllSpeedTestResults(forceRefresh: forceRefresh);
+      // Invalidate providers if force refresh (this triggers rebuild)
+      if (forceRefresh) {
+        ref.invalidate(speedTestResultsByRoomNameProvider(widget.roomName));
+        ref.invalidate(speedTestConfigsProvider);
+      }
+
+      // Get speed test results for this room by room name (now synchronous)
+      final results = ref.read(speedTestResultsByRoomNameProvider(widget.roomName));
+      final configs = ref.read(speedTestConfigsProvider);
 
       if (!mounted) return;
 
-      Logger.info(
-        'Loading speed tests for room ${widget.pmsRoomId}: Found ${speedTestResultsData?.length ?? 0} total results',
-        'RoomSpeedTestSelector'
+      LoggerService.info(
+        'Loading speed tests for room "${widget.roomName}": Found ${results.length} results',
+        tag: 'RoomSpeedTestSelector',
       );
 
-      if (speedTestResultsData == null || speedTestResultsData.isEmpty) {
-        Logger.warning(
-          'No speed test results available for room ${widget.pmsRoomId}',
-          'RoomSpeedTestSelector'
+      if (results.isEmpty) {
+        LoggerService.warning(
+          'No speed test results available for room "${widget.roomName}"',
+          tag: 'RoomSpeedTestSelector',
         );
         setState(() {
           _speedTests = [];
@@ -82,110 +93,24 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         return;
       }
 
-      // Step 2: Filter results by pms_room_id and group by speed_test_id
-      final Map<int, List<SpeedTestResultModel>> resultsByTestId = {};
-      int skippedCount = 0;
-      int matchedCount = 0;
-
-      for (final resultData in speedTestResultsData) {
-        try {
-          // Extract pms_room_id from nested object or direct field
-          dynamic pmsRoomId;
-          if (resultData['pms_room'] is Map) {
-            pmsRoomId = (resultData['pms_room'] as Map)['id'];
-          } else {
-            pmsRoomId = resultData['pms_room_id'];
-          }
-
-          // Extract speed_test_id from nested object or direct field
-          dynamic speedTestId;
-          if (resultData['speed_test'] is Map) {
-            speedTestId = (resultData['speed_test'] as Map)['id'];
-          } else {
-            speedTestId = resultData['speed_test_id'];
-          }
-
-          // Parse pms_room_id
-          int? parsedRoomId;
-          if (pmsRoomId is int) {
-            parsedRoomId = pmsRoomId;
-          } else if (pmsRoomId is String) {
-            parsedRoomId = int.tryParse(pmsRoomId);
-          }
-
-          // Parse speed_test_id
-          int? parsedSpeedTestId;
-          if (speedTestId is int) {
-            parsedSpeedTestId = speedTestId;
-          } else if (speedTestId is String) {
-            parsedSpeedTestId = int.tryParse(speedTestId);
-          }
-
-          // Only process results for this room
-          if (parsedRoomId != widget.pmsRoomId || parsedSpeedTestId == null) {
-            skippedCount++;
-            continue;
-          }
-
-          matchedCount++;
-
-          // Debug: Log raw JSON from API to see what fields are actually returned (both flat and nested)
-          final testedViaApFlat = resultData['tested_via_access_point_id'];
-          final testedViaApNested = resultData['tested_via_access_point'] is Map
-              ? (resultData['tested_via_access_point'] as Map)['id']
-              : null;
-          Logger.info(
-            'RAW API DATA for result ${resultData['id']} (test_id=$parsedSpeedTestId): '
-            'tested_via_access_point_id(flat)=$testedViaApFlat, '
-            'tested_via_access_point.id(nested)=$testedViaApNested, '
-            'access_point_id=${resultData['access_point_id']}, '
-            'access_point.id=${resultData['access_point'] is Map ? (resultData['access_point'] as Map)['id'] : null}',
-            'RoomSpeedTestSelector'
-          );
-
-          // Parse the result model
-          final result = SpeedTestResultModel.fromJson(resultData);
-
-          // Add to map - group ALL results by speed_test_id for this room
-          resultsByTestId.putIfAbsent(parsedSpeedTestId, () => []);
-          resultsByTestId[parsedSpeedTestId]!.add(result);
-        } catch (e) {
-          Logger.error(
-            'Failed to process speed test result: $e',
-            'RoomSpeedTestSelector'
-          );
+      // Group results by speed_test_id (use 0 as default for null speedTestId)
+      final resultsByTestId = <int, List<SpeedTestResult>>{};
+      var nullSpeedTestCount = 0;
+      for (final result in results) {
+        final testId = result.speedTestId ?? 0; // Use 0 for results without speedTestId
+        if (result.speedTestId == null) {
+          nullSpeedTestCount++;
         }
+        resultsByTestId.putIfAbsent(testId, () => []);
+        resultsByTestId[testId]!.add(result);
       }
 
-      Logger.info(
-        'Filtered results for room ${widget.pmsRoomId}: $matchedCount matched, $skippedCount skipped, ${resultsByTestId.length} unique tests',
-        'RoomSpeedTestSelector'
+      LoggerService.info(
+        'Grouped results for room "${widget.roomName}": ${resultsByTestId.length} unique tests, $nullSpeedTestCount with null speedTestId',
+        tag: 'RoomSpeedTestSelector',
       );
 
       if (resultsByTestId.isEmpty) {
-        // Log which room IDs were actually found
-        final foundRoomIds = <int>{};
-        for (final resultData in speedTestResultsData) {
-          dynamic pmsRoomId;
-          if (resultData['pms_room'] is Map) {
-            pmsRoomId = (resultData['pms_room'] as Map)['id'];
-          } else {
-            pmsRoomId = resultData['pms_room_id'];
-          }
-
-          if (pmsRoomId is int) {
-            foundRoomIds.add(pmsRoomId);
-          } else if (pmsRoomId is String) {
-            final parsed = int.tryParse(pmsRoomId);
-            if (parsed != null) foundRoomIds.add(parsed);
-          }
-        }
-
-        Logger.warning(
-          'No speed test results matched room ${widget.pmsRoomId} (checked ${speedTestResultsData.length} total results). '
-          'Found results for rooms: ${foundRoomIds.toList()..sort()}',
-          'RoomSpeedTestSelector'
-        );
         setState(() {
           _speedTests = [];
           _isLoading = false;
@@ -193,56 +118,34 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         return;
       }
 
-      // Step 3: Get speed test configurations from cache (already loaded during app startup)
-      final speedTestsData =
-          await RxgApiClient.getAllSpeedTests(forceRefresh: forceRefresh);
-
-      if (!mounted) return;
-
-      // Build a map of speed_test_id -> SpeedTest for quick lookup
-      final Map<int, SpeedTest> configsById = {};
-      if (speedTestsData != null) {
-        for (final testData in speedTestsData) {
-          try {
-            final testId = testData['id'];
-            int? parsedTestId;
-            if (testId is int) {
-              parsedTestId = testId;
-            } else if (testId is String) {
-              parsedTestId = int.tryParse(testId);
-            }
-
-            if (parsedTestId != null) {
-              configsById[parsedTestId] = SpeedTest.fromJson(testData);
-            }
-          } catch (e) {
-            Logger.error('Failed to parse speed test config: $e', 'RoomSpeedTestSelector');
-          }
+      // Build a map of speed_test_id -> SpeedTestConfig for quick lookup
+      final Map<int, SpeedTestConfig> configsById = {};
+      for (final config in configs) {
+        if (config.id != null) {
+          configsById[config.id!] = config;
         }
       }
 
-      // Step 4: Build SpeedTestWithResults for EACH speed_test_id in results
+      // Build SpeedTestWithResults for EACH speed_test_id in results
       final List<SpeedTestWithResults> speedTestsWithResults = [];
 
       for (final entry in resultsByTestId.entries) {
         final speedTestId = entry.key;
         final results = entry.value;
 
-        // Try to get the config from speed_tests table
-        SpeedTest? config = configsById[speedTestId];
+        // Try to get the config from speed_tests
+        SpeedTestConfig? config = configsById[speedTestId];
 
         // If no config found, create a placeholder
         if (config == null) {
-          // Create a minimal SpeedTest from the first result
           final firstResult = results.first;
-
-          config = SpeedTest(
+          config = SpeedTestConfig(
             id: speedTestId,
             name: 'Speed Test #$speedTestId',
-            target: firstResult.destination ?? 'Unknown',
-            port: firstResult.port ?? 5201,
-            iperfProtocol: firstResult.iperfProtocol ?? 'tcp',
-            passing: firstResult.passed,
+            target: firstResult.serverHost ?? 'Unknown',
+            port: 5201,
+            iperfProtocol: 'tcp',
+            passing: firstResult.passed ?? false,
           );
         }
 
@@ -252,7 +155,7 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         ));
       }
 
-      SpeedTestResultModel? updatedSelection;
+      SpeedTestResult? updatedSelection;
       if (_selectedResult != null) {
         for (final group in speedTestsWithResults) {
           for (final result in group.results) {
@@ -276,8 +179,11 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         }
         _isLoading = false;
       });
-    } catch (e) {
-      Logger.error('Failed to load speed tests: $e', 'RoomSpeedTestSelector');
+    } on Exception catch (e) {
+      LoggerService.error(
+        'Failed to load speed tests: $e',
+        tag: 'RoomSpeedTestSelector',
+      );
       setState(() {
         _errorMessage = 'Failed to load speed tests: $e';
         _speedTests = [];
@@ -293,18 +199,31 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     return value >= minRequired;
   }
 
-  bool _resultPassesForConfig(
-      SpeedTestResultModel result, SpeedTest config) {
+  bool _resultPassesForConfig(SpeedTestResult result, SpeedTestConfig config) {
     final downloadPass =
-        _metricMeetsThreshold(result.downloadMbps, config.minDownloadMbps);
+        _metricMeetsThreshold(result.downloadSpeed, config.minDownloadMbps);
     final uploadPass =
-        _metricMeetsThreshold(result.uploadMbps, config.minUploadMbps);
+        _metricMeetsThreshold(result.uploadSpeed, config.minUploadMbps);
 
-    return result.passed || (downloadPass && uploadPass);
+    return (result.passed ?? false) || (downloadPass && uploadPass);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch for cache updates to reload when speed test data arrives
+    ref.listen<AsyncValue<DateTime?>>(webSocketLastUpdateProvider, (previous, next) {
+      // Reload when cache updates (data arrived from WebSocket)
+      if (next.hasValue && next.value != null) {
+        if (_speedTests.isEmpty && !_isLoading) {
+          LoggerService.info(
+            'Cache updated, reloading speed tests for room "${widget.roomName}"',
+            tag: 'RoomSpeedTestSelector',
+          );
+          _loadSpeedTests();
+        }
+      }
+    });
+
     if (_isLoading) {
       return Card(
         margin: const EdgeInsets.all(16),
@@ -413,10 +332,8 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
       if (aPassed != true && bPassed == true) return 1;
 
       // Then by most recent within each group
-      final aTime =
-          (a['result'] as SpeedTestResultModel).completedAt;
-      final bTime =
-          (b['result'] as SpeedTestResultModel).completedAt;
+      final aTime = (a['result'] as SpeedTestResult).completedAt;
+      final bTime = (b['result'] as SpeedTestResult).completedAt;
       if (aTime != null && bTime != null) {
         return bTime.compareTo(aTime);
       }
@@ -426,15 +343,14 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
 
     final Map<String, dynamic> selectedEntry = (_selectedResult != null)
         ? allResultsWithConfig.firstWhere(
-            (item) => (item['result'] as SpeedTestResultModel).id ==
-                _selectedResult!.id,
+            (item) =>
+                (item['result'] as SpeedTestResult).id == _selectedResult!.id,
             orElse: () => allResultsWithConfig.first,
           )
         : allResultsWithConfig.first;
 
-    final currentResult =
-        selectedEntry['result'] as SpeedTestResultModel;
-    final selectedConfig = selectedEntry['config'] as SpeedTest;
+    final currentResult = selectedEntry['result'] as SpeedTestResult;
+    final selectedConfig = selectedEntry['config'] as SpeedTestConfig;
     final bool selectedPassed = selectedEntry['passed'] as bool? ??
         _resultPassesForConfig(currentResult, selectedConfig);
     final String resultLabel = (currentResult.roomType != null &&
@@ -457,8 +373,8 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
                 Text(
                   'Speed Test Results',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
@@ -467,7 +383,8 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
             // Dropdown button
             OutlinedButton(
               onPressed: () async {
-                final selected = await _showAllResultsModal(allResultsWithConfig);
+                final selected =
+                    await _showAllResultsModal(allResultsWithConfig);
                 if (selected != null) {
                   setState(() {
                     _selectedResult = selected;
@@ -541,51 +458,53 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
                 // Check if this is a coverage test (no device associations)
                 final isCoverageTest =
                     currentResult.testedViaAccessPointId == null &&
-                    currentResult.testedViaMediaConverterId == null &&
-                    currentResult.accessPointId == null &&
-                    currentResult.uplinkId == null;
+                        currentResult.testedViaMediaConverterId == null &&
+                        currentResult.accessPointId == null &&
+                        currentResult.uplinkId == null;
 
                 // Disable button if marked as not applicable for coverage tests
-                final isDisabled = !currentResult.isApplicable && isCoverageTest;
+                final isDisabled =
+                    !currentResult.isApplicable && isCoverageTest;
 
                 return SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: isDisabled ? null : () {
-                      Logger.info(
-                        '🎯 Running speed test: ${selectedConfig.name} for room ${widget.roomName}, room_type: "${currentResult.roomType}"',
-                        'RoomSpeedTestSelector'
-                      );
+                    onPressed: isDisabled
+                        ? null
+                        : () {
+                            LoggerService.info(
+                              'Running speed test: ${selectedConfig.name} for room ${widget.roomName}, room_type: "${currentResult.roomType}"',
+                              tag: 'RoomSpeedTestSelector',
+                            );
 
-                      // Determine which AP to use for the test
-                      // Priority: 1) Use existing testedViaAccessPointId from result
-                      //           2) Use first AP in room if available
-                      //           3) Otherwise null (for coverage tests)
-                      int? testedViaAccessPointId = currentResult.testedViaAccessPointId;
-                      if (testedViaAccessPointId == null && widget.apIds.isNotEmpty) {
-                        testedViaAccessPointId = widget.apIds.first;
-                        Logger.info(
-                          'Using AP ID ${widget.apIds.first} for validation test',
-                          'RoomSpeedTestSelector'
-                        );
-                      }
+                            // Determine which AP to use for the test
+                            int? testedViaAccessPointId =
+                                currentResult.testedViaAccessPointId;
+                            if (testedViaAccessPointId == null &&
+                                widget.apIds.isNotEmpty) {
+                              testedViaAccessPointId = widget.apIds.first;
+                              LoggerService.info(
+                                'Using AP ID ${widget.apIds.first} for validation test',
+                                tag: 'RoomSpeedTestSelector',
+                              );
+                            }
 
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => SpeedTestPopup(
-                          cachedTest: selectedConfig,
-                          existingResult: currentResult,
-                          pmsRoomId: widget.pmsRoomId,
-                          roomType: currentResult.roomType,
-                          testedViaAccessPointId: testedViaAccessPointId,
-                          onCompleted: () {
-                            // Refresh the test list to update results
-                            _loadSpeedTests(forceRefresh: true);
+                            showDialog<void>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => SpeedTestPopup(
+                                cachedTest: selectedConfig,
+                                existingResult: currentResult,
+                                pmsRoomId: widget.pmsRoomId,
+                                roomType: currentResult.roomType,
+                                testedViaAccessPointId: testedViaAccessPointId,
+                                onCompleted: () {
+                                  _loadSpeedTests(forceRefresh: true);
+                                },
+                                onResultSubmitted: widget.onResultSubmitted,
+                              ),
+                            );
                           },
-                        ),
-                      );
-                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -602,84 +521,88 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     );
   }
 
-  String _capitalizeEachWord(String text) {
-    return text.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
-  }
-
-  String? _getSpeedTestIcon(String testName) {
-    final lowerName = testName.toLowerCase();
-
-    if (lowerName.contains('coverage')) {
-      return 'assets/speed_test_indicator_img/coverage.png';
-    } else if (lowerName.contains('ont')) {
-      return 'assets/speed_test_indicator_img/validation_ont.png';
-    } else if (lowerName.contains('access point') || lowerName.contains('ap')) {
-      return 'assets/speed_test_indicator_img/validation_ap.png';
+  /// Determine test category from result's device associations
+  String _getTestCategory(SpeedTestResult result) {
+    // ONT validation: has media converter or uplink association
+    if (result.testedViaMediaConverterId != null || result.uplinkId != null) {
+      return 'ont';
     }
-
-    return null; // Return null if no match, will use default icon
+    // AP validation: has access point association
+    if (result.accessPointId != null || result.testedViaAccessPointId != null) {
+      return 'ap';
+    }
+    // Coverage: no device associations (room-level test)
+    return 'coverage';
   }
 
-  Future<SpeedTestResultModel?> _showAllResultsModal(List<Map<String, dynamic>> allResults) async {
-    // Group results by speed test config
-    Map<int, List<Map<String, dynamic>>> groupedResults = {};
+  Future<SpeedTestResult?> _showAllResultsModal(
+      List<Map<String, dynamic>> allResults) async {
+    // Group results by category (ONT, AP, Coverage)
+    final Map<String, List<Map<String, dynamic>>> categorizedResults = {
+      'ont': [],
+      'ap': [],
+      'coverage': [],
+    };
+
     for (final item in allResults) {
-      final config = item['config'] as SpeedTest;
-      groupedResults.putIfAbsent(config.id!, () => []);
-      groupedResults[config.id!]!.add(item);
+      final result = item['result'] as SpeedTestResult;
+      final category = _getTestCategory(result);
+      categorizedResults[category]!.add(item);
     }
 
-    // Build list of widgets with headers
+    // Build list of widgets with category headers
     List<Widget> listItems = [];
 
-    groupedResults.forEach((speedTestId, items) {
-      final config = items.first['config'] as SpeedTest;
-      final testName = config.name ?? 'Speed Test #$speedTestId';
-      final iconPath = _getSpeedTestIcon(testName);
+    // Helper to build a category section
+    void buildCategorySection(
+      String categoryKey,
+      String categoryTitle,
+      String iconPath,
+      IconData fallbackIcon,
+    ) {
+      final items = categorizedResults[categoryKey]!;
+      if (items.isEmpty) return;
 
-      // Add section header
+      // Add category header
       listItems.add(
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+          color: Colors.grey[100],
           child: Row(
             children: [
-              // Use custom image if available, otherwise use default icon
-              iconPath != null
-                  ? Image.asset(
-                      iconPath,
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback to icon if image fails to load
-                        return Icon(Icons.speed, size: 36, color: Colors.grey[600]);
-                      },
-                    )
-                  : Icon(Icons.speed, size: 36, color: Colors.grey[600]),
+              Image.asset(
+                iconPath,
+                width: 44,
+                height: 44,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Icon(fallbackIcon, size: 40, color: Colors.blue[700]);
+                },
+              ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _capitalizeEachWord(testName),
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (config.minDownloadMbps != null || config.minUploadMbps != null)
-                      Text(
-                        '≥ ${config.minDownloadMbps?.toStringAsFixed(0) ?? "?"} Mbps',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  categoryTitle,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${items.length}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
                 ),
               ),
             ],
@@ -687,12 +610,13 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         ),
       );
 
-      // Add result items for this speed test
+      // Add result items for this category
       for (final item in items) {
-        final result = item['result'] as SpeedTestResultModel;
+        final result = item['result'] as SpeedTestResult;
+        final config = item['config'] as SpeedTestConfig;
         final isSelected = result.id == _selectedResult?.id;
-        final bool passed = item['passed'] as bool? ??
-            _resultPassesForConfig(result, config);
+        final bool passed =
+            item['passed'] as bool? ?? _resultPassesForConfig(result, config);
 
         String displayText = '';
         if (result.roomType != null && result.roomType!.isNotEmpty) {
@@ -705,10 +629,11 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
           ListTile(
             selected: isSelected,
             selectedTileColor: Colors.blue[50],
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: Container(
-              width: 8,
-              height: 8,
+              width: 10,
+              height: 10,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: !result.isApplicable
@@ -720,24 +645,24 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
               displayText,
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 14,
+                fontSize: 15,
               ),
             ),
             subtitle: !result.isApplicable
                 ? Text(
                     'Not Applicable',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       color: Colors.grey[500],
                       fontStyle: FontStyle.italic,
                     ),
                   )
-                : (result.downloadMbps != null
+                : (result.downloadSpeed > 0
                     ? Text(
-                        '↓ ${result.downloadMbps!.toStringAsFixed(1)} Mbps  ↑ ${result.uploadMbps?.toStringAsFixed(1) ?? "N/A"} Mbps',
+                        '↓ ${result.downloadSpeed.toStringAsFixed(1)} Mbps  ↑ ${result.uploadSpeed.toStringAsFixed(1)} Mbps',
                         style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[500],
+                          fontSize: 12,
+                          color: Colors.grey[600],
                         ),
                       )
                     : null),
@@ -757,20 +682,32 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
         );
       }
 
-      // Add separator after each speed test type group
-      listItems.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Divider(
-            height: 1,
-            thickness: 1.5,
-            color: Colors.grey[300],
-          ),
-        ),
-      );
-    });
+      // Add separator after category
+      listItems.add(const SizedBox(height: 8));
+    }
 
-    return showModalBottomSheet<SpeedTestResultModel>(
+    // Build sections in order: ONT Validation, AP Validation, Coverage
+    buildCategorySection(
+      'ont',
+      'ONT Validation',
+      'assets/speed_test_indicator_img/validation_ont.png',
+      Icons.router,
+    );
+    buildCategorySection(
+      'ap',
+      'AP Validation',
+      'assets/speed_test_indicator_img/validation_ap.png',
+      Icons.wifi,
+    );
+    buildCategorySection(
+      'coverage',
+      'Coverage',
+      'assets/speed_test_indicator_img/coverage.png',
+      Icons.signal_cellular_alt,
+    );
+
+    // Draggable bottom sheet (matches ATT-FE-Tool style)
+    return showModalBottomSheet<SpeedTestResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -840,24 +777,12 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     );
   }
 
-  Widget _buildResultDetails(SpeedTestResultModel result, SpeedTest config) {
-    // Debug logging to see field values
-    Logger.info(
-      'Test: ${config.name} | '
-      'testedViaAP: ${result.testedViaAccessPointId} | '
-      'testedViaMediaConv: ${result.testedViaMediaConverterId} | '
-      'accessPointId: ${result.accessPointId} | '
-      'uplinkId: ${result.uplinkId}',
-      'RoomSpeedTestSelector'
-    );
-
-    // If marked as not applicable (coverage tests only), show simplified view
-    // Coverage tests have no device associations or tested-via records
-    final isCoverageTest =
-        result.testedViaAccessPointId == null &&
+  Widget _buildResultDetails(SpeedTestResult result, SpeedTestConfig config) {
+    final isCoverageTest = result.testedViaAccessPointId == null &&
         result.testedViaMediaConverterId == null &&
         result.accessPointId == null &&
         result.uplinkId == null;
+
     if (!result.isApplicable && isCoverageTest) {
       return Container(
         padding: const EdgeInsets.all(12),
@@ -918,11 +843,10 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     }
 
     final downloadPassed = _metricMeetsThreshold(
-        result.downloadMbps, config.minDownloadMbps);
-    final uploadPassed = _metricMeetsThreshold(
-        result.uploadMbps, config.minUploadMbps);
-    final bool passed =
-        _resultPassesForConfig(result, config);
+        result.downloadSpeed, config.minDownloadMbps);
+    final uploadPassed =
+        _metricMeetsThreshold(result.uploadSpeed, config.minUploadMbps);
+    final bool passed = _resultPassesForConfig(result, config);
     final bgColor = passed ? Colors.green[50] : Colors.red[50];
     final borderColor = passed ? Colors.green[200]! : Colors.red[200]!;
     final statusColor = passed ? Colors.green : Colors.red;
@@ -937,7 +861,6 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with pass/fail and date
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -969,15 +892,12 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
             ],
           ),
           const SizedBox(height: 12),
-          // Download and Upload row
           Row(
             children: [
               Expanded(
                 child: _buildMetric(
                   'Download',
-                  result.downloadMbps != null
-                      ? '${result.downloadMbps!.toStringAsFixed(1)} Mbps'
-                      : 'N/A',
+                  '${result.downloadSpeed.toStringAsFixed(1)} Mbps',
                   Icons.download,
                   passed: downloadPassed,
                 ),
@@ -986,38 +906,25 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
               Expanded(
                 child: _buildMetric(
                   'Upload',
-                  result.uploadMbps != null
-                      ? '${result.uploadMbps!.toStringAsFixed(1)} Mbps'
-                      : 'N/A',
+                  '${result.uploadSpeed.toStringAsFixed(1)} Mbps',
                   Icons.upload,
                   passed: uploadPassed,
                 ),
               ),
             ],
           ),
-          // Latency and Jitter row (if available)
-          if (result.rtt != null || result.jitter != null) ...[
+          // Latency row (if available)
+          if (result.latency > 0) ...[
             const SizedBox(height: 8),
             Row(
               children: [
-                if (result.rtt != null)
-                  Expanded(
-                    child: _buildMetric(
-                      'Latency',
-                      '${result.rtt!.toStringAsFixed(1)} ms',
-                      Icons.speed,
-                    ),
+                Expanded(
+                  child: _buildMetric(
+                    'Latency',
+                    '${result.latency.toStringAsFixed(1)} ms',
+                    Icons.speed,
                   ),
-                if (result.rtt != null && result.jitter != null)
-                  const SizedBox(width: 12),
-                if (result.jitter != null)
-                  Expanded(
-                    child: _buildMetric(
-                      'Jitter',
-                      '${result.jitter!.toStringAsFixed(1)} ms',
-                      Icons.show_chart,
-                    ),
-                  ),
+                ),
               ],
             ),
           ],
@@ -1033,7 +940,6 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
             ),
           ],
           // Actions section (only for coverage speed tests that are still applicable)
-          // Coverage tests have no device associations or tested-via records
           if (isCoverageTest && result.isApplicable) ...[
             const SizedBox(height: 16),
             SizedBox(
@@ -1108,7 +1014,7 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     }
   }
 
-  void _showNotApplicableConfirmation(SpeedTestResultModel result) {
+  void _showNotApplicableConfirmation(SpeedTestResult result) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1137,7 +1043,7 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     );
   }
 
-  Future<void> _markResultNotApplicable(SpeedTestResultModel result) async {
+  Future<void> _markResultNotApplicable(SpeedTestResult result) async {
     if (result.id == null || result.speedTestId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1150,58 +1056,26 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    // Update locally - the isApplicable field change will be sent via websocket
+    final updatedResult = result.copyWith(isApplicable: false);
 
-    try {
-      final resultId = await RxgApiClient.putSpeedTestResult(
-        speedTestId: result.speedTestId!,
-        existingResultId: result.id,
-        isApplicable: false,
+    // Notify parent via callback
+    widget.onResultSubmitted?.call(updatedResult);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Speed test marked as not applicable'),
+          backgroundColor: Colors.green,
+        ),
       );
 
-      if (mounted) {
-        Navigator.pop(context);
-
-        if (resultId != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Speed test marked as not applicable'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          await _loadSpeedTests();
-          setState(() {});
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to update speed test'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      Logger.error('Failed to mark result as not applicable: $e', 'RoomSpeedTestSelector');
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await _loadSpeedTests();
+      setState(() {});
     }
   }
 
-  void _showMarkApplicableConfirmation(SpeedTestResultModel result) {
+  void _showMarkApplicableConfirmation(SpeedTestResult result) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1230,7 +1104,7 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
     );
   }
 
-  Future<void> _markResultApplicable(SpeedTestResultModel result) async {
+  Future<void> _markResultApplicable(SpeedTestResult result) async {
     if (result.id == null || result.speedTestId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1243,54 +1117,22 @@ class _RoomSpeedTestSelectorState extends State<RoomSpeedTestSelector> {
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    // Update locally - the isApplicable field change will be sent via websocket
+    final updatedResult = result.copyWith(isApplicable: true);
 
-    try {
-      final resultId = await RxgApiClient.putSpeedTestResult(
-        speedTestId: result.speedTestId!,
-        existingResultId: result.id,
-        isApplicable: true,
+    // Notify parent via callback
+    widget.onResultSubmitted?.call(updatedResult);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Speed test marked as applicable'),
+          backgroundColor: Colors.green,
+        ),
       );
 
-      if (mounted) {
-        Navigator.pop(context);
-
-        if (resultId != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Speed test marked as applicable'),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          await _loadSpeedTests();
-          setState(() {});
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to update speed test'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      Logger.error('Failed to mark result as applicable: $e', 'RoomSpeedTestSelector');
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await _loadSpeedTests();
+      setState(() {});
     }
   }
 }
