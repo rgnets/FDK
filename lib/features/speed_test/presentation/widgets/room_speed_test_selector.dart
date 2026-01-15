@@ -322,21 +322,28 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
       }
     }
 
-    // Sort by completed tests first (passed), then uncompleted (failed), then by most recent
+    // Sort by displayed text (roomType if available, otherwise config name), then by passed/failed status
     allResultsWithConfig.sort((a, b) {
+      final aResult = a['result'] as SpeedTestResult;
+      final bResult = b['result'] as SpeedTestResult;
+      final aConfig = a['config'] as SpeedTestConfig;
+      final bConfig = b['config'] as SpeedTestConfig;
+
+      // Primary sort: alphabetically by displayed text (roomType or config name)
+      final aName = (aResult.roomType != null && aResult.roomType!.isNotEmpty)
+          ? aResult.roomType!
+          : (aConfig.name ?? '');
+      final bName = (bResult.roomType != null && bResult.roomType!.isNotEmpty)
+          ? bResult.roomType!
+          : (bConfig.name ?? '');
+      final nameCompare = aName.toLowerCase().compareTo(bName.toLowerCase());
+      if (nameCompare != 0) return nameCompare;
+
+      // Secondary sort: passed tests first within same name
       final bool aPassed = a['passed'] as bool? ?? false;
       final bool bPassed = b['passed'] as bool? ?? false;
-
-      // Completed (passed) tests first
-      if (aPassed == true && bPassed != true) return -1;
-      if (aPassed != true && bPassed == true) return 1;
-
-      // Then by most recent within each group
-      final aTime = (a['result'] as SpeedTestResult).completedAt;
-      final bTime = (b['result'] as SpeedTestResult).completedAt;
-      if (aTime != null && bTime != null) {
-        return bTime.compareTo(aTime);
-      }
+      if (aPassed && !bPassed) return -1;
+      if (!aPassed && bPassed) return 1;
 
       return 0;
     });
@@ -396,6 +403,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                   horizontal: 12,
                   vertical: 12,
                 ),
+                backgroundColor: Colors.grey[100],
                 side: const BorderSide(color: Colors.grey),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -403,6 +411,34 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
               ),
               child: Row(
                 children: [
+                  // Category image based on selected result
+                  Builder(
+                    builder: (context) {
+                      final category = _getTestCategory(currentResult);
+                      String iconPath;
+                      IconData fallbackIcon;
+                      if (category == 'ont') {
+                        iconPath = 'assets/speed_test_indicator_img/validation_ont.png';
+                        fallbackIcon = Icons.router;
+                      } else if (category == 'ap') {
+                        iconPath = 'assets/speed_test_indicator_img/validation_ap.png';
+                        fallbackIcon = Icons.wifi;
+                      } else {
+                        iconPath = 'assets/speed_test_indicator_img/coverage.png';
+                        fallbackIcon = Icons.signal_cellular_alt;
+                      }
+                      return Image.asset(
+                        iconPath,
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(fallbackIcon, size: 32, color: Colors.blue[700]);
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,27 +661,58 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
           displayText = config.name ?? 'Result #${result.id}';
         }
 
+        // Determine category icon for this specific result
+        final resultCategory = _getTestCategory(result);
+        final String resultIconPath;
+        final IconData resultFallbackIcon;
+        if (resultCategory == 'ont') {
+          resultIconPath = 'assets/speed_test_indicator_img/validation_ont.png';
+          resultFallbackIcon = Icons.router;
+        } else if (resultCategory == 'ap') {
+          resultIconPath = 'assets/speed_test_indicator_img/validation_ap.png';
+          resultFallbackIcon = Icons.wifi;
+        } else {
+          resultIconPath = 'assets/speed_test_indicator_img/coverage.png';
+          resultFallbackIcon = Icons.signal_cellular_alt;
+        }
+
         listItems.add(
           ListTile(
             selected: isSelected,
             selectedTileColor: Colors.blue[50],
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: !result.isApplicable
-                    ? Colors.grey[400]
-                    : (passed ? Colors.green : Colors.red),
-              ),
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  resultIconPath,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(resultFallbackIcon, size: 28, color: Colors.blue[700]);
+                  },
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: !result.isApplicable
+                        ? Colors.grey[400]
+                        : (passed ? Colors.green : Colors.red),
+                  ),
+                ),
+              ],
             ),
             title: Text(
               displayText,
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 15,
+                color: Colors.black,
               ),
             ),
             subtitle: !result.isApplicable
