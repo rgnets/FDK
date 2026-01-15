@@ -35,8 +35,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
   late Animation<double> _pulseAnimation;
   late List<MorseSignal> _morsePattern;
   final List<MorsePulse> _activePulses = [];
-  int? _lastUnreadCount;
-  bool? _lastIsConnected;
 
   @override
   void initState() {
@@ -69,14 +67,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
       'FDKAppBar initialized with traveling morse code: "control communication cognizance"',
       tag: 'AppBar',
     );
-
-    ref.listen<AsyncValue<int>>(unreadNotificationCountProvider, (_, __) {
-      _logActionButtonsIfChanged();
-    });
-    ref.listen<AppBarState>(appBarProvider, (_, __) {
-      _logActionButtonsIfChanged();
-    });
-    _logActionButtonsIfChanged();
   }
 
   @override
@@ -275,20 +265,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
           iconColor: isConnected ? Colors.green : Colors.orange,
         ),
       ],
-    );
-  }
-
-  void _logActionButtonsIfChanged() {
-    final unread = ref.read(unreadNotificationCountProvider).valueOrNull ?? 0;
-    final isConnected = ref.read(appBarProvider).isConnected;
-    if (_lastUnreadCount == unread && _lastIsConnected == isConnected) {
-      return;
-    }
-    _lastUnreadCount = unread;
-    _lastIsConnected = isConnected;
-    LoggerService.debug(
-      'Action buttons state - Unread: $unread, Connected: $isConnected',
-      tag: 'AppBar',
     );
   }
 
