@@ -40,7 +40,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         scanTimeoutSeconds: _prefs.getInt(_scanTimeoutKey) ?? 6,
         enableScanSound: _prefs.getBool(_scanSoundKey) ?? true,
         enableContinuousScanning: _prefs.getBool(_continuousScanKey) ?? false,
-        apiTimeoutSeconds: _prefs.getInt(_apiTimeoutKey) ?? 30,
+        wsTimeoutSeconds: _prefs.getInt(_apiTimeoutKey) ?? 30,
         enableOfflineMode: _prefs.getBool(_offlineModeKey) ?? true,
         cacheExpirationHours: _prefs.getInt(_cacheExpirationKey) ?? 12,
         enableNotifications: _prefs.getBool(_notificationsKey) ?? true,
@@ -69,7 +69,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       await _prefs.setInt(_scanTimeoutKey, settings.scanTimeoutSeconds);
       await _prefs.setBool(_scanSoundKey, settings.enableScanSound);
       await _prefs.setBool(_continuousScanKey, settings.enableContinuousScanning);
-      await _prefs.setInt(_apiTimeoutKey, settings.apiTimeoutSeconds);
+      await _prefs.setInt(_apiTimeoutKey, settings.wsTimeoutSeconds);
       await _prefs.setBool(_offlineModeKey, settings.enableOfflineMode);
       await _prefs.setInt(_cacheExpirationKey, settings.cacheExpirationHours);
       await _prefs.setBool(_notificationsKey, settings.enableNotifications);
@@ -147,7 +147,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
           'scanTimeoutSeconds': settings.scanTimeoutSeconds,
           'enableScanSound': settings.enableScanSound,
           'enableContinuousScanning': settings.enableContinuousScanning,
-          'apiTimeoutSeconds': settings.apiTimeoutSeconds,
+          'wsTimeoutSeconds': settings.wsTimeoutSeconds,
           'enableOfflineMode': settings.enableOfflineMode,
           'cacheExpirationHours': settings.cacheExpirationHours,
           'enableNotifications': settings.enableNotifications,
@@ -176,7 +176,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         scanTimeoutSeconds: data['scanTimeoutSeconds'] as int? ?? 6,
         enableScanSound: data['enableScanSound'] as bool? ?? true,
         enableContinuousScanning: data['enableContinuousScanning'] as bool? ?? false,
-        apiTimeoutSeconds: data['apiTimeoutSeconds'] as int? ?? 30,
+        wsTimeoutSeconds: data['wsTimeoutSeconds'] as int? ?? 30,
         enableOfflineMode: data['enableOfflineMode'] as bool? ?? true,
         cacheExpirationHours: data['cacheExpirationHours'] as int? ?? 12,
         enableNotifications: data['enableNotifications'] as bool? ?? true,

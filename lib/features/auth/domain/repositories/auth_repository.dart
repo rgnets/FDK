@@ -6,7 +6,7 @@ abstract class AuthRepository {
   Future<Either<Failure, User>> authenticate({
     required String fqdn,
     required String login,
-    required String apiKey,
+    required String token,
     String? siteName,
     DateTime? issuedAt,
     String? signature,

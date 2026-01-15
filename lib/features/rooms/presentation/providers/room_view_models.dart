@@ -1,6 +1,6 @@
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -18,9 +18,9 @@ class RoomViewModel {
   final int deviceCount;
   final int onlineDevices;
 
-  String get id => room.id;
+  String get id => room.id.toString();
   String get name => room.name;
-  String? get roomNumber => room.roomNumber;
+  String? get roomNumber => room.extractedNumber;
   List<String>? get deviceIds => room.deviceIds;
   Map<String, dynamic>? get metadata => room.metadata;
 
@@ -134,13 +134,6 @@ class RoomStats {
 /// Private helper to get devices for a room using unified approach
 /// Matches devices by pmsRoomId (consistent for both mock and API data)
 List<Device> _getDevicesForRoom(Room room, List<Device> allDevices) {
-  // Parse room ID as integer for pmsRoomId matching
-  final roomIdInt = int.tryParse(room.id);
-  if (roomIdInt != null) {
-    // Filter devices where pmsRoomId matches the room's numeric ID
-    return allDevices.where((device) => device.pmsRoomId == roomIdInt).toList();
-  }
-  
-  // No devices found for non-numeric room IDs
-  return [];
+  // Filter devices where pmsRoomId matches the room's numeric ID
+  return allDevices.where((device) => device.pmsRoomId == room.id).toList();
 }

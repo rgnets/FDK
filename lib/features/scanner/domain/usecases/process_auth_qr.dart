@@ -57,7 +57,8 @@ final class ProcessAuthQr
   ) {
     final fqdn = json[_fqdnKey] as String?;
     final login = json[_loginKey] as String?;
-    final apiKey = (json[_apiKeyKey] ?? json[_apiKeyAltKey]) as String?;
+    // QR codes may use api_key or apiKey - we normalize to token internally
+    final tokenValue = (json[_apiKeyKey] ?? json[_apiKeyAltKey]) as String?;
     final siteName = (json[_siteKey] ?? json[_siteAltKey]) as String?;
     final timestamp = json[_timestampKey] as String?;
     final signature = json[_signatureKey] as String?;
@@ -65,7 +66,7 @@ final class ProcessAuthQr
     return _buildCredentials(
       fqdn: fqdn,
       login: login,
-      apiKey: apiKey,
+      token: tokenValue,
       siteName: siteName,
       timestamp: timestamp,
       signature: signature,
@@ -98,7 +99,8 @@ final class ProcessAuthQr
 
     final fqdn = credentials[_fqdnKey];
     final login = credentials[_loginKey];
-    final apiKey = credentials[_apiKeyKey] ?? credentials[_apiKeyAltKey];
+    // QR codes may use api_key or apiKey - we normalize to token internally
+    final tokenValue = credentials[_apiKeyKey] ?? credentials[_apiKeyAltKey];
     final siteName = credentials[_siteKey] ?? credentials[_siteAltKey];
     final timestamp = credentials[_timestampKey];
     final signature = credentials[_signatureKey];
@@ -106,7 +108,7 @@ final class ProcessAuthQr
     return _buildCredentials(
       fqdn: fqdn,
       login: login,
-      apiKey: apiKey,
+      token: tokenValue,
       siteName: siteName,
       timestamp: timestamp,
       signature: signature,
@@ -116,7 +118,7 @@ final class ProcessAuthQr
   Either<Failure, AuthCredentials> _buildCredentials({
     required String? fqdn,
     required String? login,
-    required String? apiKey,
+    required String? token,
     required String? siteName,
     required String? timestamp,
     required String? signature,
@@ -132,8 +134,8 @@ final class ProcessAuthQr
       return const Left(ValidationFailure(message: 'QR code missing login'));
     }
 
-    if (apiKey == null || apiKey.isEmpty) {
-      return const Left(ValidationFailure(message: 'QR code missing api key'));
+    if (token == null || token.isEmpty) {
+      return const Left(ValidationFailure(message: 'QR code missing token'));
     }
 
     final normalizedSite = siteName?.trim();
@@ -168,7 +170,7 @@ final class ProcessAuthQr
       AuthCredentials(
         fqdn: fqdn,
         login: login,
-        apiKey: apiKey,
+        token: token,
         siteName: resolvedSite,
         issuedAt: issuedAt,
         signature: signature,
@@ -203,7 +205,7 @@ class AuthCredentials {
   const AuthCredentials({
     required this.fqdn,
     required this.login,
-    required this.apiKey,
+    required this.token,
     required this.siteName,
     required this.issuedAt,
     this.signature,
@@ -211,7 +213,7 @@ class AuthCredentials {
 
   final String fqdn;
   final String login;
-  final String apiKey;
+  final String token;
   final String siteName;
   final DateTime issuedAt;
   final String? signature;

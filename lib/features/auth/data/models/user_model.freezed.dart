@@ -21,28 +21,31 @@ UserModel _$UserModelFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$UserModel {
   String get username => throw _privateConstructorUsedError;
-  @JsonKey(name: 'api_url')
-  String get apiUrl => throw _privateConstructorUsedError;
+  @JsonKey(name: 'site_url')
+  String get siteUrl => throw _privateConstructorUsedError;
   @JsonKey(name: 'display_name')
   String? get displayName => throw _privateConstructorUsedError;
   String? get email => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(String username, @JsonKey(name: 'api_url') String apiUrl,
+    TResult Function(String username, @JsonKey(name: 'site_url') String siteUrl,
             @JsonKey(name: 'display_name') String? displayName, String? email)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(String username, @JsonKey(name: 'api_url') String apiUrl,
-            @JsonKey(name: 'display_name') String? displayName, String? email)?
+    TResult? Function(
+            String username,
+            @JsonKey(name: 'site_url') String siteUrl,
+            @JsonKey(name: 'display_name') String? displayName,
+            String? email)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(String username, @JsonKey(name: 'api_url') String apiUrl,
+    TResult Function(String username, @JsonKey(name: 'site_url') String siteUrl,
             @JsonKey(name: 'display_name') String? displayName, String? email)?
         $default, {
     required TResult orElse(),
@@ -77,7 +80,7 @@ abstract class $UserModelCopyWith<$Res> {
   @useResult
   $Res call(
       {String username,
-      @JsonKey(name: 'api_url') String apiUrl,
+      @JsonKey(name: 'site_url') String siteUrl,
       @JsonKey(name: 'display_name') String? displayName,
       String? email});
 }
@@ -96,7 +99,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
   @override
   $Res call({
     Object? username = null,
-    Object? apiUrl = null,
+    Object? siteUrl = null,
     Object? displayName = freezed,
     Object? email = freezed,
   }) {
@@ -105,9 +108,9 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
           ? _value.username
           : username // ignore: cast_nullable_to_non_nullable
               as String,
-      apiUrl: null == apiUrl
-          ? _value.apiUrl
-          : apiUrl // ignore: cast_nullable_to_non_nullable
+      siteUrl: null == siteUrl
+          ? _value.siteUrl
+          : siteUrl // ignore: cast_nullable_to_non_nullable
               as String,
       displayName: freezed == displayName
           ? _value.displayName
@@ -131,7 +134,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
   @useResult
   $Res call(
       {String username,
-      @JsonKey(name: 'api_url') String apiUrl,
+      @JsonKey(name: 'site_url') String siteUrl,
       @JsonKey(name: 'display_name') String? displayName,
       String? email});
 }
@@ -148,7 +151,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? username = null,
-    Object? apiUrl = null,
+    Object? siteUrl = null,
     Object? displayName = freezed,
     Object? email = freezed,
   }) {
@@ -157,9 +160,9 @@ class __$$UserModelImplCopyWithImpl<$Res>
           ? _value.username
           : username // ignore: cast_nullable_to_non_nullable
               as String,
-      apiUrl: null == apiUrl
-          ? _value.apiUrl
-          : apiUrl // ignore: cast_nullable_to_non_nullable
+      siteUrl: null == siteUrl
+          ? _value.siteUrl
+          : siteUrl // ignore: cast_nullable_to_non_nullable
               as String,
       displayName: freezed == displayName
           ? _value.displayName
@@ -178,7 +181,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
 class _$UserModelImpl implements _UserModel {
   const _$UserModelImpl(
       {required this.username,
-      @JsonKey(name: 'api_url') required this.apiUrl,
+      @JsonKey(name: 'site_url') required this.siteUrl,
       @JsonKey(name: 'display_name') this.displayName,
       this.email});
 
@@ -188,8 +191,8 @@ class _$UserModelImpl implements _UserModel {
   @override
   final String username;
   @override
-  @JsonKey(name: 'api_url')
-  final String apiUrl;
+  @JsonKey(name: 'site_url')
+  final String siteUrl;
   @override
   @JsonKey(name: 'display_name')
   final String? displayName;
@@ -198,7 +201,7 @@ class _$UserModelImpl implements _UserModel {
 
   @override
   String toString() {
-    return 'UserModel(username: $username, apiUrl: $apiUrl, displayName: $displayName, email: $email)';
+    return 'UserModel(username: $username, siteUrl: $siteUrl, displayName: $displayName, email: $email)';
   }
 
   @override
@@ -208,7 +211,7 @@ class _$UserModelImpl implements _UserModel {
             other is _$UserModelImpl &&
             (identical(other.username, username) ||
                 other.username == username) &&
-            (identical(other.apiUrl, apiUrl) || other.apiUrl == apiUrl) &&
+            (identical(other.siteUrl, siteUrl) || other.siteUrl == siteUrl) &&
             (identical(other.displayName, displayName) ||
                 other.displayName == displayName) &&
             (identical(other.email, email) || other.email == email));
@@ -217,7 +220,7 @@ class _$UserModelImpl implements _UserModel {
   @JsonKey(ignore: true)
   @override
   int get hashCode =>
-      Object.hash(runtimeType, username, apiUrl, displayName, email);
+      Object.hash(runtimeType, username, siteUrl, displayName, email);
 
   @JsonKey(ignore: true)
   @override
@@ -228,33 +231,36 @@ class _$UserModelImpl implements _UserModel {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(String username, @JsonKey(name: 'api_url') String apiUrl,
+    TResult Function(String username, @JsonKey(name: 'site_url') String siteUrl,
             @JsonKey(name: 'display_name') String? displayName, String? email)
         $default,
   ) {
-    return $default(username, apiUrl, displayName, email);
+    return $default(username, siteUrl, displayName, email);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(String username, @JsonKey(name: 'api_url') String apiUrl,
-            @JsonKey(name: 'display_name') String? displayName, String? email)?
+    TResult? Function(
+            String username,
+            @JsonKey(name: 'site_url') String siteUrl,
+            @JsonKey(name: 'display_name') String? displayName,
+            String? email)?
         $default,
   ) {
-    return $default?.call(username, apiUrl, displayName, email);
+    return $default?.call(username, siteUrl, displayName, email);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(String username, @JsonKey(name: 'api_url') String apiUrl,
+    TResult Function(String username, @JsonKey(name: 'site_url') String siteUrl,
             @JsonKey(name: 'display_name') String? displayName, String? email)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(username, apiUrl, displayName, email);
+      return $default(username, siteUrl, displayName, email);
     }
     return orElse();
   }
@@ -298,7 +304,7 @@ class _$UserModelImpl implements _UserModel {
 abstract class _UserModel implements UserModel {
   const factory _UserModel(
       {required final String username,
-      @JsonKey(name: 'api_url') required final String apiUrl,
+      @JsonKey(name: 'site_url') required final String siteUrl,
       @JsonKey(name: 'display_name') final String? displayName,
       final String? email}) = _$UserModelImpl;
 
@@ -308,8 +314,8 @@ abstract class _UserModel implements UserModel {
   @override
   String get username;
   @override
-  @JsonKey(name: 'api_url')
-  String get apiUrl;
+  @JsonKey(name: 'site_url')
+  String get siteUrl;
   @override
   @JsonKey(name: 'display_name')
   String? get displayName;

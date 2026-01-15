@@ -74,6 +74,8 @@ class StatCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.white.withValues(alpha: 0.9),
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 4),
@@ -84,6 +86,8 @@ class StatCard extends StatelessWidget {
                           color: Colors.grey[400],
                           fontSize: 11,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ],

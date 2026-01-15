@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:rgnets_fdk/core/config/mock_network_config.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/notifications/data/models/notification_model.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 
 /// Generates realistic mock data for the RG Nets network management system
 /// This class creates production-like data for devices, rooms, and notifications
@@ -297,8 +297,9 @@ class MockDataGenerator {
         : '${_floors.indexOf(floor)}${(_random.nextInt(90) + 10).toString().padLeft(2, '0')}';
       
       rooms.add(RoomModel(
-        id: 'room_${i + 1}',
+        id: 1000 + i,
         name: '$roomType $roomNumber',
+        number: roomNumber,
         metadata: {
           'area_sqft': _random.nextInt(2000) + 200,
           'capacity': roomType.contains('Conference') ? _random.nextInt(20) + 5 : null,

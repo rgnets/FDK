@@ -10,7 +10,7 @@ import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
@@ -556,8 +556,10 @@ class WebSocketDataSyncService {
 
   RoomModel _buildRoomModel(Map<String, dynamic> roomData) {
     final displayName = _buildRoomDisplayName(roomData);
+    final rawId = roomData['id'];
+    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
     return RoomModel(
-      id: roomData['id']?.toString() ?? '',
+      id: id,
       name: displayName,
       deviceIds: _extractRoomDeviceIds(roomData),
       metadata: roomData,

@@ -1,0 +1,427 @@
+import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
+import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+
+/// WebSocket-based data source for fetching devices.
+/// Replaces DeviceRemoteDataSource with a WebSocket-backed implementation.
+class DeviceWebSocketDataSource implements DeviceDataSource {
+  DeviceWebSocketDataSource({
+    required WebSocketCacheIntegration webSocketCacheIntegration,
+    String? imageBaseUrl,
+    Logger? logger,
+  })  : _cacheIntegration = webSocketCacheIntegration,
+        _imageBaseUrl = imageBaseUrl,
+        _logger = logger ?? Logger();
+
+  final WebSocketCacheIntegration _cacheIntegration;
+  final String? _imageBaseUrl;
+  final Logger _logger;
+
+  static const Map<String, String> _deviceEndpointByPrefix = {
+    'ap_': 'access_points',
+    'ont_': 'media_converters',
+    'sw_': 'switch_devices',
+    'wlan_': 'wlan_devices',
+  };
+
+  WebSocketService get _webSocketService => _cacheIntegration.webSocketService;
+
+  @override
+  Future<List<DeviceModel>> getDevices({List<String>? fields}) async {
+    _logger
+      ..i('DeviceWebSocketDataSource: getDevices() called')
+      ..i('DeviceWebSocketDataSource: WebSocket service hashCode: ${_webSocketService.hashCode}')
+      ..i('DeviceWebSocketDataSource: WebSocket connected: ${_webSocketService.isConnected}')
+      ..i('DeviceWebSocketDataSource: WebSocket state: ${_webSocketService.currentState}')
+      ..i('DeviceWebSocketDataSource: Cache integration hashCode: ${_cacheIntegration.hashCode}')
+      ..i('DeviceWebSocketDataSource: Cache has device data: ${_cacheIntegration.hasDeviceCache}');
+
+    // First try to get from cache
+    final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
+    if (cachedModels.isNotEmpty) {
+      _logger.i(
+        'DeviceWebSocketDataSource: Returning ${cachedModels.length} devices from cache',
+      );
+      return cachedModels;
+    }
+
+    // If cache is empty, request snapshots and wait for data
+    _logger.i('DeviceWebSocketDataSource: Cache empty, requesting snapshots');
+
+    if (!_webSocketService.isConnected) {
+      _logger.w('DeviceWebSocketDataSource: WebSocket not connected, cannot request data');
+      return [];
+    }
+
+    // Request snapshots for all device types
+    _logger.i('DeviceWebSocketDataSource: Calling requestFullSnapshots()');
+    _cacheIntegration.requestFullSnapshots();
+
+    // Wait a bit for data to arrive (with timeout)
+    const maxWaitTime = Duration(seconds: 10);
+    const pollInterval = Duration(milliseconds: 500);
+    var elapsed = Duration.zero;
+
+    while (elapsed < maxWaitTime) {
+      await Future<void>.delayed(pollInterval);
+      elapsed += pollInterval;
+
+      final models = _cacheIntegration.getAllCachedDeviceModels();
+      if (models.isNotEmpty) {
+        _logger.i(
+          'DeviceWebSocketDataSource: Got ${models.length} devices after ${elapsed.inMilliseconds}ms',
+        );
+        return models;
+      }
+    }
+
+    _logger.w('DeviceWebSocketDataSource: Timeout waiting for device data');
+    return [];
+  }
+
+  @override
+  Future<DeviceModel> getDevice(String id, {List<String>? fields}) async {
+    _logger.i('DeviceWebSocketDataSource: getDevice($id) called');
+
+    // First try to find in cache
+    final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
+    final cached = cachedModels.where((d) => d.id == id).firstOrNull;
+    if (cached != null) {
+      _logger.i('DeviceWebSocketDataSource: Found device $id in cache');
+      return cached;
+    }
+
+    // If WebSocket not connected, we can't fetch - throw so repository can use cache fallback
+    if (!_webSocketService.isConnected) {
+      _logger.w('DeviceWebSocketDataSource: WebSocket not connected, device $id not in cache');
+      throw Exception('Device not in cache and WebSocket not connected');
+    }
+
+    // Request specific device via WebSocket
+    final resourceType = _getResourceTypeFromId(id);
+    final rawId = _extractRawId(id);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $id');
+    }
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'resource_action',
+        resourceType: resourceType,
+        additionalData: {
+          'crud_action': 'show',
+          'id': rawId,
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final deviceData = _extractDeviceData(response.payload, response.raw);
+      if (deviceData != null) {
+        return _mapToDeviceModel(resourceType, deviceData);
+      }
+
+      throw Exception('Device not found: $id');
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to get device $id: $e');
+      throw Exception('Failed to get device: $e');
+    }
+  }
+
+  @override
+  Future<List<DeviceModel>> getDevicesByRoom(String roomId) async {
+    _logger.i('DeviceWebSocketDataSource: getDevicesByRoom($roomId) called');
+
+    // Get all devices and filter by room
+    final allDevices = await getDevices();
+    return allDevices.where((device) {
+      final pmsRoomId = device.pmsRoomId?.toString();
+      return pmsRoomId == roomId;
+    }).toList();
+  }
+
+  @override
+  Future<List<DeviceModel>> searchDevices(String query) async {
+    _logger.i('DeviceWebSocketDataSource: searchDevices($query) called');
+
+    // Get all devices and filter locally
+    final allDevices = await getDevices();
+    final lowerQuery = query.toLowerCase();
+
+    return allDevices.where((device) {
+      return device.name.toLowerCase().contains(lowerQuery) ||
+          device.id.toLowerCase().contains(lowerQuery) ||
+          (device.serialNumber?.toLowerCase().contains(lowerQuery) ?? false) ||
+          (device.macAddress?.toLowerCase().contains(lowerQuery) ?? false);
+    }).toList();
+  }
+
+  @override
+  Future<DeviceModel> updateDevice(DeviceModel device) async {
+    _logger.i('DeviceWebSocketDataSource: updateDevice(${device.id}) called');
+
+    final resourceType = _getResourceTypeFromId(device.id);
+    final rawId = _extractRawId(device.id);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: ${device.id}');
+    }
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: resourceType,
+        additionalData: {
+          'id': rawId,
+          'params': device.toJson(),
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final deviceData = _extractDeviceData(response.payload, response.raw);
+      if (deviceData != null) {
+        return _mapToDeviceModel(resourceType, deviceData);
+      }
+
+      // Return the original device if no response data
+      return device;
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to update device: $e');
+      throw Exception('Failed to update device: $e');
+    }
+  }
+
+  @override
+  Future<void> rebootDevice(String deviceId) async {
+    _logger.i('DeviceWebSocketDataSource: rebootDevice($deviceId) called');
+
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $deviceId');
+    }
+
+    try {
+      await _webSocketService.requestActionCable(
+        action: 'resource_action',
+        resourceType: resourceType,
+        additionalData: {
+          'crud_action': 'reboot',
+          'id': rawId,
+        },
+        timeout: const Duration(seconds: 30),
+      );
+      _logger.i('DeviceWebSocketDataSource: Reboot command sent for $deviceId');
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to reboot device: $e');
+      throw Exception('Failed to reboot device: $e');
+    }
+  }
+
+  @override
+  Future<void> resetDevice(String deviceId) async {
+    _logger.i('DeviceWebSocketDataSource: resetDevice($deviceId) called');
+
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $deviceId');
+    }
+
+    try {
+      await _webSocketService.requestActionCable(
+        action: 'resource_action',
+        resourceType: resourceType,
+        additionalData: {
+          'crud_action': 'reset',
+          'id': rawId,
+        },
+        timeout: const Duration(seconds: 30),
+      );
+      _logger.i('DeviceWebSocketDataSource: Reset command sent for $deviceId');
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to reset device: $e');
+      throw Exception('Failed to reset device: $e');
+    }
+  }
+
+  @override
+  Future<DeviceModel> deleteDeviceImage(
+    String deviceId,
+    String imageUrl,
+  ) async {
+    _logger.i(
+      'DeviceWebSocketDataSource: deleteDeviceImage($deviceId, $imageUrl) called',
+    );
+
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $deviceId');
+    }
+
+    // Get current device to get its images
+    final device = await getDevice(deviceId);
+    final currentImages = device.images ?? [];
+    final updatedImages = currentImages.where((img) => img != imageUrl).toList();
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: resourceType,
+        additionalData: {
+          'id': rawId,
+          'params': {'pictures': updatedImages},
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final deviceData = _extractDeviceData(response.payload, response.raw);
+      if (deviceData != null) {
+        return _mapToDeviceModel(resourceType, deviceData);
+      }
+
+      // Return updated device
+      return await getDevice(deviceId);
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to delete device image: $e');
+      throw Exception('Failed to delete device image: $e');
+    }
+  }
+
+  String? _getResourceTypeFromId(String deviceId) {
+    for (final entry in _deviceEndpointByPrefix.entries) {
+      if (deviceId.startsWith(entry.key)) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  String _extractRawId(String deviceId) {
+    for (final prefix in _deviceEndpointByPrefix.keys) {
+      if (deviceId.startsWith(prefix)) {
+        return deviceId.substring(prefix.length);
+      }
+    }
+    return deviceId;
+  }
+
+  Map<String, dynamic>? _extractDeviceData(
+    Map<String, dynamic> payload,
+    Map<String, dynamic>? raw,
+  ) {
+    if (payload.containsKey('id')) return payload;
+    if (payload['data'] is Map<String, dynamic>) {
+      return payload['data'] as Map<String, dynamic>;
+    }
+    if (raw != null && raw['data'] is Map<String, dynamic>) {
+      return raw['data'] as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  DeviceModel _mapToDeviceModel(
+    String resourceType,
+    Map<String, dynamic> deviceMap,
+  ) {
+    switch (resourceType) {
+      case 'access_points':
+        return DeviceModel(
+          id: 'ap_${deviceMap['id']}',
+          name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
+          type: 'access_point',
+          status: _determineStatus(deviceMap),
+          pmsRoomId: _extractPmsRoomId(deviceMap),
+          macAddress: deviceMap['mac']?.toString() ?? '',
+          ipAddress: deviceMap['ip']?.toString() ?? '',
+          model: deviceMap['model']?.toString(),
+          serialNumber: deviceMap['serial_number']?.toString(),
+          note: deviceMap['note']?.toString(),
+          images: _extractImages(deviceMap),
+        );
+
+      case 'media_converters':
+        return DeviceModel(
+          id: 'ont_${deviceMap['id']}',
+          name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
+          type: 'ont',
+          status: _determineStatus(deviceMap),
+          pmsRoomId: _extractPmsRoomId(deviceMap),
+          macAddress: deviceMap['mac']?.toString() ?? '',
+          ipAddress: deviceMap['ip']?.toString() ?? '',
+          model: deviceMap['model']?.toString(),
+          serialNumber: deviceMap['serial_number']?.toString(),
+          note: deviceMap['note']?.toString(),
+          images: _extractImages(deviceMap),
+        );
+
+      case 'switch_devices':
+        return DeviceModel(
+          id: 'sw_${deviceMap['id']}',
+          name: deviceMap['name']?.toString() ??
+              deviceMap['nickname']?.toString() ??
+              'Switch-${deviceMap['id']}',
+          type: 'switch',
+          status: _determineStatus(deviceMap),
+          pmsRoomId: _extractPmsRoomId(deviceMap),
+          macAddress: deviceMap['scratch']?.toString() ?? '',
+          ipAddress: deviceMap['host']?.toString() ?? '',
+          model:
+              deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
+          serialNumber: deviceMap['serial_number']?.toString(),
+          note: deviceMap['note']?.toString(),
+          images: _extractImages(deviceMap),
+        );
+
+      case 'wlan_devices':
+        return DeviceModel(
+          id: 'wlan_${deviceMap['id']}',
+          name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
+          type: 'wlan_controller',
+          status: _determineStatus(deviceMap),
+          macAddress: deviceMap['mac']?.toString() ?? '',
+          ipAddress: deviceMap['host']?.toString() ??
+              deviceMap['ip']?.toString() ??
+              '',
+          model:
+              deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
+          serialNumber: deviceMap['serial_number']?.toString(),
+          note: deviceMap['note']?.toString(),
+          images: _extractImages(deviceMap),
+        );
+
+      default:
+        throw Exception('Unknown resource type: $resourceType');
+    }
+  }
+
+  String _determineStatus(Map<String, dynamic> device) {
+    final onlineFlag = device['online'] as bool?;
+    if (onlineFlag != null) {
+      return onlineFlag ? 'online' : 'offline';
+    }
+    return 'unknown';
+  }
+
+  int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
+      final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
+      final idValue = pmsRoom['id'];
+      if (idValue is int) return idValue;
+      if (idValue is String) return int.tryParse(idValue);
+    }
+    return null;
+  }
+
+  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
+    final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
+    return normalizeImageUrls(imagesValue, baseUrl: _imageBaseUrl);
+  }
+}

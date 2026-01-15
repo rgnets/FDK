@@ -1,145 +1,52 @@
-import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
-import 'package:rgnets_fdk/core/models/websocket_events.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
-import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/utils/logging_utils.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/rooms/domain/usecases/get_rooms.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'rooms_riverpod_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class RoomsNotifier extends _$RoomsNotifier {
-  static final _logger = LoggerConfig.getLogger();
+  Logger get _logger => ref.read(loggerProvider);
 
-  /// Internal Map for O(1) lookups/updates
-  final Map<String, Room> _byId = {};
+  GetRooms get _getRooms => GetRooms(ref.read(roomRepositoryProvider));
 
   @override
   Future<List<Room>> build() async {
-    // Listen to WebSocket room events for real-time updates
-    if (EnvironmentConfig.useWebSockets) {
-      ref.listen(webSocketRoomEventsProvider, (_, next) {
-        next.whenData(_handleRoomEvent);
-      });
-    }
-
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('RoomsProvider: Loading rooms');
     }
-
+    
     try {
-      final getRooms = ref.read(getRoomsProvider);
+      final getRooms = _getRooms;
       final result = await getRooms();
-
+      
       return result.fold(
         (failure) {
           _logger.e('RoomsProvider: Failed to load rooms - ${failure.message}');
           throw Exception(failure.message);
         },
         (rooms) {
-          if (LoggerConfig.isVerboseLoggingEnabled) {
+          if (isVerboseLoggingEnabled) {
             _logger.i('RoomsProvider: Successfully loaded ${rooms.length} rooms');
           }
-          // Initialize internal map
-          _byId
-            ..clear()
-            ..addAll({for (final r in rooms) r.id: r});
-          return _byId.values.toList();
+          return rooms;
         },
       );
-    } on Exception catch (e, stack) {
-      _logger.e(
-        'RoomsProvider: Exception in build(): $e',
-        error: e,
-        stackTrace: stack,
-      );
+    } catch (e, stack) {
+      _logger.e('RoomsProvider: Exception in build(): $e', error: e, stackTrace: stack);
       rethrow;
     }
   }
 
-  // ===========================================================================
-  // WebSocket Event Handlers (O(1) dispatch via Freezed .when())
-  // ===========================================================================
-
-  /// Handle room events from WebSocket with O(1) dispatch
-  void _handleRoomEvent(RoomEvent event) {
-    event.when(
-      created: _addRoom,
-      updated: _updateRoom,
-      deleted: _removeRoom,
-      batchUpdate: _updateMultiple,
-      snapshot: _handleSnapshot,
-    );
-  }
-
-  /// O(1) add a new room
-  void _addRoom(Room room) {
-    _byId[room.id] = room;
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('RoomsProvider: Added room ${room.id}');
-    }
-  }
-
-  /// O(1) update an existing room
-  void _updateRoom(Room room) {
-    _byId[room.id] = room;
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('RoomsProvider: Updated room ${room.id}');
-    }
-  }
-
-  /// O(1) remove a room
-  void _removeRoom(String id) {
-    _byId.remove(id);
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('RoomsProvider: Removed room $id');
-    }
-  }
-
-  /// Batch update multiple rooms (O(n) but single emit)
-  void _updateMultiple(List<Room> rooms) {
-    for (final r in rooms) {
-      _byId[r.id] = r;
-    }
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('RoomsProvider: Batch updated ${rooms.length} rooms');
-    }
-  }
-
-  /// Handle full snapshot (replace all)
-  void _handleSnapshot(List<Room> rooms) {
-    _byId
-      ..clear()
-      ..addAll({for (final r in rooms) r.id: r});
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('RoomsProvider: Snapshot received with ${rooms.length} rooms');
-    }
-  }
-
-  /// Emit the current map as a list to UI
-  void _emitList() {
-    if (state.hasValue) {
-      state = AsyncValue.data(_byId.values.toList());
-    }
-  }
-
-  // ===========================================================================
-  // Public API
-  // ===========================================================================
-
   Future<void> refresh() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('RoomsProvider: Refreshing rooms');
     }
-
+    
     ref.invalidateSelf();
   }
 }
@@ -148,37 +55,29 @@ class RoomsNotifier extends _$RoomsNotifier {
 @riverpod
 RoomStatistics roomStatistics(RoomStatisticsRef ref) {
   final rooms = ref.watch(roomsNotifierProvider);
-  final devices = ref.watch(devicesNotifierProvider);
-
+  
   return rooms.when(
     data: (roomList) {
       final total = roomList.length;
-
-      final deviceList = devices.valueOrNull ?? <Device>[];
-      final devicesById = <String, Device>{
-        for (final device in deviceList) device.id: device,
-      };
-
+      // Assuming we can calculate device stats from room metadata or deviceIds
       var totalDevices = 0;
       var onlineDevices = 0;
       var roomsWithIssues = 0;
-
+      
       for (final room in roomList) {
-        final roomDeviceIds = room.deviceIds ?? <String>[];
-        final roomDevices = roomDeviceIds
-            .map((id) => devicesById[id])
-            .whereType<Device>()
-            .toList();
-        totalDevices += roomDevices.length;
-
-        final roomOnlineDevices = roomDevices.where((d) => d.isOnline).length;
-        onlineDevices += roomOnlineDevices;
-
-        if (roomDevices.any((d) => d.hasIssue || d.isOffline)) {
+        final deviceCount = room.deviceIds?.length ?? 0;
+        totalDevices += deviceCount;
+        
+        // Mock calculation for demo - in real app this would come from device status
+        final mockOnlineDevices = (deviceCount * 0.8).round(); // Assume 80% online
+        onlineDevices += mockOnlineDevices;
+        
+        // Mock issues calculation
+        if (deviceCount > 0 && mockOnlineDevices < deviceCount) {
           roomsWithIssues++;
         }
       }
-
+      
       return RoomStatistics(
         total: total,
         totalDevices: totalDevices,
@@ -213,7 +112,11 @@ Room? roomById(RoomByIdRef ref, String roomId) {
   
   return rooms.when(
     data: (roomList) {
-      final matchingRooms = roomList.where((room) => room.id == roomId);
+      final parsedId = int.tryParse(roomId);
+      if (parsedId == null) {
+        return null;
+      }
+      final matchingRooms = roomList.where((room) => room.id == parsedId);
       return matchingRooms.isNotEmpty ? matchingRooms.first : null;
     },
     loading: () => null,

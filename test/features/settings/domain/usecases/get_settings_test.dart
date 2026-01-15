@@ -130,7 +130,7 @@ void main() {
         enableContinuousScanning: true,
         
         // Network Settings
-        apiTimeoutSeconds: 60,
+        wsTimeoutSeconds: 60,
         enableOfflineMode: false,
         cacheExpirationHours: 24,
         
@@ -167,7 +167,7 @@ void main() {
           expect(settings.scanTimeoutSeconds, 15);
           expect(settings.enableScanSound, false);
           expect(settings.enableContinuousScanning, true);
-          expect(settings.apiTimeoutSeconds, 60);
+          expect(settings.wsTimeoutSeconds, 60);
           expect(settings.enableOfflineMode, false);
           expect(settings.cacheExpirationHours, 24);
           expect(settings.enableNotifications, false);

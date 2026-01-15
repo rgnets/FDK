@@ -14,7 +14,7 @@ final class AuthenticateUser extends UseCase<User, AuthenticateUserParams> {
     return repository.authenticate(
       fqdn: params.fqdn,
       login: params.login,
-      apiKey: params.apiKey,
+      token: params.token,
       siteName: params.siteName,
       issuedAt: params.issuedAt,
       signature: params.signature,
@@ -26,7 +26,7 @@ class AuthenticateUserParams extends Params {
   const AuthenticateUserParams({
     required this.fqdn,
     required this.login,
-    required this.apiKey,
+    required this.token,
     this.siteName,
     this.issuedAt,
     this.signature,
@@ -34,7 +34,7 @@ class AuthenticateUserParams extends Params {
 
   final String fqdn;
   final String login;
-  final String apiKey;
+  final String token;
   final String? siteName;
   final DateTime? issuedAt;
   final String? signature;
@@ -43,7 +43,7 @@ class AuthenticateUserParams extends Params {
   List<Object?> get props => [
     fqdn,
     login,
-    apiKey,
+    token,
     siteName,
     issuedAt,
     signature,

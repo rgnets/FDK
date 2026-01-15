@@ -13,12 +13,11 @@ This directory contains the technical documentation for the RG Nets Field Deploy
 | [README_RUNNING_APP.md](README_RUNNING_APP.md) | How to build and run the application |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Guidelines for contributing to the project |
 
-### API & Data
+### WebSocket & Data
 
 | Document | Description |
 |----------|-------------|
-| [api-contracts.md](api-contracts.md) | API endpoint contracts and specifications |
-| [api-discovery-report.md](api-discovery-report.md) | Discovered API endpoints and capabilities |
+| [websocket-contracts.md](websocket-contracts.md) | WebSocket contract, message envelope, and resource actions |
 | [data-models.md](data-models.md) | Data model definitions and relationships |
 | [data-flow-architecture.md](data-flow-architecture.md) | Data flow patterns and state management |
 
@@ -52,7 +51,6 @@ This directory contains the technical documentation for the RG Nets Field Deploy
 
 ### Additional Resources
 
-- **`archive/`** - Historical documentation and superseded plans
 - **`data-sources/`** - Data source specifications
 - **`views/`** - View-specific documentation
 

@@ -1,6 +1,7 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/utils/room_id_parser.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 
 abstract class RoomMockDataSource {
   Future<List<RoomModel>> getRooms();
@@ -45,8 +46,9 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
           : roomNumber ?? 'Room ${roomData['id']}';
 
       return RoomModel(
-        id: roomData['id']?.toString() ?? '',
+        id: parseRoomId(roomData['id']),
         name: displayName,
+        number: roomNumber,
         deviceIds: _extractDeviceIds(roomData),
         metadata: roomData,
       );
@@ -83,8 +85,9 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
         : roomNumber ?? 'Room ${roomData['id']}';
 
     return RoomModel(
-      id: roomData['id']?.toString() ?? '',
+      id: parseRoomId(roomData['id']),
       name: displayName,
+      number: roomNumber,
       deviceIds: _extractDeviceIds(roomData),
       metadata: roomData,
     );
@@ -100,10 +103,9 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
     // In a real mock implementation, you might add it to an in-memory store
     // For now, just return the room with a generated ID if needed
     final updatedRoom = RoomModel(
-      id: room.id.isNotEmpty
-          ? room.id
-          : 'mock_${DateTime.now().millisecondsSinceEpoch}',
+      id: room.id != 0 ? room.id : DateTime.now().millisecondsSinceEpoch,
       name: room.name,
+      number: room.number,
       deviceIds: room.deviceIds,
       metadata: {
         ...?room.metadata,
@@ -126,6 +128,7 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
     return RoomModel(
       id: room.id,
       name: room.name,
+      number: room.number,
       deviceIds: room.deviceIds,
       metadata: {
         ...?room.metadata,
@@ -174,4 +177,5 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
 
     return deviceIds.toList();
   }
+
 }

@@ -27,7 +27,7 @@ void main() {
         'scanTimeoutSeconds': 10,
         'enableScanSound': false,
         'enableContinuousScanning': true,
-        'apiTimeoutSeconds': 45,
+        'wsTimeoutSeconds': 45,
         'enableOfflineMode': false,
         'cacheExpirationHours': 24,
         'enableNotifications': true,
@@ -50,7 +50,7 @@ void main() {
       scanTimeoutSeconds: 10,
       enableScanSound: false,
       enableContinuousScanning: true,
-      apiTimeoutSeconds: 45,
+      wsTimeoutSeconds: 45,
       enableOfflineMode: false,
       cacheExpirationHours: 24,
       enableNotifications: true,
@@ -96,7 +96,7 @@ void main() {
           expect(settings.scanTimeoutSeconds, 10);
           expect(settings.enableScanSound, false);
           expect(settings.enableContinuousScanning, true);
-          expect(settings.apiTimeoutSeconds, 45);
+          expect(settings.wsTimeoutSeconds, 45);
           expect(settings.enableOfflineMode, false);
           expect(settings.enableLogging, true);
           expect(settings.enableMockData, true);

@@ -1,14 +1,17 @@
-import 'package:rgnets_fdk/core/config/logger_config.dart';
-import 'package:rgnets_fdk/core/config/environment.dart';
+import 'dart:async';
+
+import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
-import 'package:rgnets_fdk/core/models/websocket_events.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
-import 'package:rgnets_fdk/core/services/adaptive_refresh_manager.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/utils/logging_utils.dart';
+import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
+import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
+    as device_impl;
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_device.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices_params.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/reboot_device.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/search_devices.dart';
@@ -18,42 +21,38 @@ part 'devices_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class DevicesNotifier extends _$DevicesNotifier {
-  static final _logger = LoggerConfig.getLogger();
-  AdaptiveRefreshManager? _refreshManager;
-  CacheManager? _cacheManager;
+  Logger get _logger => ref.read(loggerProvider);
+  late final CacheManager _cacheManager;
+  StreamSubscription<List<Device>>? _devicesStreamSub;
+  bool _devicesStreamAttached = false;
+  List<Device>? _latestDevices;
+  DateTime? _latestDevicesAt;
 
-  /// Internal Map for O(1) lookups/updates
-  final Map<String, Device> _byId = {};
+  GetDevices get _getDevices => GetDevices(ref.read(deviceRepositoryProvider));
+
+  RebootDevice get _rebootDevice =>
+      RebootDevice(ref.read(deviceRepositoryProvider));
 
   @override
   Future<List<Device>> build() async {
+    final buildStartedAt = DateTime.now();
     // Initialize managers
-    _refreshManager = ref.read(adaptiveRefreshManagerProvider);
     _cacheManager = ref.read(cacheManagerProvider);
-    final storage = ref.read(storageServiceProvider);
-    final allowUnauthenticated = EnvironmentConfig.useSyntheticData;
+    final authStatus = ref.watch(authStatusProvider);
+    final isAuthenticated = authStatus?.isAuthenticated ?? false;
+    _attachDevicesStream();
 
-    // Listen to WebSocket device events for real-time updates
-    if (EnvironmentConfig.useWebSockets) {
-      ref.listen(webSocketDeviceEventsProvider, (_, next) {
-        next.whenData(_handleDeviceEvent);
-      });
-    }
-
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Loading devices');
     }
 
-    if (!storage.isAuthenticated && !allowUnauthenticated) {
-      if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (!isAuthenticated) {
+      if (isVerboseLoggingEnabled) {
         _logger.i('DevicesProvider: Skipping load (not authenticated)');
       }
+      _latestDevices = null;
+      _latestDevicesAt = null;
       return [];
-    }
-
-    if (!EnvironmentConfig.useSyntheticData) {
-      // Start sequential background refresh only when using live data.
-      _startBackgroundRefresh();
     }
 
     try {
@@ -63,10 +62,10 @@ class DevicesNotifier extends _$DevicesNotifier {
         'devices_list',
         DeviceFieldSets.listFields,
       );
-      final devices = await _cacheManager!.get<List<Device>>(
+      final devices = await _cacheManager.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
-          final getDevices = ref.read(getDevicesProvider);
+          final getDevices = _getDevices;
           final result = await getDevices(
             const GetDevicesParams(fields: DeviceFieldSets.listFields),
           );
@@ -79,7 +78,7 @@ class DevicesNotifier extends _$DevicesNotifier {
               throw Exception(failure.message);
             },
             (devices) {
-              if (LoggerConfig.isVerboseLoggingEnabled) {
+              if (isVerboseLoggingEnabled) {
                 _logger.i(
                   'DevicesProvider: Successfully loaded ${devices.length} devices with ${DeviceFieldSets.listFields.length} fields',
                 );
@@ -91,12 +90,18 @@ class DevicesNotifier extends _$DevicesNotifier {
         ttl: const Duration(minutes: 5),
       );
 
-      // Initialize internal map from loaded devices
-      _byId
-        ..clear()
-        ..addAll({for (final d in devices ?? <Device>[]) d.id: d});
+      final fetchedDevices = devices ?? [];
+      final latestDevices = _latestDevices;
+      final latestDevicesAt = _latestDevicesAt;
+      if (latestDevices != null && latestDevices.isNotEmpty) {
+        final latestIsNewer =
+            latestDevicesAt != null && latestDevicesAt.isAfter(buildStartedAt);
+        if (latestIsNewer || fetchedDevices.isEmpty) {
+          return latestDevices;
+        }
+      }
 
-      return _byId.values.toList();
+      return fetchedDevices;
     } on Exception catch (e, stack) {
       _logger.e(
         'DevicesProvider: Exception in build(): $e',
@@ -107,110 +112,37 @@ class DevicesNotifier extends _$DevicesNotifier {
     }
   }
 
-  // ===========================================================================
-  // WebSocket Event Handlers (O(1) dispatch via Freezed .when())
-  // ===========================================================================
-
-  /// Handle device events from WebSocket with O(1) dispatch
-  void _handleDeviceEvent(DeviceEvent event) {
-    event.when(
-      created: _addDevice,
-      updated: _updateDevice,
-      deleted: _removeDevice,
-      statusChanged: (id, status, online, lastSeen) => _updateDeviceStatus(
-        id: id,
-        status: status,
-        online: online,
-        lastSeen: lastSeen,
-      ),
-      batchUpdate: _updateMultiple,
-      snapshot: _handleSnapshot,
-    );
-  }
-
-  /// O(1) add a new device
-  void _addDevice(Device device) {
-    _byId[device.id] = device;
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('DevicesProvider: Added device ${device.id}');
+  void _attachDevicesStream() {
+    if (_devicesStreamAttached) {
+      return;
     }
-  }
 
-  /// O(1) update an existing device
-  void _updateDevice(Device device) {
-    _byId[device.id] = device;
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('DevicesProvider: Updated device ${device.id}');
+    final repository = ref.read(deviceRepositoryProvider);
+    if (repository is! device_impl.DeviceRepositoryImpl) {
+      return;
     }
-  }
 
-  /// O(1) remove a device
-  void _removeDevice(String id) {
-    _byId.remove(id);
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('DevicesProvider: Removed device $id');
-    }
-  }
-
-  /// O(1) update device status only (lightweight update)
-  void _updateDeviceStatus({
-    required String id,
-    required String status,
-    bool? online,
-    DateTime? lastSeen,
-  }) {
-    final existing = _byId[id];
-    if (existing != null) {
-      _byId[id] = existing.copyWith(
-        status: status,
-        lastSeen: lastSeen ?? existing.lastSeen,
-      );
-      _emitList();
-      if (LoggerConfig.isVerboseLoggingEnabled) {
-        _logger.d('DevicesProvider: Status changed for $id -> $status');
+    _devicesStreamAttached = true;
+    _devicesStreamSub = repository.devicesStream.listen((devices) {
+      _latestDevices = devices;
+      _latestDevicesAt = DateTime.now();
+      final authStatus = ref.read(authStatusProvider);
+      if (authStatus?.isUnauthenticated ?? false) {
+        return;
       }
-    }
-  }
+      state = AsyncValue.data(devices);
+    });
 
-  /// Batch update multiple devices (O(n) but single emit)
-  void _updateMultiple(List<Device> devices) {
-    for (final d in devices) {
-      _byId[d.id] = d;
-    }
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('DevicesProvider: Batch updated ${devices.length} devices');
-    }
+    ref.onDispose(() {
+      _devicesStreamSub?.cancel();
+      _devicesStreamSub = null;
+      _devicesStreamAttached = false;
+    });
   }
-
-  /// Handle full snapshot (replace all)
-  void _handleSnapshot(List<Device> devices) {
-    _byId
-      ..clear()
-      ..addAll({for (final d in devices) d.id: d});
-    _emitList();
-    if (LoggerConfig.isVerboseLoggingEnabled) {
-      _logger.d('DevicesProvider: Snapshot received with ${devices.length} devices');
-    }
-  }
-
-  /// Emit the current map as a list to UI
-  void _emitList() {
-    if (state.hasValue) {
-      state = AsyncValue.data(_byId.values.toList());
-    }
-  }
-
-  // ===========================================================================
-  // Public API (existing methods)
-  // ===========================================================================
 
   /// User-triggered refresh with loading state
   Future<void> userRefresh() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: User-triggered refresh');
     }
 
@@ -223,10 +155,10 @@ class DevicesNotifier extends _$DevicesNotifier {
         'devices_list',
         DeviceFieldSets.listFields,
       );
-      final devices = await _cacheManager!.get<List<Device>>(
+      final devices = await _cacheManager.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
-          final getDevices = ref.read(getDevicesProvider);
+          final getDevices = _getDevices;
           final result = await getDevices(
             const GetDevicesParams(fields: DeviceFieldSets.listFields),
           );
@@ -254,7 +186,7 @@ class DevicesNotifier extends _$DevicesNotifier {
   /// Silent background refresh without loading state
   /// Context-aware: refreshes based on what view is active
   Future<void> silentRefresh({String? context}) async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i(
         'DevicesProvider: Silent background refresh (context: $context)',
       );
@@ -268,10 +200,10 @@ class DevicesNotifier extends _$DevicesNotifier {
       final cacheKey = DeviceFieldSets.getCacheKey('devices_list', fields);
 
       // Force refresh the cache with appropriate fields
-      final devices = await _cacheManager!.get<List<Device>>(
+      final devices = await _cacheManager.get<List<Device>>(
         key: cacheKey,
         fetcher: () async {
-          final getDevices = ref.read(getDevicesProvider);
+          final getDevices = _getDevices;
           final result = await getDevices(GetDevicesParams(fields: fields));
 
           return result.fold(
@@ -298,20 +230,13 @@ class DevicesNotifier extends _$DevicesNotifier {
     return userRefresh();
   }
 
-  /// Start sequential background refresh
-  void _startBackgroundRefresh() {
-    _refreshManager?.startSequentialRefresh(
-      () => silentRefresh(context: 'list'),
-    );
-  }
-
   Future<void> rebootDevice(String deviceId) async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Rebooting device: $deviceId');
     }
 
     try {
-      final rebootDevice = ref.read(rebootDeviceProvider);
+      final rebootDevice = _rebootDevice;
       final result = await rebootDevice(RebootDeviceParams(deviceId: deviceId));
 
       await result.fold(
@@ -320,7 +245,7 @@ class DevicesNotifier extends _$DevicesNotifier {
           return Future<void>.error(Exception(failure.message));
         },
         (_) {
-          if (LoggerConfig.isVerboseLoggingEnabled) {
+          if (isVerboseLoggingEnabled) {
             _logger.i('DevicesProvider: Reboot command sent successfully');
           }
           return refresh();
@@ -339,10 +264,14 @@ class DevicesNotifier extends _$DevicesNotifier {
 
 @Riverpod(keepAlive: true)
 class DeviceNotifier extends _$DeviceNotifier {
+  Logger get _logger => ref.read(loggerProvider);
+
+  GetDevice get _getDevice => GetDevice(ref.read(deviceRepositoryProvider));
+
   @override
   Future<Device?> build(String deviceId) async {
     // For detail view, fetch all fields
-    final getDevice = ref.read(getDeviceProvider);
+    final getDevice = _getDevice;
     final result = await getDevice(
       GetDeviceParams(
         id: deviceId,
@@ -358,32 +287,64 @@ class DeviceNotifier extends _$DeviceNotifier {
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
-    final getDevice = ref.read(getDeviceProvider);
-    final result = await getDevice(
-      GetDeviceParams(
-        id: deviceId,
-        fields: DeviceFieldSets
-            .detailFields, // Refresh with all fields for detail view
-      ),
-    );
+    try {
+      final getDevice = _getDevice;
+      final result = await getDevice(
+        GetDeviceParams(
+          id: deviceId,
+          fields: DeviceFieldSets
+              .detailFields, // Refresh with all fields for detail view
+        ),
+      );
 
-    state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      AsyncValue.data,
-    );
+      state = result.fold(
+        (failure) => AsyncValue.error(failure.message, StackTrace.current),
+        AsyncValue.data,
+      );
+    } on Object catch (e, stack) {
+      _logger.e('DeviceNotifier: Unexpected error in refresh: $e');
+      state = AsyncValue.error(e.toString(), stack);
+    }
+  }
+
+  /// Deletes an image from the device
+  Future<bool> deleteDeviceImage(String imageUrl) async {
+    try {
+      final repository = ref.read(deviceRepositoryProvider);
+      final result = await repository.deleteDeviceImage(deviceId, imageUrl);
+
+      return result.fold(
+        (failure) {
+          _logger.e('Failed to delete image: ${failure.message}');
+          return false;
+        },
+        (Device updatedDevice) {
+          // Update the state with the new device data
+          state = AsyncValue.data(updatedDevice);
+          _logger.i('Successfully deleted image from device $deviceId');
+          return true;
+        },
+      );
+    } on Exception catch (e) {
+      _logger.e('Exception deleting image: $e');
+      return false;
+    }
   }
 }
 
 // Search provider
 @Riverpod(keepAlive: true)
 class DeviceSearchNotifier extends _$DeviceSearchNotifier {
+  SearchDevices get _searchDevices =>
+      SearchDevices(ref.read(deviceRepositoryProvider));
+
   @override
   Future<List<Device>> build(String query) async {
     if (query.isEmpty) {
       return [];
     }
 
-    final searchDevices = ref.read(searchDevicesProvider);
+    final searchDevices = _searchDevices;
     final result = await searchDevices(SearchDevicesParams(query: query));
 
     return result.fold(

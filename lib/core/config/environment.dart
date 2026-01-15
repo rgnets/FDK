@@ -5,12 +5,19 @@ enum Environment { development, staging, production }
 
 class EnvironmentConfig {
   static Environment _environment = Environment.development;
+  static const String _defaultStagingToken =
+      'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r';
 
   static void setEnvironment(Environment env) {
     _environment = env;
     // Only log in debug mode to avoid memory issues
     if (kDebugMode) {
-      debugPrint('EnvironmentConfig: Set to ${env.name}');
+      debugPrint(
+        'EnvironmentConfig: Environment set, isDevelopment=$isDevelopment, '
+        'isStaging=$isStaging, isProduction=$isProduction',
+      );
+      debugPrint('EnvironmentConfig: WebSocket URL will be: $websocketBaseUrl');
+      debugPrint('EnvironmentConfig: useSyntheticData=$useSyntheticData');
     }
   }
 
@@ -43,6 +50,12 @@ class EnvironmentConfig {
           defaultValue: 'https://api.rgnets.com',
         );
     }
+  }
+
+  /// Get the host (FQDN) from the WebSocket URL for authentication purposes.
+  static String get host {
+    final wsUri = Uri.parse(websocketBaseUrl);
+    return wsUri.host;
   }
 
   /// WebSocket configuration
@@ -126,21 +139,53 @@ class EnvironmentConfig {
     }
   }
 
+  /// API Key for HTTP requests.
   static String get apiKey {
     switch (_environment) {
       case Environment.development:
-        return 'synthetic_key'; // Not used with synthetic data
+        return 'synthetic_api_key'; // Not used with synthetic data
       case Environment.staging:
-        return const String.fromEnvironment(
+        const stagingApiKey = String.fromEnvironment(
           'STAGING_API_KEY',
           defaultValue: '',
         );
-      case Environment.production:
-        const key = String.fromEnvironment('API_KEY', defaultValue: '');
-        if (key.isEmpty) {
-          throw Exception('API_KEY not provided for production');
+        if (stagingApiKey.isNotEmpty) {
+          return stagingApiKey;
         }
-        return key;
+        const stagingToken = String.fromEnvironment(
+          'STAGING_TOKEN',
+          defaultValue: _defaultStagingToken,
+        );
+        return stagingToken;
+      case Environment.production:
+        return const String.fromEnvironment('API_KEY', defaultValue: '');
+    }
+  }
+
+  /// Authentication token for WebSocket connections.
+  static String get token {
+    switch (_environment) {
+      case Environment.development:
+        return 'synthetic_token'; // Not used with synthetic data
+      case Environment.staging:
+        const stagingToken = String.fromEnvironment(
+          'STAGING_TOKEN',
+          defaultValue: '',
+        );
+        if (stagingToken.isNotEmpty) {
+          return stagingToken;
+        }
+        const stagingApiKey = String.fromEnvironment(
+          'STAGING_API_KEY',
+          defaultValue: _defaultStagingToken,
+        );
+        return stagingApiKey;
+      case Environment.production:
+        const tok = String.fromEnvironment('WS_TOKEN', defaultValue: '');
+        if (tok.isEmpty) {
+          throw Exception('WS_TOKEN not provided for production');
+        }
+        return tok;
     }
   }
 

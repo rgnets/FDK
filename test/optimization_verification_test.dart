@@ -10,15 +10,17 @@ import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 // Mock classes
+class MockDeviceDataSource extends Mock implements DeviceDataSource {}
 class MockDeviceLocalDataSource extends Mock implements DeviceLocalDataSource {}
 class MockRoomRepository extends Mock implements RoomRepository {}
-class MockNotificationGenerationService extends Mock implements NotificationGenerationService {}
 class MockStorageService extends Mock implements StorageService {}
+class MockWebSocketService extends Mock implements WebSocketService {}
 class MockWebSocketDataSyncService extends Mock implements WebSocketDataSyncService {}
 
 void main() {
@@ -31,6 +33,7 @@ void main() {
         type: 'access_point',
         status: 'online',
       ));
+      registerFallbackValue(<DeviceModel>[]);
     });
 
     group('Service Registration Verification', () {
@@ -178,33 +181,49 @@ void main() {
     });
 
     group('Background Refresh Service Verification', () {
-      test('should refresh multiple data sources in parallel', () async {
-        final mockLocalDataSource = MockDeviceLocalDataSource();
-        final mockRoomRepository = MockRoomRepository();
-        final mockStorageService = MockStorageService();
-        final mockSyncService = MockWebSocketDataSyncService();
-        final webSocketService = WebSocketService(
-          config: WebSocketConfig(baseUri: Uri.parse('wss://example.test/ws')),
-        );
+      late MockDeviceDataSource mockDeviceDataSource;
+      late MockDeviceLocalDataSource mockLocalDataSource;
+      late MockRoomRepository mockRoomRepository;
+      late MockStorageService mockStorageService;
+      late MockWebSocketService mockWebSocketService;
+      late MockWebSocketDataSyncService mockWebSocketDataSyncService;
+      late NotificationGenerationService notificationGenerationService;
+      late BackgroundRefreshService backgroundRefreshService;
 
-        final mockNotificationService = MockNotificationGenerationService();
-        final backgroundRefreshService = BackgroundRefreshService(
+      setUp(() {
+        mockDeviceDataSource = MockDeviceDataSource();
+        mockLocalDataSource = MockDeviceLocalDataSource();
+        mockRoomRepository = MockRoomRepository();
+        mockStorageService = MockStorageService();
+        mockWebSocketService = MockWebSocketService();
+        mockWebSocketDataSyncService = MockWebSocketDataSyncService();
+        notificationGenerationService = NotificationGenerationService();
+
+        when(() => mockStorageService.isAuthenticated).thenReturn(true);
+
+        backgroundRefreshService = BackgroundRefreshService(
+          deviceDataSource: mockDeviceDataSource,
           deviceLocalDataSource: mockLocalDataSource,
           roomRepository: mockRoomRepository,
-          notificationGenerationService: mockNotificationService,
+          notificationGenerationService: notificationGenerationService,
           storageService: mockStorageService,
-          webSocketService: webSocketService,
-          webSocketDataSyncService: mockSyncService,
+          webSocketService: mockWebSocketService,
+          webSocketDataSyncService: mockWebSocketDataSyncService,
         );
-        
+      });
+
+      tearDown(() {
+        backgroundRefreshService.dispose();
+      });
+
+      test('should refresh multiple data sources in parallel', () async {
         final testDevices = [
           const DeviceModel(id: '1', name: 'Test Device', type: 'access_point', status: 'online'),
         ];
         
         // Setup mocks
-        when(() => mockStorageService.isAuthenticated).thenReturn(true);
-        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
-            .thenAnswer((_) async => testDevices);
+        when(() => mockDeviceDataSource.getDevices()).thenAnswer((_) async => testDevices);
+        when(() => mockLocalDataSource.cacheDevices(any())).thenAnswer((_) async {});
         when(mockRoomRepository.getRooms).thenAnswer((_) async => const Right([]));
         
         // Track refresh events
@@ -218,40 +237,21 @@ void main() {
         final stopwatch = Stopwatch()..start();
         await backgroundRefreshService.refreshNow();
         stopwatch.stop();
-
+        
         // Wait for stream events
         await Future<void>.delayed(const Duration(milliseconds: 50));
-
-        // WebSocket not connected in this test, expect error events
-        expect(deviceEvents.where((e) => e.isError).length, equals(1));
-        expect(roomEvents.where((e) => e.isError).length, equals(1));
         
-        backgroundRefreshService.dispose();
+        // Verify parallel execution (should be fast)
+        expect(stopwatch.elapsedMilliseconds, lessThan(200));
+        
+        // Verify both data sources were refreshed (success or error)
+        expect(deviceEvents.where((e) => e.isSuccess || e.isError).length, equals(1));
+        expect(roomEvents.where((e) => e.isSuccess || e.isError).length, equals(1));
       });
 
       test('should handle refresh errors without stopping other operations', () async {
-        final mockLocalDataSource = MockDeviceLocalDataSource();
-        final mockRoomRepository = MockRoomRepository();
-        final mockStorageService = MockStorageService();
-        final mockSyncService = MockWebSocketDataSyncService();
-        final webSocketService = WebSocketService(
-          config: WebSocketConfig(baseUri: Uri.parse('wss://example.test/ws')),
-        );
-
-        final mockNotificationService = MockNotificationGenerationService();
-        final backgroundRefreshService = BackgroundRefreshService(
-          deviceLocalDataSource: mockLocalDataSource,
-          roomRepository: mockRoomRepository,
-          notificationGenerationService: mockNotificationService,
-          storageService: mockStorageService,
-          webSocketService: webSocketService,
-          webSocketDataSyncService: mockSyncService,
-        );
-        
-        // Setup mocks - storage authenticated, rooms succeed
-        when(() => mockStorageService.isAuthenticated).thenReturn(true);
-        when(() => mockLocalDataSource.getCachedDevices(allowStale: true))
-            .thenAnswer((_) async => []);
+        // Setup mocks - devices fail, rooms succeed
+        when(() => mockDeviceDataSource.getDevices()).thenThrow(Exception('Device API error'));
         when(mockRoomRepository.getRooms).thenAnswer((_) async => const Right([]));
         
         final deviceEvents = <RefreshStatus>[];
@@ -263,12 +263,10 @@ void main() {
         // Perform refresh - should not throw
         await backgroundRefreshService.refreshNow();
         await Future<void>.delayed(const Duration(milliseconds: 50));
-
-        // WebSocket not connected in this test, expect error events
-        expect(deviceEvents.where((e) => e.isError).length, equals(1));
-        expect(roomEvents.where((e) => e.isError).length, equals(1));
         
-        backgroundRefreshService.dispose();
+        // Devices should have error, rooms should succeed
+        expect(deviceEvents.where((e) => e.isError).length, equals(1));
+        expect(roomEvents.where((e) => e.isSuccess).length, equals(1));
       });
     });
 

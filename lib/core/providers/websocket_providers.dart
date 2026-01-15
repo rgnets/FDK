@@ -2,25 +2,27 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/models/websocket_events.dart';
+import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
-import 'package:rgnets_fdk/core/services/websocket_message_router.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/home_screen_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
     hide notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
 /// Provides the base WebSocket configuration derived from the environment.
 final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
   final uri = Uri.parse(EnvironmentConfig.websocketBaseUrl);
   return WebSocketConfig(
     baseUri: uri,
-    autoReconnect: EnvironmentConfig.useWebSockets,
+    autoReconnect: true, // Always enabled - WebSocket-only architecture
     initialReconnectDelay: EnvironmentConfig.webSocketInitialReconnectDelay,
     maxReconnectDelay: EnvironmentConfig.webSocketMaxReconnectDelay,
     heartbeatInterval: EnvironmentConfig.webSocketHeartbeatInterval,
@@ -32,7 +34,7 @@ final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
 /// Provides a singleton [WebSocketService] for the application lifecycle.
 final webSocketServiceProvider = Provider<WebSocketService>((ref) {
   final config = ref.watch(webSocketConfigProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
 
   final service = WebSocketService(config: config, logger: logger);
   final stateSub = service.connectionState.listen((state) {
@@ -81,7 +83,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
 
   final service = WebSocketDataSyncService(
     socketService: socketService,
@@ -99,26 +101,22 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
 });
 
 /// Keeps WebSocket sync events wired to provider invalidation.
-/// Note: devicesNotifierProvider and roomsNotifierProvider now use direct
-/// ref.listen() to webSocketDeviceEventsProvider/webSocketRoomEventsProvider
-/// for O(1) state updates, so they don't need ref.refresh() here.
 final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   final service = ref.watch(webSocketDataSyncServiceProvider);
-  final logger = ref.watch(loggerProvider);
+  final logger = LoggerConfig.getLogger();
   final subscription = service.events.listen((event) {
     switch (event.type) {
       case WebSocketDataSyncEventType.devicesCached:
-        logger.i('WebSocketDataSync: devices cached -> refreshing derived providers');
-        // DevicesNotifier updates via ref.listen(webSocketDeviceEventsProvider)
-        // Only refresh derived providers that don't watch devicesNotifierProvider
+        logger.i('WebSocketDataSync: devices cached -> refreshing providers');
+        ref.refresh(devicesNotifierProvider);
         ref.refresh(deviceNotificationsNotifierProvider);
         ref.refresh(notificationsDomainNotifierProvider);
         ref.refresh(homeScreenStatisticsProvider);
         ref.refresh(dashboardStatsProvider);
         break;
       case WebSocketDataSyncEventType.roomsCached:
-        logger.i('WebSocketDataSync: rooms cached');
-        // RoomsNotifier updates via ref.listen(webSocketRoomEventsProvider)
+        logger.i('WebSocketDataSync: rooms cached -> refreshing providers');
+        ref.refresh(roomsNotifierProvider);
         break;
     }
   });
@@ -127,97 +125,47 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   return;
 });
 
-// =============================================================================
-// TYPED EVENT PROVIDERS (New Architecture)
-// =============================================================================
+/// Provides the WebSocket cache integration for device data.
+/// This keeps device caches in sync with WebSocket messages.
+final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
+  ref,
+) {
+  final webSocketService = ref.watch(webSocketServiceProvider);
+  final logger = LoggerConfig.getLogger();
+  final storageService = ref.watch(storageServiceProvider);
 
-/// Provides the WebSocket message router for type-safe event dispatch.
-/// Parses raw messages ONCE and emits typed [WebSocketEvent] objects.
-final webSocketMessageRouterProvider = Provider<WebSocketMessageRouter>((ref) {
-  final socketService = ref.watch(webSocketServiceProvider);
-  final logger = ref.watch(loggerProvider);
-
-  final router = WebSocketMessageRouter(
-    socketService: socketService,
+  final integration = WebSocketCacheIntegration(
+    webSocketService: webSocketService,
+    imageBaseUrl: storageService.siteUrl,
     logger: logger,
   );
 
-  // Start the router
-  router.start();
+  // Initialize the integration
+  integration.initialize();
 
-  ref.onDispose(() async {
-    await router.dispose();
+  ref.onDispose(() {
+    integration.dispose();
   });
 
-  return router;
+  return integration;
 });
 
-/// Stream of all typed WebSocket events (union type).
-/// Use `.when()` for O(1) pattern matching.
-final webSocketEventsProvider = StreamProvider<WebSocketEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.events;
-});
+/// Emits the last device-cache update time for WebSocket snapshots/updates.
+final webSocketDeviceLastUpdateProvider = StreamProvider<DateTime?>((ref) {
+  final integration = ref.watch(webSocketCacheIntegrationProvider);
+  final controller = StreamController<DateTime?>();
 
-/// Stream of device-specific events only.
-/// Emits [DeviceEvent] for created, updated, deleted, statusChanged, etc.
-final webSocketDeviceEventsProvider = StreamProvider<DeviceEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.deviceEvents;
-});
+  void listener() {
+    controller.add(integration.lastDeviceUpdate.value);
+  }
 
-/// Stream of room-specific events only.
-/// Emits [RoomEvent] for created, updated, deleted, etc.
-final webSocketRoomEventsProvider = StreamProvider<RoomEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.roomEvents;
-});
+  integration.lastDeviceUpdate.addListener(listener);
+  controller.add(integration.lastDeviceUpdate.value);
 
-/// Stream of notification events only.
-/// Emits [NotificationEvent] for received, read, cleared.
-final webSocketNotificationEventsProvider =
-    StreamProvider<NotificationEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.notificationEvents;
-});
-
-/// Stream of sync events only.
-/// Emits [SyncEvent] for started, completed, failed, delta.
-final webSocketSyncEventsProvider = StreamProvider<SyncEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.syncEvents;
-});
-
-/// Stream of connection events only.
-/// Emits [ConnectionEvent] for connected, disconnected, reconnecting, error.
-final webSocketConnectionEventsProvider =
-    StreamProvider<ConnectionEvent>((ref) {
-  final router = ref.watch(webSocketMessageRouterProvider);
-  return router.connectionEvents;
-});
-
-/// Connection status with staleness tracking.
-/// Combines connection state with last sync timestamp.
-final connectionStatusProvider = Provider<ConnectionStatus>((ref) {
-  final stateAsync = ref.watch(webSocketConnectionStateProvider);
-  final state = stateAsync.valueOrNull ?? SocketConnectionState.disconnected;
-
-  return ConnectionStatus(
-    state: state,
-    isConnected: state == SocketConnectionState.connected,
-    isReconnecting: state == SocketConnectionState.reconnecting,
-  );
-});
-
-/// Simple connection status model.
-class ConnectionStatus {
-  const ConnectionStatus({
-    required this.state,
-    required this.isConnected,
-    required this.isReconnecting,
+  ref.onDispose(() {
+    integration.lastDeviceUpdate.removeListener(listener);
+    controller.close();
   });
 
-  final SocketConnectionState state;
-  final bool isConnected;
-  final bool isReconnecting;
-}
+  return controller.stream;
+});

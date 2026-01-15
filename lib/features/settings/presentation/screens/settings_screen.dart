@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     final authSubtitle = authStatus.maybeWhen(
-      authenticated: (user) => user.apiUrl,
+      authenticated: (user) => user.siteUrl,
       orElse: () => 'Not connected',
     );
 

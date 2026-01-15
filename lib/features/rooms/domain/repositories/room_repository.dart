@@ -1,7 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 
 import 'package:rgnets_fdk/core/errors/failures.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 
 abstract class RoomRepository {
   Future<Either<Failure, List<Room>>> getRooms();

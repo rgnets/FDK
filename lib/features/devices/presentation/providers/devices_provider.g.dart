@@ -21,7 +21,7 @@ final filteredDevicesProvider = Provider<List<Device>>.internal(
 );
 
 typedef FilteredDevicesRef = ProviderRef<List<Device>>;
-String _$devicesNotifierHash() => r'12e26781b5d36208956bbdd9b5c9b7ea94480e1b';
+String _$devicesNotifierHash() => r'b1e3a083fbfa1297431caf28c36d1d6c2b437f5e';
 
 /// See also [DevicesNotifier].
 @ProviderFor(DevicesNotifier)
@@ -37,7 +37,7 @@ final devicesNotifierProvider =
 );
 
 typedef _$DevicesNotifier = AsyncNotifier<List<Device>>;
-String _$deviceNotifierHash() => r'b60d0df131013c027844231e277472d4b85e6e1e';
+String _$deviceNotifierHash() => r'6c43bb0fd73511dc13cdeeac6412d0fbfe80307c';
 
 /// Copied from Dart SDK
 class _SystemHash {

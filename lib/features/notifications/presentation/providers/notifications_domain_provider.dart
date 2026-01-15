@@ -1,8 +1,11 @@
-import 'package:rgnets_fdk/core/config/logger_config.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
+import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/usecases/usecase.dart';
+import 'package:rgnets_fdk/core/utils/logging_utils.dart';
 import 'package:rgnets_fdk/features/notifications/domain/entities/notification.dart';
 import 'package:rgnets_fdk/features/notifications/domain/usecases/get_notifications.dart';
+import 'package:rgnets_fdk/features/notifications/domain/usecases/mark_all_as_read.dart';
 import 'package:rgnets_fdk/features/notifications/domain/usecases/mark_as_read.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -11,16 +14,25 @@ part 'notifications_domain_provider.g.dart';
 /// Main notifications provider using domain layer
 @Riverpod(keepAlive: true)
 class NotificationsDomainNotifier extends _$NotificationsDomainNotifier {
-  static final _logger = LoggerConfig.getLogger();
-  
+  Logger get _logger => ref.read(loggerProvider);
+
+  GetNotifications get _getNotifications =>
+      GetNotifications(ref.read(notificationRepositoryProvider));
+
+  MarkAsRead get _markAsRead =>
+      MarkAsRead(ref.read(notificationRepositoryProvider));
+
+  MarkAllAsRead get _markAllAsRead =>
+      MarkAllAsRead(ref.read(notificationRepositoryProvider));
+
   @override
   Future<List<AppNotification>> build() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('NotificationsProvider: Loading notifications');
     }
     
     try {
-      final getNotifications = ref.read(getNotificationsProvider);
+      final getNotifications = _getNotifications;
       final result = await getNotifications(const GetNotificationsParams());
       
       return result.fold(
@@ -29,7 +41,7 @@ class NotificationsDomainNotifier extends _$NotificationsDomainNotifier {
           throw Exception(failure.message);
         },
         (notifications) {
-          if (LoggerConfig.isVerboseLoggingEnabled) {
+          if (isVerboseLoggingEnabled) {
             _logger.i('NotificationsProvider: Successfully loaded ${notifications.length} notifications');
           }
           return notifications;
@@ -42,7 +54,7 @@ class NotificationsDomainNotifier extends _$NotificationsDomainNotifier {
   }
 
   Future<void> refresh() async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('NotificationsProvider: Refreshing notifications');
     }
     
@@ -50,12 +62,12 @@ class NotificationsDomainNotifier extends _$NotificationsDomainNotifier {
   }
   
   Future<void> markAsRead(String id) async {
-    if (LoggerConfig.isVerboseLoggingEnabled) {
+    if (isVerboseLoggingEnabled) {
       _logger.i('NotificationsProvider: Marking notification as read: $id');
     }
     
     try {
-      final markAsRead = ref.read(markAsReadProvider);
+      final markAsRead = _markAsRead;
       final result = await markAsRead(MarkAsReadParams(notificationId: id));
       
       result.fold(
@@ -93,7 +105,7 @@ class NotificationsDomainNotifier extends _$NotificationsDomainNotifier {
   }
   
   Future<void> markAllAsRead() async {
-    final markAllAsRead = ref.read(markAllAsReadProvider);
+    final markAllAsRead = _markAllAsRead;
     final result = await markAllAsRead(const NoParams());
     
     result.fold(

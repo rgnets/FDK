@@ -25,7 +25,7 @@ mixin _$AppSettings {
   bool get enableScanSound => throw _privateConstructorUsedError;
   bool get enableContinuousScanning =>
       throw _privateConstructorUsedError; // Network Settings
-  int get apiTimeoutSeconds => throw _privateConstructorUsedError;
+  int get wsTimeoutSeconds => throw _privateConstructorUsedError;
   bool get enableOfflineMode => throw _privateConstructorUsedError;
   int get cacheExpirationHours =>
       throw _privateConstructorUsedError; // Notification Settings
@@ -49,7 +49,7 @@ mixin _$AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -73,7 +73,7 @@ mixin _$AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -97,7 +97,7 @@ mixin _$AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -148,7 +148,7 @@ abstract class $AppSettingsCopyWith<$Res> {
       int scanTimeoutSeconds,
       bool enableScanSound,
       bool enableContinuousScanning,
-      int apiTimeoutSeconds,
+      int wsTimeoutSeconds,
       bool enableOfflineMode,
       int cacheExpirationHours,
       bool enableNotifications,
@@ -181,7 +181,7 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
     Object? scanTimeoutSeconds = null,
     Object? enableScanSound = null,
     Object? enableContinuousScanning = null,
-    Object? apiTimeoutSeconds = null,
+    Object? wsTimeoutSeconds = null,
     Object? enableOfflineMode = null,
     Object? cacheExpirationHours = null,
     Object? enableNotifications = null,
@@ -219,9 +219,9 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
           ? _value.enableContinuousScanning
           : enableContinuousScanning // ignore: cast_nullable_to_non_nullable
               as bool,
-      apiTimeoutSeconds: null == apiTimeoutSeconds
-          ? _value.apiTimeoutSeconds
-          : apiTimeoutSeconds // ignore: cast_nullable_to_non_nullable
+      wsTimeoutSeconds: null == wsTimeoutSeconds
+          ? _value.wsTimeoutSeconds
+          : wsTimeoutSeconds // ignore: cast_nullable_to_non_nullable
               as int,
       enableOfflineMode: null == enableOfflineMode
           ? _value.enableOfflineMode
@@ -286,7 +286,7 @@ abstract class _$$AppSettingsImplCopyWith<$Res>
       int scanTimeoutSeconds,
       bool enableScanSound,
       bool enableContinuousScanning,
-      int apiTimeoutSeconds,
+      int wsTimeoutSeconds,
       bool enableOfflineMode,
       int cacheExpirationHours,
       bool enableNotifications,
@@ -317,7 +317,7 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
     Object? scanTimeoutSeconds = null,
     Object? enableScanSound = null,
     Object? enableContinuousScanning = null,
-    Object? apiTimeoutSeconds = null,
+    Object? wsTimeoutSeconds = null,
     Object? enableOfflineMode = null,
     Object? cacheExpirationHours = null,
     Object? enableNotifications = null,
@@ -355,9 +355,9 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
           ? _value.enableContinuousScanning
           : enableContinuousScanning // ignore: cast_nullable_to_non_nullable
               as bool,
-      apiTimeoutSeconds: null == apiTimeoutSeconds
-          ? _value.apiTimeoutSeconds
-          : apiTimeoutSeconds // ignore: cast_nullable_to_non_nullable
+      wsTimeoutSeconds: null == wsTimeoutSeconds
+          ? _value.wsTimeoutSeconds
+          : wsTimeoutSeconds // ignore: cast_nullable_to_non_nullable
               as int,
       enableOfflineMode: null == enableOfflineMode
           ? _value.enableOfflineMode
@@ -417,7 +417,7 @@ class _$AppSettingsImpl extends _AppSettings {
       required this.scanTimeoutSeconds,
       required this.enableScanSound,
       required this.enableContinuousScanning,
-      required this.apiTimeoutSeconds,
+      required this.wsTimeoutSeconds,
       required this.enableOfflineMode,
       required this.cacheExpirationHours,
       required this.enableNotifications,
@@ -447,7 +447,7 @@ class _$AppSettingsImpl extends _AppSettings {
   final bool enableContinuousScanning;
 // Network Settings
   @override
-  final int apiTimeoutSeconds;
+  final int wsTimeoutSeconds;
   @override
   final bool enableOfflineMode;
   @override
@@ -476,7 +476,7 @@ class _$AppSettingsImpl extends _AppSettings {
 
   @override
   String toString() {
-    return 'AppSettings(themeMode: $themeMode, showDebugInfo: $showDebugInfo, enableHapticFeedback: $enableHapticFeedback, scanTimeoutSeconds: $scanTimeoutSeconds, enableScanSound: $enableScanSound, enableContinuousScanning: $enableContinuousScanning, apiTimeoutSeconds: $apiTimeoutSeconds, enableOfflineMode: $enableOfflineMode, cacheExpirationHours: $cacheExpirationHours, enableNotifications: $enableNotifications, enableCriticalAlerts: $enableCriticalAlerts, enableInfoAlerts: $enableInfoAlerts, autoSync: $autoSync, syncIntervalMinutes: $syncIntervalMinutes, useCellularData: $useCellularData, enableLogging: $enableLogging, showPerformanceOverlay: $showPerformanceOverlay, enableMockData: $enableMockData)';
+    return 'AppSettings(themeMode: $themeMode, showDebugInfo: $showDebugInfo, enableHapticFeedback: $enableHapticFeedback, scanTimeoutSeconds: $scanTimeoutSeconds, enableScanSound: $enableScanSound, enableContinuousScanning: $enableContinuousScanning, wsTimeoutSeconds: $wsTimeoutSeconds, enableOfflineMode: $enableOfflineMode, cacheExpirationHours: $cacheExpirationHours, enableNotifications: $enableNotifications, enableCriticalAlerts: $enableCriticalAlerts, enableInfoAlerts: $enableInfoAlerts, autoSync: $autoSync, syncIntervalMinutes: $syncIntervalMinutes, useCellularData: $useCellularData, enableLogging: $enableLogging, showPerformanceOverlay: $showPerformanceOverlay, enableMockData: $enableMockData)';
   }
 
   @override
@@ -497,8 +497,8 @@ class _$AppSettingsImpl extends _AppSettings {
             (identical(
                     other.enableContinuousScanning, enableContinuousScanning) ||
                 other.enableContinuousScanning == enableContinuousScanning) &&
-            (identical(other.apiTimeoutSeconds, apiTimeoutSeconds) ||
-                other.apiTimeoutSeconds == apiTimeoutSeconds) &&
+            (identical(other.wsTimeoutSeconds, wsTimeoutSeconds) ||
+                other.wsTimeoutSeconds == wsTimeoutSeconds) &&
             (identical(other.enableOfflineMode, enableOfflineMode) ||
                 other.enableOfflineMode == enableOfflineMode) &&
             (identical(other.cacheExpirationHours, cacheExpirationHours) ||
@@ -532,7 +532,7 @@ class _$AppSettingsImpl extends _AppSettings {
       scanTimeoutSeconds,
       enableScanSound,
       enableContinuousScanning,
-      apiTimeoutSeconds,
+      wsTimeoutSeconds,
       enableOfflineMode,
       cacheExpirationHours,
       enableNotifications,
@@ -561,7 +561,7 @@ class _$AppSettingsImpl extends _AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -582,7 +582,7 @@ class _$AppSettingsImpl extends _AppSettings {
         scanTimeoutSeconds,
         enableScanSound,
         enableContinuousScanning,
-        apiTimeoutSeconds,
+        wsTimeoutSeconds,
         enableOfflineMode,
         cacheExpirationHours,
         enableNotifications,
@@ -606,7 +606,7 @@ class _$AppSettingsImpl extends _AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -627,7 +627,7 @@ class _$AppSettingsImpl extends _AppSettings {
         scanTimeoutSeconds,
         enableScanSound,
         enableContinuousScanning,
-        apiTimeoutSeconds,
+        wsTimeoutSeconds,
         enableOfflineMode,
         cacheExpirationHours,
         enableNotifications,
@@ -651,7 +651,7 @@ class _$AppSettingsImpl extends _AppSettings {
             int scanTimeoutSeconds,
             bool enableScanSound,
             bool enableContinuousScanning,
-            int apiTimeoutSeconds,
+            int wsTimeoutSeconds,
             bool enableOfflineMode,
             int cacheExpirationHours,
             bool enableNotifications,
@@ -674,7 +674,7 @@ class _$AppSettingsImpl extends _AppSettings {
           scanTimeoutSeconds,
           enableScanSound,
           enableContinuousScanning,
-          apiTimeoutSeconds,
+          wsTimeoutSeconds,
           enableOfflineMode,
           cacheExpirationHours,
           enableNotifications,
@@ -727,7 +727,7 @@ abstract class _AppSettings extends AppSettings {
       required final int scanTimeoutSeconds,
       required final bool enableScanSound,
       required final bool enableContinuousScanning,
-      required final int apiTimeoutSeconds,
+      required final int wsTimeoutSeconds,
       required final bool enableOfflineMode,
       required final int cacheExpirationHours,
       required final bool enableNotifications,
@@ -754,7 +754,7 @@ abstract class _AppSettings extends AppSettings {
   @override
   bool get enableContinuousScanning;
   @override // Network Settings
-  int get apiTimeoutSeconds;
+  int get wsTimeoutSeconds;
   @override
   bool get enableOfflineMode;
   @override

@@ -4,7 +4,10 @@ import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/unified_summary_card.dart';
 
 /// Default networking configuration values
 class _NetworkDefaults {
@@ -352,25 +355,108 @@ class _DeviceHeader extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends StatefulWidget {
+class _OverviewTab extends ConsumerStatefulWidget {
   const _OverviewTab({required this.device});
 
   final Device device;
 
   @override
-  State<_OverviewTab> createState() => _OverviewTabState();
+  ConsumerState<_OverviewTab> createState() => _OverviewTabState();
 }
 
-class _OverviewTabState extends State<_OverviewTab>
+class _OverviewTabState extends ConsumerState<_OverviewTab>
     with AutomaticKeepAliveClientMixin<_OverviewTab> {
   @override
   bool get wantKeepAlive => true;
 
+  Future<void> _handleImageDeleted(String imageUrl) async {
+    final notifier = ref.read(deviceNotifierProvider(widget.device.id).notifier);
+    final success = await notifier.deleteDeviceImage(imageUrl);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Image deleted successfully' : 'Failed to delete image',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _handleEditNote() {
+    // TODO(note-api): Navigate to note edit screen.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Note editing not yet implemented'),
+      ),
+    );
+  }
+
+  void _handleClearNote() {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Note'),
+        content: const Text('Are you sure you want to clear this note?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    ).then((confirmed) {
+      if ((confirmed ?? false) && mounted) {
+        // TODO(note-api): Implement note clearing via API.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note clearing not yet implemented'),
+          ),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    // Comprehensive device detail sections widget showing organized fields
-    return DeviceDetailSections(device: widget.device);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Unified Summary Card at the top
+        UnifiedSummaryCard(device: widget.device),
+        const SizedBox(height: 16),
+
+        // Device detail sections
+        DeviceDetailSections(
+          device: widget.device,
+          onImageDeleted: _handleImageDeleted,
+        ),
+
+        // Editable Note Section
+        const SizedBox(height: 16),
+        EditableNoteSection(
+          note: widget.device.note,
+          onEditNote: _handleEditNote,
+          onClearNote: _handleClearNote,
+        ),
+
+        // Advanced Information (expandable)
+        const SizedBox(height: 16),
+        AdvancedInfoSection(device: widget.device),
+
+        // Bottom padding for safe area
+        const SizedBox(height: 80),
+      ],
+    );
   }
 }
 
@@ -398,7 +484,7 @@ class _NetworkTabState extends State<_NetworkTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Network Configuration
-          _SectionCard(
+          SectionCard(
             title: 'Network Configuration',
             children: [
               _InfoRow('IP Address', device.ipAddress ?? 'Not configured'),
@@ -413,7 +499,7 @@ class _NetworkTabState extends State<_NetworkTab>
           
           // WiFi Settings (for Access Points)
           if (device.type == DeviceTypes.accessPoint) ...[
-            _SectionCard(
+            SectionCard(
               title: 'WiFi Settings',
               children: [
                 _InfoRow('SSID', device.ssid ?? 'RGNets-Guest'),
@@ -429,7 +515,7 @@ class _NetworkTabState extends State<_NetworkTab>
           
           // Port Status (for Switches)
           if (device.type == DeviceTypes.networkSwitch) ...[
-            const _SectionCard(
+            const SectionCard(
               title: 'Port Status',
               children: [
                 _InfoRow('Total Ports', '24'),
@@ -473,7 +559,7 @@ class _StatisticsTabState extends State<_StatisticsTab>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Traffic Statistics
-          _SectionCard(
+          SectionCard(
             title: 'Traffic Statistics',
             children: [
               _InfoRow('Total Upload', '${device.totalUpload ?? 1024} GB'),
@@ -487,7 +573,7 @@ class _StatisticsTabState extends State<_StatisticsTab>
           const SizedBox(height: 16),
           
           // Performance Metrics
-          _SectionCard(
+          SectionCard(
             title: 'Performance Metrics',
             children: [
               _InfoRow('CPU Usage', '${device.cpuUsage ?? 25}%'),
@@ -501,7 +587,7 @@ class _StatisticsTabState extends State<_StatisticsTab>
           
           // Client Statistics (for Access Points)
           if (device.type == DeviceTypes.accessPoint) ...[
-            _SectionCard(
+            SectionCard(
               title: 'Client Statistics',
               children: [
                 _InfoRow('Current Clients', '${device.connectedClients ?? 0}'),
@@ -577,38 +663,6 @@ class _LogsTabState extends State<_LogsTab>
             style: TextStyle(color: Colors.grey),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  
-  const _SectionCard({
-    required this.title,
-    required this.children,
-  });
-  final String title;
-  final List<Widget> children;
-  
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
       ),
     );
   }

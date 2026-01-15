@@ -20,7 +20,7 @@ void main() {
   group('GetCurrentUser', () {
     const tUser = User(
       username: 'testuser',
-      apiUrl: 'https://test.rgnets.com/api',
+      siteUrl: 'https://test.rgnets.com',
       displayName: 'Test User',
       email: 'test@example.com',
     );

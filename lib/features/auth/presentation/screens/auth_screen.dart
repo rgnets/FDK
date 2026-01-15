@@ -180,7 +180,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     try {
       final fqdn = credentials['fqdn'] as String?;
       final login = credentials['login'] as String?;
-      final apiKey = credentials['apiKey'] as String?;
+      final token = credentials['token'] as String?;
       final siteNameRaw =
           credentials['siteName'] as String? ??
           credentials['site_name'] as String?;
@@ -196,9 +196,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ? siteNameRaw.trim()
               : null;
 
-      logger.d('AUTH_SCREEN: Parsed - fqdn=$fqdn, login=$login, apiKey=${apiKey != null ? "${apiKey.substring(0, 4)}..." : "null"}');
+      logger.d('AUTH_SCREEN: Parsed - fqdn=$fqdn, login=$login, token=${token != null ? "${token.substring(0, 4)}..." : "null"}');
 
-      if (fqdn == null || login == null || apiKey == null) {
+      if (fqdn == null || login == null || token == null) {
         logger.e('AUTH_SCREEN: Invalid credential payload - missing required fields');
         throw Exception('Invalid credential payload');
       }
@@ -207,7 +207,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       final approved = await _showCredentialApprovalSheet(
         fqdn: fqdn,
         login: login,
-        apiKey: apiKey,
+        token: token,
         siteName: siteName,
         issuedAt: issuedAt,
         signature: signature,
@@ -251,7 +251,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           .authenticate(
             fqdn: fqdn,
             login: login,
-            apiKey: apiKey,
+            token: token,
             siteName: siteName,
             issuedAt: issuedAt,
             signature: signature,
@@ -320,7 +320,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<bool> _showCredentialApprovalSheet({
     required String fqdn,
     required String login,
-    required String apiKey,
+    required String token,
     String? siteName,
     DateTime? issuedAt,
     String? signature,
@@ -346,7 +346,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           return CredentialApprovalSheet(
             fqdn: fqdn,
             login: login,
-            apiKey: apiKey,
+            token: token,
             siteName: siteName,
             issuedAt: issuedAt,
             signature: signature,
@@ -375,7 +375,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     await _processScannedCredentials(<String, dynamic>{
       'fqdn': result['fqdn'],
       'login': result['login'],
-      'apiKey': result['apiKey'],
+      'token': result['token'],
       'siteName': result['siteName'],
     });
   }

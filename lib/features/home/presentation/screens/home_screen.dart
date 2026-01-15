@@ -36,7 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         LoggerService.debug('HomeScreen - Auth data received', tag: 'HomeScreen');
         auth.maybeWhen(
           authenticated: (user) {
-            LoggerService.debug('HomeScreen - User authenticated: username=${user.username}, apiUrl=${user.apiUrl}', tag: 'HomeScreen');
+            LoggerService.debug('HomeScreen - User authenticated: username=${user.username}, siteUrl=${user.siteUrl}', tag: 'HomeScreen');
             return null;
           },
           unauthenticated: () {
