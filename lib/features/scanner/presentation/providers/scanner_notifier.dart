@@ -5,11 +5,11 @@ import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/usecases/usecase.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
+import 'package:rgnets_fdk/features/scanner/domain/repositories/scanner_repository.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/complete_scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/get_current_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_barcode.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/start_scan_session.dart';
-import 'package:rgnets_fdk/features/scanner/domain/repositories/scanner_repository.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'scanner_notifier.g.dart';

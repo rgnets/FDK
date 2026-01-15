@@ -4,11 +4,11 @@ import 'package:fpdart/fpdart.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_mock_data_source.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_websocket_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
-import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 class RoomRepositoryImpl implements RoomRepository {

@@ -87,7 +87,7 @@ class BackgroundRefreshService {
     _logger.d('BackgroundRefreshService: Starting background refresh');
 
     if (!webSocketService.isConnected) {
-      final message = 'WebSocket disconnected';
+      const message = 'WebSocket disconnected';
       _logger.w('BackgroundRefreshService: $message');
       _deviceRefreshController.add(RefreshStatus.error(message));
       _roomRefreshController.add(RefreshStatus.error(message));

@@ -69,12 +69,12 @@ class EnvironmentConfig {
       case Environment.staging:
         return const String.fromEnvironment(
           'STAGING_WS_URL',
-          defaultValue: 'wss://zew.netlab.ninja/ws',
+          defaultValue: 'wss://dlp.netlab.ninja/ws',
         );
       case Environment.production:
         return const String.fromEnvironment(
           'WS_URL',
-          defaultValue: 'wss://zew.netlab.ninja/ws',
+          defaultValue: 'wss://dlp.netlab.ninja/ws',
         );
     }
   }

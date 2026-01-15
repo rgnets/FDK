@@ -9,9 +9,15 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
-import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
+import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
+import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
+import 'package:rgnets_fdk/features/auth/domain/usecases/get_current_user.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart'
     as devices_providers;
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart'
@@ -20,12 +26,6 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     as device_notifications;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
     as notifications_domain;
-import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
-import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
-import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
-import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
-import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
-import 'package:rgnets_fdk/features/auth/domain/usecases/get_current_user.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auth_notifier.g.dart';
@@ -215,7 +215,8 @@ class Auth extends _$Auth {
 
       await _stopBackgroundServices();
       _clearImageCache();
-      _invalidateDataProviders();
+      // Note: Provider invalidation and cache clearing is now handled by
+      // authSignOutCleanupProvider to avoid CircularDependencyError
 
       // Disconnect WebSocket to stop message processing
       _logger.d('AUTH_NOTIFIER: Disconnecting WebSocket...');
@@ -266,20 +267,6 @@ class Auth extends _$Auth {
       _logger.d('AUTH_NOTIFIER: Image cache cleared');
     } on Exception catch (e) {
       _logger.w('AUTH_NOTIFIER: Failed to clear image cache: $e');
-    }
-  }
-
-  void _invalidateDataProviders() {
-    try {
-      _logger.d('AUTH_NOTIFIER: Invalidating data providers after sign out');
-      ref.invalidate(devices_providers.devicesNotifierProvider);
-      ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
-      ref.invalidate(
-        notifications_domain.notificationsDomainNotifierProvider,
-      );
-      ref.invalidate(dashboard_providers.dashboardStatsProvider);
-    } on Exception catch (e) {
-      _logger.w('AUTH_NOTIFIER: Failed to invalidate data providers: $e');
     }
   }
 
@@ -546,6 +533,51 @@ AuthStatus? authStatus(AuthStatusRef ref) {
   final authAsync = ref.watch(authProvider);
   return authAsync.valueOrNull;
 }
+
+/// Listener provider that handles cleanup when auth state changes to unauthenticated.
+/// This is separated from Auth.signOut() to avoid CircularDependencyError when
+/// invalidating providers that depend on authStatusProvider.
+final authSignOutCleanupProvider = Provider<void>((ref) {
+  final logger = ref.read(loggerProvider);
+
+  ref.listen<AuthStatus?>(authStatusProvider, (AuthStatus? previous, AuthStatus? next) {
+    final wasAuthenticated = previous?.isAuthenticated ?? false;
+    final isNowUnauthenticated = next?.isUnauthenticated ?? false;
+
+    if (wasAuthenticated && isNowUnauthenticated) {
+      logger.i('AUTH_CLEANUP: Detected sign-out, clearing caches and invalidating providers');
+
+      // Clear device local cache
+      try {
+        ref.read(deviceLocalDataSourceProvider).clearCache();
+        logger.d('AUTH_CLEANUP: Device local cache cleared');
+      } on Exception catch (e) {
+        logger.w('AUTH_CLEANUP: Failed to clear device local cache: $e');
+      }
+
+      // Clear WebSocket cache integration
+      try {
+        ref.read(webSocketCacheIntegrationProvider).clearCaches();
+        logger.d('AUTH_CLEANUP: WebSocket cache cleared');
+      } on Exception catch (e) {
+        logger.w('AUTH_CLEANUP: Failed to clear WebSocket cache: $e');
+      }
+
+      // Invalidate data providers - safe from listener context (no circular dependency)
+      try {
+        ref.invalidate(devices_providers.devicesNotifierProvider);
+        ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
+        ref.invalidate(notifications_domain.notificationsDomainNotifierProvider);
+        ref.invalidate(dashboard_providers.dashboardStatsProvider);
+        logger.d('AUTH_CLEANUP: Data providers invalidated');
+      } on Exception catch (e) {
+        logger.w('AUTH_CLEANUP: Failed to invalidate data providers: $e');
+      }
+
+      logger.i('AUTH_CLEANUP: ✅ Sign-out cleanup complete');
+    }
+  });
+});
 
 Uri _buildActionCableUri({
   required Uri baseUri,

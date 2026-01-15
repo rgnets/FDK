@@ -69,9 +69,9 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final cacheWidth =
-        (media.size.width * media.devicePixelRatio).round().clamp(1, 4096).toInt();
+        (media.size.width * media.devicePixelRatio).round().clamp(1, 4096);
     final cacheHeight =
-        (media.size.height * media.devicePixelRatio).round().clamp(1, 4096).toInt();
+        (media.size.height * media.devicePixelRatio).round().clamp(1, 4096);
 
     return Scaffold(
       backgroundColor: Colors.transparent,

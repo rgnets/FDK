@@ -12,6 +12,7 @@ import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/home_screen_provider.dart';
+import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
     hide notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
@@ -108,15 +109,18 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
     switch (event.type) {
       case WebSocketDataSyncEventType.devicesCached:
         logger.i('WebSocketDataSync: devices cached -> refreshing providers');
-        ref.refresh(devicesNotifierProvider);
-        ref.refresh(deviceNotificationsNotifierProvider);
-        ref.refresh(notificationsDomainNotifierProvider);
-        ref.refresh(homeScreenStatisticsProvider);
-        ref.refresh(dashboardStatsProvider);
+        ref.invalidate(devicesNotifierProvider);
+        ref.invalidate(deviceNotificationsNotifierProvider);
+        ref.invalidate(notificationsDomainNotifierProvider);
+        ref.invalidate(homeScreenStatisticsProvider);
+        ref.invalidate(dashboardStatsProvider);
+        // Refresh health notices providers (they aggregate from device data)
+        ref.invalidate(aggregateHealthCountsNotifierProvider);
+        ref.invalidate(healthNoticesNotifierProvider);
         break;
       case WebSocketDataSyncEventType.roomsCached:
         logger.i('WebSocketDataSync: rooms cached -> refreshing providers');
-        ref.refresh(roomsNotifierProvider);
+        ref.invalidate(roomsNotifierProvider);
         break;
     }
   });
@@ -143,9 +147,7 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
   // Initialize the integration
   integration.initialize();
 
-  ref.onDispose(() {
-    integration.dispose();
-  });
+  ref.onDispose(integration.dispose);
 
   return integration;
 });

@@ -10,7 +10,7 @@ Uri? parseImageBaseUri(String? baseUrl) {
   if (parsed != null && parsed.hasScheme) {
     return parsed;
   }
-  final normalized = trimmed.replaceFirst(RegExp(r'^/+'), '');
+  final normalized = trimmed.replaceFirst(RegExp('^/+'), '');
   return Uri.tryParse('https://$normalized');
 }
 

@@ -10,14 +10,13 @@ part 'dashboard_provider.g.dart';
 
 @riverpod
 class DashboardStats extends _$DashboardStats {
-  late final BackgroundRefreshService _backgroundRefreshService;
-  late final PerformanceMonitorService _performanceMonitor;
-  
+  BackgroundRefreshService get _backgroundRefreshService =>
+      ref.read(backgroundRefreshServiceProvider);
+  PerformanceMonitorService get _performanceMonitor =>
+      ref.read(performanceMonitorProvider);
+
   @override
   Future<Map<String, dynamic>> build() async {
-    // Initialize services from providers
-    _backgroundRefreshService = ref.watch(backgroundRefreshServiceProvider);
-    _performanceMonitor = ref.watch(performanceMonitorProvider);
     final storage = ref.watch(storageServiceProvider);
     
     // Start background refresh service

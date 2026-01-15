@@ -7,7 +7,7 @@ import 'package:rgnets_fdk/features/debug/debug_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/screens/device_detail_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/screens/devices_screen.dart';
 import 'package:rgnets_fdk/features/home/presentation/screens/home_screen.dart';
-import 'package:rgnets_fdk/features/notifications/presentation/screens/notifications_screen.dart';
+import 'package:rgnets_fdk/features/issues/presentation/screens/health_notices_screen.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/room_detail_screen.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/rooms_screen.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/screens/scanner_screen.dart';
@@ -99,13 +99,12 @@ class AppRouter {
             ],
           ),
           
-          // Notifications
+          // Notifications / Health Notices
           GoRoute(
             path: '/notifications',
             pageBuilder: (context, state) {
-              final tab = state.uri.queryParameters['tab'];
-              return NoTransitionPage(
-                child: NotificationsScreen(initialTab: tab),
+              return const NoTransitionPage(
+                child: HealthNoticesScreen(),
               );
             },
           ),

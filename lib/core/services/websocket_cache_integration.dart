@@ -7,6 +7,8 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
+import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 
 /// Callback type for when device data is received via WebSocket.
 typedef DeviceDataCallback = void Function(
@@ -133,6 +135,18 @@ class WebSocketCacheIntegration {
     Map<String, dynamic> deviceMap,
   ) {
     try {
+      // DEBUG: Log raw device data keys to see what backend sends
+      final hasHnCounts = deviceMap['hn_counts'] != null;
+      final hasHealthNotices = deviceMap['health_notices'] != null;
+      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
+      if (hasHnCounts) {
+        print('  hn_counts value: ${deviceMap['hn_counts']}');
+      }
+
+      // Extract health notice counts if present
+      final hnCounts = _extractHealthCounts(deviceMap);
+      final healthNotices = _extractHealthNotices(deviceMap);
+
       switch (resourceType) {
         case 'access_points':
           return DeviceModel(
@@ -147,6 +161,8 @@ class WebSocketCacheIntegration {
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
             images: _extractImages(deviceMap),
+            hnCounts: hnCounts,
+            healthNotices: healthNotices,
           );
 
         case 'media_converters':
@@ -162,6 +178,8 @@ class WebSocketCacheIntegration {
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
             images: _extractImages(deviceMap),
+            hnCounts: hnCounts,
+            healthNotices: healthNotices,
           );
 
         case 'switch_devices':
@@ -179,6 +197,8 @@ class WebSocketCacheIntegration {
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
             images: _extractImages(deviceMap),
+            hnCounts: hnCounts,
+            healthNotices: healthNotices,
           );
 
         default:
@@ -211,6 +231,42 @@ class WebSocketCacheIntegration {
   List<String>? _extractImages(Map<String, dynamic> deviceMap) {
     final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
     return normalizeImageUrls(imagesValue, baseUrl: _imageBaseUrl);
+  }
+
+  HealthCountsModel? _extractHealthCounts(Map<String, dynamic> deviceMap) {
+    final hnCountsData = deviceMap['hn_counts'];
+    if (hnCountsData == null) {
+      return null;
+    }
+    _logger.i('WebSocketCacheIntegration: Found hn_counts for device ${deviceMap['name'] ?? deviceMap['id']}: $hnCountsData');
+    if (hnCountsData is Map<String, dynamic>) {
+      try {
+        return HealthCountsModel.fromJson(hnCountsData);
+      } catch (e) {
+        _logger.w('Failed to parse hn_counts: $e');
+        return null;
+      }
+    }
+    return null;
+  }
+
+  List<HealthNoticeModel>? _extractHealthNotices(Map<String, dynamic> deviceMap) {
+    final healthNoticesData = deviceMap['health_notices'];
+    if (healthNoticesData == null) {
+      return null;
+    }
+    if (healthNoticesData is List) {
+      try {
+        return healthNoticesData
+            .whereType<Map<String, dynamic>>()
+            .map(HealthNoticeModel.fromJson)
+            .toList();
+      } catch (e) {
+        _logger.w('Failed to parse health_notices: $e');
+        return null;
+      }
+    }
+    return null;
   }
 
   void initialize() {
@@ -647,6 +703,20 @@ class WebSocketCacheIntegration {
       _bumpLastUpdate();
       _bumpDeviceUpdate();
 
+      // Debug: Log first device's keys to see what fields backend is sending
+      if (items.isNotEmpty) {
+        final firstItem = items.first;
+        final hasHnCounts = firstItem.containsKey('hn_counts');
+        final hasHealthNotices = firstItem.containsKey('health_notices');
+        _logger.i(
+          'WebSocketCacheIntegration: $resourceType snapshot - ${items.length} items, '
+          'has hn_counts: $hasHnCounts, has health_notices: $hasHealthNotices',
+        );
+        if (!hasHnCounts && !hasHealthNotices) {
+          _logger.i('  First item keys: ${firstItem.keys.toList()}');
+        }
+      }
+
       // Notify device callbacks
       for (final callback in _deviceDataCallbacks) {
         callback(resourceType, items);
@@ -661,7 +731,7 @@ class WebSocketCacheIntegration {
   ) {
     final accumulator = _snapshotAccumulators.putIfAbsent(
       resourceType,
-      () => _SnapshotAccumulator(),
+      _SnapshotAccumulator.new,
     );
 
     final shouldReset = _shouldResetAccumulator(accumulator, requestId);
@@ -672,7 +742,7 @@ class WebSocketCacheIntegration {
     if (items.isEmpty) {
       accumulator.touch();
       final hasCached =
-          _deviceCache[resourceType]?.isNotEmpty == true ||
+          (_deviceCache[resourceType]?.isNotEmpty ?? false) ||
           _roomCache.isNotEmpty;
       final hasAccumulated = accumulator.items.isNotEmpty;
       if (hasAccumulated || hasCached) {
@@ -814,6 +884,37 @@ class WebSocketCacheIntegration {
 
   void _bumpDeviceUpdate() {
     lastDeviceUpdate.value = DateTime.now();
+  }
+
+  /// Clears all cached data without disposing the integration.
+  /// Call this during sign-out to prevent stale data from leaking to new sessions.
+  void clearCaches() {
+    _logger.i('WebSocketCacheIntegration: Clearing all caches');
+
+    // Clear device and room caches
+    _deviceCache.clear();
+    _roomCache.clear();
+
+    // Clear snapshot state
+    for (final timer in _snapshotFlushTimers.values) {
+      timer.cancel();
+    }
+    _snapshotFlushTimers.clear();
+    _snapshotAccumulators.clear();
+    _pendingSnapshots.clear();
+    _requestedSnapshots.clear();
+
+    // Reset snapshot flags to request fresh data on next connection
+    _needsSnapshot = true;
+    _snapshotInFlight = false;
+
+    // Reset subscription state
+    _channelSubscribeSent = false;
+    _channelConfirmed = false;
+    _resourcesSubscribed = false;
+    _confirmedResources.clear();
+
+    _logger.d('WebSocketCacheIntegration: All caches cleared, ready for fresh data');
   }
 
   void dispose() {

@@ -45,6 +45,13 @@ class DeviceRepositoryImpl implements DeviceRepository {
   // Stream controllers for real-time updates
   final _devicesStreamController = StreamController<List<Device>>.broadcast();
   Stream<List<Device>> get devicesStream => _devicesStreamController.stream;
+
+  // Store latest devices from WebSocket for immediate access by new subscribers
+  List<Device>? _latestWebSocketDevices;
+
+  /// Get the current devices from WebSocket cache without waiting for stream event.
+  /// Returns null if no WebSocket data has been received yet.
+  List<Device>? get currentDevices => _latestWebSocketDevices;
   
   void _initializePaginationService() {
     _paginationService = PaginationService<Device>(
@@ -84,6 +91,9 @@ class DeviceRepositoryImpl implements DeviceRepository {
       _logger.i(
         'DeviceRepositoryImpl: Total devices from WebSocket cache: ${allDevices.length}',
       );
+
+      // Store for immediate access by new subscribers (fixes broadcast stream race condition)
+      _latestWebSocketDevices = allDevices;
 
       // Update the stream with new data
       _devicesStreamController.add(allDevices);
@@ -210,7 +220,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
   }) async {
     try {
       if (!_isAuthenticated()) {
-        return Left(DeviceFailure(message: 'Not authenticated'));
+        return const Left(DeviceFailure(message: 'Not authenticated'));
       }
       // Use data source
       final deviceModel = await dataSource.getDevice(id, fields: fields);
@@ -266,7 +276,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
   Future<Either<Failure, Device>> updateDevice(Device device) async {
     try {
       if (!_isAuthenticated()) {
-        return Left(DeviceFailure(message: 'Not authenticated'));
+        return const Left(DeviceFailure(message: 'Not authenticated'));
       }
       final deviceModel = DeviceModel(
         id: device.id,

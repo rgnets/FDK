@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:rgnets_fdk/core/config/mock_network_config.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
-import 'package:rgnets_fdk/features/notifications/data/models/notification_model.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/notifications/data/models/notification_model.dart';
 
 /// Generates realistic mock data for the RG Nets network management system
 /// This class creates production-like data for devices, rooms, and notifications

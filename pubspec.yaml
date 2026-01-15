@@ -61,6 +61,7 @@ dependencies:
   url_launcher: ^6.3.1
   uuid: ^4.5.1
   web_socket_channel: ^3.0.3
+  flutter_cache_manager: any
 dev_dependencies:
   build_runner: ^2.4.8
   drift_dev: ^2.21.0
