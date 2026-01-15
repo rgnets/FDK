@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  app_links: ^6.3.2
   battery_plus: ^6.1.0
   cached_network_image: ^3.4.1
   collection: ^1.18.0
