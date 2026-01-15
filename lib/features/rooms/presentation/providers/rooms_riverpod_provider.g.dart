@@ -6,7 +6,7 @@ part of 'rooms_riverpod_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$roomStatisticsHash() => r'16009c7965b05d31a8c231f853860c87823e85b3';
+String _$roomStatisticsHash() => r'f28177d2192a91c882e3bcc6173005c6f329eb44';
 
 /// Provider for room statistics
 ///
@@ -183,7 +183,7 @@ class _RoomByIdProviderElement extends AutoDisposeProviderElement<Room?>
   String get roomId => (origin as RoomByIdProvider).roomId;
 }
 
-String _$roomsNotifierHash() => r'708e1cb6755a2c5f8e1210667d3eba495855d9b7';
+String _$roomsNotifierHash() => r'2673e73d35cb62c54a51a0b54636ce631c33ceb5';
 
 /// See also [RoomsNotifier].
 @ProviderFor(RoomsNotifier)
