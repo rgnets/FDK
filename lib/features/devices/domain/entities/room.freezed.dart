@@ -29,28 +29,52 @@ mixin _$Room {
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)
+    TResult Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)?
+    TResult? Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)?
+    TResult Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -242,11 +266,11 @@ class __$$RoomImplCopyWithImpl<$Res>
           : location // ignore: cast_nullable_to_non_nullable
               as String?,
       deviceIds: freezed == deviceIds
-          ? _value.deviceIds
+          ? _value._deviceIds
           : deviceIds // ignore: cast_nullable_to_non_nullable
               as List<String>?,
       metadata: freezed == metadata
-          ? _value.metadata
+          ? _value._metadata
           : metadata // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       createdAt: freezed == createdAt
@@ -349,20 +373,19 @@ class _$RoomImpl extends _Room {
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        runtimeType,
-        id,
-        name,
-        building,
-        floor,
-        number,
-        description,
-        location,
-        const DeepCollectionEquality().hash(_deviceIds),
-        const DeepCollectionEquality().hash(_metadata),
-        createdAt,
-        updatedAt,
-      ]);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      name,
+      building,
+      floor,
+      number,
+      description,
+      location,
+      const DeepCollectionEquality().hash(_deviceIds),
+      const DeepCollectionEquality().hash(_metadata),
+      createdAt,
+      updatedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -373,10 +396,18 @@ class _$RoomImpl extends _Room {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)
+    TResult Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)
         $default,
   ) {
     return $default(id, name, building, floor, number, description, location,
@@ -386,10 +417,18 @@ class _$RoomImpl extends _Room {
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)?
+    TResult? Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)?
         $default,
   ) {
     return $default?.call(id, name, building, floor, number, description,
@@ -399,10 +438,18 @@ class _$RoomImpl extends _Room {
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int id, String name, String? building, String? floor,
-            String? number, String? description, String? location,
-            List<String>? deviceIds, Map<String, dynamic>? metadata,
-            DateTime? createdAt, DateTime? updatedAt)?
+    TResult Function(
+            int id,
+            String name,
+            String? building,
+            String? floor,
+            String? number,
+            String? description,
+            String? location,
+            List<String>? deviceIds,
+            Map<String, dynamic>? metadata,
+            DateTime? createdAt,
+            DateTime? updatedAt)?
         $default, {
     required TResult orElse(),
   }) {

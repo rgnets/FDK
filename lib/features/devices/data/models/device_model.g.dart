@@ -46,6 +46,13 @@ _$DeviceModelImpl _$$DeviceModelImplFromJson(Map<String, dynamic> json) =>
       note: json['note'] as String?,
       images:
           (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
+      healthNotices: (json['health_notices'] as List<dynamic>?)
+          ?.map((e) => HealthNoticeModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      hnCounts: json['hn_counts'] == null
+          ? null
+          : HealthCountsModel.fromJson(
+              json['hn_counts'] as Map<String, dynamic>),
     );
 
 Map<String, dynamic> _$$DeviceModelImplToJson(_$DeviceModelImpl instance) {
@@ -91,5 +98,8 @@ Map<String, dynamic> _$$DeviceModelImplToJson(_$DeviceModelImpl instance) {
   writeNotNull('max_clients', instance.maxClients);
   writeNotNull('note', instance.note);
   writeNotNull('images', instance.images);
+  writeNotNull('health_notices',
+      instance.healthNotices?.map((e) => e.toJson()).toList());
+  writeNotNull('hn_counts', instance.hnCounts?.toJson());
   return val;
 }

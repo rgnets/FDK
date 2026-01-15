@@ -25,9 +25,7 @@ void main() {
       EnvironmentConfig.setEnvironment(Environment.staging);
     });
     
-    test('Staging environment should have correct configuration', () {
-      expectStagingEnvironmentConfig();
-    });
+    test('Staging environment should have correct configuration', expectStagingEnvironmentConfig);
     
     test('Staging should attempt auto-authentication', () async {
       // The staging environment should have credentials configured

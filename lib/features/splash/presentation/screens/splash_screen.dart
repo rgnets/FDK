@@ -294,7 +294,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         final siteName = storageService.siteName;
 
         final parsed = Uri.tryParse(siteUrl);
-        final fqdn = parsed?.host ?? siteUrl.replaceFirst(RegExp(r'^https?://'), '');
+        final fqdn = parsed?.host ?? siteUrl.replaceFirst(RegExp('^https?://'), '');
 
         if (authToken.isEmpty || login.isEmpty || fqdn.isEmpty) {
           logger.w(

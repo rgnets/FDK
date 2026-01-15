@@ -23,7 +23,7 @@ final roomStatisticsProvider = AutoDisposeProvider<RoomStatistics>.internal(
 );
 
 typedef RoomStatisticsRef = AutoDisposeProviderRef<RoomStatistics>;
-String _$roomByIdHash() => r'abe9b0715dfdb52a01a783a95c8a75f2a90a5193';
+String _$roomByIdHash() => r'310270c2acbb8b5f589cbf41241b5fdc99e32db4';
 
 /// Copied from Dart SDK
 class _SystemHash {

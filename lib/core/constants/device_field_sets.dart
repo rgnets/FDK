@@ -28,6 +28,8 @@ class DeviceFieldSets {
     'online', // For notifications
     'note', // For notifications
     'images', // For notifications
+    'hn_counts', // Health notice counts for alerts badge
+    'health_notices', // Health notice list for alerts screen
   ];
 
   /// All fields for detail view

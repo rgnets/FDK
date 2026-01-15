@@ -22,11 +22,10 @@ part 'devices_provider.g.dart';
 @Riverpod(keepAlive: true)
 class DevicesNotifier extends _$DevicesNotifier {
   Logger get _logger => ref.read(loggerProvider);
-  late final CacheManager _cacheManager;
+  CacheManager get _cacheManager => ref.read(cacheManagerProvider);
   StreamSubscription<List<Device>>? _devicesStreamSub;
   bool _devicesStreamAttached = false;
   List<Device>? _latestDevices;
-  DateTime? _latestDevicesAt;
 
   GetDevices get _getDevices => GetDevices(ref.read(deviceRepositoryProvider));
 
@@ -35,9 +34,6 @@ class DevicesNotifier extends _$DevicesNotifier {
 
   @override
   Future<List<Device>> build() async {
-    final buildStartedAt = DateTime.now();
-    // Initialize managers
-    _cacheManager = ref.read(cacheManagerProvider);
     final authStatus = ref.watch(authStatusProvider);
     final isAuthenticated = authStatus?.isAuthenticated ?? false;
     _attachDevicesStream();
@@ -51,7 +47,6 @@ class DevicesNotifier extends _$DevicesNotifier {
         _logger.i('DevicesProvider: Skipping load (not authenticated)');
       }
       _latestDevices = null;
-      _latestDevicesAt = null;
       return [];
     }
 
@@ -92,13 +87,17 @@ class DevicesNotifier extends _$DevicesNotifier {
 
       final fetchedDevices = devices ?? [];
       final latestDevices = _latestDevices;
-      final latestDevicesAt = _latestDevicesAt;
-      if (latestDevices != null && latestDevices.isNotEmpty) {
-        final latestIsNewer =
-            latestDevicesAt != null && latestDevicesAt.isAfter(buildStartedAt);
-        if (latestIsNewer || fetchedDevices.isEmpty) {
-          return latestDevices;
+
+      // WebSocket stream is the real-time source of truth.
+      // Always prefer stream data when available since it reflects the current server state.
+      // The fetched/cached data is only used as a fallback for initial load before stream delivers.
+      if (latestDevices != null) {
+        if (isVerboseLoggingEnabled) {
+          _logger.d(
+            'DevicesProvider: Using stream data (${latestDevices.length}) - real-time source',
+          );
         }
+        return latestDevices;
       }
 
       return fetchedDevices;
@@ -123,9 +122,18 @@ class DevicesNotifier extends _$DevicesNotifier {
     }
 
     _devicesStreamAttached = true;
+
+    // Check for any devices that arrived before subscription (broadcast stream race fix)
+    final currentDevices = repository.currentDevices;
+    if (currentDevices != null && currentDevices.isNotEmpty) {
+      _logger.d(
+        'DevicesProvider: Found ${currentDevices.length} existing devices on stream attach',
+      );
+      _latestDevices = currentDevices;
+    }
+
     _devicesStreamSub = repository.devicesStream.listen((devices) {
       _latestDevices = devices;
-      _latestDevicesAt = DateTime.now();
       final authStatus = ref.read(authStatusProvider);
       if (authStatus?.isUnauthenticated ?? false) {
         return;
