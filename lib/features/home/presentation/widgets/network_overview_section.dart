@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/navigation_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/domain/entities/home_statistics.dart';
 import 'package:rgnets_fdk/features/home/presentation/providers/home_screen_provider.dart';
 import 'package:rgnets_fdk/features/home/presentation/widgets/stat_card.dart';
+import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
+import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 
 /// Network overview section showing device and room statistics
 class NetworkOverviewSection extends ConsumerWidget {
@@ -20,8 +22,17 @@ class NetworkOverviewSection extends ConsumerWidget {
     final deviceUpdateAsync = ref.watch(webSocketDeviceLastUpdateProvider);
     final roomsAsync = ref.watch(roomsNotifierProvider);
     final roomStats = ref.watch(roomStatisticsProvider);
+    final allNotices = ref.watch(healthNoticesListProvider);
+
+    // Calculate counts from actual notices
+    final fatalCount = allNotices.where((n) => n.severity == HealthNoticeSeverity.fatal).length;
+    final criticalCount = allNotices.where((n) => n.severity == HealthNoticeSeverity.critical).length;
+    final warningCount = allNotices.where((n) => n.severity == HealthNoticeSeverity.warning).length;
+    final noticeCount = allNotices.where((n) => n.severity == HealthNoticeSeverity.notice).length;
+    final totalIssues = allNotices.length;
+
     const navigationService = NavigationService();
-    
+
     // Check loading states
     final isHomeStatsLoading = homeStatsAsync.isLoading || homeStatsAsync.isRefreshing;
     final isRoomsLoading = roomsAsync.isLoading || roomsAsync.isRefreshing;
@@ -30,7 +41,7 @@ class NetworkOverviewSection extends ConsumerWidget {
     final homeStats = homeStatsAsync.valueOrNull ?? HomeStatistics.loading();
     final hasDeviceData = deviceUpdateAsync.valueOrNull != null;
     final isDeviceStatsLoading =
-        !hasDeviceData && (devicesAsync.isLoading || devicesAsync.valueOrNull?.isEmpty == true);
+        !hasDeviceData && (devicesAsync.isLoading || (devicesAsync.valueOrNull?.isEmpty ?? false));
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,20 +97,46 @@ class NetworkOverviewSection extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: StatCard(
-                icon: Icons.description,
-                label: 'Doc Issues',
-                value: isDeviceStatsLoading ? '--' : homeStats.missingDocs.toString(),
-                color: Colors.blue,
-                subtitle: isDeviceStatsLoading ? 'Loading...' : homeStats.missingDocsText,
-                onTap: () => navigationService.navigateToNotifications(
-                  GoRouter.of(context),
-                  tab: NotificationTab.docsMissing,
-                ),
+                icon: Icons.warning_amber_rounded,
+                label: 'Issues',
+                value: isDeviceStatsLoading ? '--' : totalIssues.toString(),
+                color: fatalCount > 0 || criticalCount > 0
+                    ? Colors.red
+                    : warningCount > 0
+                        ? Colors.orange
+                        : Colors.green,
+                subtitle: isDeviceStatsLoading
+                    ? 'Loading...'
+                    : _buildIssuesSubtitle(fatalCount, criticalCount, warningCount, noticeCount),
+                onTap: () => context.go('/notifications'),
               ),
             ),
           ],
         ),
       ],
     );
+  }
+
+  String _buildIssuesSubtitle(int fatal, int critical, int warning, int notice) {
+    final total = fatal + critical + warning + notice;
+    if (total == 0) {
+      return 'All healthy';
+    }
+
+    final parts = <String>[];
+    if (fatal > 0) {
+      parts.add('$fatal fatal');
+    }
+    if (critical > 0) {
+      parts.add('$critical critical');
+    }
+    if (warning > 0) {
+      parts.add('$warning warning');
+    }
+    if (notice > 0) {
+      parts.add('$notice notice');
+    }
+
+    return parts.take(2).join(', ');
   }
 }

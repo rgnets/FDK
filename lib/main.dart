@@ -4,8 +4,10 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
+import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -85,6 +87,10 @@ class _FDKAppState extends ConsumerState<FDKApp> {
     // Start background refresh service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(backgroundRefreshServiceProvider).startBackgroundRefresh();
+      // Initialize WebSocket data sync listener to refresh providers when data arrives
+      ref.read(webSocketDataSyncListenerProvider);
+      // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
+      ref.read(authSignOutCleanupProvider);
     });
   }
 

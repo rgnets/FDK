@@ -1,7 +1,8 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
+import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 
 part 'device_model.freezed.dart';
 part 'device_model.g.dart';
@@ -42,6 +43,8 @@ class DeviceModel with _$DeviceModel {
     @JsonKey(name: 'max_clients') int? maxClients,
     String? note,
     List<String>? images,
+    @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
+    @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
   }) = _DeviceModel;
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) =>

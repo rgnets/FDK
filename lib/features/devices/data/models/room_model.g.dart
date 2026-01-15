@@ -13,7 +13,9 @@ _$RoomModelImpl _$$RoomModelImplFromJson(Map<String, dynamic> json) =>
       building: json['building'] as String?,
       floor: json['floor'] as String?,
       number: json['number'] as String?,
-      deviceIds: (json['device_ids'] as List<dynamic>?)?.cast<String>(),
+      deviceIds: (json['device_ids'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
 

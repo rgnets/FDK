@@ -2,15 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:logger/logger.dart';
-
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
-import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
@@ -288,7 +287,7 @@ class WebSocketDataSyncService {
         ..clear()
         ..['devices.summary'] = models;
       _pendingDeviceCache = _cacheDevices(models);
-      unawaited(_pendingDeviceCache!);
+      unawaited(_pendingDeviceCache);
       return;
     }
 
@@ -299,7 +298,7 @@ class WebSocketDataSyncService {
         combined.addAll(_deviceSnapshots[entry] ?? const []);
       }
       _pendingDeviceCache = _cacheDevices(combined);
-      unawaited(_pendingDeviceCache!);
+      unawaited(_pendingDeviceCache);
     }
   }
 
@@ -337,7 +336,7 @@ class WebSocketDataSyncService {
         ..clear()
         ..['rooms.summary'] = models;
       _pendingRoomCache = _cacheRooms(models);
-      unawaited(_pendingRoomCache!);
+      unawaited(_pendingRoomCache);
       return;
     }
 
@@ -348,7 +347,7 @@ class WebSocketDataSyncService {
         combined.addAll(_roomSnapshots[entry] ?? const []);
       }
       _pendingRoomCache = _cacheRooms(combined);
-      unawaited(_pendingRoomCache!);
+      unawaited(_pendingRoomCache);
     }
   }
 
@@ -379,6 +378,19 @@ class WebSocketDataSyncService {
         data.containsKey('id')) {
       final normalized = Map<String, dynamic>.from(data);
       normalized['id'] = normalized['id'].toString();
+      // Ensure hn_counts and health_notices are present even for pre-normalized data
+      normalized['hn_counts'] ??= {
+        'total': 0,
+        'fatal': 0,
+        'critical': 0,
+        'warning': 0,
+        'notice': 0,
+      };
+      normalized['health_notices'] ??= <Map<String, dynamic>>[];
+      // Debug logging
+      if (data['hn_counts'] != null) {
+        _logger.d('Pre-normalized device ${data['name'] ?? data['id']}: hn_counts=${data['hn_counts']}');
+      }
       return normalized;
     }
 
@@ -423,6 +435,19 @@ class WebSocketDataSyncService {
     required String type,
     required String defaultName,
   }) {
+    // Debug: Log raw device data keys to diagnose missing hn_counts/health_notices
+    final hasHnCounts = data['hn_counts'] != null;
+    final hasHealthNotices = data['health_notices'] != null;
+
+    // Always log first device of each type to see what backend sends
+    _logger.i('RAW DEVICE DATA [$type]: keys=${data.keys.toList()}, hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
+    if (hasHnCounts) {
+      _logger.i('  hn_counts value: ${data['hn_counts']}');
+    }
+    if (hasHealthNotices) {
+      _logger.i('  health_notices value: ${data['health_notices']}');
+    }
+
     return {
       'id': id,
       'name': data['name'] ?? data['nickname'] ?? defaultName,
@@ -436,7 +461,26 @@ class WebSocketDataSyncService {
       'location': _extractLocation(data),
       'last_seen': data['last_seen'] ?? data['updated_at'],
       'images': _extractImages(data),
-      'metadata': data,
+      'metadata': {
+        ...data,
+        // Ensure hn_counts and health_notices are in metadata for provider access
+        'hn_counts': data['hn_counts'] ?? {
+          'total': 0,
+          'fatal': 0,
+          'critical': 0,
+          'warning': 0,
+          'notice': 0,
+        },
+        'health_notices': data['health_notices'] ?? <Map<String, dynamic>>[],
+      },
+      'health_notices': data['health_notices'] ?? <Map<String, dynamic>>[],
+      'hn_counts': data['hn_counts'] ?? {
+        'total': 0,
+        'fatal': 0,
+        'critical': 0,
+        'warning': 0,
+        'notice': 0,
+      },
     };
   }
 
@@ -631,13 +675,6 @@ class WebSocketDataSyncService {
 }
 
 class WebSocketDataSyncEvent {
-  const WebSocketDataSyncEvent._({
-    required this.type,
-    required this.count,
-  });
-
-  final WebSocketDataSyncEventType type;
-  final int count;
 
   factory WebSocketDataSyncEvent.devicesCached({required int count}) =>
       WebSocketDataSyncEvent._(
@@ -650,6 +687,13 @@ class WebSocketDataSyncEvent {
         type: WebSocketDataSyncEventType.roomsCached,
         count: count,
       );
+  const WebSocketDataSyncEvent._({
+    required this.type,
+    required this.count,
+  });
+
+  final WebSocketDataSyncEventType type;
+  final int count;
 }
 
 enum WebSocketDataSyncEventType {
