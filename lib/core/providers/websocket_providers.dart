@@ -134,6 +134,14 @@ final webSocketDataSyncListenerProvider = Provider<void>((ref) {
         logger.i('WebSocketDataSync: speed test results cached (${event.count})');
         ref.invalidate(speedTestResultsProvider);
         break;
+      case WebSocketDataSyncEventType.speedTestConfigsCached:
+        logger.i('WebSocketDataSync: speed test configs cached (${event.count})');
+        ref.invalidate(speedTestConfigsProvider);
+        break;
+      case WebSocketDataSyncEventType.speedTestResultsCached:
+        logger.i('WebSocketDataSync: speed test results cached (${event.count})');
+        ref.invalidate(speedTestResultsProvider);
+        break;
     }
   });
 

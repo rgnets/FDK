@@ -27,14 +27,6 @@ android {
         }
     }
 
-    // CMake configuration for native iPerf3 library
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
-
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.rgnets.rgnets_fdk"
