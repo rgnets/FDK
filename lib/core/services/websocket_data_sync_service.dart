@@ -5,25 +5,34 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
     required WebSocketService socketService,
-    required DeviceLocalDataSource deviceLocalDataSource,
+    required APLocalDataSource apLocalDataSource,
+    required ONTLocalDataSource ontLocalDataSource,
+    required SwitchLocalDataSource switchLocalDataSource,
+    required WLANLocalDataSource wlanLocalDataSource,
     required RoomLocalDataSource roomLocalDataSource,
     required NotificationGenerationService notificationService,
     required CacheManager cacheManager,
+    required StorageService storageService,
     Logger? logger,
   }) : _socketService = socketService,
-       _deviceLocalDataSource = deviceLocalDataSource,
+       _apLocalDataSource = apLocalDataSource,
+       _ontLocalDataSource = ontLocalDataSource,
+       _switchLocalDataSource = switchLocalDataSource,
+       _wlanLocalDataSource = wlanLocalDataSource,
        _roomLocalDataSource = roomLocalDataSource,
        _notificationService = notificationService,
        _cacheManager = cacheManager,
+       _storageService = storageService,
        _logger = logger ?? Logger();
 
   static const String _channelName = 'RxgChannel';
@@ -36,21 +45,26 @@ class WebSocketDataSyncService {
   static const List<String> _roomResources = ['pms_rooms'];
 
   final WebSocketService _socketService;
-  final DeviceLocalDataSource _deviceLocalDataSource;
+  final APLocalDataSource _apLocalDataSource;
+  final ONTLocalDataSource _ontLocalDataSource;
+  final SwitchLocalDataSource _switchLocalDataSource;
+  final WLANLocalDataSource _wlanLocalDataSource;
   final RoomLocalDataSource _roomLocalDataSource;
   final NotificationGenerationService _notificationService;
   final CacheManager _cacheManager;
+  final StorageService _storageService;
   final Logger _logger;
 
   StreamSubscription<SocketMessage>? _messageSub;
   StreamSubscription<SocketConnectionState>? _stateSub;
   bool _started = false;
 
-  final Map<String, List<DeviceModel>> _deviceSnapshots = {};
+  /// ID-to-Type index for routing device lookups
+  final Map<String, String> _idToTypeIndex = {};
+
   final Map<String, List<RoomModel>> _roomSnapshots = {};
   final Set<String> _pendingSnapshots = {};
   Completer<void>? _initialSyncCompleter;
-  Future<void>? _pendingDeviceCache;
   Future<void>? _pendingRoomCache;
   final _eventController = StreamController<WebSocketDataSyncEvent>.broadcast();
 
@@ -78,7 +92,6 @@ class WebSocketDataSyncService {
     _messageSub = null;
     _stateSub = null;
     _pendingSnapshots.clear();
-    _deviceSnapshots.clear();
     _roomSnapshots.clear();
     _initialSyncCompleter = null;
   }
@@ -86,6 +99,10 @@ class WebSocketDataSyncService {
   Future<void> dispose() async {
     await stop();
     await _eventController.close();
+    _apLocalDataSource.dispose();
+    _ontLocalDataSource.dispose();
+    _switchLocalDataSource.dispose();
+    _wlanLocalDataSource.dispose();
   }
 
   Future<void> syncInitialData({
@@ -96,7 +113,6 @@ class WebSocketDataSyncService {
       ..clear()
       ..addAll(_deviceResources)
       ..addAll(_roomResources);
-    _pendingDeviceCache = null;
     _pendingRoomCache = null;
 
     _initialSyncCompleter = Completer<void>();
@@ -110,25 +126,39 @@ class WebSocketDataSyncService {
       },
     );
 
-    // Wait for any pending cache operations to complete
-    final pendingCaches = <Future<void>>[];
-    if (_pendingDeviceCache != null) {
-      pendingCaches.add(_pendingDeviceCache!);
-    }
+    // Flush all typed caches to storage
+    await _flushAllDeviceCaches();
+
+    // Wait for any pending room cache operations
     if (_pendingRoomCache != null) {
-      pendingCaches.add(_pendingRoomCache!);
-    }
-    if (pendingCaches.isNotEmpty) {
-      _logger.i('WebSocketDataSync: Waiting for cache operations to complete');
-      await Future.wait(pendingCaches).timeout(
+      _logger.i('WebSocketDataSync: Waiting for room cache to complete');
+      await _pendingRoomCache!.timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          _logger.w('WebSocketDataSync: Cache operations timed out');
-          return [];
+          _logger.w('WebSocketDataSync: Room cache timed out');
         },
       );
-      _logger.i('WebSocketDataSync: Cache operations completed');
     }
+    _logger.i('WebSocketDataSync: Cache operations completed');
+  }
+
+  /// Flush all typed device caches to storage
+  Future<void> _flushAllDeviceCaches() async {
+    await Future.wait([
+      _apLocalDataSource.flushNow(),
+      _ontLocalDataSource.flushNow(),
+      _switchLocalDataSource.flushNow(),
+      _wlanLocalDataSource.flushNow(),
+    ]);
+    await _persistIdToTypeIndex();
+  }
+
+  /// Persist the ID-to-Type index to storage
+  Future<void> _persistIdToTypeIndex() async {
+    await _storageService.setString(
+      DeviceModelSealed.idTypeIndexKey,
+      json.encode(_idToTypeIndex),
+    );
   }
 
   void _handleConnectionState(SocketConnectionState state) {
@@ -269,53 +299,139 @@ class WebSocketDataSyncService {
     List<Map<String, dynamic>> items, {
     required String? resourceType,
   }) {
-    final models = <DeviceModel>[];
-    for (final item in items) {
-      final normalized = _normalizeDeviceJson(item, resourceType: resourceType);
-      if (normalized == null) {
-        continue;
-      }
-      try {
-        models.add(DeviceModel.fromJson(normalized));
-      } on Exception catch (e) {
-        _logger.w('WebSocketDataSync: Failed to parse device: $e');
-      }
-    }
-
+    // Handle summary (all types at once)
     if (resourceType == null) {
-      _deviceSnapshots
-        ..clear()
-        ..['devices.summary'] = models;
-      _pendingDeviceCache = _cacheDevices(models);
-      unawaited(_pendingDeviceCache);
+      _handleMixedDeviceSnapshot(items);
       return;
     }
 
-    _deviceSnapshots[resourceType] = models;
-    if (_deviceResources.every(_deviceSnapshots.containsKey)) {
-      final combined = <DeviceModel>[];
-      for (final entry in _deviceResources) {
-        combined.addAll(_deviceSnapshots[entry] ?? const []);
-      }
-      _pendingDeviceCache = _cacheDevices(combined);
-      unawaited(_pendingDeviceCache);
+    // Route to specific typed cache based on resource type
+    final deviceType = DeviceModelSealed.getDeviceTypeFromResourceType(resourceType);
+    if (deviceType == null) {
+      _logger.w('WebSocketDataSync: Unknown resource type: $resourceType');
+      return;
+    }
+
+    switch (deviceType) {
+      case DeviceModelSealed.typeAccessPoint:
+        _cacheAPDevices(items);
+      case DeviceModelSealed.typeONT:
+        _cacheONTDevices(items);
+      case DeviceModelSealed.typeSwitch:
+        _cacheSwitchDevices(items);
+      case DeviceModelSealed.typeWLAN:
+        _cacheWLANDevices(items);
     }
   }
 
-  Future<void> _cacheDevices(List<DeviceModel> devices) async {
-    _logger.i('WebSocketDataSync: Caching ${devices.length} devices');
-    await _deviceLocalDataSource.cacheDevices(devices);
+  /// Handle a mixed snapshot containing multiple device types
+  void _handleMixedDeviceSnapshot(List<Map<String, dynamic>> items) {
+    final apItems = <Map<String, dynamic>>[];
+    final ontItems = <Map<String, dynamic>>[];
+    final switchItems = <Map<String, dynamic>>[];
+    final wlanItems = <Map<String, dynamic>>[];
+
+    for (final item in items) {
+      final type = item['type']?.toString() ?? item['device_type']?.toString();
+      switch (type) {
+        case DeviceModelSealed.typeAccessPoint:
+          apItems.add(item);
+        case DeviceModelSealed.typeONT:
+          ontItems.add(item);
+        case DeviceModelSealed.typeSwitch:
+          switchItems.add(item);
+        case DeviceModelSealed.typeWLAN:
+          wlanItems.add(item);
+        default:
+          _logger.w('WebSocketDataSync: Unknown device type in summary: $type');
+      }
+    }
+
+    if (apItems.isNotEmpty) _cacheAPDevices(apItems);
+    if (ontItems.isNotEmpty) _cacheONTDevices(ontItems);
+    if (switchItems.isNotEmpty) _cacheSwitchDevices(switchItems);
+    if (wlanItems.isNotEmpty) _cacheWLANDevices(wlanItems);
+  }
+
+  void _cacheAPDevices(List<Map<String, dynamic>> items) {
+    final models = <APModel>[];
+    for (final item in items) {
+      try {
+        final normalized = _normalizeToAPModel(item);
+        models.add(normalized);
+        _idToTypeIndex[normalized.id] = DeviceModelSealed.typeAccessPoint;
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse AP: $e');
+      }
+    }
+    if (models.isNotEmpty) {
+      unawaited(_apLocalDataSource.cacheDevices(models));
+      _logger.d('WebSocketDataSync: Cached ${models.length} APs');
+      _emitDevicesCached(models.length);
+    }
+  }
+
+  void _cacheONTDevices(List<Map<String, dynamic>> items) {
+    final models = <ONTModel>[];
+    for (final item in items) {
+      try {
+        final normalized = _normalizeToONTModel(item);
+        models.add(normalized);
+        _idToTypeIndex[normalized.id] = DeviceModelSealed.typeONT;
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse ONT: $e');
+      }
+    }
+    if (models.isNotEmpty) {
+      unawaited(_ontLocalDataSource.cacheDevices(models));
+      _logger.d('WebSocketDataSync: Cached ${models.length} ONTs');
+      _emitDevicesCached(models.length);
+    }
+  }
+
+  void _cacheSwitchDevices(List<Map<String, dynamic>> items) {
+    final models = <SwitchModel>[];
+    for (final item in items) {
+      try {
+        final normalized = _normalizeToSwitchModel(item);
+        models.add(normalized);
+        _idToTypeIndex[normalized.id] = DeviceModelSealed.typeSwitch;
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse Switch: $e');
+      }
+    }
+    if (models.isNotEmpty) {
+      unawaited(_switchLocalDataSource.cacheDevices(models));
+      _logger.d('WebSocketDataSync: Cached ${models.length} Switches');
+      _emitDevicesCached(models.length);
+    }
+  }
+
+  void _cacheWLANDevices(List<Map<String, dynamic>> items) {
+    final models = <WLANModel>[];
+    for (final item in items) {
+      try {
+        final normalized = _normalizeToWLANModel(item);
+        models.add(normalized);
+        _idToTypeIndex[normalized.id] = DeviceModelSealed.typeWLAN;
+      } on Exception catch (e) {
+        _logger.w('WebSocketDataSync: Failed to parse WLAN: $e');
+      }
+    }
+    if (models.isNotEmpty) {
+      unawaited(_wlanLocalDataSource.cacheDevices(models));
+      _logger.d('WebSocketDataSync: Cached ${models.length} WLANs');
+      _emitDevicesCached(models.length);
+    }
+  }
+
+  void _emitDevicesCached(int count) {
     final cacheKey = DeviceFieldSets.getCacheKey(
       'devices_list',
       DeviceFieldSets.listFields,
     );
     _cacheManager.invalidate(cacheKey);
-    _notificationService.generateFromDevices(
-      devices.map((model) => model.toEntity()).toList(),
-    );
-    _eventController.add(
-      WebSocketDataSyncEvent.devicesCached(count: devices.length),
-    );
+    _eventController.add(WebSocketDataSyncEvent.devicesCached(count: count));
   }
 
   void _handleRoomSnapshot(
@@ -369,119 +485,108 @@ class WebSocketDataSyncService {
     }
   }
 
-  Map<String, dynamic>? _normalizeDeviceJson(
-    Map<String, dynamic> data, {
-    required String? resourceType,
-  }) {
-    if (data.containsKey('type') &&
-        data.containsKey('status') &&
-        data.containsKey('id')) {
-      final normalized = Map<String, dynamic>.from(data);
-      normalized['id'] = normalized['id'].toString();
-      // Ensure hn_counts and health_notices are present even for pre-normalized data
-      normalized['hn_counts'] ??= {
-        'total': 0,
-        'fatal': 0,
-        'critical': 0,
-        'warning': 0,
-        'notice': 0,
-      };
-      normalized['health_notices'] ??= <Map<String, dynamic>>[];
-      // Debug logging
-      if (data['hn_counts'] != null) {
-        _logger.d('Pre-normalized device ${data['name'] ?? data['id']}: hn_counts=${data['hn_counts']}');
-      }
-      return normalized;
-    }
+  // ============================================================================
+  // Type-Specific Normalization Methods
+  // ============================================================================
 
-    final idValue = data['id']?.toString() ?? '';
-    switch (resourceType) {
-      case 'access_points':
-        return _buildDeviceJson(
-          data,
-          id: 'ap_$idValue',
-          type: 'access_point',
-          defaultName: 'AP-$idValue',
-        );
-      case 'media_converters':
-        return _buildDeviceJson(
-          data,
-          id: 'ont_$idValue',
-          type: 'ont',
-          defaultName: 'ONT-$idValue',
-        );
-      case 'switch_devices':
-        return _buildDeviceJson(
-          data,
-          id: 'sw_$idValue',
-          type: 'switch',
-          defaultName: 'Switch-$idValue',
-        );
-      case 'wlan_devices':
-        return _buildDeviceJson(
-          data,
-          id: 'wlan_$idValue',
-          type: 'wlan_controller',
-          defaultName: 'WLAN-$idValue',
-        );
-      default:
-        return null;
-    }
+  APModel _normalizeToAPModel(Map<String, dynamic> data) {
+    return APModel(
+      id: (data['id'] ?? '').toString(),
+      name: data['name']?.toString() ?? 'Unknown AP',
+      status: _determineStatus(data),
+      pmsRoomId: _extractPmsRoomId(data),
+      ipAddress: data['ip']?.toString(),
+      macAddress: data['mac']?.toString(),
+      location: _extractLocation(data),
+      model: data['model']?.toString(),
+      serialNumber: data['serial_number']?.toString(),
+      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
+      note: data['note']?.toString(),
+      images: _extractImages(data),
+      metadata: data,
+      connectionState: data['connection_state']?.toString(),
+      signalStrength: data['signal_strength'] as int?,
+      connectedClients: data['connected_clients'] as int?,
+      ssid: data['ssid']?.toString(),
+      channel: data['channel'] as int?,
+      maxClients: data['max_clients'] as int?,
+      currentUpload: (data['current_upload'] as num?)?.toDouble(),
+      currentDownload: (data['current_download'] as num?)?.toDouble(),
+      onboardingStatus: data['ap_onboarding_status'] as Map<String, dynamic>?,
+    );
   }
 
-  Map<String, dynamic> _buildDeviceJson(
-    Map<String, dynamic> data, {
-    required String id,
-    required String type,
-    required String defaultName,
-  }) {
-    // Debug: Log raw device data keys to diagnose missing hn_counts/health_notices
-    final hasHnCounts = data['hn_counts'] != null;
-    final hasHealthNotices = data['health_notices'] != null;
+  ONTModel _normalizeToONTModel(Map<String, dynamic> data) {
+    return ONTModel(
+      id: (data['id'] ?? '').toString(),
+      name: data['name']?.toString() ?? 'Unknown ONT',
+      status: _determineStatus(data),
+      pmsRoomId: _extractPmsRoomId(data),
+      ipAddress: data['ip']?.toString(),
+      macAddress: data['mac']?.toString(),
+      location: _extractLocation(data),
+      model: data['model']?.toString(),
+      serialNumber: data['serial_number']?.toString(),
+      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
+      note: data['note']?.toString(),
+      images: _extractImages(data),
+      metadata: data,
+      isRegistered: data['is_registered'] as bool?,
+      switchPort: data['switch_port'] as Map<String, dynamic>?,
+      onboardingStatus: data['ont_onboarding_status'] as Map<String, dynamic>?,
+      ports: (data['ont_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
+      uptime: data['uptime']?.toString(),
+      phase: data['phase']?.toString(),
+    );
+  }
 
-    // Always log first device of each type to see what backend sends
-    _logger.i('RAW DEVICE DATA [$type]: keys=${data.keys.toList()}, hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
-    if (hasHnCounts) {
-      _logger.i('  hn_counts value: ${data['hn_counts']}');
-    }
-    if (hasHealthNotices) {
-      _logger.i('  health_notices value: ${data['health_notices']}');
-    }
+  SwitchModel _normalizeToSwitchModel(Map<String, dynamic> data) {
+    return SwitchModel(
+      id: (data['id'] ?? '').toString(),
+      name: data['name']?.toString() ?? 'Unknown Switch',
+      status: _determineStatus(data),
+      pmsRoomId: _extractPmsRoomId(data),
+      ipAddress: data['ip']?.toString() ?? data['host']?.toString(),
+      macAddress: data['mac']?.toString(),
+      location: _extractLocation(data),
+      model: data['model']?.toString(),
+      serialNumber: data['serial_number']?.toString(),
+      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
+      note: data['note']?.toString(),
+      images: _extractImages(data),
+      metadata: data,
+      host: data['host']?.toString(),
+      ports: (data['switch_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
+      cpuUsage: data['cpu_usage'] as int?,
+      memoryUsage: data['memory_usage'] as int?,
+      temperature: data['temperature'] as int?,
+    );
+  }
 
-    return {
-      'id': id,
-      'name': data['name'] ?? data['nickname'] ?? defaultName,
-      'type': type,
-      'status': _determineStatus(data),
-      'pms_room_id': _extractPmsRoomId(data),
-      'mac_address': data['mac'] ?? data['mac_address'] ?? '',
-      'ip_address': data['ip'] ?? data['ip_address'] ?? data['host'] ?? '',
-      'model': data['model'] ?? data['device'] ?? '',
-      'serial_number': data['serial_number'] ?? '',
-      'location': _extractLocation(data),
-      'last_seen': data['last_seen'] ?? data['updated_at'],
-      'images': _extractImages(data),
-      'metadata': {
-        ...data,
-        // Ensure hn_counts and health_notices are in metadata for provider access
-        'hn_counts': data['hn_counts'] ?? {
-          'total': 0,
-          'fatal': 0,
-          'critical': 0,
-          'warning': 0,
-          'notice': 0,
-        },
-        'health_notices': data['health_notices'] ?? <Map<String, dynamic>>[],
-      },
-      'health_notices': data['health_notices'] ?? <Map<String, dynamic>>[],
-      'hn_counts': data['hn_counts'] ?? {
-        'total': 0,
-        'fatal': 0,
-        'critical': 0,
-        'warning': 0,
-        'notice': 0,
-      },
-    };
+  WLANModel _normalizeToWLANModel(Map<String, dynamic> data) {
+    return WLANModel(
+      id: (data['id'] ?? '').toString(),
+      name: data['name']?.toString() ?? 'Unknown WLAN',
+      status: _determineStatus(data),
+      pmsRoomId: _extractPmsRoomId(data),
+      ipAddress: data['ip']?.toString(),
+      macAddress: data['mac']?.toString(),
+      location: _extractLocation(data),
+      model: data['model']?.toString(),
+      serialNumber: data['serial_number']?.toString(),
+      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
+      note: data['note']?.toString(),
+      images: _extractImages(data),
+      metadata: data,
+      controllerType: data['controller_type']?.toString(),
+      managedAPs: data['managed_aps'] as int?,
+      vlan: data['vlan'] as int?,
+      totalUpload: data['total_upload'] as int?,
+      totalDownload: data['total_download'] as int?,
+      packetLoss: (data['packet_loss'] as num?)?.toDouble(),
+      latency: data['latency'] as int?,
+      restartCount: data['restart_count'] as int?,
+    );
   }
 
   String _determineStatus(Map<String, dynamic> device) {
@@ -537,6 +642,21 @@ class WebSocketDataSyncService {
   }
 
   int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // Try direct pms_room_id field first
+    final directId = deviceMap['pms_room_id'];
+    if (directId != null) {
+      if (directId is int) {
+        return directId;
+      }
+      if (directId is String) {
+        final parsed = int.tryParse(directId);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+
+    // Try nested pms_room.id
     if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
       final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
       final idValue = pmsRoom['id'];
@@ -547,6 +667,7 @@ class WebSocketDataSyncService {
         return int.tryParse(idValue);
       }
     }
+
     return null;
   }
 

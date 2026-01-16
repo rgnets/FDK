@@ -236,9 +236,14 @@ class WebSocketCacheIntegration {
     if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
       final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
       final idValue = pmsRoom['id'];
-      if (idValue is int) return idValue;
-      if (idValue is String) return int.tryParse(idValue);
+      if (idValue is int) {
+        return idValue;
+      }
+      if (idValue is String) {
+        return int.tryParse(idValue);
+      }
     }
+
     return null;
   }
 
