@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart'; // Assuming this path
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 
