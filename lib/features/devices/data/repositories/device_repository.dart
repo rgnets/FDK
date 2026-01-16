@@ -12,7 +12,6 @@ import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
@@ -204,17 +203,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
     );
   }
 
-  /// Convert old DeviceModel to new DeviceModelSealed
-  /// This bridges the gap between the old data source and new typed caches
-  DeviceModelSealed _convertToSealed(DeviceModel model) {
-    final json = model.toJson();
-    // Ensure device_type is set for Freezed discriminator
-    if (!json.containsKey('device_type')) {
-      json['device_type'] = model.type;
-    }
-    return DeviceModelSealed.fromJson(json);
-  }
-
   // Pagination service for efficient loading
   late final PaginationService<Device> _paginationService;
   
@@ -340,9 +328,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
       // Cache in background to avoid blocking
       unawaited(PerformanceMonitorService.instance.trackFuture(
         'DeviceRepository.cache',
-        () => _cacheDevicesToTypedCaches(
-          deviceModels.map(_convertToSealed).toList(),
-        ),
+        () => _cacheDevicesToTypedCaches(deviceModels),
         metadata: {'count': deviceModels.length},
       ));
       
@@ -378,9 +364,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
       }
       _logger.d('DeviceRepositoryImpl: Starting background refresh');
       final deviceModels = await dataSource.getDevices();
-      await _cacheDevicesToTypedCaches(
-        deviceModels.map(_convertToSealed).toList(),
-      );
+      await _cacheDevicesToTypedCaches(deviceModels);
 
       // Update stream with fresh data
       final devices = deviceModels.map((model) => model.toEntity()).toList();
@@ -403,8 +387,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
       }
       // Use data source
       final deviceModel = await dataSource.getDevice(id, fields: fields);
-      final sealedModel = _convertToSealed(deviceModel);
-      await _cacheDeviceToTypedCache(sealedModel);
+      await _cacheDeviceToTypedCache(deviceModel);
       return Right(deviceModel.toEntity());
     } on Object catch (e) {
       // Catch both Exception and Error (e.g., StateError from WebSocket)
@@ -458,43 +441,113 @@ class DeviceRepositoryImpl implements DeviceRepository {
       if (!_isAuthenticated()) {
         return const Left(DeviceFailure(message: 'Not authenticated'));
       }
-      final deviceModel = DeviceModel(
-        id: device.id,
-        name: device.name,
-        type: device.type,
-        status: device.status,
-        ipAddress: device.ipAddress,
-        macAddress: device.macAddress,
-        location: device.location,
-        lastSeen: device.lastSeen,
-        metadata: device.metadata,
-        model: device.model,
-        serialNumber: device.serialNumber,
-        firmware: device.firmware,
-        signalStrength: device.signalStrength,
-        uptime: device.uptime,
-        connectedClients: device.connectedClients,
-        vlan: device.vlan,
-        ssid: device.ssid,
-        channel: device.channel,
-        totalUpload: device.totalUpload,
-        totalDownload: device.totalDownload,
-        currentUpload: device.currentUpload,
-        currentDownload: device.currentDownload,
-        packetLoss: device.packetLoss,
-        latency: device.latency,
-        cpuUsage: device.cpuUsage,
-        memoryUsage: device.memoryUsage,
-        temperature: device.temperature,
-        restartCount: device.restartCount,
-        maxClients: device.maxClients,
-      );
+      final deviceModel = _deviceToSealedModel(device);
       final updatedModel = await dataSource.updateDevice(deviceModel);
-      final sealedModel = _convertToSealed(updatedModel);
-      await _cacheDeviceToTypedCache(sealedModel);
+      await _cacheDeviceToTypedCache(updatedModel);
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
       return Left(DeviceFailure(message: 'Failed to update device: $e'));
+    }
+  }
+
+  /// Convert a Device entity to the appropriate DeviceModelSealed variant
+  DeviceModelSealed _deviceToSealedModel(Device device) {
+    switch (device.type) {
+      case DeviceModelSealed.typeAccessPoint:
+        return DeviceModelSealed.ap(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          signalStrength: device.signalStrength,
+          connectedClients: device.connectedClients,
+          ssid: device.ssid,
+          channel: device.channel,
+        );
+      case DeviceModelSealed.typeONT:
+        return DeviceModelSealed.ont(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          uptime: device.uptime?.toString(),
+        );
+      case DeviceModelSealed.typeSwitch:
+        return DeviceModelSealed.switchDevice(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          cpuUsage: device.cpuUsage,
+          memoryUsage: device.memoryUsage,
+          temperature: device.temperature,
+        );
+      case DeviceModelSealed.typeWLAN:
+        return DeviceModelSealed.wlan(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          vlan: device.vlan,
+          latency: device.latency,
+        );
+      default:
+        // Fallback to AP type for unknown types
+        return DeviceModelSealed.ap(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          note: device.note,
+          images: device.images,
+        );
     }
   }
 
@@ -531,8 +584,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
         deviceId,
         imageUrl,
       );
-      final sealedModel = _convertToSealed(updatedModel);
-      await _cacheDeviceToTypedCache(sealedModel);
+      await _cacheDeviceToTypedCache(updatedModel);
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
       return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
