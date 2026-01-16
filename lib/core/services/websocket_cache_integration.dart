@@ -6,7 +6,7 @@ import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 
@@ -107,9 +107,9 @@ class WebSocketCacheIntegration {
     return _deviceCache[resourceType];
   }
 
-  /// Get all cached devices as DeviceModels.
-  List<DeviceModel> getAllCachedDeviceModels() {
-    final allDevices = <DeviceModel>[];
+  /// Get all cached devices as DeviceModelSealed.
+  List<DeviceModelSealed> getAllCachedDeviceModels() {
+    final allDevices = <DeviceModelSealed>[];
 
     for (final entry in _deviceCache.entries) {
       final resourceType = entry.key;
@@ -130,33 +130,24 @@ class WebSocketCacheIntegration {
     return allDevices;
   }
 
-  DeviceModel? _mapToDeviceModel(
+  DeviceModelSealed? _mapToDeviceModel(
     String resourceType,
     Map<String, dynamic> deviceMap,
   ) {
     try {
-      // DEBUG: Log raw device data keys to see what backend sends
-      final hasHnCounts = deviceMap['hn_counts'] != null;
-      final hasHealthNotices = deviceMap['health_notices'] != null;
-      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
-      if (hasHnCounts) {
-        print('  hn_counts value: ${deviceMap['hn_counts']}');
-      }
-
       // Extract health notice counts if present
       final hnCounts = _extractHealthCounts(deviceMap);
       final healthNotices = _extractHealthNotices(deviceMap);
 
       switch (resourceType) {
         case 'access_points':
-          return DeviceModel(
+          return DeviceModelSealed.ap(
             id: 'ap_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
-            type: 'access_point',
             status: _determineStatus(deviceMap),
             pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['mac']?.toString() ?? '',
-            ipAddress: deviceMap['ip']?.toString() ?? '',
+            macAddress: deviceMap['mac']?.toString(),
+            ipAddress: deviceMap['ip']?.toString(),
             model: deviceMap['model']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
@@ -166,14 +157,13 @@ class WebSocketCacheIntegration {
           );
 
         case 'media_converters':
-          return DeviceModel(
+          return DeviceModelSealed.ont(
             id: 'ont_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
-            type: 'ont',
             status: _determineStatus(deviceMap),
             pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['mac']?.toString() ?? '',
-            ipAddress: deviceMap['ip']?.toString() ?? '',
+            macAddress: deviceMap['mac']?.toString(),
+            ipAddress: deviceMap['ip']?.toString(),
             model: deviceMap['model']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
@@ -183,16 +173,31 @@ class WebSocketCacheIntegration {
           );
 
         case 'switch_devices':
-          return DeviceModel(
+          return DeviceModelSealed.switchDevice(
             id: 'sw_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ??
                 deviceMap['nickname']?.toString() ??
                 'Switch-${deviceMap['id']}',
-            type: 'switch',
             status: _determineStatus(deviceMap),
             pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['scratch']?.toString() ?? '',
-            ipAddress: deviceMap['host']?.toString() ?? '',
+            macAddress: deviceMap['scratch']?.toString(),
+            ipAddress: deviceMap['host']?.toString(),
+            host: deviceMap['host']?.toString(),
+            model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
+            serialNumber: deviceMap['serial_number']?.toString(),
+            note: deviceMap['note']?.toString(),
+            images: _extractImages(deviceMap),
+            hnCounts: hnCounts,
+            healthNotices: healthNotices,
+          );
+
+        case 'wlan_devices':
+          return DeviceModelSealed.wlan(
+            id: 'wlan_${deviceMap['id']}',
+            name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
+            status: _determineStatus(deviceMap),
+            macAddress: deviceMap['mac']?.toString(),
+            ipAddress: deviceMap['host']?.toString() ?? deviceMap['ip']?.toString(),
             model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
@@ -219,12 +224,32 @@ class WebSocketCacheIntegration {
   }
 
   int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // Try direct pms_room_id field first
+    final directId = deviceMap['pms_room_id'];
+    if (directId != null) {
+      if (directId is int) {
+        return directId;
+      }
+      if (directId is String) {
+        final parsed = int.tryParse(directId);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+
+    // Try nested pms_room.id
     if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
       final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
       final idValue = pmsRoom['id'];
-      if (idValue is int) return idValue;
-      if (idValue is String) return int.tryParse(idValue);
+      if (idValue is int) {
+        return idValue;
+      }
+      if (idValue is String) {
+        return int.tryParse(idValue);
+      }
     }
+
     return null;
   }
 

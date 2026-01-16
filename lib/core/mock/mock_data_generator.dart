@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:rgnets_fdk/core/config/mock_network_config.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/notifications/data/models/notification_model.dart';
 
@@ -120,8 +120,8 @@ class MockDataGenerator {
   ];
   
   /// Generate a list of realistic devices
-  static List<DeviceModel> generateDevices({int count = 50}) {
-    final devices = <DeviceModel>[];
+  static List<DeviceModelSealed> generateDevices({int count = 50}) {
+    final devices = <DeviceModelSealed>[];
     final now = DateTime.now();
     
     // RG Nets field deployment device distribution (ONLY core deployment types)
@@ -177,60 +177,99 @@ class MockDataGenerator {
       final connectedClients = deviceType == 'Access Point' ? _random.nextInt(50) : null;
       final uptime = _random.nextInt(86400 * 30); // Up to 30 days in seconds
       
-      devices.add(DeviceModel(
-        id: id,
-        name: '$prefix-$building-$floor-$number'.replaceAll(' ', '-').toUpperCase(),
-        type: deviceType,
-        status: status,
-        ipAddress: ipAddress,
-        macAddress: macAddress,
-        location: '$building - $floor - $room',
-        lastSeen: lastSeen,
-        model: _getDeviceModel(deviceType),
-        serialNumber: 'SN${_random.nextInt(900000) + 100000}',
-        firmware: '${_random.nextInt(10) + 1}.${_random.nextInt(20)}.${_random.nextInt(100)}',
-        signalStrength: signalStrength,
-        uptime: uptime,
-        connectedClients: connectedClients,
-        vlan: vlanId + 1,
-        ssid: deviceType == 'Access Point' ? 'RGNets-${building.replaceAll(' ', '')}' : null,
-        channel: deviceType == 'Access Point' ? _random.nextInt(11) + 1 : null,
-        totalUpload: _random.nextInt(10000),
-        totalDownload: _random.nextInt(20000),
-        currentUpload: _random.nextDouble() * 100,
-        currentDownload: _random.nextDouble() * 500,
-        packetLoss: _random.nextDouble() * 0.5,
-        latency: _random.nextInt(50) + 1,
-        cpuUsage: status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
-        memoryUsage: status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
-        temperature: _random.nextInt(20) + 30,
-        restartCount: _random.nextInt(5),
-        maxClients: deviceType == 'Access Point' ? _random.nextInt(30) + 20 : null,
-        metadata: {
-          'firmware': '${_random.nextInt(10) + 1}.${_random.nextInt(20)}.${_random.nextInt(100)}',
-          'model': _getDeviceModel(deviceType),
-          'vlan': _vlans[vlanId],
-          'uptime': '${_random.nextInt(365)}d ${_random.nextInt(24)}h ${_random.nextInt(60)}m',
-          'cpu_usage': status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
-          'memory_usage': status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
-          'temperature': _random.nextInt(20) + 30,
-          'clients': connectedClients,
-          'bandwidth': '${_random.nextInt(900) + 100} Mbps',
-        },
-      ));
+      final deviceName = '$prefix-$building-$floor-$number'.replaceAll(' ', '-').toUpperCase();
+      final deviceModel = _getDeviceModel(deviceType);
+      final serialNumber = 'SN${_random.nextInt(900000) + 100000}';
+      final firmware = '${_random.nextInt(10) + 1}.${_random.nextInt(20)}.${_random.nextInt(100)}';
+      final locationStr = '$building - $floor - $room';
+      final metadata = <String, dynamic>{
+        'firmware': firmware,
+        'model': deviceModel,
+        'vlan': _vlans[vlanId],
+        'uptime': '${_random.nextInt(365)}d ${_random.nextInt(24)}h ${_random.nextInt(60)}m',
+        'cpu_usage': status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
+        'memory_usage': status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
+        'temperature': _random.nextInt(20) + 30,
+        'clients': connectedClients,
+        'bandwidth': '${_random.nextInt(900) + 100} Mbps',
+      };
+
+      // Create appropriate sealed model variant based on device type
+      final device = switch (deviceType) {
+        'Access Point' => DeviceModelSealed.ap(
+          id: id,
+          name: deviceName,
+          status: status,
+          ipAddress: ipAddress,
+          macAddress: macAddress,
+          location: locationStr,
+          lastSeen: lastSeen,
+          model: deviceModel,
+          serialNumber: serialNumber,
+          firmware: firmware,
+          signalStrength: signalStrength,
+          connectedClients: connectedClients,
+          ssid: 'RGNets-${building.replaceAll(' ', '')}',
+          channel: _random.nextInt(11) + 1,
+          metadata: metadata,
+        ),
+        'Switch' => DeviceModelSealed.switchDevice(
+          id: id,
+          name: deviceName,
+          status: status,
+          ipAddress: ipAddress,
+          macAddress: macAddress,
+          location: locationStr,
+          lastSeen: lastSeen,
+          model: deviceModel,
+          serialNumber: serialNumber,
+          firmware: firmware,
+          cpuUsage: status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
+          memoryUsage: status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
+          temperature: _random.nextInt(20) + 30,
+          metadata: metadata,
+        ),
+        'ONT' => DeviceModelSealed.ont(
+          id: id,
+          name: deviceName,
+          status: status,
+          ipAddress: ipAddress,
+          macAddress: macAddress,
+          location: locationStr,
+          lastSeen: lastSeen,
+          model: deviceModel,
+          serialNumber: serialNumber,
+          firmware: firmware,
+          uptime: uptime.toString(),
+          metadata: metadata,
+        ),
+        _ => DeviceModelSealed.ap(
+          id: id,
+          name: deviceName,
+          status: status,
+          ipAddress: ipAddress,
+          macAddress: macAddress,
+          location: locationStr,
+          lastSeen: lastSeen,
+          model: deviceModel,
+          serialNumber: serialNumber,
+          firmware: firmware,
+          metadata: metadata,
+        ),
+      };
+      devices.add(device);
     }
     
     return devices;
   }
   
   /// Generate core infrastructure devices (RG Nets focused - ONLY core deployment types)
-  static List<DeviceModel> _generateCoreDevices(DateTime now) {
+  static List<DeviceModelSealed> _generateCoreDevices(DateTime now) {
     return [
       // Core distribution switch
-      DeviceModel(
+      DeviceModelSealed.switchDevice(
         id: 'core_sw_001',
         name: 'SW-CORE-DISTRIBUTION',
-        type: 'Switch',
         status: 'online',
         ipAddress: MockNetworkConfig.coreDistributionSwitchIp,
         macAddress: _generateMAC(),
@@ -239,18 +278,9 @@ class MockDataGenerator {
         model: 'Cisco Catalyst 9400',
         serialNumber: 'SN100001',
         firmware: '16.2.1',
-        uptime: 180 * 86400, // 180 days in seconds
-        vlan: 1,
-        totalUpload: 50000,
-        totalDownload: 100000,
-        currentUpload: 850.5,
-        currentDownload: 1200.75,
-        packetLoss: 0.01,
-        latency: 2,
         cpuUsage: 15,
         memoryUsage: 35,
         temperature: 38,
-        restartCount: 0,
         metadata: const {
           'firmware': '16.2.1',
           'model': 'Cisco Catalyst 9400',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
@@ -6,8 +7,8 @@ import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
 /// Service for background data refresh
@@ -15,7 +16,10 @@ import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.da
 class BackgroundRefreshService {
   BackgroundRefreshService({
     required this.deviceDataSource,
-    required this.deviceLocalDataSource,
+    required this.apLocalDataSource,
+    required this.ontLocalDataSource,
+    required this.switchLocalDataSource,
+    required this.wlanLocalDataSource,
     required this.roomRepository,
     required this.notificationGenerationService,
     required this.storageService,
@@ -26,12 +30,56 @@ class BackgroundRefreshService {
   static final _logger = LoggerConfig.getLogger();
 
   final DeviceDataSource deviceDataSource;
-  final DeviceLocalDataSource deviceLocalDataSource;
+  final APLocalDataSource apLocalDataSource;
+  final ONTLocalDataSource ontLocalDataSource;
+  final SwitchLocalDataSource switchLocalDataSource;
+  final WLANLocalDataSource wlanLocalDataSource;
   final RoomRepository roomRepository;
   final NotificationGenerationService notificationGenerationService;
   final StorageService storageService;
   final WebSocketService webSocketService;
   final WebSocketDataSyncService webSocketDataSyncService;
+
+  /// ID-to-Type index for routing device lookups
+  final Map<String, String> _idToTypeIndex = {};
+
+  /// Cache devices to their appropriate typed caches
+  Future<void> _cacheDevicesToTypedCaches(List<DeviceModelSealed> devices) async {
+    final apDevices = <APModel>[];
+    final ontDevices = <ONTModel>[];
+    final switchDevices = <SwitchModel>[];
+    final wlanDevices = <WLANModel>[];
+
+    for (final device in devices) {
+      switch (device) {
+        case APModel():
+          apDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeAccessPoint;
+        case ONTModel():
+          ontDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeONT;
+        case SwitchModel():
+          switchDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeSwitch;
+        case WLANModel():
+          wlanDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeWLAN;
+      }
+    }
+
+    await Future.wait([
+      if (apDevices.isNotEmpty) apLocalDataSource.cacheDevices(apDevices),
+      if (ontDevices.isNotEmpty) ontLocalDataSource.cacheDevices(ontDevices),
+      if (switchDevices.isNotEmpty) switchLocalDataSource.cacheDevices(switchDevices),
+      if (wlanDevices.isNotEmpty) wlanLocalDataSource.cacheDevices(wlanDevices),
+    ]);
+
+    // Persist the ID-to-Type index
+    await storageService.setString(
+      DeviceModelSealed.idTypeIndexKey,
+      json.encode(_idToTypeIndex),
+    );
+  }
 
   Timer? _refreshTimer;
   bool _isRefreshing = false;
@@ -124,25 +172,25 @@ class BackgroundRefreshService {
         return;
       }
       _deviceRefreshController.add(RefreshStatus.refreshing);
-      
+
       final stopwatch = Stopwatch()..start();
 
-      // Fetch new data
+      // Fetch new data (data source now returns DeviceModelSealed directly)
       final devices = await deviceDataSource.getDevices();
 
-      // Cache the new data
-      await deviceLocalDataSource.cacheDevices(devices);
+      // Cache to typed caches
+      await _cacheDevicesToTypedCaches(devices);
 
-      // Convert DeviceModel to Device entities and generate notifications
-      final deviceEntities = devices.map((deviceModel) => deviceModel.toEntity()).toList();
+      // Convert to Device entities and generate notifications
+      final deviceEntities = devices.map((model) => model.toEntity()).toList();
       final newNotifications = notificationGenerationService.generateFromDevices(deviceEntities);
       if (newNotifications.isNotEmpty) {
         _logger.i('BackgroundRefreshService: Generated ${newNotifications.length} notifications from device status');
       }
-      
+
       stopwatch.stop();
       _logger.d('BackgroundRefreshService: Devices refreshed in ${stopwatch.elapsedMilliseconds}ms');
-      
+
       _deviceRefreshController.add(RefreshStatus.success(
         itemCount: devices.length,
         duration: stopwatch.elapsed,
