@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
-import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
@@ -20,7 +19,6 @@ class WebSocketDataSyncService {
     required SwitchLocalDataSource switchLocalDataSource,
     required WLANLocalDataSource wlanLocalDataSource,
     required RoomLocalDataSource roomLocalDataSource,
-    required NotificationGenerationService notificationService,
     required CacheManager cacheManager,
     required StorageService storageService,
     Logger? logger,
@@ -30,7 +28,6 @@ class WebSocketDataSyncService {
        _switchLocalDataSource = switchLocalDataSource,
        _wlanLocalDataSource = wlanLocalDataSource,
        _roomLocalDataSource = roomLocalDataSource,
-       _notificationService = notificationService,
        _cacheManager = cacheManager,
        _storageService = storageService,
        _logger = logger ?? Logger();
@@ -50,7 +47,6 @@ class WebSocketDataSyncService {
   final SwitchLocalDataSource _switchLocalDataSource;
   final WLANLocalDataSource _wlanLocalDataSource;
   final RoomLocalDataSource _roomLocalDataSource;
-  final NotificationGenerationService _notificationService;
   final CacheManager _cacheManager;
   final StorageService _storageService;
   final Logger _logger;

@@ -75,13 +75,12 @@ final webSocketAuthEventsProvider = StreamProvider<SocketMessage>((ref) {
   );
 });
 
-/// Handles WebSocket-driven cache hydration for devices/rooms/notifications.
+/// Handles WebSocket-driven cache hydration for devices/rooms.
 final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   ref,
 ) {
   final socketService = ref.watch(webSocketServiceProvider);
   final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
-  final notificationService = ref.watch(notificationGenerationServiceProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
   final storageService = ref.watch(storageServiceProvider);
   final logger = LoggerConfig.getLogger();
@@ -100,7 +99,6 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
     wlanLocalDataSource: wlanLocalDataSource,
     storageService: storageService,
     roomLocalDataSource: roomLocalDataSource,
-    notificationService: notificationService,
     cacheManager: cacheManager,
     logger: logger,
   );
