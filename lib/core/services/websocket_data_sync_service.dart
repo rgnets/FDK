@@ -364,9 +364,10 @@ class WebSocketDataSyncService {
         _logger.w('WebSocketDataSync: Failed to parse AP: $e');
       }
     }
+    // Always cache to clear stale data when snapshot is empty
+    unawaited(_apLocalDataSource.cacheDevices(models));
+    _logger.d('WebSocketDataSync: Cached ${models.length} APs');
     if (models.isNotEmpty) {
-      unawaited(_apLocalDataSource.cacheDevices(models));
-      _logger.d('WebSocketDataSync: Cached ${models.length} APs');
       _emitDevicesCached(models.length);
     }
   }
@@ -382,9 +383,10 @@ class WebSocketDataSyncService {
         _logger.w('WebSocketDataSync: Failed to parse ONT: $e');
       }
     }
+    // Always cache to clear stale data when snapshot is empty
+    unawaited(_ontLocalDataSource.cacheDevices(models));
+    _logger.d('WebSocketDataSync: Cached ${models.length} ONTs');
     if (models.isNotEmpty) {
-      unawaited(_ontLocalDataSource.cacheDevices(models));
-      _logger.d('WebSocketDataSync: Cached ${models.length} ONTs');
       _emitDevicesCached(models.length);
     }
   }
@@ -400,9 +402,10 @@ class WebSocketDataSyncService {
         _logger.w('WebSocketDataSync: Failed to parse Switch: $e');
       }
     }
+    // Always cache to clear stale data when snapshot is empty
+    unawaited(_switchLocalDataSource.cacheDevices(models));
+    _logger.d('WebSocketDataSync: Cached ${models.length} Switches');
     if (models.isNotEmpty) {
-      unawaited(_switchLocalDataSource.cacheDevices(models));
-      _logger.d('WebSocketDataSync: Cached ${models.length} Switches');
       _emitDevicesCached(models.length);
     }
   }
@@ -418,9 +421,10 @@ class WebSocketDataSyncService {
         _logger.w('WebSocketDataSync: Failed to parse WLAN: $e');
       }
     }
+    // Always cache to clear stale data when snapshot is empty
+    unawaited(_wlanLocalDataSource.cacheDevices(models));
+    _logger.d('WebSocketDataSync: Cached ${models.length} WLANs');
     if (models.isNotEmpty) {
-      unawaited(_wlanLocalDataSource.cacheDevices(models));
-      _logger.d('WebSocketDataSync: Cached ${models.length} WLANs');
       _emitDevicesCached(models.length);
     }
   }
@@ -750,7 +754,7 @@ class WebSocketDataSyncService {
       return [];
     }
 
-    void addDevices(List<dynamic>? list, {String? prefix}) {
+    void addDevices(List<dynamic>? list) {
       if (list == null) {
         return;
       }
@@ -760,7 +764,7 @@ class WebSocketDataSyncService {
         }
         final id = entry['id'];
         if (id != null) {
-          deviceIds.add(prefix != null ? '$prefix$id' : id.toString());
+          deviceIds.add(id.toString());
         }
 
         final nested = entry['devices'];
