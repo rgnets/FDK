@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_counts.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
@@ -67,7 +68,7 @@ class AggregateHealthCountsNotifier extends _$AggregateHealthCountsNotifier {
         totalNotice += counts.notice;
         // Log first few devices with hn_counts to debug
         if (kDebugMode && devicesWithHnCounts <= 5) {
-          print('  DEBUG Device ${device.name} (${device.id}): total=${counts.total}, fatal=${counts.fatal}, critical=${counts.critical}, warning=${counts.warning}, notice=${counts.notice}');
+          print('  DEBUG Device ${device.deviceName} (${device.deviceId}): total=${counts.total}, fatal=${counts.fatal}, critical=${counts.critical}, warning=${counts.warning}, notice=${counts.notice}');
         }
       }
     }
@@ -141,9 +142,9 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       if (deviceNotices != null) {
         for (final noticeModel in deviceNotices) {
           notices.add(noticeModel.toEntity().copyWith(
-            deviceId: device.id,
-            deviceName: device.name,
-            deviceType: device.type,
+            deviceId: device.deviceId,
+            deviceName: device.deviceName,
+            deviceType: device.deviceType,
           ));
         }
       }

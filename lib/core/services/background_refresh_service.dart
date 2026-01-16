@@ -8,7 +8,6 @@ import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.dart';
 
@@ -43,16 +42,6 @@ class BackgroundRefreshService {
 
   /// ID-to-Type index for routing device lookups
   final Map<String, String> _idToTypeIndex = {};
-
-  /// Convert old DeviceModel to new DeviceModelSealed
-  DeviceModelSealed _convertToSealed(DeviceModel model) {
-    final jsonData = model.toJson();
-    // Ensure device_type is set for Freezed discriminator
-    if (!jsonData.containsKey('device_type')) {
-      jsonData['device_type'] = model.type;
-    }
-    return DeviceModelSealed.fromJson(jsonData);
-  }
 
   /// Cache devices to their appropriate typed caches
   Future<void> _cacheDevicesToTypedCaches(List<DeviceModelSealed> devices) async {
@@ -186,15 +175,14 @@ class BackgroundRefreshService {
 
       final stopwatch = Stopwatch()..start();
 
-      // Fetch new data
+      // Fetch new data (data source now returns DeviceModelSealed directly)
       final devices = await deviceDataSource.getDevices();
 
-      // Convert to sealed models and cache to typed caches
-      final sealedModels = devices.map(_convertToSealed).toList();
-      await _cacheDevicesToTypedCaches(sealedModels);
+      // Cache to typed caches
+      await _cacheDevicesToTypedCaches(devices);
 
       // Convert to Device entities and generate notifications
-      final deviceEntities = sealedModels.map((model) => model.toEntity()).toList();
+      final deviceEntities = devices.map((model) => model.toEntity()).toList();
       final newNotifications = notificationGenerationService.generateFromDevices(deviceEntities);
       if (newNotifications.isNotEmpty) {
         _logger.i('BackgroundRefreshService: Generated ${newNotifications.length} notifications from device status');
