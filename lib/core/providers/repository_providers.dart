@@ -10,7 +10,6 @@ import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
     as auth_impl;
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_mock_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_websocket_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
@@ -45,14 +44,8 @@ final authLocalDataSourceProvider = Provider<AuthLocalDataSource>((ref) {
   return AuthLocalDataSourceImpl(storageService: storage);
 });
 
-/// Device local data source provider (legacy - for backward compatibility)
-final deviceLocalDataSourceProvider = Provider<DeviceLocalDataSource>((ref) {
-  final storage = ref.watch(storageServiceProvider);
-  return DeviceLocalDataSourceImpl(storageService: storage);
-});
-
 // ============================================================================
-// Typed Device Local Data Sources (new architecture)
+// Typed Device Local Data Sources
 // ============================================================================
 
 /// AP (Access Point) local data source provider
