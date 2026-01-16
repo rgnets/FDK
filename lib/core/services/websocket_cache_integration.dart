@@ -219,12 +219,32 @@ class WebSocketCacheIntegration {
   }
 
   int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // Try direct pms_room_id field first
+    final directId = deviceMap['pms_room_id'];
+    if (directId != null) {
+      if (directId is int) {
+        return directId;
+      }
+      if (directId is String) {
+        final parsed = int.tryParse(directId);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+
+    // Try nested pms_room.id
     if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
       final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
       final idValue = pmsRoom['id'];
-      if (idValue is int) return idValue;
-      if (idValue is String) return int.tryParse(idValue);
+      if (idValue is int) {
+        return idValue;
+      }
+      if (idValue is String) {
+        return int.tryParse(idValue);
+      }
     }
+
     return null;
   }
 

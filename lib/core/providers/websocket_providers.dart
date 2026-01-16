@@ -80,15 +80,25 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   ref,
 ) {
   final socketService = ref.watch(webSocketServiceProvider);
-  final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
   final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
   final notificationService = ref.watch(notificationGenerationServiceProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
+  final storageService = ref.watch(storageServiceProvider);
   final logger = LoggerConfig.getLogger();
+
+  // Typed device local data sources (new architecture)
+  final apLocalDataSource = ref.watch(apLocalDataSourceProvider);
+  final ontLocalDataSource = ref.watch(ontLocalDataSourceProvider);
+  final switchLocalDataSource = ref.watch(switchLocalDataSourceProvider);
+  final wlanLocalDataSource = ref.watch(wlanLocalDataSourceProvider);
 
   final service = WebSocketDataSyncService(
     socketService: socketService,
-    deviceLocalDataSource: deviceLocalDataSource,
+    apLocalDataSource: apLocalDataSource,
+    ontLocalDataSource: ontLocalDataSource,
+    switchLocalDataSource: switchLocalDataSource,
+    wlanLocalDataSource: wlanLocalDataSource,
+    storageService: storageService,
     roomLocalDataSource: roomLocalDataSource,
     notificationService: notificationService,
     cacheManager: cacheManager,
