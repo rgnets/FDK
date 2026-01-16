@@ -7,6 +7,8 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
+
 /// Connection states emitted by [WebSocketService].
 enum SocketConnectionState { disconnected, connecting, connected, reconnecting }
 

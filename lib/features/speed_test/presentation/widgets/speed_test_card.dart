@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
@@ -7,14 +9,14 @@ import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
-class SpeedTestCard extends StatefulWidget {
+class SpeedTestCard extends ConsumerStatefulWidget {
   const SpeedTestCard({super.key});
 
   @override
-  State<SpeedTestCard> createState() => _SpeedTestCardState();
+  ConsumerState<SpeedTestCard> createState() => _SpeedTestCardState();
 }
 
-class _SpeedTestCardState extends State<SpeedTestCard> {
+class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   final SpeedTestService _speedTestService = SpeedTestService();
   SpeedTestStatus _status = SpeedTestStatus.idle;
   SpeedTestResult? _lastResult;
@@ -115,11 +117,16 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
   Future<void> _showSpeedTestPopup() async {
     if (!mounted) return;
 
+    // Get adhoc config for the popup
+    final integration = ref.read(webSocketCacheIntegrationProvider);
+    final adhocConfig = integration.getAdhocSpeedTestConfig();
+
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return SpeedTestPopup(
+          cachedTest: adhocConfig,
           onCompleted: () async {
             if (mounted) {
               LoggerService.info(
@@ -128,6 +135,31 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
               setState(() {
                 _lastResult = _speedTestService.lastResult;
               });
+            }
+          },
+          onResultSubmitted: (result) async {
+            // Submit adhoc result to server
+            final success = await integration.createAdhocSpeedTestResult(
+              downloadSpeed: result.downloadSpeed,
+              uploadSpeed: result.uploadSpeed,
+              latency: result.latency,
+              source: result.localIpAddress,
+            );
+            if (mounted) {
+              final testPassed = result.passed ?? false;
+              final statusText = testPassed ? 'PASSED' : 'FAILED';
+              final message = success
+                  ? 'Speed test $statusText - Result submitted'
+                  : 'Failed to submit speed test result';
+              final backgroundColor = success
+                  ? (testPassed ? Colors.green : Colors.orange)
+                  : Colors.red;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(message),
+                  backgroundColor: backgroundColor,
+                ),
+              );
             }
           },
         );

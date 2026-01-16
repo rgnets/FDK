@@ -103,8 +103,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    LoggerService.debug('Building FDKAppBar', tag: 'AppBar');
-
     final appBarState = ref.watch(appBarProvider);
     final unreadCountAsync = ref.watch(unreadNotificationCountProvider);
     final unreadCount = unreadCountAsync.when(
@@ -114,11 +112,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
         LoggerService.error('Error getting unread count', error: error, tag: 'AppBar');
         return 0;
       },
-    );
-
-    LoggerService.debug(
-      'App bar state - Route: ${appBarState.currentRoute}, Title: ${appBarState.pageTitle}',
-      tag: 'AppBar',
     );
 
     return Container(
@@ -195,8 +188,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
   }
 
   Widget _buildLogo() {
-    LoggerService.debug('Building logo section', tag: 'AppBar');
-
     return Container(
       width: 100,
       height: 40,
@@ -213,9 +204,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
   }
 
   Widget _buildCenterSection(String subtitle) {
-    // Subtitle parameter kept for potential future use or debugging
-    LoggerService.debug('Building center section (page: $subtitle)', tag: 'AppBar');
-
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -247,7 +235,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
           icon: Icons.notifications_outlined,
           badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount.toString()) : null,
           onTap: () {
-            LoggerService.debug('Notification button tapped', tag: 'AppBar');
             HapticFeedback.lightImpact();
             context.go('/notifications');
           },
@@ -258,7 +245,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
         _buildActionButton(
           icon: isConnected ? Icons.check_circle_outline : Icons.error_outline,
           onTap: () {
-            LoggerService.debug('Connection status button tapped', tag: 'AppBar');
             HapticFeedback.lightImpact();
             _showConnectionStatus(context, isConnected);
           },

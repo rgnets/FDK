@@ -10,12 +10,24 @@ import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config
 
 class SpeedTestPopup extends StatefulWidget {
   final SpeedTestConfig? cachedTest;
+  final SpeedTestResult? existingResult;
+  final int? pmsRoomId;
+  final String? roomType;
+  final int? testedViaAccessPointId;
+  final int? testedViaMediaConverterId;
   final VoidCallback? onCompleted;
+  final void Function(SpeedTestResult result)? onResultSubmitted;
 
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
+    this.existingResult,
+    this.pmsRoomId,
+    this.roomType,
+    this.testedViaAccessPointId,
+    this.testedViaMediaConverterId,
     this.onCompleted,
+    this.onResultSubmitted,
   });
 
   @override
@@ -244,6 +256,33 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
     final uploadPassed = minUpload == null || _uploadSpeed >= minUpload;
 
     _testPassed = downloadPassed && uploadPassed;
+
+    // Auto-submit result if passed and callback provided
+    if (_testPassed && widget.onResultSubmitted != null) {
+      _submitResult();
+    }
+  }
+
+  void _submitResult() {
+    final result = SpeedTestResult(
+      downloadSpeed: _downloadSpeed,
+      uploadSpeed: _uploadSpeed,
+      latency: _latency,
+      timestamp: DateTime.now(),
+      localIpAddress: _localIp,
+      serverHost: _serverHost,
+      // PMS Room fields
+      id: widget.existingResult?.id,
+      speedTestId: widget.cachedTest?.id,
+      pmsRoomId: widget.pmsRoomId,
+      roomType: widget.roomType,
+      testedViaAccessPointId: widget.testedViaAccessPointId,
+      testedViaMediaConverterId: widget.testedViaMediaConverterId,
+      passed: _testPassed,
+      completedAt: DateTime.now(),
+    );
+
+    widget.onResultSubmitted?.call(result);
   }
 
   @override
@@ -760,6 +799,23 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                 ],
 
                 if (_status == SpeedTestStatus.completed) ...[
+                  // Show submit button if test failed and callback provided
+                  if (!_testPassed && widget.onResultSubmitted != null) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _submitResult,
+                        icon: const Icon(Icons.save, size: 16),
+                        label: const Text('Submit Failed Result'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.warning,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       Expanded(

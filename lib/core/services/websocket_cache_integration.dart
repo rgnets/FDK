@@ -9,6 +9,8 @@ import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
 /// Callback type for when device data is received via WebSocket.
 typedef DeviceDataCallback = void Function(
@@ -41,12 +43,20 @@ class WebSocketCacheIntegration {
   /// Room resource type.
   static const String _roomResourceType = 'pms_rooms';
 
-  /// All resource types (devices + rooms).
+  /// Speed test resource types.
+  static const List<String> _speedTestResourceTypes = [
+    'speed_tests',
+    'speed_test_results',
+  ];
+
+  /// All resource types (devices + rooms + speed tests).
   static const List<String> _resourceTypes = [
     'access_points',
     'switch_devices',
     'media_converters',
     'pms_rooms',
+    'speed_tests',
+    'speed_test_results',
   ];
 
   final ValueNotifier<DateTime?> lastUpdate = ValueNotifier<DateTime?>(null);
@@ -81,6 +91,18 @@ class WebSocketCacheIntegration {
   /// Callbacks for when room data is received.
   final List<void Function(List<Map<String, dynamic>>)> _roomDataCallbacks = [];
 
+  /// Cached speed test configs.
+  final List<SpeedTestConfig> _speedTestConfigCache = [];
+
+  /// Cached speed test results.
+  final List<SpeedTestResult> _speedTestResultCache = [];
+
+  /// Callbacks for when speed test config data is received.
+  final List<void Function(List<SpeedTestConfig>)> _speedTestConfigCallbacks = [];
+
+  /// Callbacks for when speed test result data is received.
+  final List<void Function(List<SpeedTestResult>)> _speedTestResultCallbacks = [];
+
   /// Register a callback for device data updates.
   void onDeviceData(DeviceDataCallback callback) {
     _deviceDataCallbacks.add(callback);
@@ -91,13 +113,51 @@ class WebSocketCacheIntegration {
     _roomDataCallbacks.add(callback);
   }
 
+  /// Register a callback for speed test config data updates.
+  void onSpeedTestConfigData(void Function(List<SpeedTestConfig>) callback) {
+    _speedTestConfigCallbacks.add(callback);
+  }
+
+  /// Register a callback for speed test result data updates.
+  void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
+    _speedTestResultCallbacks.add(callback);
+  }
+
   /// Get cached rooms.
   List<Map<String, dynamic>> getCachedRooms() {
     return List.unmodifiable(_roomCache);
   }
 
+  /// Get cached speed test configs.
+  List<SpeedTestConfig> getCachedSpeedTestConfigs() {
+    return List.unmodifiable(_speedTestConfigCache);
+  }
+
+  /// Get cached speed test results.
+  List<SpeedTestResult> getCachedSpeedTestResults() {
+    return List.unmodifiable(_speedTestResultCache);
+  }
+
+  /// Get cached speed test results filtered by PMS room ID.
+  List<SpeedTestResult> getCachedSpeedTestResultsByRoom(int pmsRoomId) {
+    return _speedTestResultCache
+        .where((r) => r.pmsRoomId == pmsRoomId)
+        .toList();
+  }
+
+  /// Get cached speed test results filtered by room name.
+  List<SpeedTestResult> getCachedSpeedTestResultsByRoomName(String roomName) {
+    return _speedTestResultCache
+        .where((r) => r.roomName == roomName)
+        .toList();
+  }
+
   /// Check if we have cached room data.
   bool get hasRoomCache => _roomCache.isNotEmpty;
+
+  /// Check if we have cached speed test data.
+  bool get hasSpeedTestCache =>
+      _speedTestConfigCache.isNotEmpty || _speedTestResultCache.isNotEmpty;
 
   /// Check if we have cached device data.
   bool get hasDeviceCache => _deviceCache.values.any((list) => list.isNotEmpty);
@@ -135,14 +195,6 @@ class WebSocketCacheIntegration {
     Map<String, dynamic> deviceMap,
   ) {
     try {
-      // DEBUG: Log raw device data keys to see what backend sends
-      final hasHnCounts = deviceMap['hn_counts'] != null;
-      final hasHealthNotices = deviceMap['health_notices'] != null;
-      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
-      if (hasHnCounts) {
-        print('  hn_counts value: ${deviceMap['hn_counts']}');
-      }
-
       // Extract health notice counts if present
       final hnCounts = _extractHealthCounts(deviceMap);
       final healthNotices = _extractHealthNotices(deviceMap);
@@ -401,6 +453,120 @@ class WebSocketCacheIntegration {
     return true;
   }
 
+  /// Submit speed test result to update an existing result in the cache
+  /// Fills in download_mbps, upload_mbps, and rtt (latency) for the existing result
+  /// [source] - IP address of the device that performed the test
+  Future<bool> submitSpeedTestResult(
+    SpeedTestResult result, {
+    String? source,
+  }) async {
+    if (result.id == null) {
+      _logger.e('WebSocketCacheIntegration: Cannot submit result without id');
+      return false;
+    }
+
+    _logger.i('WebSocketCacheIntegration: Submitting speed test result id=${result.id}, '
+        'download=${result.downloadSpeed}, upload=${result.uploadSpeed}, rtt=${result.latency}, '
+        'source=$source');
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: 'speed_test_results',
+        additionalData: {
+          'id': result.id,
+          'params': {
+            'download_mbps': result.downloadSpeed,
+            'upload_mbps': result.uploadSpeed,
+            'rtt': result.latency,
+            if (source != null) 'source': source,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      _logger.i('WebSocketCacheIntegration: Speed test response: ${response.payload}');
+
+      // Check for error in response
+      final error = response.payload['error'] ?? response.payload['errors'];
+      if (error != null) {
+        _logger.e('WebSocketCacheIntegration: Server returned error: $error');
+        return false;
+      }
+
+      _logger.i('WebSocketCacheIntegration: Speed test result submitted successfully');
+      return true;
+    } on Exception catch (e) {
+      _logger.e('WebSocketCacheIntegration: Failed to submit speed test result: $e');
+      return false;
+    }
+  }
+
+  /// Get the adhoc speed test config from cache
+  SpeedTestConfig? getAdhocSpeedTestConfig() {
+    final matches = _speedTestConfigCache.where(
+      (config) => config.name?.toLowerCase().contains('adhoc') ?? false,
+    );
+    if (matches.isEmpty) {
+      _logger.w('WebSocketCacheIntegration: No adhoc speed test config found');
+      return null;
+    }
+    return matches.first;
+  }
+
+  /// Create a new speed test result for adhoc tests
+  /// Uses the adhoc speed test config and creates a new result on the server
+  /// [source] - IP address of the device that performed the test
+  Future<bool> createAdhocSpeedTestResult({
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+  }) async {
+    final adhocConfig = getAdhocSpeedTestConfig();
+    if (adhocConfig?.id == null) {
+      _logger.e('WebSocketCacheIntegration: Cannot create adhoc result - no adhoc config found');
+      return false;
+    }
+
+    _logger.i('WebSocketCacheIntegration: Creating adhoc speed test result '
+        'download=$downloadSpeed, upload=$uploadSpeed, rtt=$latency, '
+        'source=$source');
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'create_resource',
+        resourceType: 'speed_test_results',
+        additionalData: {
+          'params': {
+            'speed_test_id': adhocConfig!.id,
+            'download_mbps': downloadSpeed,
+            'upload_mbps': uploadSpeed,
+            'rtt': latency,
+            'completed_at': DateTime.now().toIso8601String(),
+            if (source != null) 'source': source,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      _logger.i('WebSocketCacheIntegration: Adhoc speed test response: ${response.payload}');
+
+      // Check for error in response
+      final error = response.payload['error'] ?? response.payload['errors'];
+      if (error != null) {
+        _logger.e('WebSocketCacheIntegration: Server returned error: $error');
+        return false;
+      }
+
+      _logger.i('WebSocketCacheIntegration: Adhoc speed test result created successfully');
+      return true;
+    } on Exception catch (e) {
+      _logger.e('WebSocketCacheIntegration: Failed to create adhoc speed test result: $e');
+      return false;
+    }
+  }
+
   /// Request full snapshots for all resource types.
   void requestFullSnapshots() {
     _logger.i('WebSocketCacheIntegration: Manual sync requested');
@@ -471,10 +637,10 @@ class WebSocketCacheIntegration {
     final payload = message.payload;
     final raw = message.raw ?? {};
 
-    // Log all messages for debugging
-    _logger.d(
+    final resourceTypeFromPayload = payload['resource_type']?.toString();
+    _logger.i(
       'WebSocketCacheIntegration: Received message - type: ${message.type}, '
-      'payload keys: ${payload.keys.toList()}, raw keys: ${raw.keys.toList()}',
+      'resource_type: $resourceTypeFromPayload',
     );
 
     if (_isChannelConfirmation(message)) {
@@ -500,8 +666,8 @@ class WebSocketCacheIntegration {
     if (resourceType == null || !_resourceTypes.contains(resourceType)) {
       // Log why we're ignoring this message
       if (resourceType != null) {
-        _logger.d(
-          'WebSocketCacheIntegration: Ignoring message for unknown resource: $resourceType',
+        _logger.i(
+          'WebSocketCacheIntegration: IGNORING unknown resource: $resourceType (known: $_resourceTypes)',
         );
       }
       return;
@@ -519,21 +685,13 @@ class WebSocketCacheIntegration {
     }
 
     // Check if it's a snapshot/index response
-    if (_isSnapshotMessage(action, payload, raw)) {
+    final isSnapshot = _isSnapshotMessage(action, payload, raw);
+    if (isSnapshot) {
       final items = _extractSnapshotItems(payload, raw);
       if (items != null) {
         _logger.i(
           'WebSocketCacheIntegration: Received snapshot for $resourceType: ${items.length} items',
         );
-
-        // Log first item to debug images
-        if (items.isNotEmpty) {
-          final firstItem = items.first;
-          _logger.d(
-            'WebSocketCacheIntegration: First $resourceType item has images: ${firstItem['images']}',
-          );
-        }
-
         final requestId = _extractSnapshotRequestId(payload, raw);
         _applySnapshotAccumulated(resourceType, items, requestId);
         _markSnapshotHandled(resourceType);
@@ -720,6 +878,39 @@ class WebSocketCacheIntegration {
       // Notify device callbacks
       for (final callback in _deviceDataCallbacks) {
         callback(resourceType, items);
+      }
+    } else if (resourceType == 'speed_tests') {
+      // Handle speed test config data
+      _logger.i('WebSocketCacheIntegration: Processing ${items.length} speed test configs');
+      final configs = items.map((item) => _buildSpeedTestConfig(item)).toList();
+      _speedTestConfigCache
+        ..clear()
+        ..addAll(configs);
+      _bumpLastUpdate();
+
+      // Notify speed test config callbacks
+      for (final callback in _speedTestConfigCallbacks) {
+        callback(configs);
+      }
+    } else if (resourceType == 'speed_test_results') {
+      // Handle speed test result data
+      final results = <SpeedTestResult>[];
+      for (final item in items) {
+        try {
+          results.add(_buildSpeedTestResult(item));
+        } on Exception catch (e) {
+          _logger.w('WebSocketCacheIntegration: Failed to parse speed test result: $e');
+        }
+      }
+
+      _speedTestResultCache
+        ..clear()
+        ..addAll(results);
+      _bumpLastUpdate();
+
+      // Notify speed test result callbacks
+      for (final callback in _speedTestResultCallbacks) {
+        callback(results);
       }
     }
   }
@@ -929,8 +1120,12 @@ class WebSocketCacheIntegration {
     lastDeviceUpdate.dispose();
     _deviceDataCallbacks.clear();
     _roomDataCallbacks.clear();
+    _speedTestConfigCallbacks.clear();
+    _speedTestResultCallbacks.clear();
     _deviceCache.clear();
     _roomCache.clear();
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
   }
 
   /// Request a specific resource type snapshot manually.
@@ -941,6 +1136,119 @@ class WebSocketCacheIntegration {
 
   /// Expose the WebSocket service for direct requests.
   WebSocketService get webSocketService => _webSocketService;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Speed Test Parsing Helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Safely parse an int from dynamic value (handles String, num, null)
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  /// Safely parse a double from dynamic value (handles String, num, null)
+  double _parseDouble(dynamic value, {double defaultValue = 0.0}) {
+    if (value == null) return defaultValue;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
+  /// Safely parse a nullable double from dynamic value (returns null if value is null)
+  double? _parseDoubleOrNull(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  /// Safely parse a bool from dynamic value (handles String, bool, int, null)
+  bool? _parseBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is String) {
+      if (value.toLowerCase() == 'true') return true;
+      if (value.toLowerCase() == 'false') return false;
+    }
+    if (value is int) return value != 0;
+    return null;
+  }
+
+  /// Parse DateTime safely
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    return DateTime.tryParse(value.toString());
+  }
+
+  SpeedTestConfig _buildSpeedTestConfig(Map<String, dynamic> data) {
+    return SpeedTestConfig(
+      id: _parseInt(data['id']),
+      name: data['name']?.toString(),
+      testType: data['test_type']?.toString(),
+      target: data['target']?.toString(),
+      port: _parseInt(data['port']),
+      iperfProtocol: data['iperf_protocol']?.toString(),
+      minDownloadMbps: _parseDoubleOrNull(data['min_download_mbps']),
+      minUploadMbps: _parseDoubleOrNull(data['min_upload_mbps']),
+      period: _parseInt(data['period']),
+      periodUnit: data['period_unit']?.toString(),
+      startsAt: _parseDateTime(data['starts_at']),
+      nextCheckAt: _parseDateTime(data['next_check_at']),
+      lastCheckedAt: _parseDateTime(data['last_checked_at']),
+      passing: _parseBool(data['passing']) ?? false,
+      lastResult: data['last_result']?.toString(),
+      maxFailures: _parseInt(data['max_failures']),
+      disableUplinkOnFailure: _parseBool(data['disable_uplink_on_failure']) ?? false,
+      sampleSizePct: _parseInt(data['sample_size_pct']),
+      pskOverride: data['psk_override']?.toString(),
+      wlanId: _parseInt(data['wlan_id']),
+      note: data['note']?.toString(),
+      scratch: data['scratch']?.toString(),
+      createdBy: data['created_by']?.toString(),
+      updatedBy: data['updated_by']?.toString(),
+      createdAt: _parseDateTime(data['created_at']),
+      updatedAt: _parseDateTime(data['updated_at']),
+    );
+  }
+
+  SpeedTestResult _buildSpeedTestResult(Map<String, dynamic> data) {
+    // Extract room name - could be in 'room', 'room_name', or nested 'pms_room.room'
+    var roomName = data['room']?.toString() ?? data['room_name']?.toString();
+    if (roomName == null && data['pms_room'] is Map<String, dynamic>) {
+      final pmsRoom = data['pms_room'] as Map<String, dynamic>;
+      roomName = pmsRoom['room']?.toString() ?? pmsRoom['name']?.toString();
+    }
+
+    return SpeedTestResult(
+      id: _parseInt(data['id']),
+      speedTestId: _parseInt(data['speed_test_id']),
+      pmsRoomId: _parseInt(data['pms_room_id']),
+      roomName: roomName,
+      roomType: data['room_type']?.toString(),
+      accessPointId: _parseInt(data['access_point_id']),
+      testedViaAccessPointId: _parseInt(data['tested_via_access_point_id']),
+      testedViaMediaConverterId: _parseInt(data['tested_via_media_converter_id']),
+      uplinkId: _parseInt(data['uplink_id']),
+      downloadSpeed: _parseDouble(data['download_mbps']),
+      uploadSpeed: _parseDouble(data['upload_mbps']),
+      latency: _parseDouble(data['rtt']),
+      timestamp: data['created_at'] != null
+          ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      completedAt: _parseDateTime(data['completed_at']),
+      isApplicable: _parseBool(data['is_applicable']) ?? true,
+      passed: _parseBool(data['passed']),
+      localIpAddress: data['local_ip_address']?.toString(),
+      serverHost: data['server_host']?.toString(),
+    );
+  }
 }
 
 class _SnapshotAccumulator {

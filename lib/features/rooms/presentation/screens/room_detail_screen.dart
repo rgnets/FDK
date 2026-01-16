@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/widgets/room_speed_test_selector.dart';
 
 /// Room detail screen with device management
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -295,18 +297,64 @@ class _RoomHeader extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends StatelessWidget {
-  
+class _OverviewTab extends ConsumerWidget {
+
   const _OverviewTab({required this.roomVm});
   final RoomViewModel roomVm;
-  
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Parse room ID as int for speed test selector
+    final roomIdInt = int.tryParse(roomVm.id) ?? 0;
+    // Use room number for matching speed test results (falls back to name if null)
+    final roomNameForMatch = roomVm.roomNumber ?? roomVm.name;
+    print('>>> _OverviewTab: roomVm.id="${roomVm.id}", roomNumber="${roomVm.roomNumber}", roomNameForMatch="$roomNameForMatch"');
+
+    // Get devices for this room to extract AP IDs and stats
+    final roomDeviceState = ref.watch(roomDeviceNotifierProvider(roomVm.id));
+    final stats = roomDeviceState.stats;
+    final apIds = roomDeviceState.allDevices
+        .where((d) => d.type == DeviceTypes.accessPoint)
+        .map((d) => int.tryParse(d.id) ?? 0)
+        .where((id) => id > 0)
+        .toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Speed Test Section
+          RoomSpeedTestSelector(
+            pmsRoomId: roomIdInt,
+            roomName: roomNameForMatch,
+            roomType: roomVm.metadata?['room_type'] as String?,
+            apIds: apIds,
+            onResultSubmitted: (result) async {
+              final integration = ref.read(webSocketCacheIntegrationProvider);
+              final success = await integration.submitSpeedTestResult(
+                result,
+                source: result.localIpAddress,
+              );
+              if (context.mounted) {
+                final testPassed = result.passed ?? false;
+                final statusText = testPassed ? 'PASSED' : 'FAILED';
+                final message = success
+                    ? 'Speed test $statusText - Result submitted'
+                    : 'Failed to submit speed test result';
+                final backgroundColor = success
+                    ? (testPassed ? Colors.green : Colors.orange)
+                    : Colors.red;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    backgroundColor: backgroundColor,
+                  ),
+                );
+              }
+            },
+          ),
+
           // Room Information
           _SectionCard(
             title: 'Room Information',
@@ -322,7 +370,7 @@ class _OverviewTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Device Statistics
           _SectionCard(
             title: 'Device Statistics',
@@ -335,15 +383,15 @@ class _OverviewTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
-          // Quick Stats Grid
+
+          // Quick Stats Grid - Use actual device counts from roomDeviceState
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   icon: Icons.wifi,
                   label: 'Access Points',
-                  value: '${(roomVm.deviceCount * 0.45).round()}',
+                  value: '${stats.accessPoints}',
                   color: Colors.blue,
                 ),
               ),
@@ -352,7 +400,7 @@ class _OverviewTab extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.hub,
                   label: 'Switches',
-                  value: '${(roomVm.deviceCount * 0.35).round()}',
+                  value: '${stats.switches}',
                   color: Colors.purple,
                 ),
               ),
@@ -365,22 +413,22 @@ class _OverviewTab extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.fiber_manual_record,
                   label: 'ONTs',
-                  value: '${(roomVm.deviceCount * 0.2).round()}',
+                  value: '${stats.onts}',
                   color: Colors.teal,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _StatCard(
-                  icon: Icons.speed,
-                  label: 'Avg Load',
-                  value: '${25 + (roomVm.deviceCount * 2)}%',
+                  icon: Icons.router,
+                  label: 'WLAN Ctrls',
+                  value: '${stats.wlanControllers}',
                   color: Colors.orange,
                 ),
               ),
             ],
           ),
-          
+
           const SizedBox(height: 80), // Space for bottom bar
         ],
       ),
