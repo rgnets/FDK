@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -329,14 +330,28 @@ class _OverviewTab extends ConsumerWidget {
             roomName: roomNameForMatch,
             roomType: roomVm.metadata?['room_type'] as String?,
             apIds: apIds,
-            onResultSubmitted: (result) {
-              // TODO(dlp): Submit result via websocket
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Speed test result recorded'),
-                  backgroundColor: Colors.green,
-                ),
+            onResultSubmitted: (result) async {
+              final integration = ref.read(webSocketCacheIntegrationProvider);
+              final success = await integration.submitSpeedTestResult(
+                result,
+                source: result.localIpAddress,
               );
+              if (context.mounted) {
+                final testPassed = result.passed ?? false;
+                final statusText = testPassed ? 'PASSED' : 'FAILED';
+                final message = success
+                    ? 'Speed test $statusText - Result submitted'
+                    : 'Failed to submit speed test result';
+                final backgroundColor = success
+                    ? (testPassed ? Colors.green : Colors.orange)
+                    : Colors.red;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    backgroundColor: backgroundColor,
+                  ),
+                );
+              }
             },
           ),
 

@@ -464,8 +464,8 @@ class WebSocketDataSyncService {
       target: data['target']?.toString(),
       port: _parseInt(data['port']),
       iperfProtocol: data['iperf_protocol']?.toString(),
-      minDownloadMbps: _parseDouble(data['min_download_mbps'], defaultValue: 0.0),
-      minUploadMbps: _parseDouble(data['min_upload_mbps'], defaultValue: 0.0),
+      minDownloadMbps: _parseDoubleOrNull(data['min_download_mbps']),
+      minUploadMbps: _parseDoubleOrNull(data['min_upload_mbps']),
       period: _parseInt(data['period']),
       periodUnit: data['period_unit']?.toString(),
       startsAt: parseDateTime(data['starts_at']),
@@ -526,6 +526,15 @@ class WebSocketDataSyncService {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? defaultValue;
     return defaultValue;
+  }
+
+  /// Safely parse a nullable double from dynamic value (returns null if value is null)
+  double? _parseDoubleOrNull(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   /// Safely parse a bool from dynamic value (handles String, bool, int, null)

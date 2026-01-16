@@ -195,14 +195,6 @@ class WebSocketCacheIntegration {
     Map<String, dynamic> deviceMap,
   ) {
     try {
-      // DEBUG: Log raw device data keys to see what backend sends
-      final hasHnCounts = deviceMap['hn_counts'] != null;
-      final hasHealthNotices = deviceMap['health_notices'] != null;
-      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
-      if (hasHnCounts) {
-        print('  hn_counts value: ${deviceMap['hn_counts']}');
-      }
-
       // Extract health notice counts if present
       final hnCounts = _extractHealthCounts(deviceMap);
       final healthNotices = _extractHealthNotices(deviceMap);
@@ -459,6 +451,120 @@ class WebSocketCacheIntegration {
       'data': jsonEncode(data),
     });
     return true;
+  }
+
+  /// Submit speed test result to update an existing result in the cache
+  /// Fills in download_mbps, upload_mbps, and rtt (latency) for the existing result
+  /// [source] - IP address of the device that performed the test
+  Future<bool> submitSpeedTestResult(
+    SpeedTestResult result, {
+    String? source,
+  }) async {
+    if (result.id == null) {
+      _logger.e('WebSocketCacheIntegration: Cannot submit result without id');
+      return false;
+    }
+
+    _logger.i('WebSocketCacheIntegration: Submitting speed test result id=${result.id}, '
+        'download=${result.downloadSpeed}, upload=${result.uploadSpeed}, rtt=${result.latency}, '
+        'source=$source');
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: 'speed_test_results',
+        additionalData: {
+          'id': result.id,
+          'params': {
+            'download_mbps': result.downloadSpeed,
+            'upload_mbps': result.uploadSpeed,
+            'rtt': result.latency,
+            if (source != null) 'source': source,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      _logger.i('WebSocketCacheIntegration: Speed test response: ${response.payload}');
+
+      // Check for error in response
+      final error = response.payload['error'] ?? response.payload['errors'];
+      if (error != null) {
+        _logger.e('WebSocketCacheIntegration: Server returned error: $error');
+        return false;
+      }
+
+      _logger.i('WebSocketCacheIntegration: Speed test result submitted successfully');
+      return true;
+    } on Exception catch (e) {
+      _logger.e('WebSocketCacheIntegration: Failed to submit speed test result: $e');
+      return false;
+    }
+  }
+
+  /// Get the adhoc speed test config from cache
+  SpeedTestConfig? getAdhocSpeedTestConfig() {
+    final matches = _speedTestConfigCache.where(
+      (config) => config.name?.toLowerCase().contains('adhoc') ?? false,
+    );
+    if (matches.isEmpty) {
+      _logger.w('WebSocketCacheIntegration: No adhoc speed test config found');
+      return null;
+    }
+    return matches.first;
+  }
+
+  /// Create a new speed test result for adhoc tests
+  /// Uses the adhoc speed test config and creates a new result on the server
+  /// [source] - IP address of the device that performed the test
+  Future<bool> createAdhocSpeedTestResult({
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+  }) async {
+    final adhocConfig = getAdhocSpeedTestConfig();
+    if (adhocConfig?.id == null) {
+      _logger.e('WebSocketCacheIntegration: Cannot create adhoc result - no adhoc config found');
+      return false;
+    }
+
+    _logger.i('WebSocketCacheIntegration: Creating adhoc speed test result '
+        'download=$downloadSpeed, upload=$uploadSpeed, rtt=$latency, '
+        'source=$source');
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'create_resource',
+        resourceType: 'speed_test_results',
+        additionalData: {
+          'params': {
+            'speed_test_id': adhocConfig!.id,
+            'download_mbps': downloadSpeed,
+            'upload_mbps': uploadSpeed,
+            'rtt': latency,
+            'completed_at': DateTime.now().toIso8601String(),
+            if (source != null) 'source': source,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      _logger.i('WebSocketCacheIntegration: Adhoc speed test response: ${response.payload}');
+
+      // Check for error in response
+      final error = response.payload['error'] ?? response.payload['errors'];
+      if (error != null) {
+        _logger.e('WebSocketCacheIntegration: Server returned error: $error');
+        return false;
+      }
+
+      _logger.i('WebSocketCacheIntegration: Adhoc speed test result created successfully');
+      return true;
+    } on Exception catch (e) {
+      _logger.e('WebSocketCacheIntegration: Failed to create adhoc speed test result: $e');
+      return false;
+    }
   }
 
   /// Request full snapshots for all resource types.
@@ -1053,6 +1159,15 @@ class WebSocketCacheIntegration {
     return defaultValue;
   }
 
+  /// Safely parse a nullable double from dynamic value (returns null if value is null)
+  double? _parseDoubleOrNull(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   /// Safely parse a bool from dynamic value (handles String, bool, int, null)
   bool? _parseBool(dynamic value) {
     if (value == null) return null;
@@ -1080,8 +1195,8 @@ class WebSocketCacheIntegration {
       target: data['target']?.toString(),
       port: _parseInt(data['port']),
       iperfProtocol: data['iperf_protocol']?.toString(),
-      minDownloadMbps: _parseDouble(data['min_download_mbps'], defaultValue: 0.0),
-      minUploadMbps: _parseDouble(data['min_upload_mbps'], defaultValue: 0.0),
+      minDownloadMbps: _parseDoubleOrNull(data['min_download_mbps']),
+      minUploadMbps: _parseDoubleOrNull(data['min_upload_mbps']),
       period: _parseInt(data['period']),
       periodUnit: data['period_unit']?.toString(),
       startsAt: _parseDateTime(data['starts_at']),

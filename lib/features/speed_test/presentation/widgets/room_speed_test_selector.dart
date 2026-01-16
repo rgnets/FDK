@@ -411,10 +411,10 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
               ),
               child: Row(
                 children: [
-                  // Category image based on selected result
+                  // Category image based on selected result (cross-validated with config name)
                   Builder(
                     builder: (context) {
-                      final category = _getTestCategory(currentResult);
+                      final category = _getTestCategory(currentResult, config: selectedConfig);
                       String iconPath;
                       IconData fallbackIcon;
                       if (category == 'ont') {
@@ -557,17 +557,28 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     );
   }
 
-  /// Determine test category from result's device associations
-  String _getTestCategory(SpeedTestResult result) {
-    // ONT validation: has media converter or uplink association
+  /// Determine test category by cross-validating with SpeedTestConfig name
+  /// Falls back to device associations if config name doesn't indicate type
+  String _getTestCategory(SpeedTestResult result, {SpeedTestConfig? config}) {
+    // Primary: Use SpeedTestConfig name to determine category
+    if (config?.name != null) {
+      final lowerName = config!.name!.toLowerCase();
+      if (lowerName.contains('ont')) {
+        return 'ont';
+      } else if (lowerName.contains('access point') || lowerName.contains('ap validation')) {
+        return 'ap';
+      } else if (lowerName.contains('coverage')) {
+        return 'coverage';
+      }
+    }
+
+    // Fallback: Infer from device associations on the result
     if (result.testedViaMediaConverterId != null || result.uplinkId != null) {
       return 'ont';
     }
-    // AP validation: has access point association
     if (result.accessPointId != null || result.testedViaAccessPointId != null) {
       return 'ap';
     }
-    // Coverage: no device associations (room-level test)
     return 'coverage';
   }
 
@@ -582,7 +593,8 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
 
     for (final item in allResults) {
       final result = item['result'] as SpeedTestResult;
-      final category = _getTestCategory(result);
+      final config = item['config'] as SpeedTestConfig?;
+      final category = _getTestCategory(result, config: config);
       categorizedResults[category]!.add(item);
     }
 
@@ -661,8 +673,8 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
           displayText = config.name ?? 'Result #${result.id}';
         }
 
-        // Determine category icon for this specific result
-        final resultCategory = _getTestCategory(result);
+        // Determine category icon for this specific result (cross-validated with config name)
+        final resultCategory = _getTestCategory(result, config: config);
         final String resultIconPath;
         final IconData resultFallbackIcon;
         if (resultCategory == 'ont') {
