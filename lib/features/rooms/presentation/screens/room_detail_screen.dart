@@ -8,7 +8,10 @@ import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+<<<<<<< HEAD
 import 'package:rgnets_fdk/features/onboarding/presentation/widgets/onboarding_stage_badge.dart';
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';

@@ -181,6 +181,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final roomId = _parseRoomId(roomData['id']);
     final roomName = _buildRoomName(roomData);
 
+<<<<<<< HEAD
     // DEBUG: Log room data structure
     _logger.i('DEBUG ROOM $roomId ($roomName): roomData keys = ${roomData.keys.toList()}');
     _logger.i('DEBUG ROOM $roomId: access_points = ${roomData['access_points']}');
@@ -188,12 +189,17 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     _logger.i('DEBUG ROOM $roomId: switch_ports = ${roomData['switch_ports']}');
     _logger.i('DEBUG ROOM $roomId: deviceModels count = ${deviceModels.length}');
 
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
     // Extract device references from room data
     final deviceRefs = _extractDeviceReferences(roomData);
     final totalDevices = deviceRefs.length;
 
+<<<<<<< HEAD
     _logger.i('DEBUG ROOM $roomId: Extracted ${deviceRefs.length} device refs: $deviceRefs');
 
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
     if (totalDevices == 0) {
       return RoomReadinessMetrics(
         roomId: roomId,
@@ -214,9 +220,13 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     for (final ref in deviceRefs) {
       final device = _findDevice(ref, deviceModels);
+<<<<<<< HEAD
       _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
       if (device == null) {
         _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
+=======
+      if (device == null) {
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
         // Device reference exists but device not found - critical issue
         issues.add(
           Issue(
@@ -366,10 +376,14 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
   dynamic _findDevice(Map<String, dynamic> ref, List deviceModels) {
     final refId = ref['id']?.toString();
     final refType = ref['type'] as String?;
+<<<<<<< HEAD
     if (refId == null) {
       _logger.w('DEBUG _findDevice: refId is null for ref=$ref');
       return null;
     }
+=======
+    if (refId == null) return null;
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
 
     // Build expected device ID with prefix
     final prefix = switch (refType) {
@@ -380,6 +394,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     };
     final prefixedId = '$prefix$refId';
 
+<<<<<<< HEAD
     _logger.i('DEBUG _findDevice: Looking for refId=$refId prefixedId=$prefixedId in ${deviceModels.length} devices');
 
     // Log first few device IDs for comparison
@@ -394,18 +409,26 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       _logger.i('DEBUG _findDevice: Sample device IDs in cache: $sampleIds');
     }
 
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
     for (final device in deviceModels) {
       try {
         final deviceId = device.id as String?;
         if (deviceId == prefixedId || deviceId == refId) {
+<<<<<<< HEAD
           _logger.i('DEBUG _findDevice: MATCH FOUND deviceId=$deviceId');
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
           return device;
         }
       } catch (_) {
         // Handle case where device is a Map
         if (device is Map<String, dynamic>) {
           if (device['id']?.toString() == refId) {
+<<<<<<< HEAD
             _logger.i('DEBUG _findDevice: MATCH FOUND (Map) id=${device['id']}');
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
             return device;
           }
         }
@@ -415,11 +438,17 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     // Also check in the reference data itself (inline device data)
     final refData = ref['data'];
     if (refData is Map<String, dynamic> && refData.containsKey('online')) {
+<<<<<<< HEAD
       _logger.i('DEBUG _findDevice: Using inline refData with online=${refData['online']}');
       return refData;
     }
 
     _logger.w('DEBUG _findDevice: NO MATCH for refId=$refId prefixedId=$prefixedId');
+=======
+      return refData;
+    }
+
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
     return null;
   }
 
@@ -507,6 +536,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       return RoomStatus.empty;
     }
 
+<<<<<<< HEAD
     // Check for device-missing issues (always DOWN - device expected but not found)
     final hasMissingDevice = issues.any((i) => i.code == 'DEVICE_MISSING');
     if (hasMissingDevice) {
@@ -520,6 +550,16 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     // PARTIAL if some devices offline OR any issues exist
     if (onlineDevices < totalDevices || issues.isNotEmpty) {
+=======
+    // Check for critical issues
+    final hasCritical = issues.any((i) => i.severity == IssueSeverity.critical);
+    if (hasCritical) {
+      return RoomStatus.down;
+    }
+
+    // Check for any non-critical issues
+    if (issues.isNotEmpty) {
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
       return RoomStatus.partial;
     }
 
