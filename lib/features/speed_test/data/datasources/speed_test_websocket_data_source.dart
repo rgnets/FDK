@@ -34,8 +34,10 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
     try {
       final response = await _webSocketService.requestActionCable(
-        action: 'index',
+        action: 'resource_action',
         resourceType: _speedTestConfigResourceType,
+        additionalData: {'crud_action': 'index'},
+        timeout: const Duration(seconds: 15),
       );
 
       final data = response.payload['data'];
@@ -79,9 +81,13 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     final response = await _webSocketService.requestActionCable(
-      action: 'show',
+      action: 'resource_action',
       resourceType: _speedTestConfigResourceType,
-      additionalData: {'id': id},
+      additionalData: {
+        'crud_action': 'show',
+        'id': id,
+      },
+      timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];
@@ -115,7 +121,9 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     try {
-      final additionalData = <String, dynamic>{};
+      final additionalData = <String, dynamic>{
+        'crud_action': 'index',
+      };
       if (speedTestId != null) additionalData['speed_test_id'] = speedTestId;
       if (accessPointId != null) {
         additionalData['access_point_id'] = accessPointId;
@@ -124,9 +132,10 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       if (offset != null) additionalData['offset'] = offset;
 
       final response = await _webSocketService.requestActionCable(
-        action: 'index',
+        action: 'resource_action',
         resourceType: _speedTestResultResourceType,
-        additionalData: additionalData.isNotEmpty ? additionalData : null,
+        additionalData: additionalData,
+        timeout: const Duration(seconds: 15),
       );
 
       final data = response.payload['data'];
@@ -174,9 +183,13 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     final response = await _webSocketService.requestActionCable(
-      action: 'show',
+      action: 'resource_action',
       resourceType: _speedTestResultResourceType,
-      additionalData: {'id': id},
+      additionalData: {
+        'crud_action': 'show',
+        'id': id,
+      },
+      timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];
@@ -204,9 +217,12 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     );
 
     final response = await _webSocketService.requestActionCable(
-      action: 'create',
+      action: 'create_resource',
       resourceType: _speedTestResultResourceType,
-      additionalData: jsonToSend,
+      additionalData: {
+        'params': jsonToSend,
+      },
+      timeout: const Duration(seconds: 15),
     );
 
     LoggerService.info(
@@ -242,9 +258,13 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     final response = await _webSocketService.requestActionCable(
-      action: 'update',
+      action: 'update_resource',
       resourceType: _speedTestResultResourceType,
-      additionalData: result.toJson(),
+      additionalData: {
+        'id': result.id,
+        'params': result.toJson(),
+      },
+      timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];

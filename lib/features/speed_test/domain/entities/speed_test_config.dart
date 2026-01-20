@@ -3,31 +3,51 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'speed_test_config.freezed.dart';
 part 'speed_test_config.g.dart';
 
+/// Safely converts a value to int, handling strings and nulls
+int? _toInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+/// Safely converts a value to double, handling strings and nulls
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
 @freezed
 class SpeedTestConfig with _$SpeedTestConfig {
   const factory SpeedTestConfig({
-    int? id,
+    @JsonKey(fromJson: _toInt) int? id,
     String? name,
     @JsonKey(name: 'test_type') String? testType,
     String? target,
-    int? port,
+    @JsonKey(fromJson: _toInt) int? port,
     @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-    @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-    @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-    int? period,
+    @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+    double? minDownloadMbps,
+    @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+    double? minUploadMbps,
+    @JsonKey(fromJson: _toInt) int? period,
     @JsonKey(name: 'period_unit') String? periodUnit,
     @JsonKey(name: 'starts_at') DateTime? startsAt,
     @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
     @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
     @Default(false) bool passing,
     @JsonKey(name: 'last_result') String? lastResult,
-    @JsonKey(name: 'max_failures') int? maxFailures,
+    @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
     @JsonKey(name: 'disable_uplink_on_failure')
     @Default(false)
     bool disableUplinkOnFailure,
-    @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+    @JsonKey(name: 'sample_size_pct', fromJson: _toInt) int? sampleSizePct,
     @JsonKey(name: 'psk_override') String? pskOverride,
-    @JsonKey(name: 'wlan_id') int? wlanId,
+    @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
     String? note,
     String? scratch,
     @JsonKey(name: 'created_by') String? createdBy,
