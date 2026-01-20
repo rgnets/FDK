@@ -9,18 +9,18 @@ part of 'speed_test_result.dart';
 _$SpeedTestResultImpl _$$SpeedTestResultImplFromJson(
         Map<String, dynamic> json) =>
     _$SpeedTestResultImpl(
-      id: _toInt(json['id']),
-      speedTestId: _toInt(json['speed_test_id']),
+      id: (json['id'] as num?)?.toInt(),
+      speedTestId: (json['speed_test_id'] as num?)?.toInt(),
       testType: json['test_type'] as String?,
       source: json['source'] as String?,
       destination: json['destination'] as String?,
-      port: _toInt(json['port']),
+      port: (json['port'] as num?)?.toInt(),
       iperfProtocol: json['iperf_protocol'] as String?,
-      downloadMbps: _toDouble(json['download_mbps']),
-      uploadMbps: _toDouble(json['upload_mbps']),
-      rtt: _toDouble(json['rtt']),
-      jitter: _toDouble(json['jitter']),
-      packetLoss: _toDouble(json['packet_loss']),
+      downloadMbps: (json['download_mbps'] as num?)?.toDouble(),
+      uploadMbps: (json['upload_mbps'] as num?)?.toDouble(),
+      rtt: (json['rtt'] as num?)?.toDouble(),
+      jitter: (json['jitter'] as num?)?.toDouble(),
+      packetLoss: (json['packet_loss'] as num?)?.toDouble(),
       passed: json['passed'] as bool? ?? false,
       isApplicable: json['is_applicable'] as bool? ?? true,
       initiatedAt: json['initiated_at'] == null
@@ -31,16 +31,18 @@ _$SpeedTestResultImpl _$$SpeedTestResultImplFromJson(
           : DateTime.parse(json['completed_at'] as String),
       raw: json['raw'] as String?,
       imageUrl: json['image_url'] as String?,
-      accessPointId: _toInt(json['access_point_id']),
-      testedViaAccessPointId: _toInt(json['tested_via_access_point_id']),
+      accessPointId: (json['access_point_id'] as num?)?.toInt(),
+      testedViaAccessPointId:
+          (json['tested_via_access_point_id'] as num?)?.toInt(),
       testedViaAccessPointRadioId:
-          _toInt(json['tested_via_access_point_radio_id']),
-      testedViaMediaConverterId: _toInt(json['tested_via_media_converter_id']),
-      uplinkId: _toInt(json['uplink_id']),
-      wlanId: _toInt(json['wlan_id']),
-      pmsRoomId: _toInt(json['pms_room_id']),
+          (json['tested_via_access_point_radio_id'] as num?)?.toInt(),
+      testedViaMediaConverterId:
+          (json['tested_via_media_converter_id'] as num?)?.toInt(),
+      uplinkId: (json['uplink_id'] as num?)?.toInt(),
+      wlanId: (json['wlan_id'] as num?)?.toInt(),
+      pmsRoomId: (json['pms_room_id'] as num?)?.toInt(),
       roomType: json['room_type'] as String?,
-      adminId: _toInt(json['admin_id']),
+      adminId: (json['admin_id'] as num?)?.toInt(),
       note: json['note'] as String?,
       scratch: json['scratch'] as String?,
       createdBy: json['created_by'] as String?,
@@ -102,6 +104,8 @@ Map<String, dynamic> _$$SpeedTestResultImplToJson(
   writeNotNull('updated_by', instance.updatedBy);
   writeNotNull('created_at', instance.createdAt?.toIso8601String());
   writeNotNull('updated_at', instance.updatedAt?.toIso8601String());
+  val['has_error'] = instance.hasError;
+  writeNotNull('error_message', instance.errorMessage);
   writeNotNull('local_ip_address', instance.localIpAddress);
   writeNotNull('server_host', instance.serverHost);
   return val;

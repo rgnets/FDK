@@ -248,22 +248,172 @@ class _SpeedTestResultsNotifierProviderElement
       (origin as SpeedTestResultsNotifierProvider).accessPointId;
 }
 
-String _$speedTestRunNotifierHash() =>
-    r'83cb66e1211ab3f3b1f5a9f72b96c8189b0b8cb5';
+String _$speedTestWithResultsNotifierHash() =>
+    r'ca7c8b8e92c543d1ca0e47ee04a15a7a328c6d40';
 
-/// See also [SpeedTestRunNotifier].
-@ProviderFor(SpeedTestRunNotifier)
-final speedTestRunNotifierProvider =
-    NotifierProvider<SpeedTestRunNotifier, SpeedTestRunState>.internal(
-  SpeedTestRunNotifier.new,
-  name: r'speedTestRunNotifierProvider',
+abstract class _$SpeedTestWithResultsNotifier
+    extends BuildlessAsyncNotifier<SpeedTestWithResults> {
+  late final int configId;
+
+  FutureOr<SpeedTestWithResults> build(
+    int configId,
+  );
+}
+
+/// See also [SpeedTestWithResultsNotifier].
+@ProviderFor(SpeedTestWithResultsNotifier)
+const speedTestWithResultsNotifierProvider =
+    SpeedTestWithResultsNotifierFamily();
+
+/// See also [SpeedTestWithResultsNotifier].
+class SpeedTestWithResultsNotifierFamily
+    extends Family<AsyncValue<SpeedTestWithResults>> {
+  /// See also [SpeedTestWithResultsNotifier].
+  const SpeedTestWithResultsNotifierFamily();
+
+  /// See also [SpeedTestWithResultsNotifier].
+  SpeedTestWithResultsNotifierProvider call(
+    int configId,
+  ) {
+    return SpeedTestWithResultsNotifierProvider(
+      configId,
+    );
+  }
+
+  @override
+  SpeedTestWithResultsNotifierProvider getProviderOverride(
+    covariant SpeedTestWithResultsNotifierProvider provider,
+  ) {
+    return call(
+      provider.configId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'speedTestWithResultsNotifierProvider';
+}
+
+/// See also [SpeedTestWithResultsNotifier].
+class SpeedTestWithResultsNotifierProvider extends AsyncNotifierProviderImpl<
+    SpeedTestWithResultsNotifier, SpeedTestWithResults> {
+  /// See also [SpeedTestWithResultsNotifier].
+  SpeedTestWithResultsNotifierProvider(
+    int configId,
+  ) : this._internal(
+          () => SpeedTestWithResultsNotifier()..configId = configId,
+          from: speedTestWithResultsNotifierProvider,
+          name: r'speedTestWithResultsNotifierProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$speedTestWithResultsNotifierHash,
+          dependencies: SpeedTestWithResultsNotifierFamily._dependencies,
+          allTransitiveDependencies:
+              SpeedTestWithResultsNotifierFamily._allTransitiveDependencies,
+          configId: configId,
+        );
+
+  SpeedTestWithResultsNotifierProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.configId,
+  }) : super.internal();
+
+  final int configId;
+
+  @override
+  FutureOr<SpeedTestWithResults> runNotifierBuild(
+    covariant SpeedTestWithResultsNotifier notifier,
+  ) {
+    return notifier.build(
+      configId,
+    );
+  }
+
+  @override
+  Override overrideWith(SpeedTestWithResultsNotifier Function() create) {
+    return ProviderOverride(
+      origin: this,
+      override: SpeedTestWithResultsNotifierProvider._internal(
+        () => create()..configId = configId,
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        configId: configId,
+      ),
+    );
+  }
+
+  @override
+  AsyncNotifierProviderElement<SpeedTestWithResultsNotifier,
+      SpeedTestWithResults> createElement() {
+    return _SpeedTestWithResultsNotifierProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SpeedTestWithResultsNotifierProvider &&
+        other.configId == configId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, configId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+mixin SpeedTestWithResultsNotifierRef
+    on AsyncNotifierProviderRef<SpeedTestWithResults> {
+  /// The parameter `configId` of this provider.
+  int get configId;
+}
+
+class _SpeedTestWithResultsNotifierProviderElement
+    extends AsyncNotifierProviderElement<SpeedTestWithResultsNotifier,
+        SpeedTestWithResults> with SpeedTestWithResultsNotifierRef {
+  _SpeedTestWithResultsNotifierProviderElement(super.provider);
+
+  @override
+  int get configId => (origin as SpeedTestWithResultsNotifierProvider).configId;
+}
+
+String _$allSpeedTestsWithResultsNotifierHash() =>
+    r'd773bec35269df06902eed57df641eb48a46c935';
+
+/// See also [AllSpeedTestsWithResultsNotifier].
+@ProviderFor(AllSpeedTestsWithResultsNotifier)
+final allSpeedTestsWithResultsNotifierProvider = AsyncNotifierProvider<
+    AllSpeedTestsWithResultsNotifier, List<SpeedTestWithResults>>.internal(
+  AllSpeedTestsWithResultsNotifier.new,
+  name: r'allSpeedTestsWithResultsNotifierProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$speedTestRunNotifierHash,
+      : _$allSpeedTestsWithResultsNotifierHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
-typedef _$SpeedTestRunNotifier = Notifier<SpeedTestRunState>;
+typedef _$AllSpeedTestsWithResultsNotifier
+    = AsyncNotifier<List<SpeedTestWithResults>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

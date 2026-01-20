@@ -34,10 +34,8 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
     try {
       final response = await _webSocketService.requestActionCable(
-        action: 'resource_action',
+        action: 'index',
         resourceType: _speedTestConfigResourceType,
-        additionalData: {'crud_action': 'index'},
-        timeout: const Duration(seconds: 15),
       );
 
       final data = response.payload['data'];
@@ -81,13 +79,9 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     final response = await _webSocketService.requestActionCable(
-      action: 'resource_action',
+      action: 'show',
       resourceType: _speedTestConfigResourceType,
-      additionalData: {
-        'crud_action': 'show',
-        'id': id,
-      },
-      timeout: const Duration(seconds: 15),
+      additionalData: {'id': id},
     );
 
     final data = response.payload['data'];
@@ -121,9 +115,7 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     try {
-      final additionalData = <String, dynamic>{
-        'crud_action': 'index',
-      };
+      final additionalData = <String, dynamic>{};
       if (speedTestId != null) additionalData['speed_test_id'] = speedTestId;
       if (accessPointId != null) {
         additionalData['access_point_id'] = accessPointId;
@@ -132,10 +124,9 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       if (offset != null) additionalData['offset'] = offset;
 
       final response = await _webSocketService.requestActionCable(
-        action: 'resource_action',
+        action: 'index',
         resourceType: _speedTestResultResourceType,
-        additionalData: additionalData,
-        timeout: const Duration(seconds: 15),
+        additionalData: additionalData.isNotEmpty ? additionalData : null,
       );
 
       final data = response.payload['data'];
@@ -183,13 +174,9 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     }
 
     final response = await _webSocketService.requestActionCable(
-      action: 'resource_action',
+      action: 'show',
       resourceType: _speedTestResultResourceType,
-      additionalData: {
-        'crud_action': 'show',
-        'id': id,
-      },
-      timeout: const Duration(seconds: 15),
+      additionalData: {'id': id},
     );
 
     final data = response.payload['data'];
@@ -210,47 +197,16 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw StateError('WebSocket not connected');
     }
 
-    // Build params with only fields the backend accepts (same format as adhoc submission)
-    final params = <String, dynamic>{
-      if (result.speedTestId != null) 'speed_test_id': result.speedTestId,
-      if (result.downloadMbps != null) 'download_mbps': result.downloadMbps,
-      if (result.uploadMbps != null) 'upload_mbps': result.uploadMbps,
-      if (result.rtt != null) 'rtt': result.rtt,
-      if (result.jitter != null) 'jitter': result.jitter,
-      if (result.packetLoss != null) 'packet_loss': result.packetLoss,
-      'passed': result.passed,
-      'is_applicable': result.isApplicable,
-      if (result.initiatedAt != null) 'initiated_at': result.initiatedAt!.toIso8601String(),
-      if (result.completedAt != null) 'completed_at': result.completedAt!.toIso8601String(),
-      if (result.testType != null) 'test_type': result.testType,
-      if (result.source != null) 'source': result.source,
-      if (result.destination != null) 'destination': result.destination,
-      if (result.port != null) 'port': result.port,
-      if (result.iperfProtocol != null) 'iperf_protocol': result.iperfProtocol,
-      if (result.accessPointId != null) 'access_point_id': result.accessPointId,
-      if (result.testedViaAccessPointId != null) 'tested_via_access_point_id': result.testedViaAccessPointId,
-      if (result.testedViaAccessPointRadioId != null) 'tested_via_access_point_radio_id': result.testedViaAccessPointRadioId,
-      if (result.testedViaMediaConverterId != null) 'tested_via_media_converter_id': result.testedViaMediaConverterId,
-      if (result.uplinkId != null) 'uplink_id': result.uplinkId,
-      if (result.wlanId != null) 'wlan_id': result.wlanId,
-      if (result.pmsRoomId != null) 'pms_room_id': result.pmsRoomId,
-      if (result.roomType != null) 'room_type': result.roomType,
-      if (result.note != null) 'note': result.note,
-      if (result.raw != null) 'raw': result.raw,
-    };
-
+    final jsonToSend = result.toJson();
     LoggerService.info(
-      'createSpeedTestResult sending: $params',
+      'createSpeedTestResult sending: $jsonToSend',
       tag: 'SpeedTestWS',
     );
 
     final response = await _webSocketService.requestActionCable(
-      action: 'create_resource',
+      action: 'create',
       resourceType: _speedTestResultResourceType,
-      additionalData: {
-        'params': params,
-      },
-      timeout: const Duration(seconds: 15),
+      additionalData: jsonToSend,
     );
 
     LoggerService.info(
@@ -285,48 +241,10 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw ArgumentError('Cannot update speed test result without id');
     }
 
-    // Build params with only fields the backend accepts
-    final params = <String, dynamic>{
-      if (result.speedTestId != null) 'speed_test_id': result.speedTestId,
-      if (result.downloadMbps != null) 'download_mbps': result.downloadMbps,
-      if (result.uploadMbps != null) 'upload_mbps': result.uploadMbps,
-      if (result.rtt != null) 'rtt': result.rtt,
-      if (result.jitter != null) 'jitter': result.jitter,
-      if (result.packetLoss != null) 'packet_loss': result.packetLoss,
-      'passed': result.passed,
-      'is_applicable': result.isApplicable,
-      if (result.initiatedAt != null) 'initiated_at': result.initiatedAt!.toIso8601String(),
-      if (result.completedAt != null) 'completed_at': result.completedAt!.toIso8601String(),
-      if (result.testType != null) 'test_type': result.testType,
-      if (result.source != null) 'source': result.source,
-      if (result.destination != null) 'destination': result.destination,
-      if (result.port != null) 'port': result.port,
-      if (result.iperfProtocol != null) 'iperf_protocol': result.iperfProtocol,
-      if (result.accessPointId != null) 'access_point_id': result.accessPointId,
-      if (result.testedViaAccessPointId != null) 'tested_via_access_point_id': result.testedViaAccessPointId,
-      if (result.testedViaAccessPointRadioId != null) 'tested_via_access_point_radio_id': result.testedViaAccessPointRadioId,
-      if (result.testedViaMediaConverterId != null) 'tested_via_media_converter_id': result.testedViaMediaConverterId,
-      if (result.uplinkId != null) 'uplink_id': result.uplinkId,
-      if (result.wlanId != null) 'wlan_id': result.wlanId,
-      if (result.pmsRoomId != null) 'pms_room_id': result.pmsRoomId,
-      if (result.roomType != null) 'room_type': result.roomType,
-      if (result.note != null) 'note': result.note,
-      if (result.raw != null) 'raw': result.raw,
-    };
-
-    LoggerService.info(
-      'updateSpeedTestResult sending: $params',
-      tag: 'SpeedTestWS',
-    );
-
     final response = await _webSocketService.requestActionCable(
-      action: 'update_resource',
+      action: 'update',
       resourceType: _speedTestResultResourceType,
-      additionalData: {
-        'id': result.id,
-        'params': params,
-      },
-      timeout: const Duration(seconds: 15),
+      additionalData: result.toJson(),
     );
 
     final data = response.payload['data'];

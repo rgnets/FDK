@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_with_results.dart';
 
 /// Repository interface for speed test configurations and results.
 abstract class SpeedTestRepository {
@@ -40,4 +41,15 @@ abstract class SpeedTestRepository {
   Future<Either<Failure, SpeedTestResult>> updateSpeedTestResult(
     SpeedTestResult result,
   );
+
+  // ============================================================================
+  // Joined Operations
+  // ============================================================================
+
+  /// Get a speed test configuration with all its results
+  Future<Either<Failure, SpeedTestWithResults>> getSpeedTestWithResults(int id);
+
+  /// Get all speed test configurations with their results
+  Future<Either<Failure, List<SpeedTestWithResults>>>
+      getAllSpeedTestsWithResults();
 }

@@ -20,27 +20,23 @@ SpeedTestResult _$SpeedTestResultFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$SpeedTestResult {
-  @JsonKey(fromJson: _toInt)
   int? get id => throw _privateConstructorUsedError;
-  @JsonKey(name: 'speed_test_id', fromJson: _toInt)
+  @JsonKey(name: 'speed_test_id')
   int? get speedTestId => throw _privateConstructorUsedError;
   @JsonKey(name: 'test_type')
   String? get testType => throw _privateConstructorUsedError;
   String? get source => throw _privateConstructorUsedError;
   String? get destination => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _toInt)
   int? get port => throw _privateConstructorUsedError;
   @JsonKey(name: 'iperf_protocol')
   String? get iperfProtocol => throw _privateConstructorUsedError;
-  @JsonKey(name: 'download_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'download_mbps')
   double? get downloadMbps => throw _privateConstructorUsedError;
-  @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'upload_mbps')
   double? get uploadMbps => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _toDouble)
   double? get rtt => throw _privateConstructorUsedError;
-  @JsonKey(fromJson: _toDouble)
   double? get jitter => throw _privateConstructorUsedError;
-  @JsonKey(name: 'packet_loss', fromJson: _toDouble)
+  @JsonKey(name: 'packet_loss')
   double? get packetLoss => throw _privateConstructorUsedError;
   bool get passed => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_applicable')
@@ -52,23 +48,23 @@ mixin _$SpeedTestResult {
   String? get raw => throw _privateConstructorUsedError;
   @JsonKey(name: 'image_url')
   String? get imageUrl => throw _privateConstructorUsedError;
-  @JsonKey(name: 'access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'access_point_id')
   int? get accessPointId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_id')
   int? get testedViaAccessPointId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_radio_id')
   int? get testedViaAccessPointRadioId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_media_converter_id')
   int? get testedViaMediaConverterId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'uplink_id', fromJson: _toInt)
+  @JsonKey(name: 'uplink_id')
   int? get uplinkId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'wlan_id', fromJson: _toInt)
+  @JsonKey(name: 'wlan_id')
   int? get wlanId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'pms_room_id', fromJson: _toInt)
+  @JsonKey(name: 'pms_room_id')
   int? get pmsRoomId => throw _privateConstructorUsedError;
   @JsonKey(name: 'room_type')
   String? get roomType => throw _privateConstructorUsedError;
-  @JsonKey(name: 'admin_id', fromJson: _toInt)
+  @JsonKey(name: 'admin_id')
   int? get adminId => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   String? get scratch => throw _privateConstructorUsedError;
@@ -80,10 +76,8 @@ mixin _$SpeedTestResult {
   DateTime? get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt =>
-      throw _privateConstructorUsedError; // Legacy fields for backwards compatibility (not sent to server)
-  @JsonKey(includeToJson: false)
+      throw _privateConstructorUsedError; // Legacy fields for backwards compatibility
   bool get hasError => throw _privateConstructorUsedError;
-  @JsonKey(name: 'error_message', includeToJson: false)
   String? get errorMessage => throw _privateConstructorUsedError;
   @JsonKey(name: 'local_ip_address')
   String? get localIpAddress => throw _privateConstructorUsedError;
@@ -92,48 +86,43 @@ mixin _$SpeedTestResult {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)
@@ -143,48 +132,43 @@ mixin _$SpeedTestResult {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -194,48 +178,43 @@ mixin _$SpeedTestResult {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -272,44 +251,42 @@ abstract class $SpeedTestResultCopyWith<$Res> {
       _$SpeedTestResultCopyWithImpl<$Res, SpeedTestResult>;
   @useResult
   $Res call(
-      {@JsonKey(fromJson: _toInt) int? id,
-      @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+      {int? id,
+      @JsonKey(name: 'speed_test_id') int? speedTestId,
       @JsonKey(name: 'test_type') String? testType,
       String? source,
       String? destination,
-      @JsonKey(fromJson: _toInt) int? port,
+      int? port,
       @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-      @JsonKey(name: 'download_mbps', fromJson: _toDouble) double? downloadMbps,
-      @JsonKey(name: 'upload_mbps', fromJson: _toDouble) double? uploadMbps,
-      @JsonKey(fromJson: _toDouble) double? rtt,
-      @JsonKey(fromJson: _toDouble) double? jitter,
-      @JsonKey(name: 'packet_loss', fromJson: _toDouble) double? packetLoss,
+      @JsonKey(name: 'download_mbps') double? downloadMbps,
+      @JsonKey(name: 'upload_mbps') double? uploadMbps,
+      double? rtt,
+      double? jitter,
+      @JsonKey(name: 'packet_loss') double? packetLoss,
       bool passed,
       @JsonKey(name: 'is_applicable') bool isApplicable,
       @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
       @JsonKey(name: 'completed_at') DateTime? completedAt,
       String? raw,
       @JsonKey(name: 'image_url') String? imageUrl,
-      @JsonKey(name: 'access_point_id', fromJson: _toInt) int? accessPointId,
-      @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
-      int? testedViaAccessPointId,
-      @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+      @JsonKey(name: 'access_point_id') int? accessPointId,
+      @JsonKey(name: 'tested_via_access_point_id') int? testedViaAccessPointId,
+      @JsonKey(name: 'tested_via_access_point_radio_id')
       int? testedViaAccessPointRadioId,
-      @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+      @JsonKey(name: 'tested_via_media_converter_id')
       int? testedViaMediaConverterId,
-      @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-      @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-      @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+      @JsonKey(name: 'uplink_id') int? uplinkId,
+      @JsonKey(name: 'wlan_id') int? wlanId,
+      @JsonKey(name: 'pms_room_id') int? pmsRoomId,
       @JsonKey(name: 'room_type') String? roomType,
-      @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+      @JsonKey(name: 'admin_id') int? adminId,
       String? note,
       String? scratch,
       @JsonKey(name: 'created_by') String? createdBy,
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      @JsonKey(includeToJson: false) bool hasError,
-      @JsonKey(name: 'error_message', includeToJson: false)
+      bool hasError,
       String? errorMessage,
       @JsonKey(name: 'local_ip_address') String? localIpAddress,
       @JsonKey(name: 'server_host') String? serverHost});
@@ -528,44 +505,42 @@ abstract class _$$SpeedTestResultImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {@JsonKey(fromJson: _toInt) int? id,
-      @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+      {int? id,
+      @JsonKey(name: 'speed_test_id') int? speedTestId,
       @JsonKey(name: 'test_type') String? testType,
       String? source,
       String? destination,
-      @JsonKey(fromJson: _toInt) int? port,
+      int? port,
       @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-      @JsonKey(name: 'download_mbps', fromJson: _toDouble) double? downloadMbps,
-      @JsonKey(name: 'upload_mbps', fromJson: _toDouble) double? uploadMbps,
-      @JsonKey(fromJson: _toDouble) double? rtt,
-      @JsonKey(fromJson: _toDouble) double? jitter,
-      @JsonKey(name: 'packet_loss', fromJson: _toDouble) double? packetLoss,
+      @JsonKey(name: 'download_mbps') double? downloadMbps,
+      @JsonKey(name: 'upload_mbps') double? uploadMbps,
+      double? rtt,
+      double? jitter,
+      @JsonKey(name: 'packet_loss') double? packetLoss,
       bool passed,
       @JsonKey(name: 'is_applicable') bool isApplicable,
       @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
       @JsonKey(name: 'completed_at') DateTime? completedAt,
       String? raw,
       @JsonKey(name: 'image_url') String? imageUrl,
-      @JsonKey(name: 'access_point_id', fromJson: _toInt) int? accessPointId,
-      @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
-      int? testedViaAccessPointId,
-      @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+      @JsonKey(name: 'access_point_id') int? accessPointId,
+      @JsonKey(name: 'tested_via_access_point_id') int? testedViaAccessPointId,
+      @JsonKey(name: 'tested_via_access_point_radio_id')
       int? testedViaAccessPointRadioId,
-      @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+      @JsonKey(name: 'tested_via_media_converter_id')
       int? testedViaMediaConverterId,
-      @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-      @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-      @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+      @JsonKey(name: 'uplink_id') int? uplinkId,
+      @JsonKey(name: 'wlan_id') int? wlanId,
+      @JsonKey(name: 'pms_room_id') int? pmsRoomId,
       @JsonKey(name: 'room_type') String? roomType,
-      @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+      @JsonKey(name: 'admin_id') int? adminId,
       String? note,
       String? scratch,
       @JsonKey(name: 'created_by') String? createdBy,
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      @JsonKey(includeToJson: false) bool hasError,
-      @JsonKey(name: 'error_message', includeToJson: false)
+      bool hasError,
       String? errorMessage,
       @JsonKey(name: 'local_ip_address') String? localIpAddress,
       @JsonKey(name: 'server_host') String? serverHost});
@@ -777,44 +752,43 @@ class __$$SpeedTestResultImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$SpeedTestResultImpl extends _SpeedTestResult {
   const _$SpeedTestResultImpl(
-      {@JsonKey(fromJson: _toInt) this.id,
-      @JsonKey(name: 'speed_test_id', fromJson: _toInt) this.speedTestId,
+      {this.id,
+      @JsonKey(name: 'speed_test_id') this.speedTestId,
       @JsonKey(name: 'test_type') this.testType,
       this.source,
       this.destination,
-      @JsonKey(fromJson: _toInt) this.port,
+      this.port,
       @JsonKey(name: 'iperf_protocol') this.iperfProtocol,
-      @JsonKey(name: 'download_mbps', fromJson: _toDouble) this.downloadMbps,
-      @JsonKey(name: 'upload_mbps', fromJson: _toDouble) this.uploadMbps,
-      @JsonKey(fromJson: _toDouble) this.rtt,
-      @JsonKey(fromJson: _toDouble) this.jitter,
-      @JsonKey(name: 'packet_loss', fromJson: _toDouble) this.packetLoss,
+      @JsonKey(name: 'download_mbps') this.downloadMbps,
+      @JsonKey(name: 'upload_mbps') this.uploadMbps,
+      this.rtt,
+      this.jitter,
+      @JsonKey(name: 'packet_loss') this.packetLoss,
       this.passed = false,
       @JsonKey(name: 'is_applicable') this.isApplicable = true,
       @JsonKey(name: 'initiated_at') this.initiatedAt,
       @JsonKey(name: 'completed_at') this.completedAt,
       this.raw,
       @JsonKey(name: 'image_url') this.imageUrl,
-      @JsonKey(name: 'access_point_id', fromJson: _toInt) this.accessPointId,
-      @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
-      this.testedViaAccessPointId,
-      @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+      @JsonKey(name: 'access_point_id') this.accessPointId,
+      @JsonKey(name: 'tested_via_access_point_id') this.testedViaAccessPointId,
+      @JsonKey(name: 'tested_via_access_point_radio_id')
       this.testedViaAccessPointRadioId,
-      @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+      @JsonKey(name: 'tested_via_media_converter_id')
       this.testedViaMediaConverterId,
-      @JsonKey(name: 'uplink_id', fromJson: _toInt) this.uplinkId,
-      @JsonKey(name: 'wlan_id', fromJson: _toInt) this.wlanId,
-      @JsonKey(name: 'pms_room_id', fromJson: _toInt) this.pmsRoomId,
+      @JsonKey(name: 'uplink_id') this.uplinkId,
+      @JsonKey(name: 'wlan_id') this.wlanId,
+      @JsonKey(name: 'pms_room_id') this.pmsRoomId,
       @JsonKey(name: 'room_type') this.roomType,
-      @JsonKey(name: 'admin_id', fromJson: _toInt) this.adminId,
+      @JsonKey(name: 'admin_id') this.adminId,
       this.note,
       this.scratch,
       @JsonKey(name: 'created_by') this.createdBy,
       @JsonKey(name: 'updated_by') this.updatedBy,
       @JsonKey(name: 'created_at') this.createdAt,
       @JsonKey(name: 'updated_at') this.updatedAt,
-      @JsonKey(includeToJson: false) this.hasError = false,
-      @JsonKey(name: 'error_message', includeToJson: false) this.errorMessage,
+      this.hasError = false,
+      this.errorMessage,
       @JsonKey(name: 'local_ip_address') this.localIpAddress,
       @JsonKey(name: 'server_host') this.serverHost})
       : super._();
@@ -823,10 +797,9 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
       _$$SpeedTestResultImplFromJson(json);
 
   @override
-  @JsonKey(fromJson: _toInt)
   final int? id;
   @override
-  @JsonKey(name: 'speed_test_id', fromJson: _toInt)
+  @JsonKey(name: 'speed_test_id')
   final int? speedTestId;
   @override
   @JsonKey(name: 'test_type')
@@ -836,25 +809,22 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @override
   final String? destination;
   @override
-  @JsonKey(fromJson: _toInt)
   final int? port;
   @override
   @JsonKey(name: 'iperf_protocol')
   final String? iperfProtocol;
   @override
-  @JsonKey(name: 'download_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'download_mbps')
   final double? downloadMbps;
   @override
-  @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'upload_mbps')
   final double? uploadMbps;
   @override
-  @JsonKey(fromJson: _toDouble)
   final double? rtt;
   @override
-  @JsonKey(fromJson: _toDouble)
   final double? jitter;
   @override
-  @JsonKey(name: 'packet_loss', fromJson: _toDouble)
+  @JsonKey(name: 'packet_loss')
   final double? packetLoss;
   @override
   @JsonKey()
@@ -874,31 +844,31 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @JsonKey(name: 'image_url')
   final String? imageUrl;
   @override
-  @JsonKey(name: 'access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'access_point_id')
   final int? accessPointId;
   @override
-  @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_id')
   final int? testedViaAccessPointId;
   @override
-  @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_radio_id')
   final int? testedViaAccessPointRadioId;
   @override
-  @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_media_converter_id')
   final int? testedViaMediaConverterId;
   @override
-  @JsonKey(name: 'uplink_id', fromJson: _toInt)
+  @JsonKey(name: 'uplink_id')
   final int? uplinkId;
   @override
-  @JsonKey(name: 'wlan_id', fromJson: _toInt)
+  @JsonKey(name: 'wlan_id')
   final int? wlanId;
   @override
-  @JsonKey(name: 'pms_room_id', fromJson: _toInt)
+  @JsonKey(name: 'pms_room_id')
   final int? pmsRoomId;
   @override
   @JsonKey(name: 'room_type')
   final String? roomType;
   @override
-  @JsonKey(name: 'admin_id', fromJson: _toInt)
+  @JsonKey(name: 'admin_id')
   final int? adminId;
   @override
   final String? note;
@@ -916,12 +886,11 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
-// Legacy fields for backwards compatibility (not sent to server)
+// Legacy fields for backwards compatibility
   @override
-  @JsonKey(includeToJson: false)
+  @JsonKey()
   final bool hasError;
   @override
-  @JsonKey(name: 'error_message', includeToJson: false)
   final String? errorMessage;
   @override
   @JsonKey(name: 'local_ip_address')
@@ -1062,48 +1031,43 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)
@@ -1153,48 +1117,43 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -1244,48 +1203,43 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(
-            @JsonKey(fromJson: _toInt) int? id,
-            @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+            int? id,
+            @JsonKey(name: 'speed_test_id') int? speedTestId,
             @JsonKey(name: 'test_type') String? testType,
             String? source,
             String? destination,
-            @JsonKey(fromJson: _toInt) int? port,
+            int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-            double? downloadMbps,
-            @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-            double? uploadMbps,
-            @JsonKey(fromJson: _toDouble) double? rtt,
-            @JsonKey(fromJson: _toDouble) double? jitter,
-            @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-            double? packetLoss,
+            @JsonKey(name: 'download_mbps') double? downloadMbps,
+            @JsonKey(name: 'upload_mbps') double? uploadMbps,
+            double? rtt,
+            double? jitter,
+            @JsonKey(name: 'packet_loss') double? packetLoss,
             bool passed,
             @JsonKey(name: 'is_applicable') bool isApplicable,
             @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
             @JsonKey(name: 'completed_at') DateTime? completedAt,
             String? raw,
             @JsonKey(name: 'image_url') String? imageUrl,
-            @JsonKey(name: 'access_point_id', fromJson: _toInt)
-            int? accessPointId,
-            @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+            @JsonKey(name: 'access_point_id') int? accessPointId,
+            @JsonKey(name: 'tested_via_access_point_id')
             int? testedViaAccessPointId,
-            @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_access_point_radio_id')
             int? testedViaAccessPointRadioId,
-            @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+            @JsonKey(name: 'tested_via_media_converter_id')
             int? testedViaMediaConverterId,
-            @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-            @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+            @JsonKey(name: 'uplink_id') int? uplinkId,
+            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'pms_room_id') int? pmsRoomId,
             @JsonKey(name: 'room_type') String? roomType,
-            @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+            @JsonKey(name: 'admin_id') int? adminId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            @JsonKey(includeToJson: false) bool hasError,
-            @JsonKey(name: 'error_message', includeToJson: false)
+            bool hasError,
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -1373,62 +1327,56 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
 
 abstract class _SpeedTestResult extends SpeedTestResult {
   const factory _SpeedTestResult(
-      {@JsonKey(fromJson: _toInt) final int? id,
-      @JsonKey(name: 'speed_test_id', fromJson: _toInt) final int? speedTestId,
-      @JsonKey(name: 'test_type') final String? testType,
-      final String? source,
-      final String? destination,
-      @JsonKey(fromJson: _toInt) final int? port,
-      @JsonKey(name: 'iperf_protocol') final String? iperfProtocol,
-      @JsonKey(name: 'download_mbps', fromJson: _toDouble)
-      final double? downloadMbps,
-      @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
-      final double? uploadMbps,
-      @JsonKey(fromJson: _toDouble) final double? rtt,
-      @JsonKey(fromJson: _toDouble) final double? jitter,
-      @JsonKey(name: 'packet_loss', fromJson: _toDouble)
-      final double? packetLoss,
-      final bool passed,
-      @JsonKey(name: 'is_applicable') final bool isApplicable,
-      @JsonKey(name: 'initiated_at') final DateTime? initiatedAt,
-      @JsonKey(name: 'completed_at') final DateTime? completedAt,
-      final String? raw,
-      @JsonKey(name: 'image_url') final String? imageUrl,
-      @JsonKey(name: 'access_point_id', fromJson: _toInt)
-      final int? accessPointId,
-      @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
-      final int? testedViaAccessPointId,
-      @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
-      final int? testedViaAccessPointRadioId,
-      @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
-      final int? testedViaMediaConverterId,
-      @JsonKey(name: 'uplink_id', fromJson: _toInt) final int? uplinkId,
-      @JsonKey(name: 'wlan_id', fromJson: _toInt) final int? wlanId,
-      @JsonKey(name: 'pms_room_id', fromJson: _toInt) final int? pmsRoomId,
-      @JsonKey(name: 'room_type') final String? roomType,
-      @JsonKey(name: 'admin_id', fromJson: _toInt) final int? adminId,
-      final String? note,
-      final String? scratch,
-      @JsonKey(name: 'created_by') final String? createdBy,
-      @JsonKey(name: 'updated_by') final String? updatedBy,
-      @JsonKey(name: 'created_at') final DateTime? createdAt,
-      @JsonKey(name: 'updated_at') final DateTime? updatedAt,
-      @JsonKey(includeToJson: false) final bool hasError,
-      @JsonKey(name: 'error_message', includeToJson: false)
-      final String? errorMessage,
-      @JsonKey(name: 'local_ip_address') final String? localIpAddress,
-      @JsonKey(name: 'server_host')
-      final String? serverHost}) = _$SpeedTestResultImpl;
+          {final int? id,
+          @JsonKey(name: 'speed_test_id') final int? speedTestId,
+          @JsonKey(name: 'test_type') final String? testType,
+          final String? source,
+          final String? destination,
+          final int? port,
+          @JsonKey(name: 'iperf_protocol') final String? iperfProtocol,
+          @JsonKey(name: 'download_mbps') final double? downloadMbps,
+          @JsonKey(name: 'upload_mbps') final double? uploadMbps,
+          final double? rtt,
+          final double? jitter,
+          @JsonKey(name: 'packet_loss') final double? packetLoss,
+          final bool passed,
+          @JsonKey(name: 'is_applicable') final bool isApplicable,
+          @JsonKey(name: 'initiated_at') final DateTime? initiatedAt,
+          @JsonKey(name: 'completed_at') final DateTime? completedAt,
+          final String? raw,
+          @JsonKey(name: 'image_url') final String? imageUrl,
+          @JsonKey(name: 'access_point_id') final int? accessPointId,
+          @JsonKey(name: 'tested_via_access_point_id')
+          final int? testedViaAccessPointId,
+          @JsonKey(name: 'tested_via_access_point_radio_id')
+          final int? testedViaAccessPointRadioId,
+          @JsonKey(name: 'tested_via_media_converter_id')
+          final int? testedViaMediaConverterId,
+          @JsonKey(name: 'uplink_id') final int? uplinkId,
+          @JsonKey(name: 'wlan_id') final int? wlanId,
+          @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
+          @JsonKey(name: 'room_type') final String? roomType,
+          @JsonKey(name: 'admin_id') final int? adminId,
+          final String? note,
+          final String? scratch,
+          @JsonKey(name: 'created_by') final String? createdBy,
+          @JsonKey(name: 'updated_by') final String? updatedBy,
+          @JsonKey(name: 'created_at') final DateTime? createdAt,
+          @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+          final bool hasError,
+          final String? errorMessage,
+          @JsonKey(name: 'local_ip_address') final String? localIpAddress,
+          @JsonKey(name: 'server_host') final String? serverHost}) =
+      _$SpeedTestResultImpl;
   const _SpeedTestResult._() : super._();
 
   factory _SpeedTestResult.fromJson(Map<String, dynamic> json) =
       _$SpeedTestResultImpl.fromJson;
 
   @override
-  @JsonKey(fromJson: _toInt)
   int? get id;
   @override
-  @JsonKey(name: 'speed_test_id', fromJson: _toInt)
+  @JsonKey(name: 'speed_test_id')
   int? get speedTestId;
   @override
   @JsonKey(name: 'test_type')
@@ -1438,25 +1386,22 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   @override
   String? get destination;
   @override
-  @JsonKey(fromJson: _toInt)
   int? get port;
   @override
   @JsonKey(name: 'iperf_protocol')
   String? get iperfProtocol;
   @override
-  @JsonKey(name: 'download_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'download_mbps')
   double? get downloadMbps;
   @override
-  @JsonKey(name: 'upload_mbps', fromJson: _toDouble)
+  @JsonKey(name: 'upload_mbps')
   double? get uploadMbps;
   @override
-  @JsonKey(fromJson: _toDouble)
   double? get rtt;
   @override
-  @JsonKey(fromJson: _toDouble)
   double? get jitter;
   @override
-  @JsonKey(name: 'packet_loss', fromJson: _toDouble)
+  @JsonKey(name: 'packet_loss')
   double? get packetLoss;
   @override
   bool get passed;
@@ -1475,31 +1420,31 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   @JsonKey(name: 'image_url')
   String? get imageUrl;
   @override
-  @JsonKey(name: 'access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'access_point_id')
   int? get accessPointId;
   @override
-  @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_id')
   int? get testedViaAccessPointId;
   @override
-  @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_access_point_radio_id')
   int? get testedViaAccessPointRadioId;
   @override
-  @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+  @JsonKey(name: 'tested_via_media_converter_id')
   int? get testedViaMediaConverterId;
   @override
-  @JsonKey(name: 'uplink_id', fromJson: _toInt)
+  @JsonKey(name: 'uplink_id')
   int? get uplinkId;
   @override
-  @JsonKey(name: 'wlan_id', fromJson: _toInt)
+  @JsonKey(name: 'wlan_id')
   int? get wlanId;
   @override
-  @JsonKey(name: 'pms_room_id', fromJson: _toInt)
+  @JsonKey(name: 'pms_room_id')
   int? get pmsRoomId;
   @override
   @JsonKey(name: 'room_type')
   String? get roomType;
   @override
-  @JsonKey(name: 'admin_id', fromJson: _toInt)
+  @JsonKey(name: 'admin_id')
   int? get adminId;
   @override
   String? get note;
@@ -1517,11 +1462,9 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
-  @override // Legacy fields for backwards compatibility (not sent to server)
-  @JsonKey(includeToJson: false)
+  @override // Legacy fields for backwards compatibility
   bool get hasError;
   @override
-  @JsonKey(name: 'error_message', includeToJson: false)
   String? get errorMessage;
   @override
   @JsonKey(name: 'local_ip_address')

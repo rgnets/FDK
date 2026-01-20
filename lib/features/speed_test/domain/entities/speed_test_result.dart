@@ -4,66 +4,47 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 part 'speed_test_result.freezed.dart';
 part 'speed_test_result.g.dart';
 
-/// Safely converts a value to int, handling strings and nulls
-int? _toInt(dynamic value) {
-  if (value == null) return null;
-  if (value is int) return value;
-  if (value is double) return value.toInt();
-  if (value is String) return int.tryParse(value);
-  return null;
-}
-
-/// Safely converts a value to double, handling strings and nulls
-double? _toDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is double) return value;
-  if (value is int) return value.toDouble();
-  if (value is String) return double.tryParse(value);
-  return null;
-}
-
 @freezed
 class SpeedTestResult with _$SpeedTestResult {
   const factory SpeedTestResult({
-    @JsonKey(fromJson: _toInt) int? id,
-    @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
+    int? id,
+    @JsonKey(name: 'speed_test_id') int? speedTestId,
     @JsonKey(name: 'test_type') String? testType,
     String? source,
     String? destination,
-    @JsonKey(fromJson: _toInt) int? port,
+    int? port,
     @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-    @JsonKey(name: 'download_mbps', fromJson: _toDouble) double? downloadMbps,
-    @JsonKey(name: 'upload_mbps', fromJson: _toDouble) double? uploadMbps,
-    @JsonKey(fromJson: _toDouble) double? rtt,
-    @JsonKey(fromJson: _toDouble) double? jitter,
-    @JsonKey(name: 'packet_loss', fromJson: _toDouble) double? packetLoss,
+    @JsonKey(name: 'download_mbps') double? downloadMbps,
+    @JsonKey(name: 'upload_mbps') double? uploadMbps,
+    double? rtt,
+    double? jitter,
+    @JsonKey(name: 'packet_loss') double? packetLoss,
     @Default(false) bool passed,
     @JsonKey(name: 'is_applicable') @Default(true) bool isApplicable,
     @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
     String? raw,
     @JsonKey(name: 'image_url') String? imageUrl,
-    @JsonKey(name: 'access_point_id', fromJson: _toInt) int? accessPointId,
-    @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
-    int? testedViaAccessPointId,
-    @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
+    @JsonKey(name: 'access_point_id') int? accessPointId,
+    @JsonKey(name: 'tested_via_access_point_id') int? testedViaAccessPointId,
+    @JsonKey(name: 'tested_via_access_point_radio_id')
     int? testedViaAccessPointRadioId,
-    @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
+    @JsonKey(name: 'tested_via_media_converter_id')
     int? testedViaMediaConverterId,
-    @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
-    @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
-    @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
+    @JsonKey(name: 'uplink_id') int? uplinkId,
+    @JsonKey(name: 'wlan_id') int? wlanId,
+    @JsonKey(name: 'pms_room_id') int? pmsRoomId,
     @JsonKey(name: 'room_type') String? roomType,
-    @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
+    @JsonKey(name: 'admin_id') int? adminId,
     String? note,
     String? scratch,
     @JsonKey(name: 'created_by') String? createdBy,
     @JsonKey(name: 'updated_by') String? updatedBy,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
-    // Legacy fields for backwards compatibility (not sent to server)
-    @JsonKey(includeToJson: false) @Default(false) bool hasError,
-    @JsonKey(name: 'error_message', includeToJson: false) String? errorMessage,
+    // Legacy fields for backwards compatibility
+    @Default(false) bool hasError,
+    String? errorMessage,
     @JsonKey(name: 'local_ip_address') String? localIpAddress,
     @JsonKey(name: 'server_host') String? serverHost,
   }) = _SpeedTestResult;
@@ -93,21 +74,16 @@ class SpeedTestResult with _$SpeedTestResult {
 
   /// Pre-process JSON to detect and correct swapped download/upload values
   static Map<String, dynamic> _preprocessJson(Map<String, dynamic> json) {
-    // First extract IDs from nested association objects
-    var normalizedJson = _extractNestedAssociationIds(json);
-    // Then normalize any string IDs to ints
-    normalizedJson = _normalizeTestedViaAccessPointId(normalizedJson);
-
-    final download = _parseDecimal(normalizedJson['download_mbps']);
-    final upload = _parseDecimal(normalizedJson['upload_mbps']);
+    final download = _parseDecimal(json['download_mbps']);
+    final upload = _parseDecimal(json['upload_mbps']);
 
     if (download == null || upload == null) {
-      return normalizedJson;
+      return json;
     }
 
     // Both are 0 - likely incomplete test, don't swap
     if (download == 0 && upload == 0) {
-      return normalizedJson;
+      return json;
     }
 
     bool shouldSwap = false;
@@ -133,63 +109,12 @@ class SpeedTestResult with _$SpeedTestResult {
       );
       // Create a new map with swapped values
       return {
-        ...normalizedJson,
+        ...json,
         'download_mbps': upload,
         'upload_mbps': download,
       };
     }
 
-    return normalizedJson;
-  }
-
-  /// Extract IDs from nested association objects
-  /// RESTFramework sends associations as objects like:
-  ///   "tested_via_access_point": { "id": 1309, "name": "..." }
-  /// instead of:
-  ///   "tested_via_access_point_id": 1309
-  static Map<String, dynamic> _extractNestedAssociationIds(
-    Map<String, dynamic> json,
-  ) {
-    final result = Map<String, dynamic>.from(json);
-
-    // Map of association name to the corresponding _id field
-    const associationMappings = {
-      'tested_via_access_point': 'tested_via_access_point_id',
-      'tested_via_media_converter': 'tested_via_media_converter_id',
-      'speed_test': 'speed_test_id',
-      'pms_room': 'pms_room_id',
-      'access_point': 'access_point_id',
-    };
-
-    for (final entry in associationMappings.entries) {
-      final associationKey = entry.key;
-      final idKey = entry.value;
-
-      // Only extract if the _id field is not already set
-      if (result[idKey] == null && result[associationKey] is Map) {
-        final association = result[associationKey] as Map;
-        if (association['id'] != null) {
-          result[idKey] = association['id'];
-        }
-      }
-    }
-
-    return result;
-  }
-
-  static Map<String, dynamic> _normalizeTestedViaAccessPointId(
-    Map<String, dynamic> json,
-  ) {
-    final value = json['tested_via_access_point_id'];
-    if (value is String) {
-      final parsed = int.tryParse(value);
-      if (parsed != null) {
-        return {
-          ...json,
-          'tested_via_access_point_id': parsed,
-        };
-      }
-    }
     return json;
   }
 
