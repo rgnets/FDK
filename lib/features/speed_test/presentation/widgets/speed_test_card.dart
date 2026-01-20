@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
@@ -117,20 +118,18 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   Future<void> _showSpeedTestPopup() async {
     if (!mounted) return;
 
-    // Get available configs from provider - use first config if available (adhoc)
-    final configsAsync = ref.read(speedTestConfigsNotifierProvider);
-    final adhocConfig = configsAsync.whenOrNull(
-      data: (configs) => configs.isNotEmpty ? configs.first : null,
-    );
+    // Get adhoc config from cache (pre-loaded at WebSocket connect)
+    final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+    final adhocConfig = cacheIntegration.getAdhocSpeedTestConfig();
 
     if (adhocConfig != null) {
       LoggerService.info(
-        'Using adhoc config: ${adhocConfig.name} (id: ${adhocConfig.id})',
+        'Using adhoc config from cache: ${adhocConfig.name} (id: ${adhocConfig.id})',
         tag: 'SpeedTestCard',
       );
     } else {
       LoggerService.info(
-        'No configs available - running adhoc test without config',
+        'No configs in cache - running adhoc test without config',
         tag: 'SpeedTestCard',
       );
     }
@@ -179,10 +178,9 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
       // Check if requirements are met (for pass/fail determination)
       bool passed = true;
       if (configId != null) {
-        final configsAsync = ref.read(speedTestConfigsNotifierProvider);
-        final config = configsAsync.whenOrNull(
-          data: (configs) => configs.where((c) => c.id == configId).firstOrNull,
-        );
+        final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+        final configs = cacheIntegration.getCachedSpeedTestConfigs();
+        final config = configs.where((c) => c.id == configId).firstOrNull;
 
         if (config != null) {
           final downloadOk = config.minDownloadMbps == null ||
