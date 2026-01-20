@@ -1,20 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
-class SpeedTestCard extends StatefulWidget {
+class SpeedTestCard extends ConsumerStatefulWidget {
   const SpeedTestCard({super.key});
 
   @override
-  State<SpeedTestCard> createState() => _SpeedTestCardState();
+  ConsumerState<SpeedTestCard> createState() => _SpeedTestCardState();
 }
 
-class _SpeedTestCardState extends State<SpeedTestCard> {
+class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   final SpeedTestService _speedTestService = SpeedTestService();
   SpeedTestStatus _status = SpeedTestStatus.idle;
   SpeedTestResult? _lastResult;
@@ -115,19 +117,45 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
   Future<void> _showSpeedTestPopup() async {
     if (!mounted) return;
 
-    showDialog(
+    // Get available configs from provider - use first config if available (adhoc)
+    final configsAsync = ref.read(speedTestConfigsNotifierProvider);
+    final adhocConfig = configsAsync.whenOrNull(
+      data: (configs) => configs.isNotEmpty ? configs.first : null,
+    );
+
+    if (adhocConfig != null) {
+      LoggerService.info(
+        'Using adhoc config: ${adhocConfig.name} (id: ${adhocConfig.id})',
+        tag: 'SpeedTestCard',
+      );
+    } else {
+      LoggerService.info(
+        'No configs available - running adhoc test without config',
+        tag: 'SpeedTestCard',
+      );
+    }
+
+    showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext context) {
         return SpeedTestPopup(
+          cachedTest: adhocConfig,
           onCompleted: () async {
             if (mounted) {
               LoggerService.info(
                   'Speed test completed - reloading result for dashboard',
                   tag: 'SpeedTestCard');
+
+              final result = _speedTestService.lastResult;
               setState(() {
-                _lastResult = _speedTestService.lastResult;
+                _lastResult = result;
               });
+
+              // Submit adhoc result to server if test completed successfully
+              if (result != null && !result.hasError) {
+                await _submitAdhocResult(result, adhocConfig?.id);
+              }
             }
           },
         );
@@ -135,8 +163,81 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
     );
   }
 
+  /// Submit adhoc speed test result to the server
+  Future<void> _submitAdhocResult(SpeedTestResult result, int? configId) async {
+    try {
+      LoggerService.info(
+        'Submitting adhoc speed test result: '
+        'source=${result.localIpAddress}, '
+        'destination=${result.serverHost}, '
+        'download=${result.downloadMbps}, '
+        'upload=${result.uploadMbps}, '
+        'ping=${result.rtt}',
+        tag: 'SpeedTestCard',
+      );
+
+      // Check if requirements are met (for pass/fail determination)
+      bool passed = true;
+      if (configId != null) {
+        final configsAsync = ref.read(speedTestConfigsNotifierProvider);
+        final config = configsAsync.whenOrNull(
+          data: (configs) => configs.where((c) => c.id == configId).firstOrNull,
+        );
+
+        if (config != null) {
+          final downloadOk = config.minDownloadMbps == null ||
+              (result.downloadMbps ?? 0) >= config.minDownloadMbps!;
+          final uploadOk = config.minUploadMbps == null ||
+              (result.uploadMbps ?? 0) >= config.minUploadMbps!;
+          passed = downloadOk && uploadOk;
+        }
+      }
+
+      // Create result with all required fields for submission
+      final resultToSubmit = SpeedTestResult(
+        speedTestId: configId,
+        testType: 'iperf3',
+        source: result.localIpAddress,
+        destination: result.serverHost,
+        port: _speedTestService.serverPort,
+        iperfProtocol: _speedTestService.useUdp ? 'udp' : 'tcp',
+        downloadMbps: result.downloadMbps,
+        uploadMbps: result.uploadMbps,
+        rtt: result.rtt,
+        jitter: result.jitter,
+        passed: passed,
+        completedAt: DateTime.now(),
+        localIpAddress: result.localIpAddress,
+        serverHost: result.serverHost,
+      );
+
+      // Submit via provider
+      final saved = await ref
+          .read(speedTestResultsNotifierProvider().notifier)
+          .createResult(resultToSubmit);
+
+      if (saved != null) {
+        LoggerService.info(
+          'Adhoc speed test result submitted successfully: id=${saved.id}',
+          tag: 'SpeedTestCard',
+        );
+      } else {
+        LoggerService.warning(
+          'Failed to submit adhoc speed test result',
+          tag: 'SpeedTestCard',
+        );
+      }
+    } catch (e) {
+      LoggerService.error(
+        'Error submitting adhoc speed test result',
+        error: e,
+        tag: 'SpeedTestCard',
+      );
+    }
+  }
+
   void _showConfigDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
