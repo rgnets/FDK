@@ -4,38 +4,57 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 part 'speed_test_result.freezed.dart';
 part 'speed_test_result.g.dart';
 
+/// Safely converts a value to int, handling strings and nulls
+int? _toInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+/// Safely converts a value to double, handling strings and nulls
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
 @freezed
 class SpeedTestResult with _$SpeedTestResult {
   const factory SpeedTestResult({
-    int? id,
-    @JsonKey(name: 'speed_test_id') int? speedTestId,
+    @JsonKey(fromJson: _toInt) int? id,
+    @JsonKey(name: 'speed_test_id', fromJson: _toInt) int? speedTestId,
     @JsonKey(name: 'test_type') String? testType,
     String? source,
     String? destination,
-    int? port,
+    @JsonKey(fromJson: _toInt) int? port,
     @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-    @JsonKey(name: 'download_mbps') double? downloadMbps,
-    @JsonKey(name: 'upload_mbps') double? uploadMbps,
-    double? rtt,
-    double? jitter,
-    @JsonKey(name: 'packet_loss') double? packetLoss,
+    @JsonKey(name: 'download_mbps', fromJson: _toDouble) double? downloadMbps,
+    @JsonKey(name: 'upload_mbps', fromJson: _toDouble) double? uploadMbps,
+    @JsonKey(fromJson: _toDouble) double? rtt,
+    @JsonKey(fromJson: _toDouble) double? jitter,
+    @JsonKey(name: 'packet_loss', fromJson: _toDouble) double? packetLoss,
     @Default(false) bool passed,
     @JsonKey(name: 'is_applicable') @Default(true) bool isApplicable,
     @JsonKey(name: 'initiated_at') DateTime? initiatedAt,
     @JsonKey(name: 'completed_at') DateTime? completedAt,
     String? raw,
     @JsonKey(name: 'image_url') String? imageUrl,
-    @JsonKey(name: 'access_point_id') int? accessPointId,
-    @JsonKey(name: 'tested_via_access_point_id') int? testedViaAccessPointId,
-    @JsonKey(name: 'tested_via_access_point_radio_id')
+    @JsonKey(name: 'access_point_id', fromJson: _toInt) int? accessPointId,
+    @JsonKey(name: 'tested_via_access_point_id', fromJson: _toInt)
+    int? testedViaAccessPointId,
+    @JsonKey(name: 'tested_via_access_point_radio_id', fromJson: _toInt)
     int? testedViaAccessPointRadioId,
-    @JsonKey(name: 'tested_via_media_converter_id')
+    @JsonKey(name: 'tested_via_media_converter_id', fromJson: _toInt)
     int? testedViaMediaConverterId,
-    @JsonKey(name: 'uplink_id') int? uplinkId,
-    @JsonKey(name: 'wlan_id') int? wlanId,
-    @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+    @JsonKey(name: 'uplink_id', fromJson: _toInt) int? uplinkId,
+    @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
+    @JsonKey(name: 'pms_room_id', fromJson: _toInt) int? pmsRoomId,
     @JsonKey(name: 'room_type') String? roomType,
-    @JsonKey(name: 'admin_id') int? adminId,
+    @JsonKey(name: 'admin_id', fromJson: _toInt) int? adminId,
     String? note,
     String? scratch,
     @JsonKey(name: 'created_by') String? createdBy,
@@ -74,8 +93,9 @@ class SpeedTestResult with _$SpeedTestResult {
 
   /// Pre-process JSON to detect and correct swapped download/upload values
   static Map<String, dynamic> _preprocessJson(Map<String, dynamic> json) {
-    final download = _parseDecimal(json['download_mbps']);
-    final upload = _parseDecimal(json['upload_mbps']);
+    final normalizedJson = _normalizeTestedViaAccessPointId(json);
+    final download = _parseDecimal(normalizedJson['download_mbps']);
+    final upload = _parseDecimal(normalizedJson['upload_mbps']);
 
     if (download == null || upload == null) {
       return json;
@@ -109,12 +129,28 @@ class SpeedTestResult with _$SpeedTestResult {
       );
       // Create a new map with swapped values
       return {
-        ...json,
+        ...normalizedJson,
         'download_mbps': upload,
         'upload_mbps': download,
       };
     }
 
+    return normalizedJson;
+  }
+
+  static Map<String, dynamic> _normalizeTestedViaAccessPointId(
+    Map<String, dynamic> json,
+  ) {
+    final value = json['tested_via_access_point_id'];
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) {
+        return {
+          ...json,
+          'tested_via_access_point_id': parsed,
+        };
+      }
+    }
     return json;
   }
 
