@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
+import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -91,7 +94,52 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       ref.read(webSocketDataSyncListenerProvider);
       // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
       ref.read(authSignOutCleanupProvider);
+      // Initialize deeplink service for handling fdk:// URLs
+      _initializeDeeplinkService();
     });
+  }
+
+  /// Initialize the deeplink service with callbacks for confirmation and authentication.
+  Future<void> _initializeDeeplinkService() async {
+    final deeplinkService = ref.read(deeplinkServiceProvider);
+
+    await deeplinkService.initialize(
+      confirmCallback: _showDeeplinkConfirmation,
+      authenticateCallback: _authenticateFromDeeplink,
+      onSuccess: () => AppRouter.router.go('/home'),
+      onCancel: () => AppRouter.router.go('/auth'),
+      onError: () => AppRouter.router.go('/auth'),
+    );
+  }
+
+  /// Show a confirmation dialog for deeplink credentials.
+  Future<bool> _showDeeplinkConfirmation(DeeplinkCredentials credentials) async {
+    final navigatorContext = AppRouter.router.routerDelegate.navigatorKey.currentContext;
+    if (navigatorContext == null) {
+      LoggerService.warning('No navigator context available for deeplink confirmation');
+      return false;
+    }
+
+    final result = await showModalBottomSheet<bool>(
+      context: navigatorContext,
+      isScrollControlled: true,
+      builder: (context) => CredentialApprovalSheet(
+        fqdn: credentials.fqdn,
+        login: credentials.login,
+        token: credentials.apiKey,
+      ),
+    );
+
+    return result ?? false;
+  }
+
+  /// Authenticate using credentials from a deeplink.
+  Future<void> _authenticateFromDeeplink(DeeplinkCredentials credentials) async {
+    await ref.read(authProvider.notifier).authenticate(
+      fqdn: credentials.fqdn,
+      login: credentials.login,
+      token: credentials.apiKey,
+    );
   }
 
   @override
