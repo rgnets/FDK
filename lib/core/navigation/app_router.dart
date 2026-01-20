@@ -23,6 +23,15 @@ class AppRouter {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: EnvironmentConfig.isDevelopment,
+    // Redirect deeplinks (fdk:// scheme) to splash - the DeeplinkService handles them
+    redirect: (context, state) {
+      // If the URI has a custom scheme (like fdk://), redirect to splash
+      // The DeeplinkService will handle the actual deeplink processing
+      if (state.uri.scheme == 'fdk') {
+        return '/splash';
+      }
+      return null;
+    },
     routes: [
       // Splash screen (outside of shell)
       GoRoute(
