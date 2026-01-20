@@ -5,16 +5,11 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_with_results.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 
 class SpeedTestPopup extends ConsumerStatefulWidget {
-  /// The speed test configuration (use this OR [speedTestWithResults])
+  /// The speed test configuration
   final SpeedTestConfig? cachedTest;
-
-  /// The joined speed test with results (use this OR [cachedTest])
-  /// If provided, the config will be extracted from this
-  final SpeedTestWithResults? speedTestWithResults;
 
   final VoidCallback? onCompleted;
 
@@ -24,7 +19,6 @@ class SpeedTestPopup extends ConsumerStatefulWidget {
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
-    this.speedTestWithResults,
     this.onCompleted,
     this.onResultSubmitted,
   });
@@ -66,10 +60,8 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
     super.dispose();
   }
 
-  /// Get the effective config from either cachedTest or speedTestWithResults
-  SpeedTestConfig? get _effectiveConfig {
-    return widget.cachedTest ?? widget.speedTestWithResults?.config;
-  }
+  /// Get the effective config
+  SpeedTestConfig? get _effectiveConfig => widget.cachedTest;
 
   double? _getMinDownload() => _effectiveConfig?.minDownloadMbps;
   double? _getMinUpload() => _effectiveConfig?.minUploadMbps;
