@@ -1,5 +1,6 @@
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'device_ui_state_provider.g.dart';
@@ -10,21 +11,28 @@ class DeviceUIState {
     this.searchQuery = '',
     this.filterType = 'access_point',  // Default to first tab (APs)
     this.isSearching = false,
+    this.selectedPhase = PhaseFilterState.allPhases,
   });
 
   final String searchQuery;
   final String filterType;
   final bool isSearching;
+  final String selectedPhase;
+
+  /// Returns true if phase filtering is active
+  bool get isPhaseFiltering => selectedPhase != PhaseFilterState.allPhases;
 
   DeviceUIState copyWith({
     String? searchQuery,
     String? filterType,
     bool? isSearching,
+    String? selectedPhase,
   }) {
     return DeviceUIState(
       searchQuery: searchQuery ?? this.searchQuery,
       filterType: filterType ?? this.filterType,
       isSearching: isSearching ?? this.isSearching,
+      selectedPhase: selectedPhase ?? this.selectedPhase,
     );
   }
 }
@@ -34,7 +42,16 @@ class DeviceUIState {
 class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
   @override
   DeviceUIState build() {
-    return const DeviceUIState();
+    // Listen to phase filter changes and update only selectedPhase
+    ref.listen<PhaseFilterState>(phaseFilterNotifierProvider, (previous, next) {
+      if (previous?.selectedPhase != next.selectedPhase) {
+        state = state.copyWith(selectedPhase: next.selectedPhase);
+      }
+    });
+
+    // Initialize with current phase filter state
+    final phaseState = ref.read(phaseFilterNotifierProvider);
+    return DeviceUIState(selectedPhase: phaseState.selectedPhase);
   }
 
   void setSearchQuery(String query) {
@@ -55,6 +72,16 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
       isSearching: false,
     );
   }
+
+  void setPhaseFilter(String phase) {
+    // Update both local state and the phase filter provider (for persistence)
+    state = state.copyWith(selectedPhase: phase);
+    ref.read(phaseFilterNotifierProvider.notifier).setPhase(phase);
+  }
+
+  void clearPhaseFilter() {
+    setPhaseFilter(PhaseFilterState.allPhases);
+  }
 }
 
 /// Provider for filtered devices based on UI state
@@ -62,21 +89,26 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
 List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
   final uiState = ref.watch(deviceUIStateNotifierProvider);
+  final phaseFilter = ref.watch(phaseFilterNotifierProvider);
 
   return devices.when(
     data: (deviceList) {
       final filtered = deviceList.where((device) {
         // Filter by type
-        final matchesType = uiState.filterType == 'all' || 
+        final matchesType = uiState.filterType == 'all' ||
                            device.type == uiState.filterType;
-        
+
         // Filter by search query
         final matchesSearch = uiState.searchQuery.isEmpty ||
                              device.name.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
                              device.type.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
                              (device.location?.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ?? false);
-        
-        return matchesType && matchesSearch;
+
+        // Filter by phase (using metadata)
+        final devicePhase = device.metadata?['phase'] as String?;
+        final matchesPhase = phaseFilter.matchesFilter(devicePhase);
+
+        return matchesType && matchesSearch && matchesPhase;
       }).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
@@ -150,4 +182,16 @@ class MockDataState {
 
   final bool isUsingMockData;
   final String? apiErrorMessage;
+}
+
+/// Provider for available phases based on all devices
+@riverpod
+List<String> devicePhases(DevicePhasesRef ref) {
+  final devices = ref.watch(devicesNotifierProvider);
+
+  return devices.when(
+    data: (deviceList) => PhaseFilterState.getUniquePhasesFromDevices(deviceList),
+    loading: () => [PhaseFilterState.allPhases],
+    error: (_, __) => [PhaseFilterState.allPhases],
+  );
 }
