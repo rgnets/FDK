@@ -7,16 +7,27 @@ import 'package:rgnets_fdk/features/speed_test/data/services/network_gateway_ser
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_with_results.dart';
 
 class SpeedTestPopup extends StatefulWidget {
+  /// The speed test configuration (use this OR [speedTestWithResults])
   final SpeedTestConfig? cachedTest;
+
+  /// The joined speed test with results (use this OR [cachedTest])
+  /// If provided, the config will be extracted from this
+  final SpeedTestWithResults? speedTestWithResults;
+
   final VoidCallback? onCompleted;
 
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
+    this.speedTestWithResults,
     this.onCompleted,
-  });
+  }) : assert(
+          cachedTest != null || speedTestWithResults != null || true,
+          'Either cachedTest or speedTestWithResults can be provided, or neither for a standalone test',
+        );
 
   @override
   State<SpeedTestPopup> createState() => _SpeedTestPopupState();
@@ -205,12 +216,10 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
       _serverHost = gatewayIp ?? 'Detecting...';
     });
 
-    String? configTarget;
-    final cachedTest = widget.cachedTest;
-    if (cachedTest != null) {
-      configTarget = cachedTest.target;
-    }
+    // Get target from effective config (works with both cachedTest and speedTestWithResults)
+    final configTarget = _getConfigTarget();
 
+    // Run test: tries local gateway first, then falls back to config target
     await _speedTestService.runSpeedTestWithFallback(configTarget: configTarget);
   }
 
@@ -221,18 +230,31 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
     }
   }
 
+  /// Get the effective config from either cachedTest or speedTestWithResults
+  SpeedTestConfig? get _effectiveConfig {
+    return widget.cachedTest ?? widget.speedTestWithResults?.config;
+  }
+
   double? _getMinDownload() {
-    return widget.cachedTest?.minDownloadMbps;
+    return _effectiveConfig?.minDownloadMbps;
   }
 
   double? _getMinUpload() {
-    return widget.cachedTest?.minUploadMbps;
+    return _effectiveConfig?.minUploadMbps;
+  }
+
+  String? _getConfigTarget() {
+    return _effectiveConfig?.target;
+  }
+
+  String? _getConfigName() {
+    return _effectiveConfig?.name;
   }
 
   void _validateTestResults() {
-    final cachedTest = widget.cachedTest;
+    final config = _effectiveConfig;
 
-    if (cachedTest == null) {
+    if (config == null) {
       _testPassed = true;
       return;
     }
@@ -565,7 +587,141 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+
+                // Requirements section (shown when config has thresholds)
+                if (_effectiveConfig != null &&
+                    (_getMinDownload() != null || _getMinUpload() != null)) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.assignment,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _getConfigName() ?? 'Speed Test Requirements',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            // Download requirement
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.download,
+                                    size: 14,
+                                    color: AppColors.success,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Min: ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.gray400,
+                                    ),
+                                  ),
+                                  Text(
+                                    _getMinDownload() != null
+                                        ? _formatSpeed(_getMinDownload()!)
+                                        : 'None',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.gray300,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Upload requirement
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.upload,
+                                    size: 14,
+                                    color: AppColors.info,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Min: ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.gray400,
+                                    ),
+                                  ),
+                                  Text(
+                                    _getMinUpload() != null
+                                        ? _formatSpeed(_getMinUpload()!)
+                                        : 'None',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.gray300,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Server fallback info
+                        if (_getConfigTarget() != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.swap_horiz,
+                                size: 14,
+                                color: AppColors.gray500,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Gateway first, then ${_getConfigTarget()}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.gray500,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Speed indicators
                 SizedBox(

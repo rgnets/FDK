@@ -176,11 +176,11 @@ class SpeedTestService {
         // Create a partial result for live updates based on current phase
         // Preserve completed phase speed so UI shows both download AND upload
         final liveResult = SpeedTestResult(
-          downloadSpeed:
+          downloadMbps:
               _isDownloadPhase ? speedMbps : _completedDownloadSpeed,
-          uploadSpeed: !_isDownloadPhase ? speedMbps : _completedUploadSpeed,
-          latency: 0.0,
-          timestamp: DateTime.now(),
+          uploadMbps: !_isDownloadPhase ? speedMbps : _completedUploadSpeed,
+          rtt: 0.0,
+          completedAt: DateTime.now(),
         );
 
         _resultController.add(liveResult);
@@ -413,10 +413,10 @@ class SpeedTestService {
 
       // Create result
       return SpeedTestResult(
-        downloadSpeed: (downloadSpeed as num).toDouble(),
-        uploadSpeed: (uploadSpeed as num).toDouble(),
-        latency: (latency as num).toDouble(),
-        timestamp: DateTime.now(),
+        downloadMbps: (downloadSpeed as num).toDouble(),
+        uploadMbps: (uploadSpeed as num).toDouble(),
+        rtt: (latency as num).toDouble(),
+        completedAt: DateTime.now(),
         localIpAddress: localIp,
         serverHost: serverHost,
       );
