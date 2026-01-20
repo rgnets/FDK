@@ -632,8 +632,6 @@ class _LogsTab extends StatefulWidget {
 
 class _LogsTabState extends State<_LogsTab>
     with AutomaticKeepAliveClientMixin<_LogsTab> {
-  late final List<Map<String, dynamic>> _logs = _generateMockLogs();
-
   @override
   bool get wantKeepAlive => true;
 
@@ -641,214 +639,32 @@ class _LogsTabState extends State<_LogsTab>
   Widget build(BuildContext context) {
     super.build(context);
 
-    return Column(
-      children: [
-        // Filter bar
-        Container(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              const Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _LogFilterChip(label: 'All', isSelected: true),
-                      SizedBox(width: 8),
-                      _LogFilterChip(label: 'Errors', color: Colors.red),
-                      SizedBox(width: 8),
-                      _LogFilterChip(label: 'Warnings', color: Colors.orange),
-                      SizedBox(width: 8),
-                      _LogFilterChip(label: 'Info', color: Colors.blue),
-                      SizedBox(width: 8),
-                      _LogFilterChip(label: 'Debug', color: Colors.grey),
-                    ],
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.download),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Downloading logs...')),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        
-        // Log list
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: _logs.length,
-            itemBuilder: (context, index) {
-              final log = _logs[index];
-              return _LogItem(log: log);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-  
-  List<Map<String, dynamic>> _generateMockLogs() {
-    return [
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 1)),
-        'level': 'info',
-        'message': 'Device connected successfully',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 5)),
-        'level': 'warning',
-        'message': 'High CPU usage detected (85%)',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 10)),
-        'level': 'info',
-        'message': 'Configuration updated',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 15)),
-        'level': 'error',
-        'message': 'Failed to connect to upstream server',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 20)),
-        'level': 'info',
-        'message': 'Client authenticated: user@example.com',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(minutes: 30)),
-        'level': 'debug',
-        'message': 'Memory cleanup completed',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(hours: 1)),
-        'level': 'info',
-        'message': 'Firmware check initiated',
-      },
-      {
-        'timestamp': DateTime.now().subtract(const Duration(hours: 2)),
-        'level': 'warning',
-        'message': 'Multiple authentication failures detected',
-      },
-    ];
-  }
-}
-
-class _LogFilterChip extends StatelessWidget {
-  
-  const _LogFilterChip({
-    required this.label,
-    this.color,
-    this.isSelected = false,
-  });
-  final String label;
-  final Color? color;
-  final bool isSelected;
-  
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) {},
-      backgroundColor: color?.withValues(alpha: 0.2),
-      selectedColor: color?.withValues(alpha: 0.3) ?? 
-        Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-      checkmarkColor: color ?? Theme.of(context).colorScheme.primary,
-    );
-  }
-}
-
-class _LogItem extends StatelessWidget {
-  
-  const _LogItem({required this.log});
-  final Map<String, dynamic> log;
-  
-  @override
-  Widget build(BuildContext context) {
-    final level = log['level'] as String;
-    final timestamp = log['timestamp'] as DateTime;
-    final message = log['message'] as String;
-    
-    Color levelColor;
-    IconData levelIcon;
-    
-    switch (level) {
-      case 'error':
-        levelColor = Colors.red;
-        levelIcon = Icons.error_outline;
-        break;
-      case 'warning':
-        levelColor = Colors.orange;
-        levelIcon = Icons.warning_amber;
-        break;
-      case 'info':
-        levelColor = Colors.blue;
-        levelIcon = Icons.info_outline;
-        break;
-      case 'debug':
-        levelColor = Colors.grey;
-        levelIcon = Icons.bug_report;
-        break;
-      default:
-        levelColor = Colors.grey;
-        levelIcon = Icons.note;
-    }
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(levelIcon, size: 20, color: levelColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(timestamp),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
+          Icon(
+            Icons.article_outlined,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Logs not available',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
             ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Device logs are not yet supported',
+            style: TextStyle(color: Colors.grey),
           ),
         ],
       ),
     );
-  }
-  
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-    
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-    }
   }
 }
 

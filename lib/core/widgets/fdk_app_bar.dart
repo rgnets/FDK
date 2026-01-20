@@ -240,8 +240,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
   }
 
   Widget _buildActionButtons(BuildContext context, WidgetRef ref, int unreadCount, bool isConnected) {
-    LoggerService.debug('Building action buttons - Unread: $unreadCount, Connected: $isConnected', tag: 'AppBar');
-
     return Row(
       children: [
         // Notification button

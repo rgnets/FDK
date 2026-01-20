@@ -99,6 +99,7 @@ class WebSocketService {
   final Map<String, _PendingRequest> _pendingRequests = {};
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
+  SocketMessage? _lastMessage;
   WebSocketConnectionParams? _currentParams;
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
@@ -320,9 +321,7 @@ class WebSocketService {
       final type = _extractType(decoded, payload);
       final headers = _extractHeaders(decoded);
 
-      if (type == 'system.heartbeat' || type == 'ping') {
-        _lastHeartbeat = DateTime.now();
-      }
+      _lastHeartbeat = DateTime.now();
 
       final message = SocketMessage(
         type: type,
@@ -480,8 +479,6 @@ class WebSocketService {
     await _messageController.close();
   }
 }
-
-SocketMessage? _lastMessage;
 
 Map<String, dynamic> _extractPayload(Map<String, dynamic> decoded) {
   final payloadValue = decoded['payload'];

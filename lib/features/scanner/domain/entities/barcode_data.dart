@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
 
 part 'barcode_data.freezed.dart';
 
@@ -27,6 +28,22 @@ class BarcodeData with _$BarcodeData {
     final serialPattern = RegExp(r'^[A-Z0-9]{6,20}$', caseSensitive: false);
     return serialPattern.hasMatch(rawValue) && !isMacAddress;
   }
+
+  /// Detect device type from serial number using prefix patterns.
+  /// Returns null if serial doesn't match any known device pattern.
+  DeviceTypeFromSerial? get detectedDeviceType {
+    if (!isSerialNumber) return null;
+    return SerialPatterns.detectDeviceType(rawValue);
+  }
+
+  /// Check if this is an AP serial number.
+  bool get isAPSerial => SerialPatterns.isAPSerial(rawValue);
+
+  /// Check if this is an ONT serial number.
+  bool get isONTSerial => SerialPatterns.isONTSerial(rawValue);
+
+  /// Check if this is a Switch serial number.
+  bool get isSwitchSerial => SerialPatterns.isSwitchSerial(rawValue);
 
   /// Check if this looks like a part number
   bool get isPartNumber {
