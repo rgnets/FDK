@@ -2,12 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
-import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
-import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
 class SpeedTestCard extends ConsumerStatefulWidget {
@@ -140,21 +139,21 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
       builder: (BuildContext context) {
         return SpeedTestPopup(
           cachedTest: adhocConfig,
-          onCompleted: () async {
+          onCompleted: () {
             if (mounted) {
               LoggerService.info(
-                  'Speed test completed - reloading result for dashboard',
-                  tag: 'SpeedTestCard');
-
+                'Speed test completed - reloading result for dashboard',
+                tag: 'SpeedTestCard',
+              );
               final result = _speedTestService.lastResult;
               setState(() {
                 _lastResult = result;
               });
-
-              // Submit adhoc result to server if test completed successfully
-              if (result != null && !result.hasError) {
-                await _submitAdhocResult(result, adhocConfig?.id);
-              }
+            }
+          },
+          onResultSubmitted: (result) async {
+            if (!result.hasError) {
+              await _submitAdhocResult(result);
             }
           },
         );
@@ -162,61 +161,34 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
     );
   }
 
-  /// Submit adhoc speed test result to the server
-  Future<void> _submitAdhocResult(SpeedTestResult result, int? configId) async {
+  /// Submit adhoc speed test result to the server via WebSocket cache integration
+  Future<void> _submitAdhocResult(SpeedTestResult result) async {
     try {
       LoggerService.info(
         'Submitting adhoc speed test result: '
-        'source=${result.localIpAddress}, '
-        'destination=${result.serverHost}, '
+        'source=${result.source}, '
+        'destination=${result.destination}, '
         'download=${result.downloadMbps}, '
         'upload=${result.uploadMbps}, '
         'ping=${result.rtt}',
         tag: 'SpeedTestCard',
       );
 
-      // Check if requirements are met (for pass/fail determination)
-      bool passed = true;
-      if (configId != null) {
-        final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-        final configs = cacheIntegration.getCachedSpeedTestConfigs();
-        final config = configs.where((c) => c.id == configId).firstOrNull;
-
-        if (config != null) {
-          final downloadOk = config.minDownloadMbps == null ||
-              (result.downloadMbps ?? 0) >= config.minDownloadMbps!;
-          final uploadOk = config.minUploadMbps == null ||
-              (result.uploadMbps ?? 0) >= config.minUploadMbps!;
-          passed = downloadOk && uploadOk;
-        }
-      }
-
-      // Create result with all required fields for submission
-      final resultToSubmit = SpeedTestResult(
-        speedTestId: configId,
-        testType: 'iperf3',
-        source: result.localIpAddress,
-        destination: result.serverHost,
-        port: _speedTestService.serverPort,
-        iperfProtocol: _speedTestService.useUdp ? 'udp' : 'tcp',
-        downloadMbps: result.downloadMbps,
-        uploadMbps: result.uploadMbps,
-        rtt: result.rtt,
-        jitter: result.jitter,
-        passed: passed,
-        completedAt: DateTime.now(),
-        localIpAddress: result.localIpAddress,
-        serverHost: result.serverHost,
+      final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+      final success = await cacheIntegration.createAdhocSpeedTestResult(
+        downloadSpeed: result.downloadMbps ?? 0,
+        uploadSpeed: result.uploadMbps ?? 0,
+        latency: result.rtt ?? 0,
+        source: result.source,
+        destination: result.destination,
+        port: result.port,
+        protocol: result.iperfProtocol,
+        passed: result.passed,
       );
 
-      // Submit via provider
-      final saved = await ref
-          .read(speedTestResultsNotifierProvider().notifier)
-          .createResult(resultToSubmit);
-
-      if (saved != null) {
+      if (success) {
         LoggerService.info(
-          'Adhoc speed test result submitted successfully: id=${saved.id}',
+          'Adhoc speed test result submitted successfully',
           tag: 'SpeedTestCard',
         );
       } else {

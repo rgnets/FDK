@@ -19,11 +19,15 @@ class SpeedTestPopup extends StatefulWidget {
 
   final VoidCallback? onCompleted;
 
+  /// Callback when result should be submitted (auto-called when test passes)
+  final void Function(SpeedTestResult result)? onResultSubmitted;
+
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
     this.speedTestWithResults,
     this.onCompleted,
+    this.onResultSubmitted,
   }) : assert(
           cachedTest != null || speedTestWithResults != null || true,
           'Either cachedTest or speedTestWithResults can be provided, or neither for a standalone test',
@@ -256,16 +260,47 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
 
     if (config == null) {
       _testPassed = true;
-      return;
+    } else {
+      final minDownload = _getMinDownload();
+      final minUpload = _getMinUpload();
+
+      final downloadPassed = minDownload == null || _downloadSpeed >= minDownload;
+      final uploadPassed = minUpload == null || _uploadSpeed >= minUpload;
+
+      _testPassed = downloadPassed && uploadPassed;
     }
 
-    final minDownload = _getMinDownload();
-    final minUpload = _getMinUpload();
+    // Auto-submit result when test completes (passed or failed)
+    if (widget.onResultSubmitted != null) {
+      _submitResult();
+    }
+  }
 
-    final downloadPassed = minDownload == null || _downloadSpeed >= minDownload;
-    final uploadPassed = minUpload == null || _uploadSpeed >= minUpload;
+  /// Submit the test result via callback
+  void _submitResult() {
+    final result = SpeedTestResult(
+      downloadMbps: _downloadSpeed,
+      uploadMbps: _uploadSpeed,
+      rtt: _latency,
+      localIpAddress: _localIp,
+      serverHost: _serverHost,
+      speedTestId: _effectiveConfig?.id,
+      passed: _testPassed,
+      completedAt: DateTime.now(),
+      testType: 'iperf3',
+      source: _localIp,
+      destination: _serverHost,
+      port: _speedTestService.serverPort,
+      iperfProtocol: _speedTestService.useUdp ? 'udp' : 'tcp',
+    );
 
-    _testPassed = downloadPassed && uploadPassed;
+    LoggerService.info(
+      'SpeedTestPopup: Auto-submitting result - passed=$_testPassed, '
+      'download=$_downloadSpeed, upload=$_uploadSpeed',
+      tag: 'SpeedTestPopup',
+    );
+
+    widget.onResultSubmitted?.call(result);
   }
 
   @override
