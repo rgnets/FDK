@@ -1,12 +1,11 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
-import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
 class SpeedTestCard extends ConsumerStatefulWidget {
@@ -17,53 +16,13 @@ class SpeedTestCard extends ConsumerStatefulWidget {
 }
 
 class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
-  final SpeedTestService _speedTestService = SpeedTestService();
-  SpeedTestStatus _status = SpeedTestStatus.idle;
-  SpeedTestResult? _lastResult;
-  double _progress = 0.0;
-  StreamSubscription<SpeedTestStatus>? _statusSubscription;
-  StreamSubscription<SpeedTestResult>? _resultSubscription;
-  StreamSubscription<double>? _progressSubscription;
-
   @override
   void initState() {
     super.initState();
-    _initializeService();
-  }
-
-  Future<void> _initializeService() async {
-    await _speedTestService.initialize();
-
-    _status = _speedTestService.status;
-    _lastResult = _speedTestService.lastResult;
-
-    _statusSubscription = _speedTestService.statusStream.listen((status) {
-      if (mounted) {
-        setState(() => _status = status);
-      }
+    // Initialize the notifier (idempotent - safe to call multiple times)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(speedTestRunNotifierProvider.notifier).initialize();
     });
-
-    _resultSubscription = _speedTestService.resultStream.listen((result) {
-      if (mounted) {
-        setState(() => _lastResult = result);
-      }
-    });
-
-    _progressSubscription = _speedTestService.progressStream.listen((progress) {
-      if (mounted) {
-        setState(() => _progress = progress);
-      }
-    });
-
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _statusSubscription?.cancel();
-    _resultSubscription?.cancel();
-    _progressSubscription?.cancel();
-    super.dispose();
   }
 
   String _formatSpeed(double speed) {
@@ -74,11 +33,12 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
     }
   }
 
-  String _getLastTestTime() {
-    if (_lastResult == null) return 'Never';
+  String _getLastTestTime(SpeedTestResult? lastResult) {
+    if (lastResult == null) return 'Never';
 
     final now = DateTime.now();
-    final diff = now.difference(_lastResult!.timestamp);
+    final timestamp = lastResult.completedAt ?? lastResult.timestamp;
+    final diff = now.difference(timestamp);
 
     if (diff.inMinutes < 1) {
       return 'Just now';
@@ -142,13 +102,9 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
           onCompleted: () {
             if (mounted) {
               LoggerService.info(
-                'Speed test completed - reloading result for dashboard',
+                'Speed test completed - UI will update via Riverpod',
                 tag: 'SpeedTestCard',
               );
-              final result = _speedTestService.lastResult;
-              setState(() {
-                _lastResult = result;
-              });
             }
           },
           onResultSubmitted: (result) async {
@@ -209,56 +165,62 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   void _showConfigDialog() {
     showDialog<void>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Speed Test Settings'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text('Use UDP Protocol'),
-                  subtitle: Text(_speedTestService.useUdp
-                      ? 'UDP (faster, less reliable)'
-                      : 'TCP (slower, more reliable)'),
-                  value: _speedTestService.useUdp,
-                  onChanged: (value) {
-                    _speedTestService.updateConfiguration(useUdp: value);
-                    setState(() {});
-                  },
+      builder: (BuildContext dialogContext) {
+        return Consumer(
+          builder: (context, ref, child) {
+            final testState = ref.watch(speedTestRunNotifierProvider);
+            final notifier = ref.read(speedTestRunNotifierProvider.notifier);
+
+            return AlertDialog(
+              title: const Text('Speed Test Settings'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Use UDP Protocol'),
+                      subtitle: Text(testState.useUdp
+                          ? 'UDP (faster, less reliable)'
+                          : 'TCP (slower, more reliable)'),
+                      value: testState.useUdp,
+                      onChanged: (value) {
+                        notifier.updateConfiguration(useUdp: value);
+                      },
+                    ),
+                    const Divider(),
+                    ListTile(
+                      leading: const Icon(Icons.router),
+                      title: const Text('Default Gateway'),
+                      subtitle: Text(
+                          '${testState.serverHost}:${testState.serverPort}'),
+                      trailing: const Icon(Icons.info_outline),
+                    ),
+                    ListTile(
+                      title: const Text('Test Duration'),
+                      subtitle: Text('${testState.testDuration} seconds'),
+                      trailing: const Icon(Icons.timer),
+                    ),
+                    ListTile(
+                      title: const Text('Bandwidth Limit'),
+                      subtitle: Text('${testState.bandwidthMbps} Mbps'),
+                      trailing: const Icon(Icons.speed),
+                    ),
+                    ListTile(
+                      title: const Text('Parallel Streams'),
+                      subtitle: Text('${testState.parallelStreams} streams'),
+                      trailing: const Icon(Icons.stream),
+                    ),
+                  ],
                 ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.router),
-                  title: const Text('Default Gateway'),
-                  subtitle: Text(
-                      '${_speedTestService.serverHost}:${_speedTestService.serverPort}'),
-                  trailing: const Icon(Icons.info_outline),
-                ),
-                ListTile(
-                  title: const Text('Test Duration'),
-                  subtitle: Text('${_speedTestService.testDuration} seconds'),
-                  trailing: const Icon(Icons.timer),
-                ),
-                ListTile(
-                  title: const Text('Bandwidth Limit'),
-                  subtitle: Text('${_speedTestService.bandwidthMbps} Mbps'),
-                  trailing: const Icon(Icons.speed),
-                ),
-                ListTile(
-                  title: const Text('Parallel Streams'),
-                  subtitle: Text('${_speedTestService.parallelStreams} streams'),
-                  trailing: const Icon(Icons.stream),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Close'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -266,6 +228,11 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
 
   @override
   Widget build(BuildContext context) {
+    final testState = ref.watch(speedTestRunNotifierProvider);
+    final status = testState.executionStatus;
+    final lastResult = testState.completedResult;
+    final hasError = lastResult?.hasError == true;
+
     return GestureDetector(
       onLongPress: _showConfigDialog,
       child: Card(
@@ -280,10 +247,10 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
               Row(
                 children: [
                   Icon(
-                    _status == SpeedTestStatus.running
+                    status == SpeedTestStatus.running
                         ? Icons.speed
                         : Icons.network_check,
-                    color: _status == SpeedTestStatus.running
+                    color: status == SpeedTestStatus.running
                         ? AppColors.primary
                         : AppColors.gray500,
                     size: 20,
@@ -299,25 +266,25 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
                               fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          _speedTestService.useUdp
+                          testState.useUdp
                               ? 'UDP Protocol'
                               : 'TCP Protocol',
                           style: TextStyle(
                               fontSize: 10, color: AppColors.gray500),
                         ),
-                        if (_lastResult?.localIpAddress != null ||
-                            _lastResult?.serverHost != null)
+                        if (testState.localIpAddress != null ||
+                            testState.serverHost.isNotEmpty)
                           Text(
-                            '${_lastResult?.localIpAddress ?? "Unknown"} → ${_lastResult?.serverHost ?? _speedTestService.serverHost}',
+                            '${testState.localIpAddress ?? "Unknown"} → ${testState.serverHost}',
                             style: TextStyle(
                                 fontSize: 9, color: AppColors.gray500),
                           ),
                       ],
                     ),
                   ),
-                  if (_lastResult != null && !_lastResult!.hasError)
+                  if (lastResult != null && !hasError)
                     Text(
-                      _getLastTestTime(),
+                      _getLastTestTime(lastResult),
                       style: TextStyle(fontSize: 10, color: AppColors.gray500),
                     ),
                 ],
@@ -325,20 +292,20 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
               const SizedBox(height: 12),
 
               // Results or placeholder
-              if (_lastResult != null && !_lastResult!.hasError) ...[
+              if (lastResult != null && !hasError) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildSpeedMetric('Down', _lastResult!.downloadSpeed,
+                    _buildSpeedMetric('Down', testState.downloadSpeed,
                         AppColors.success, Icons.download),
-                    _buildSpeedMetric('Up', _lastResult!.uploadSpeed,
+                    _buildSpeedMetric('Up', testState.uploadSpeed,
                         AppColors.info, Icons.upload),
                     _buildSpeedMetric(
-                        'Ping', _lastResult!.latency, Colors.orange, Icons.timer,
+                        'Ping', testState.latency, Colors.orange, Icons.timer,
                         isLatency: true),
                   ],
                 ),
-              ] else if (_lastResult?.hasError == true) ...[
+              ] else if (hasError) ...[
                 Center(
                   child: Column(
                     children: [
@@ -348,9 +315,9 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
                       const Text('Test failed',
                           style:
                               TextStyle(color: AppColors.error, fontSize: 12)),
-                      if (_lastResult!.errorMessage != null)
+                      if (testState.errorMessage != null)
                         Text(
-                          _lastResult!.errorMessage!,
+                          testState.errorMessage!,
                           style: const TextStyle(
                               color: AppColors.error, fontSize: 10),
                           textAlign: TextAlign.center,
@@ -373,10 +340,10 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
               ],
 
               // Progress bar
-              if (_status == SpeedTestStatus.running) ...[
+              if (status == SpeedTestStatus.running) ...[
                 const SizedBox(height: 12),
                 LinearProgressIndicator(
-                  value: _progress / 100,
+                  value: testState.progress / 100,
                   backgroundColor: AppColors.gray700,
                   valueColor:
                       const AlwaysStoppedAnimation<Color>(AppColors.primary),
@@ -386,12 +353,12 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${_progress.toStringAsFixed(0)}% Complete',
+                      '${testState.progress.toStringAsFixed(0)}% Complete',
                       style: TextStyle(fontSize: 10, color: AppColors.gray500),
                     ),
-                    if (_speedTestService.serverHost.isNotEmpty)
+                    if (testState.serverHost.isNotEmpty)
                       Text(
-                        'Testing to ${_speedTestService.serverHost}',
+                        'Testing to ${testState.serverHost}',
                         style: TextStyle(
                             fontSize: 9,
                             color: AppColors.gray500,
@@ -406,27 +373,23 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
               // Action button
               Center(
                 child: ElevatedButton.icon(
-                  onPressed: _status == SpeedTestStatus.running
+                  onPressed: status == SpeedTestStatus.running
                       ? null
                       : _showSpeedTestPopup,
                   icon: Icon(
-                    _status == SpeedTestStatus.running
+                    status == SpeedTestStatus.running
                         ? Icons.speed
-                        : (_lastResult?.hasError == true
-                            ? Icons.refresh
-                            : Icons.play_arrow),
+                        : (hasError ? Icons.refresh : Icons.play_arrow),
                     size: 14,
                   ),
                   label: Text(
-                    _status == SpeedTestStatus.running
+                    status == SpeedTestStatus.running
                         ? 'Test Running...'
-                        : (_lastResult?.hasError == true
-                            ? 'Retry Test'
-                            : 'Run Test'),
+                        : (hasError ? 'Retry Test' : 'Run Test'),
                     style: const TextStyle(fontSize: 11),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _status == SpeedTestStatus.running
+                    backgroundColor: status == SpeedTestStatus.running
                         ? AppColors.gray600
                         : AppColors.primary,
                     foregroundColor: Colors.white,

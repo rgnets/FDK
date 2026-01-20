@@ -415,5 +415,22 @@ final allSpeedTestsWithResultsNotifierProvider = AsyncNotifierProvider<
 
 typedef _$AllSpeedTestsWithResultsNotifier
     = AsyncNotifier<List<SpeedTestWithResults>>;
+String _$speedTestRunNotifierHash() =>
+    r'76bfa7b486be1d8d9b2e3ed1c36b42f6ed9676b7';
+
+/// See also [SpeedTestRunNotifier].
+@ProviderFor(SpeedTestRunNotifier)
+final speedTestRunNotifierProvider =
+    NotifierProvider<SpeedTestRunNotifier, SpeedTestRunState>.internal(
+  SpeedTestRunNotifier.new,
+  name: r'speedTestRunNotifierProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$speedTestRunNotifierHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$SpeedTestRunNotifier = Notifier<SpeedTestRunState>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

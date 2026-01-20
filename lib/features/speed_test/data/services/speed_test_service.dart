@@ -11,12 +11,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// Main orchestrator service for speed testing
 class SpeedTestService {
-  static final SpeedTestService _instance = SpeedTestService._internal();
-  factory SpeedTestService() => _instance;
-  SpeedTestService._internal();
+  /// Regular constructor - each notifier owns its own instance
+  SpeedTestService()
+      : _iperf3Service = Iperf3Service(),
+        _gatewayService = NetworkGatewayService();
 
-  final Iperf3Service _iperf3Service = Iperf3Service();
-  final NetworkGatewayService _gatewayService = NetworkGatewayService();
+  final Iperf3Service _iperf3Service;
+  final NetworkGatewayService _gatewayService;
 
   // Configuration
   String _serverHost = '';
@@ -562,6 +563,7 @@ class SpeedTestService {
     return const JsonCodec().encode(map);
   }
 
+  /// Ensure dispose method exists to clean up streams
   void dispose() {
     _progressSubscription?.cancel();
     _statusController.close();
