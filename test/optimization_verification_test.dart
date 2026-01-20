@@ -200,6 +200,8 @@ void main() {
         notificationGenerationService = NotificationGenerationService();
 
         when(() => mockStorageService.isAuthenticated).thenReturn(true);
+        when(() => mockWebSocketService.isConnected).thenReturn(true);
+        when(() => mockWebSocketDataSyncService.syncInitialData()).thenAnswer((_) async {});
 
         backgroundRefreshService = BackgroundRefreshService(
           deviceDataSource: mockDeviceDataSource,

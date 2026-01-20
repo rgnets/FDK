@@ -6,7 +6,7 @@ part of 'room_view_models.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$roomViewModelsHash() => r'b7e0a03c80849034d8fe3ca9765b2277d6aea340';
+String _$roomViewModelsHash() => r'fd255023455699f0385a3474b7c07fd44b71892a';
 
 /// Provider for room view models with display information
 ///
@@ -187,7 +187,7 @@ class _RoomViewModelByIdProviderElement
 }
 
 String _$filteredRoomViewModelsHash() =>
-    r'c9bd9f594a3f2a9b8ce2e68441bea1d8a3dba712';
+    r'c4f8d9f36ebbf2eea084e9f4a5d45494abf7819a';
 
 /// Provider for filtered room view models
 ///
@@ -329,7 +329,7 @@ class _FilteredRoomViewModelsProviderElement
   String get filter => (origin as FilteredRoomViewModelsProvider).filter;
 }
 
-String _$roomStatsHash() => r'7f467560bee67242ddcb2db39fc21691fdc98823';
+String _$roomStatsHash() => r'9008c72267275fc3749d0ee2607570b59f174d07';
 
 /// Provider for room statistics based on view models
 ///

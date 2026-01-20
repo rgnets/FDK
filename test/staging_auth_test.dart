@@ -132,16 +132,39 @@ void main() {
       EnvironmentConfig.setEnvironment(Environment.development);
       expect(EnvironmentConfig.isDevelopment, isTrue);
       expect(EnvironmentConfig.useSyntheticData, isTrue);
-      
+
       // Test staging
       EnvironmentConfig.setEnvironment(Environment.staging);
       expect(EnvironmentConfig.isStaging, isTrue);
       expect(EnvironmentConfig.websocketBaseUrl, startsWith('wss://'));
-      
+
       // Test production
       EnvironmentConfig.setEnvironment(Environment.production);
       expect(EnvironmentConfig.isProduction, isTrue);
       expect(EnvironmentConfig.useSyntheticData, isFalse);
+    });
+
+    test('Staging apiUsername should have default fallback', () {
+      // Set staging environment
+      EnvironmentConfig.setEnvironment(Environment.staging);
+
+      // Should return default staging username when env var not set
+      expect(EnvironmentConfig.apiUsername, equals('fetoolreadonly'));
+      expect(EnvironmentConfig.apiUsername, isNotEmpty);
+    });
+
+    test('apiUsername should vary by environment', () {
+      // Development should have synthetic user
+      EnvironmentConfig.setEnvironment(Environment.development);
+      expect(EnvironmentConfig.apiUsername, equals('synthetic_user'));
+
+      // Staging should have default or env-provided username
+      EnvironmentConfig.setEnvironment(Environment.staging);
+      expect(EnvironmentConfig.apiUsername, isNotEmpty);
+
+      // Production returns empty string when env var not set (requires config)
+      EnvironmentConfig.setEnvironment(Environment.production);
+      expect(EnvironmentConfig.apiUsername, isEmpty);
     });
   });
 }

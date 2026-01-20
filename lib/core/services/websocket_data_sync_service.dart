@@ -656,9 +656,45 @@ class WebSocketDataSyncService {
       }
     }
 
+    void addSwitchPortDevices(List<dynamic>? list) {
+      if (list == null) {
+        return;
+      }
+      for (final entry in list) {
+        if (entry is! Map<String, dynamic>) {
+          continue;
+        }
+        final switchDevice = entry['switch_device'];
+        final switchDeviceId = switchDevice is Map<String, dynamic>
+            ? switchDevice['id']
+            : entry['switch_device_id'];
+        final id = switchDeviceId ?? entry['id'];
+        if (id != null) {
+          deviceIds.add('sw_$id');
+        }
+
+        final nested = entry['devices'];
+        if (nested is List<dynamic>) {
+          for (final device in nested) {
+            if (device is Map<String, dynamic>) {
+              final nestedId = device['id'];
+              if (nestedId != null) {
+                deviceIds.add(nestedId.toString());
+              }
+            }
+          }
+        }
+      }
+    }
+
     addDevices(roomData['access_points'] as List<dynamic>?, prefix: 'ap_');
     addDevices(roomData['media_converters'] as List<dynamic>?, prefix: 'ont_');
-    addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
+    final switchPorts = roomData['switch_ports'];
+    if (switchPorts is List && switchPorts.isNotEmpty) {
+      addSwitchPortDevices(switchPorts);
+    } else {
+      addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
+    }
     addDevices(roomData['wlan_devices'] as List<dynamic>?, prefix: 'wlan_');
     addDevices(roomData['infrastructure_devices'] as List<dynamic>?);
 

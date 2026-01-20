@@ -27,6 +27,10 @@ import 'package:rgnets_fdk/features/rooms/domain/repositories/room_repository.da
 import 'package:rgnets_fdk/features/scanner/data/datasources/scanner_local_data_source.dart';
 import 'package:rgnets_fdk/features/scanner/data/repositories/scanner_repository_impl.dart';
 import 'package:rgnets_fdk/features/scanner/domain/repositories/scanner_repository.dart';
+import 'package:rgnets_fdk/features/room_readiness/data/datasources/room_readiness_data_source.dart';
+import 'package:rgnets_fdk/features/room_readiness/data/datasources/room_readiness_mock_data_source.dart';
+import 'package:rgnets_fdk/features/room_readiness/data/repositories/room_readiness_repository_impl.dart';
+import 'package:rgnets_fdk/features/room_readiness/domain/repositories/room_readiness_repository.dart';
 import 'package:rgnets_fdk/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:rgnets_fdk/features/settings/domain/repositories/settings_repository.dart';
 
@@ -174,6 +178,36 @@ final scannerRepositoryProvider = Provider<ScannerRepository>((ref) {
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return SettingsRepositoryImpl(sharedPreferences: prefs);
+});
+
+/// Room readiness WebSocket data source provider
+final roomReadinessDataSourceProvider = Provider<RoomReadinessDataSource>((ref) {
+  final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
+  final logger = LoggerConfig.getLogger();
+  return RoomReadinessWebSocketDataSource(
+    webSocketCacheIntegration: webSocketCacheIntegration,
+    logger: logger,
+  );
+});
+
+/// Room readiness mock data source provider
+final roomReadinessMockDataSourceProvider =
+    Provider<RoomReadinessMockDataSource>((ref) {
+  final mockDataService = ref.watch(mockDataServiceProvider);
+  return RoomReadinessMockDataSourceImpl(mockDataService: mockDataService);
+});
+
+/// Room readiness repository provider
+final roomReadinessRepositoryProvider = Provider<RoomReadinessRepository>((ref) {
+  final dataSource = ref.watch(roomReadinessDataSourceProvider);
+  final mockDataSource = ref.watch(roomReadinessMockDataSourceProvider);
+  final logger = LoggerConfig.getLogger();
+
+  return RoomReadinessRepositoryImpl(
+    dataSource: dataSource,
+    mockDataSource: mockDataSource,
+    logger: logger,
+  );
 });
 
 // ============================================================================
