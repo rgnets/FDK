@@ -4,7 +4,6 @@ import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_with_results.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/repositories/speed_test_repository.dart';
 
 /// Implementation of [SpeedTestRepository] using WebSocket data source.
@@ -120,83 +119,6 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
       return Right(updated);
     } on Exception catch (e) {
       _logger.e('SpeedTestRepositoryImpl: Failed to update result: $e');
-      return Left(_mapExceptionToFailure(e));
-    }
-  }
-
-  // ============================================================================
-  // Joined Operations
-  // ============================================================================
-
-  @override
-  Future<Either<Failure, SpeedTestWithResults>> getSpeedTestWithResults(
-    int id,
-  ) async {
-    try {
-      _logger.i('SpeedTestRepositoryImpl: getSpeedTestWithResults($id) called');
-
-      // Fetch config and results in parallel
-      final configFuture = _dataSource.getSpeedTestConfig(id);
-      final resultsFuture = _dataSource.getSpeedTestResults(speedTestId: id);
-
-      final config = await configFuture;
-      final results = await resultsFuture;
-
-      final joined = SpeedTestWithResults(
-        config: config,
-        results: results,
-      );
-
-      _logger.i(
-        'SpeedTestRepositoryImpl: Got config $id with ${results.length} results',
-      );
-      return Right(joined);
-    } on Exception catch (e) {
-      _logger.e(
-        'SpeedTestRepositoryImpl: Failed to get speed test with results: $e',
-      );
-      return Left(_mapExceptionToFailure(e));
-    }
-  }
-
-  @override
-  Future<Either<Failure, List<SpeedTestWithResults>>>
-      getAllSpeedTestsWithResults() async {
-    try {
-      _logger.i(
-        'SpeedTestRepositoryImpl: getAllSpeedTestsWithResults() called',
-      );
-
-      // Fetch all configs and results
-      final configs = await _dataSource.getSpeedTestConfigs();
-      final allResults = await _dataSource.getSpeedTestResults();
-
-      // Group results by speedTestId
-      final resultsByConfigId = <int, List<SpeedTestResult>>{};
-      for (final result in allResults) {
-        if (result.speedTestId != null) {
-          resultsByConfigId
-              .putIfAbsent(result.speedTestId!, () => [])
-              .add(result);
-        }
-      }
-
-      // Join configs with their results
-      final joined = configs.map((config) {
-        final results = config.id != null
-            ? (resultsByConfigId[config.id!] ?? <SpeedTestResult>[])
-            : <SpeedTestResult>[];
-        return SpeedTestWithResults(config: config, results: results);
-      }).toList();
-
-      _logger.i(
-        'SpeedTestRepositoryImpl: Got ${joined.length} speed tests with results',
-      );
-      return Right(joined);
-    } on Exception catch (e) {
-      _logger.e(
-        'SpeedTestRepositoryImpl: Failed to get all speed tests with results: $e',
-      );
       return Left(_mapExceptionToFailure(e));
     }
   }

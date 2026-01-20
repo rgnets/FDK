@@ -13,7 +13,6 @@ import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_with_results.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/repositories/speed_test_repository.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/state/speed_test_run_state.dart';
 
@@ -172,96 +171,6 @@ class SpeedTestResultsNotifier extends _$SpeedTestResultsNotifier {
         return updated;
       },
     );
-  }
-}
-
-// ============================================================================
-// Speed Test With Results Provider (Joined)
-// ============================================================================
-
-@Riverpod(keepAlive: true)
-class SpeedTestWithResultsNotifier extends _$SpeedTestWithResultsNotifier {
-  Logger get _logger => ref.read(loggerProvider);
-
-  @override
-  Future<SpeedTestWithResults> build(int configId) async {
-    _logger.i('SpeedTestWithResultsNotifier: Loading config $configId');
-
-    final repository = ref.watch(speedTestRepositoryProvider);
-    final result = await repository.getSpeedTestWithResults(configId);
-
-    return result.fold(
-      (failure) {
-        _logger.e(
-          'SpeedTestWithResultsNotifier: Failed - ${failure.message}',
-        );
-        throw Exception(failure.message);
-      },
-      (joined) {
-        _logger.i(
-          'SpeedTestWithResultsNotifier: Loaded config $configId '
-          'with ${joined.resultCount} results',
-        );
-        return joined;
-      },
-    );
-  }
-
-  Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final repository = ref.read(speedTestRepositoryProvider);
-      final result = await repository.getSpeedTestWithResults(configId);
-      return result.fold(
-        (failure) => throw Exception(failure.message),
-        (joined) => joined,
-      );
-    });
-  }
-}
-
-// ============================================================================
-// All Speed Tests With Results Provider
-// ============================================================================
-
-@Riverpod(keepAlive: true)
-class AllSpeedTestsWithResultsNotifier
-    extends _$AllSpeedTestsWithResultsNotifier {
-  Logger get _logger => ref.read(loggerProvider);
-
-  @override
-  Future<List<SpeedTestWithResults>> build() async {
-    _logger.i('AllSpeedTestsWithResultsNotifier: Loading all speed tests');
-
-    final repository = ref.watch(speedTestRepositoryProvider);
-    final result = await repository.getAllSpeedTestsWithResults();
-
-    return result.fold(
-      (failure) {
-        _logger.e(
-          'AllSpeedTestsWithResultsNotifier: Failed - ${failure.message}',
-        );
-        throw Exception(failure.message);
-      },
-      (joined) {
-        _logger.i(
-          'AllSpeedTestsWithResultsNotifier: Loaded ${joined.length} speed tests',
-        );
-        return joined;
-      },
-    );
-  }
-
-  Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final repository = ref.read(speedTestRepositoryProvider);
-      final result = await repository.getAllSpeedTestsWithResults();
-      return result.fold(
-        (failure) => throw Exception(failure.message),
-        (joined) => joined,
-      );
-    });
   }
 }
 
