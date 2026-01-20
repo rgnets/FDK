@@ -20,18 +20,21 @@ SpeedTestConfig _$SpeedTestConfigFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$SpeedTestConfig {
+  @JsonKey(fromJson: _toInt)
   int? get id => throw _privateConstructorUsedError;
   String? get name => throw _privateConstructorUsedError;
   @JsonKey(name: 'test_type')
   String? get testType => throw _privateConstructorUsedError;
   String? get target => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _toInt)
   int? get port => throw _privateConstructorUsedError;
   @JsonKey(name: 'iperf_protocol')
   String? get iperfProtocol => throw _privateConstructorUsedError;
-  @JsonKey(name: 'min_download_mbps')
+  @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
   double? get minDownloadMbps => throw _privateConstructorUsedError;
-  @JsonKey(name: 'min_upload_mbps')
+  @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
   double? get minUploadMbps => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _toInt)
   int? get period => throw _privateConstructorUsedError;
   @JsonKey(name: 'period_unit')
   String? get periodUnit => throw _privateConstructorUsedError;
@@ -44,15 +47,15 @@ mixin _$SpeedTestConfig {
   bool get passing => throw _privateConstructorUsedError;
   @JsonKey(name: 'last_result')
   String? get lastResult => throw _privateConstructorUsedError;
-  @JsonKey(name: 'max_failures')
+  @JsonKey(name: 'max_failures', fromJson: _toInt)
   int? get maxFailures => throw _privateConstructorUsedError;
   @JsonKey(name: 'disable_uplink_on_failure')
   bool get disableUplinkOnFailure => throw _privateConstructorUsedError;
-  @JsonKey(name: 'sample_size_pct')
+  @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
   int? get sampleSizePct => throw _privateConstructorUsedError;
   @JsonKey(name: 'psk_override')
   String? get pskOverride => throw _privateConstructorUsedError;
-  @JsonKey(name: 'wlan_id')
+  @JsonKey(name: 'wlan_id', fromJson: _toInt)
   int? get wlanId => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   String? get scratch => throw _privateConstructorUsedError;
@@ -67,27 +70,30 @@ mixin _$SpeedTestConfig {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -100,27 +106,30 @@ mixin _$SpeedTestConfig {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -133,27 +142,30 @@ mixin _$SpeedTestConfig {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -193,26 +205,28 @@ abstract class $SpeedTestConfigCopyWith<$Res> {
       _$SpeedTestConfigCopyWithImpl<$Res, SpeedTestConfig>;
   @useResult
   $Res call(
-      {int? id,
+      {@JsonKey(fromJson: _toInt) int? id,
       String? name,
       @JsonKey(name: 'test_type') String? testType,
       String? target,
-      int? port,
+      @JsonKey(fromJson: _toInt) int? port,
       @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-      @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-      @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-      int? period,
+      @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+      double? minDownloadMbps,
+      @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+      double? minUploadMbps,
+      @JsonKey(fromJson: _toInt) int? period,
       @JsonKey(name: 'period_unit') String? periodUnit,
       @JsonKey(name: 'starts_at') DateTime? startsAt,
       @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
       @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
       bool passing,
       @JsonKey(name: 'last_result') String? lastResult,
-      @JsonKey(name: 'max_failures') int? maxFailures,
+      @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
       @JsonKey(name: 'disable_uplink_on_failure') bool disableUplinkOnFailure,
-      @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+      @JsonKey(name: 'sample_size_pct', fromJson: _toInt) int? sampleSizePct,
       @JsonKey(name: 'psk_override') String? pskOverride,
-      @JsonKey(name: 'wlan_id') int? wlanId,
+      @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
       String? note,
       String? scratch,
       @JsonKey(name: 'created_by') String? createdBy,
@@ -379,26 +393,28 @@ abstract class _$$SpeedTestConfigImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {int? id,
+      {@JsonKey(fromJson: _toInt) int? id,
       String? name,
       @JsonKey(name: 'test_type') String? testType,
       String? target,
-      int? port,
+      @JsonKey(fromJson: _toInt) int? port,
       @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-      @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-      @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-      int? period,
+      @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+      double? minDownloadMbps,
+      @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+      double? minUploadMbps,
+      @JsonKey(fromJson: _toInt) int? period,
       @JsonKey(name: 'period_unit') String? periodUnit,
       @JsonKey(name: 'starts_at') DateTime? startsAt,
       @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
       @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
       bool passing,
       @JsonKey(name: 'last_result') String? lastResult,
-      @JsonKey(name: 'max_failures') int? maxFailures,
+      @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
       @JsonKey(name: 'disable_uplink_on_failure') bool disableUplinkOnFailure,
-      @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+      @JsonKey(name: 'sample_size_pct', fromJson: _toInt) int? sampleSizePct,
       @JsonKey(name: 'psk_override') String? pskOverride,
-      @JsonKey(name: 'wlan_id') int? wlanId,
+      @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
       String? note,
       String? scratch,
       @JsonKey(name: 'created_by') String? createdBy,
@@ -558,27 +574,28 @@ class __$$SpeedTestConfigImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   const _$SpeedTestConfigImpl(
-      {this.id,
+      {@JsonKey(fromJson: _toInt) this.id,
       this.name,
       @JsonKey(name: 'test_type') this.testType,
       this.target,
-      this.port,
+      @JsonKey(fromJson: _toInt) this.port,
       @JsonKey(name: 'iperf_protocol') this.iperfProtocol,
-      @JsonKey(name: 'min_download_mbps') this.minDownloadMbps,
-      @JsonKey(name: 'min_upload_mbps') this.minUploadMbps,
-      this.period,
+      @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+      this.minDownloadMbps,
+      @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble) this.minUploadMbps,
+      @JsonKey(fromJson: _toInt) this.period,
       @JsonKey(name: 'period_unit') this.periodUnit,
       @JsonKey(name: 'starts_at') this.startsAt,
       @JsonKey(name: 'next_check_at') this.nextCheckAt,
       @JsonKey(name: 'last_checked_at') this.lastCheckedAt,
       this.passing = false,
       @JsonKey(name: 'last_result') this.lastResult,
-      @JsonKey(name: 'max_failures') this.maxFailures,
+      @JsonKey(name: 'max_failures', fromJson: _toInt) this.maxFailures,
       @JsonKey(name: 'disable_uplink_on_failure')
       this.disableUplinkOnFailure = false,
-      @JsonKey(name: 'sample_size_pct') this.sampleSizePct,
+      @JsonKey(name: 'sample_size_pct', fromJson: _toInt) this.sampleSizePct,
       @JsonKey(name: 'psk_override') this.pskOverride,
-      @JsonKey(name: 'wlan_id') this.wlanId,
+      @JsonKey(name: 'wlan_id', fromJson: _toInt) this.wlanId,
       this.note,
       this.scratch,
       @JsonKey(name: 'created_by') this.createdBy,
@@ -591,6 +608,7 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
       _$$SpeedTestConfigImplFromJson(json);
 
   @override
+  @JsonKey(fromJson: _toInt)
   final int? id;
   @override
   final String? name;
@@ -600,17 +618,19 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   @override
   final String? target;
   @override
+  @JsonKey(fromJson: _toInt)
   final int? port;
   @override
   @JsonKey(name: 'iperf_protocol')
   final String? iperfProtocol;
   @override
-  @JsonKey(name: 'min_download_mbps')
+  @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
   final double? minDownloadMbps;
   @override
-  @JsonKey(name: 'min_upload_mbps')
+  @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
   final double? minUploadMbps;
   @override
+  @JsonKey(fromJson: _toInt)
   final int? period;
   @override
   @JsonKey(name: 'period_unit')
@@ -631,19 +651,19 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   @JsonKey(name: 'last_result')
   final String? lastResult;
   @override
-  @JsonKey(name: 'max_failures')
+  @JsonKey(name: 'max_failures', fromJson: _toInt)
   final int? maxFailures;
   @override
   @JsonKey(name: 'disable_uplink_on_failure')
   final bool disableUplinkOnFailure;
   @override
-  @JsonKey(name: 'sample_size_pct')
+  @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
   final int? sampleSizePct;
   @override
   @JsonKey(name: 'psk_override')
   final String? pskOverride;
   @override
-  @JsonKey(name: 'wlan_id')
+  @JsonKey(name: 'wlan_id', fromJson: _toInt)
   final int? wlanId;
   @override
   final String? note;
@@ -760,27 +780,30 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -822,27 +845,30 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -884,27 +910,30 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(
-            int? id,
+            @JsonKey(fromJson: _toInt) int? id,
             String? name,
             @JsonKey(name: 'test_type') String? testType,
             String? target,
-            int? port,
+            @JsonKey(fromJson: _toInt) int? port,
             @JsonKey(name: 'iperf_protocol') String? iperfProtocol,
-            @JsonKey(name: 'min_download_mbps') double? minDownloadMbps,
-            @JsonKey(name: 'min_upload_mbps') double? minUploadMbps,
-            int? period,
+            @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+            double? minDownloadMbps,
+            @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+            double? minUploadMbps,
+            @JsonKey(fromJson: _toInt) int? period,
             @JsonKey(name: 'period_unit') String? periodUnit,
             @JsonKey(name: 'starts_at') DateTime? startsAt,
             @JsonKey(name: 'next_check_at') DateTime? nextCheckAt,
             @JsonKey(name: 'last_checked_at') DateTime? lastCheckedAt,
             bool passing,
             @JsonKey(name: 'last_result') String? lastResult,
-            @JsonKey(name: 'max_failures') int? maxFailures,
+            @JsonKey(name: 'max_failures', fromJson: _toInt) int? maxFailures,
             @JsonKey(name: 'disable_uplink_on_failure')
             bool disableUplinkOnFailure,
-            @JsonKey(name: 'sample_size_pct') int? sampleSizePct,
+            @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+            int? sampleSizePct,
             @JsonKey(name: 'psk_override') String? pskOverride,
-            @JsonKey(name: 'wlan_id') int? wlanId,
+            @JsonKey(name: 'wlan_id', fromJson: _toInt) int? wlanId,
             String? note,
             String? scratch,
             @JsonKey(name: 'created_by') String? createdBy,
@@ -984,40 +1013,44 @@ class _$SpeedTestConfigImpl extends _SpeedTestConfig {
 
 abstract class _SpeedTestConfig extends SpeedTestConfig {
   const factory _SpeedTestConfig(
-          {final int? id,
-          final String? name,
-          @JsonKey(name: 'test_type') final String? testType,
-          final String? target,
-          final int? port,
-          @JsonKey(name: 'iperf_protocol') final String? iperfProtocol,
-          @JsonKey(name: 'min_download_mbps') final double? minDownloadMbps,
-          @JsonKey(name: 'min_upload_mbps') final double? minUploadMbps,
-          final int? period,
-          @JsonKey(name: 'period_unit') final String? periodUnit,
-          @JsonKey(name: 'starts_at') final DateTime? startsAt,
-          @JsonKey(name: 'next_check_at') final DateTime? nextCheckAt,
-          @JsonKey(name: 'last_checked_at') final DateTime? lastCheckedAt,
-          final bool passing,
-          @JsonKey(name: 'last_result') final String? lastResult,
-          @JsonKey(name: 'max_failures') final int? maxFailures,
-          @JsonKey(name: 'disable_uplink_on_failure')
-          final bool disableUplinkOnFailure,
-          @JsonKey(name: 'sample_size_pct') final int? sampleSizePct,
-          @JsonKey(name: 'psk_override') final String? pskOverride,
-          @JsonKey(name: 'wlan_id') final int? wlanId,
-          final String? note,
-          final String? scratch,
-          @JsonKey(name: 'created_by') final String? createdBy,
-          @JsonKey(name: 'updated_by') final String? updatedBy,
-          @JsonKey(name: 'created_at') final DateTime? createdAt,
-          @JsonKey(name: 'updated_at') final DateTime? updatedAt}) =
-      _$SpeedTestConfigImpl;
+      {@JsonKey(fromJson: _toInt) final int? id,
+      final String? name,
+      @JsonKey(name: 'test_type') final String? testType,
+      final String? target,
+      @JsonKey(fromJson: _toInt) final int? port,
+      @JsonKey(name: 'iperf_protocol') final String? iperfProtocol,
+      @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
+      final double? minDownloadMbps,
+      @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
+      final double? minUploadMbps,
+      @JsonKey(fromJson: _toInt) final int? period,
+      @JsonKey(name: 'period_unit') final String? periodUnit,
+      @JsonKey(name: 'starts_at') final DateTime? startsAt,
+      @JsonKey(name: 'next_check_at') final DateTime? nextCheckAt,
+      @JsonKey(name: 'last_checked_at') final DateTime? lastCheckedAt,
+      final bool passing,
+      @JsonKey(name: 'last_result') final String? lastResult,
+      @JsonKey(name: 'max_failures', fromJson: _toInt) final int? maxFailures,
+      @JsonKey(name: 'disable_uplink_on_failure')
+      final bool disableUplinkOnFailure,
+      @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
+      final int? sampleSizePct,
+      @JsonKey(name: 'psk_override') final String? pskOverride,
+      @JsonKey(name: 'wlan_id', fromJson: _toInt) final int? wlanId,
+      final String? note,
+      final String? scratch,
+      @JsonKey(name: 'created_by') final String? createdBy,
+      @JsonKey(name: 'updated_by') final String? updatedBy,
+      @JsonKey(name: 'created_at') final DateTime? createdAt,
+      @JsonKey(name: 'updated_at')
+      final DateTime? updatedAt}) = _$SpeedTestConfigImpl;
   const _SpeedTestConfig._() : super._();
 
   factory _SpeedTestConfig.fromJson(Map<String, dynamic> json) =
       _$SpeedTestConfigImpl.fromJson;
 
   @override
+  @JsonKey(fromJson: _toInt)
   int? get id;
   @override
   String? get name;
@@ -1027,17 +1060,19 @@ abstract class _SpeedTestConfig extends SpeedTestConfig {
   @override
   String? get target;
   @override
+  @JsonKey(fromJson: _toInt)
   int? get port;
   @override
   @JsonKey(name: 'iperf_protocol')
   String? get iperfProtocol;
   @override
-  @JsonKey(name: 'min_download_mbps')
+  @JsonKey(name: 'min_download_mbps', fromJson: _toDouble)
   double? get minDownloadMbps;
   @override
-  @JsonKey(name: 'min_upload_mbps')
+  @JsonKey(name: 'min_upload_mbps', fromJson: _toDouble)
   double? get minUploadMbps;
   @override
+  @JsonKey(fromJson: _toInt)
   int? get period;
   @override
   @JsonKey(name: 'period_unit')
@@ -1057,19 +1092,19 @@ abstract class _SpeedTestConfig extends SpeedTestConfig {
   @JsonKey(name: 'last_result')
   String? get lastResult;
   @override
-  @JsonKey(name: 'max_failures')
+  @JsonKey(name: 'max_failures', fromJson: _toInt)
   int? get maxFailures;
   @override
   @JsonKey(name: 'disable_uplink_on_failure')
   bool get disableUplinkOnFailure;
   @override
-  @JsonKey(name: 'sample_size_pct')
+  @JsonKey(name: 'sample_size_pct', fromJson: _toInt)
   int? get sampleSizePct;
   @override
   @JsonKey(name: 'psk_override')
   String? get pskOverride;
   @override
-  @JsonKey(name: 'wlan_id')
+  @JsonKey(name: 'wlan_id', fromJson: _toInt)
   int? get wlanId;
   @override
   String? get note;
