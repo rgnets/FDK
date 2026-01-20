@@ -117,3 +117,11 @@ class NotFoundFailure extends Failure {
     super.statusCode,
   });
 }
+
+/// Room readiness related failures
+class RoomReadinessFailure extends Failure {
+  const RoomReadinessFailure({
+    required super.message,
+    super.statusCode,
+  });
+}

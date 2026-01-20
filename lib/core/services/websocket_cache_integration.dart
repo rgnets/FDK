@@ -219,6 +219,14 @@ class WebSocketCacheIntegration {
   }
 
   int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // Primary: direct pms_room_id column (what backend actually sends)
+    final directId = deviceMap['pms_room_id'];
+    if (directId is int) return directId;
+    if (directId is String) {
+      final parsed = int.tryParse(directId);
+      if (parsed != null) return parsed;
+    }
+    // Fallback: nested pms_room object (legacy/future compatibility)
     if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
       final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
       final idValue = pmsRoom['id'];

@@ -159,11 +159,26 @@ class RoomWebSocketDataSource implements RoomDataSource {
   RoomModel _mapToRoomModel(Map<String, dynamic> roomData) {
     final displayName = _buildDisplayName(roomData);
     final roomNumber = roomData['room']?.toString();
+    final deviceIds = _extractDeviceIds(roomData);
+
+    // Debug: Log what device associations are present in room data
+    final hasAPs = roomData['access_points'] is List && (roomData['access_points'] as List).isNotEmpty;
+    final hasMCs = roomData['media_converters'] is List && (roomData['media_converters'] as List).isNotEmpty;
+    final hasSPs = roomData['switch_ports'] is List && (roomData['switch_ports'] as List).isNotEmpty;
+    final hasSDs = roomData['switch_devices'] is List && (roomData['switch_devices'] as List).isNotEmpty;
+    _logger.i(
+      'RoomWebSocketDataSource: Room ${roomData['id']} device associations: '
+      'APs=$hasAPs, MCs=$hasMCs, SPs=$hasSPs, SDs=$hasSDs, extracted=${deviceIds.length} deviceIds',
+    );
+    if (deviceIds.isEmpty) {
+      _logger.w('RoomWebSocketDataSource: Room ${roomData['id']} has NO device associations! Keys: ${roomData.keys.toList()}');
+    }
+
     return RoomModel(
       id: parseRoomId(roomData['id']),
       name: displayName,
       number: roomNumber,
-      deviceIds: _extractDeviceIds(roomData),
+      deviceIds: deviceIds,
       metadata: roomData,
     );
   }
@@ -206,9 +221,41 @@ class RoomWebSocketDataSource implements RoomDataSource {
       }
     }
 
+    void addSwitchPortDevices(List<dynamic>? list) {
+      if (list == null) return;
+      for (final entry in list) {
+        if (entry is! Map<String, dynamic>) continue;
+        final switchDevice = entry['switch_device'];
+        final switchDeviceId = switchDevice is Map<String, dynamic>
+            ? switchDevice['id']
+            : entry['switch_device_id'];
+        final id = switchDeviceId ?? entry['id'];
+        if (id != null) {
+          deviceIds.add('sw_$id');
+        }
+
+        final nested = entry['devices'];
+        if (nested is List<dynamic>) {
+          for (final device in nested) {
+            if (device is Map<String, dynamic>) {
+              final nestedId = device['id'];
+              if (nestedId != null) {
+                deviceIds.add(nestedId.toString());
+              }
+            }
+          }
+        }
+      }
+    }
+
     addDevices(roomData['access_points'] as List<dynamic>?, prefix: 'ap_');
     addDevices(roomData['media_converters'] as List<dynamic>?, prefix: 'ont_');
-    addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
+    final switchPorts = roomData['switch_ports'];
+    if (switchPorts is List && switchPorts.isNotEmpty) {
+      addSwitchPortDevices(switchPorts);
+    } else {
+      addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
+    }
     addDevices(roomData['wlan_devices'] as List<dynamic>?, prefix: 'wlan_');
     addDevices(roomData['infrastructure_devices'] as List<dynamic>?);
 
