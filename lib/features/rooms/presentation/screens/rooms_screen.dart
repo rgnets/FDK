@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
 import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
+import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
@@ -141,9 +142,9 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                           itemCount: filteredRooms.length,
                           itemBuilder: (context, index) {
                             final roomVm = filteredRooms[index];
-                            final statusColor = roomVm.hasIssues ? Colors.orange : Colors.green;
+                            final statusColor = _getStatusColor(roomVm.status);
                             final percentage = roomVm.onlinePercentage;
-                            
+
                             // Build subtitle lines
                             final subtitleLines = <UnifiedInfoLine>[
                               UnifiedInfoLine(
@@ -151,13 +152,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                                 text: '${roomVm.onlineDevices}/${roomVm.deviceCount} devices online',
                               ),
                             ];
-                            
+
                             return UnifiedListItem(
                               title: roomVm.name,
                               icon: Icons.meeting_room,
-                              status: roomVm.hasIssues 
-                                ? UnifiedItemStatus.warning 
-                                : UnifiedItemStatus.good,
+                              status: _getUnifiedItemStatus(roomVm.status),
                               subtitleLines: subtitleLines,
                               trailingWidget: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -180,7 +179,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    roomVm.hasIssues ? 'Has Issues' : 'Ready',
+                                    roomVm.statusText,
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: statusColor,
@@ -203,5 +202,31 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
         },
       ),
     );
+  }
+
+  Color _getStatusColor(RoomStatus status) {
+    switch (status) {
+      case RoomStatus.ready:
+        return Colors.green;
+      case RoomStatus.partial:
+        return Colors.orange;
+      case RoomStatus.down:
+        return Colors.red;
+      case RoomStatus.empty:
+        return Colors.grey;
+    }
+  }
+
+  UnifiedItemStatus _getUnifiedItemStatus(RoomStatus status) {
+    switch (status) {
+      case RoomStatus.ready:
+        return UnifiedItemStatus.good;
+      case RoomStatus.partial:
+        return UnifiedItemStatus.warning;
+      case RoomStatus.down:
+        return UnifiedItemStatus.error;
+      case RoomStatus.empty:
+        return UnifiedItemStatus.unknown;
+    }
   }
 }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
@@ -164,7 +165,7 @@ class _RoomHeader extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final statusColor = roomVm.hasIssues ? Colors.orange : Colors.green;
+    final statusColor = _getStatusColor(roomVm.status);
     final healthPercentage = roomVm.onlinePercentage;
     
     return Container(
@@ -230,7 +231,7 @@ class _RoomHeader extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        roomVm.hasIssues ? 'HAS ISSUES' : 'OPERATIONAL',
+                        roomVm.statusText.toUpperCase(),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -293,6 +294,19 @@ class _RoomHeader extends StatelessWidget {
       ),
     );
   }
+
+  Color _getStatusColor(RoomStatus status) {
+    switch (status) {
+      case RoomStatus.ready:
+        return Colors.green;
+      case RoomStatus.partial:
+        return Colors.orange;
+      case RoomStatus.down:
+        return Colors.red;
+      case RoomStatus.empty:
+        return Colors.grey;
+    }
+  }
 }
 
 class _OverviewTab extends StatelessWidget {
@@ -331,7 +345,7 @@ class _OverviewTab extends StatelessWidget {
               _InfoRow('Online Devices', roomVm.onlineDevices.toString()),
               _InfoRow('Offline Devices', (roomVm.deviceCount - roomVm.onlineDevices).toString()),
               _InfoRow('Health Score', '${roomVm.onlinePercentage.toStringAsFixed(1)}%'),
-              _InfoRow('Issues', roomVm.hasIssues ? 'Yes' : 'None'),
+              _InfoRow('Status', roomVm.statusText),
             ],
           ),
           const SizedBox(height: 16),

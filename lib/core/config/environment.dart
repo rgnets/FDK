@@ -7,6 +7,7 @@ class EnvironmentConfig {
   static Environment _environment = Environment.development;
   static const String _defaultStagingToken =
       'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r';
+  static const String _defaultStagingUsername = 'fetoolreadonly';
 
   static void setEnvironment(Environment env) {
     _environment = env;
@@ -130,10 +131,14 @@ class EnvironmentConfig {
       case Environment.development:
         return 'synthetic_user'; // Not used with synthetic data
       case Environment.staging:
-        return const String.fromEnvironment(
+        const stagingLogin = String.fromEnvironment(
           'STAGING_API_LOGIN',
           defaultValue: '',
         );
+        if (stagingLogin.isNotEmpty) {
+          return stagingLogin;
+        }
+        return _defaultStagingUsername;
       case Environment.production:
         return const String.fromEnvironment('API_USERNAME', defaultValue: '');
     }
