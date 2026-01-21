@@ -7,7 +7,7 @@ part of 'room_device_view_model.dart';
 // **************************************************************************
 
 String _$roomDeviceNotifierHash() =>
-    r'a20713f81680fbb3ebac1c930231f646c6714913';
+    r'162f6ee280103a8736f496c2943e0921738d1e2c';
 
 /// Copied from Dart SDK
 class _SystemHash {
