@@ -309,13 +309,16 @@ class _RoomHeader extends StatelessWidget {
   }
 }
 
-class _OverviewTab extends StatelessWidget {
-  
+class _OverviewTab extends ConsumerWidget {
+
   const _OverviewTab({required this.roomVm});
   final RoomViewModel roomVm;
-  
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get actual device statistics from RoomDeviceNotifier
+    final roomDeviceState = ref.watch(roomDeviceNotifierProvider(roomVm.id));
+    final stats = roomDeviceState.stats;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -350,14 +353,14 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           
-          // Quick Stats Grid
+          // Quick Stats Grid - using actual device statistics
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   icon: Icons.wifi,
                   label: 'Access Points',
-                  value: '${(roomVm.deviceCount * 0.45).round()}',
+                  value: '${stats.accessPoints}',
                   color: Colors.blue,
                 ),
               ),
@@ -366,7 +369,7 @@ class _OverviewTab extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.hub,
                   label: 'Switches',
-                  value: '${(roomVm.deviceCount * 0.35).round()}',
+                  value: '${stats.switches}',
                   color: Colors.purple,
                 ),
               ),
@@ -379,16 +382,16 @@ class _OverviewTab extends StatelessWidget {
                 child: _StatCard(
                   icon: Icons.fiber_manual_record,
                   label: 'ONTs',
-                  value: '${(roomVm.deviceCount * 0.2).round()}',
+                  value: '${stats.onts}',
                   color: Colors.teal,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _StatCard(
-                  icon: Icons.speed,
-                  label: 'Avg Load',
-                  value: '${25 + (roomVm.deviceCount * 2)}%',
+                  icon: Icons.router,
+                  label: 'WLAN Controllers',
+                  value: '${stats.wlanControllers}',
                   color: Colors.orange,
                 ),
               ),

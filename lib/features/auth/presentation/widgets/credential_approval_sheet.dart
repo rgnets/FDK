@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 class CredentialApprovalSheet extends StatefulWidget {
@@ -128,8 +130,17 @@ class _CredentialApprovalSheetState extends State<CredentialApprovalSheet> {
   }
 }
 
+/// Entry mode for credential input - manual fields or JSON paste
+enum CredentialEntryMode { manual, json }
+
 class ManualCredentialEntrySheet extends StatefulWidget {
-  const ManualCredentialEntrySheet({super.key});
+  const ManualCredentialEntrySheet({
+    super.key,
+    this.onCredentialsSubmitted,
+  });
+
+  /// Optional callback for testing - if provided, called instead of Navigator.pop
+  final void Function(Map<String, String>)? onCredentialsSubmitted;
 
   @override
   State<ManualCredentialEntrySheet> createState() =>
@@ -143,6 +154,10 @@ class _ManualCredentialEntrySheetState
   final _loginController = TextEditingController();
   final _tokenController = TextEditingController();
   final _siteController = TextEditingController();
+  final _jsonController = TextEditingController();
+
+  CredentialEntryMode _entryMode = CredentialEntryMode.manual;
+  String? _jsonError;
 
   @override
   void dispose() {
@@ -150,7 +165,106 @@ class _ManualCredentialEntrySheetState
     _loginController.dispose();
     _tokenController.dispose();
     _siteController.dispose();
+    _jsonController.dispose();
     super.dispose();
+  }
+
+  /// Parse JSON credentials and return a Map or null if invalid
+  Map<String, String>? _parseJsonCredentials(String jsonString) {
+    final trimmed = jsonString.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _jsonError = 'Please enter JSON credentials';
+      });
+      return null;
+    }
+
+    try {
+      final dynamic decoded = jsonDecode(trimmed);
+      if (decoded is! Map<String, dynamic>) {
+        setState(() {
+          _jsonError = 'Invalid JSON: Expected an object';
+        });
+        return null;
+      }
+
+      final json = decoded;
+
+      // Extract fields with alternative key support (api_key/apiKey, site_name/siteName)
+      final fqdn = json['fqdn']?.toString();
+      final login = json['login']?.toString();
+      final token = (json['api_key'] ?? json['apiKey'])?.toString();
+      final siteName = (json['site_name'] ?? json['siteName'])?.toString();
+
+      // Validate required fields
+      if (fqdn == null || fqdn.trim().isEmpty) {
+        setState(() {
+          _jsonError = 'Missing required field: fqdn';
+        });
+        return null;
+      }
+
+      if (login == null || login.trim().isEmpty) {
+        setState(() {
+          _jsonError = 'Missing required field: login';
+        });
+        return null;
+      }
+
+      if (token == null || token.trim().isEmpty) {
+        setState(() {
+          _jsonError = 'Missing required field: api_key or apiKey';
+        });
+        return null;
+      }
+
+      // Clear any previous error
+      setState(() {
+        _jsonError = null;
+      });
+
+      return {
+        'fqdn': fqdn.trim(),
+        'login': login.trim(),
+        'token': token.trim(),
+        'siteName': siteName?.trim() ?? '',
+      };
+    } on FormatException {
+      setState(() {
+        _jsonError = 'Invalid JSON format';
+      });
+      return null;
+    }
+  }
+
+  void _onContinuePressed() {
+    if (_entryMode == CredentialEntryMode.manual) {
+      // Manual mode: validate form
+      if (_formKey.currentState?.validate() != true) {
+        return;
+      }
+      final credentials = <String, String>{
+        'fqdn': _fqdnController.text.trim(),
+        'login': _loginController.text.trim(),
+        'token': _tokenController.text.trim(),
+        'siteName': _siteController.text.trim(),
+      };
+      _submitCredentials(credentials);
+    } else {
+      // JSON mode: parse JSON
+      final credentials = _parseJsonCredentials(_jsonController.text);
+      if (credentials != null) {
+        _submitCredentials(credentials);
+      }
+    }
+  }
+
+  void _submitCredentials(Map<String, String> credentials) {
+    if (widget.onCredentialsSubmitted != null) {
+      widget.onCredentialsSubmitted!(credentials);
+    } else {
+      Navigator.of(context).pop(credentials);
+    }
   }
 
   @override
@@ -165,114 +279,157 @@ class _ManualCredentialEntrySheetState
       ),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Enter credentials',
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Manual entry is available when a QR code is unavailable.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Enter credentials',
+                  style: theme.textTheme.titleLarge,
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: _fqdnController,
-              decoration: const InputDecoration(
-                labelText: 'Server (fqdn)',
-                hintText: 'zew.netlab.ninja',
-              ),
-              autofillHints: const [AutofillHints.url],
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Server is required';
-                }
-                if (value.contains('://')) {
-                  return 'Remove protocol (https://)';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _loginController,
-              decoration: const InputDecoration(
-                labelText: 'Login',
-                hintText: 'fieldtech',
-              ),
-              autofillHints: const [AutofillHints.username],
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Login is required';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _tokenController,
-              decoration: const InputDecoration(
-                labelText: 'Token',
-                hintText: 'Paste or scan key',
-              ),
-              autofillHints: const [AutofillHints.password],
-              obscureText: true,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'token is required';
-                }
-                if (value.trim().length < 10) {
-                  return 'token looks too short';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _siteController,
-              decoration: const InputDecoration(
-                labelText: 'Site (optional)',
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(null),
-                    child: const Text('Cancel'),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Manual entry or paste JSON credentials.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () {
-                      if (_formKey.currentState?.validate() != true) {
-                        return;
-                      }
-                      Navigator.of(context).pop(<String, String>{
-                        'fqdn': _fqdnController.text.trim(),
-                        'login': _loginController.text.trim(),
-                        'token': _tokenController.text.trim(),
-                        'siteName': _siteController.text.trim(),
-                      });
-                    },
-                    child: const Text('Continue'),
+              ),
+              const SizedBox(height: 16),
+              // Mode toggle using SegmentedButton
+              SegmentedButton<CredentialEntryMode>(
+                segments: const [
+                  ButtonSegment<CredentialEntryMode>(
+                    value: CredentialEntryMode.manual,
+                    label: Text('Manual'),
+                    icon: Icon(Icons.edit),
+                  ),
+                  ButtonSegment<CredentialEntryMode>(
+                    value: CredentialEntryMode.json,
+                    label: Text('JSON'),
+                    icon: Icon(Icons.code),
+                  ),
+                ],
+                selected: {_entryMode},
+                onSelectionChanged: (Set<CredentialEntryMode> newSelection) {
+                  setState(() {
+                    _entryMode = newSelection.first;
+                    _jsonError = null; // Clear error on mode switch
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
+              // Show either manual fields or JSON input based on mode
+              if (_entryMode == CredentialEntryMode.manual) ...[
+                TextFormField(
+                  controller: _fqdnController,
+                  decoration: const InputDecoration(
+                    labelText: 'Server (fqdn)',
+                    hintText: 'zew.netlab.ninja',
+                  ),
+                  autofillHints: const [AutofillHints.url],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Server is required';
+                    }
+                    if (value.contains('://')) {
+                      return 'Remove protocol (https://)';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _loginController,
+                  decoration: const InputDecoration(
+                    labelText: 'Login',
+                    hintText: 'fieldtech',
+                  ),
+                  autofillHints: const [AutofillHints.username],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Login is required';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _tokenController,
+                  decoration: const InputDecoration(
+                    labelText: 'Token',
+                    hintText: 'Paste or scan key',
+                  ),
+                  autofillHints: const [AutofillHints.password],
+                  obscureText: true,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'token is required';
+                    }
+                    if (value.trim().length < 10) {
+                      return 'token looks too short';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _siteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Site (optional)',
+                  ),
+                ),
+              ] else ...[
+                // JSON input mode
+                TextFormField(
+                  key: const Key('json_input_field'),
+                  controller: _jsonController,
+                  decoration: InputDecoration(
+                    labelText: 'JSON Credentials',
+                    hintText: '{\n  "fqdn": "...",\n  "login": "...",\n  "api_key": "..."\n}',
+                    alignLabelWithHint: true,
+                    errorText: _jsonError,
+                    border: const OutlineInputBorder(),
+                  ),
+                  maxLines: 8,
+                  keyboardType: TextInputType.multiline,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Paste full JSON credentials. Required fields: fqdn, login, api_key (or apiKey)',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
-            ),
-          ],
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(null),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _onContinuePressed,
+                      child: const Text('Continue'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
