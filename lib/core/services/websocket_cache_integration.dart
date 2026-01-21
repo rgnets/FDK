@@ -138,7 +138,8 @@ class WebSocketCacheIntegration {
       // DEBUG: Log raw device data keys to see what backend sends
       final hasHnCounts = deviceMap['hn_counts'] != null;
       final hasHealthNotices = deviceMap['health_notices'] != null;
-      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices');
+      final phase = deviceMap['phase'];
+      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices, phase=$phase');
       if (hasHnCounts) {
         print('  hn_counts value: ${deviceMap['hn_counts']}');
       }
@@ -163,6 +164,7 @@ class WebSocketCacheIntegration {
             images: _extractImages(deviceMap),
             hnCounts: hnCounts,
             healthNotices: healthNotices,
+            metadata: deviceMap,
           );
 
         case 'media_converters':
@@ -180,6 +182,7 @@ class WebSocketCacheIntegration {
             images: _extractImages(deviceMap),
             hnCounts: hnCounts,
             healthNotices: healthNotices,
+            metadata: deviceMap,
           );
 
         case 'switch_devices':
@@ -199,6 +202,7 @@ class WebSocketCacheIntegration {
             images: _extractImages(deviceMap),
             hnCounts: hnCounts,
             healthNotices: healthNotices,
+            metadata: deviceMap,
           );
 
         default:

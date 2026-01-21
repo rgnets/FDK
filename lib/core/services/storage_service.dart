@@ -23,6 +23,10 @@ class StorageService {
   static const String _keyEnableNotifications = 'enable_notifications';
   static const String _keyAutoSync = 'auto_sync';
   static const String _keySyncInterval = 'sync_interval';
+  static const String _keyPhaseFilter = 'device_phase_filter';
+
+  /// Public key for phase filter (for tests and direct access)
+  static const String keyPhaseFilter = _keyPhaseFilter;
 
   // Legacy keys for migration
   static const String _legacyKeyApiUrl = 'api_url';
@@ -211,6 +215,12 @@ class StorageService {
   int get syncInterval => _prefs.getInt(_keySyncInterval) ?? 15;
   Future<void> setSyncInterval(int minutes) =>
       _prefs.setInt(_keySyncInterval, minutes);
+
+  // Phase filter
+  String? get phaseFilter => _prefs.getString(_keyPhaseFilter);
+  Future<void> setPhaseFilter(String phase) =>
+      _prefs.setString(_keyPhaseFilter, phase);
+  Future<void> clearPhaseFilter() => _prefs.remove(_keyPhaseFilter);
 
   // Generic methods
   Future<bool> setBool(String key, {required bool value}) =>

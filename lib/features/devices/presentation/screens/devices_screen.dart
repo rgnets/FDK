@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/device_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
 
 /// Screen for managing devices
 class DevicesScreen extends ConsumerStatefulWidget {
@@ -87,7 +88,116 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         return 'access_point';
     }
   }
-  
+
+  Widget _buildPhaseFilterBar(WidgetRef ref, List<Device> devices) {
+    final phases = ref.watch(devicePhasesProvider);
+    final phaseState = ref.watch(phaseFilterNotifierProvider);
+    final isFiltering = phaseState.isFiltering;
+    final selectedPhase = phaseState.selectedPhase;
+
+    // Don't show if there are no phases to filter (only "All Phases")
+    if (phases.length <= 1) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: PopupMenuButton<String>(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isFiltering
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isFiltering
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isFiltering ? Icons.label : Icons.filter_list,
+                size: 18,
+                color: isFiltering
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isFiltering ? selectedPhase : 'Phase',
+                  style: TextStyle(
+                    color: isFiltering
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: isFiltering
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+            ],
+          ),
+        ),
+        itemBuilder: (BuildContext context) {
+          return phases.map((String phase) {
+            final isSelected = phase == selectedPhase;
+            return PopupMenuItem<String>(
+              value: phase,
+              child: Row(
+                children: [
+                  Icon(
+                    phase == PhaseFilterState.allPhases
+                        ? Icons.filter_list_off
+                        : Icons.label,
+                    size: 18,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      phase,
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                ],
+              ),
+            );
+          }).toList();
+        },
+        onSelected: (String newPhase) {
+          ref.read(deviceUIStateNotifierProvider.notifier).setPhaseFilter(newPhase);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // AppBar removed from DevicesScreen - search and menu functionality needs to be relocated
@@ -161,16 +271,19 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                       ),
                     ),
                   
+                  // Phase filter bar
+                  _buildPhaseFilterBar(ref, devices),
+
                   // HUD Tab Bar - taller with full data
                   Builder(
                     builder: (context) {
                       final uiState = ref.watch(deviceUIStateNotifierProvider);
-                      
+
                       final apCount = devices.where((d) => d.type == 'access_point').length;
                       final switchCount = devices.where((d) => d.type == 'switch').length;
                       final ontCount = devices.where((d) => d.type == 'ont').length;
-                      
-                      
+
+
                       return HUDTabBar(
                         height: 80,
                         showFullCount: true,
