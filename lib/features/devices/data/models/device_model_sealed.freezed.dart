@@ -33,7 +33,6 @@ DeviceModelSealed _$DeviceModelSealedFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$DeviceModelSealed {
-// Common fields
   String get id => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
@@ -81,6 +80,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -198,6 +198,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -315,6 +316,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -626,6 +628,7 @@ abstract class _$$APModelImplCopyWith<$Res>
       List<String>? images,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+      @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
       @JsonKey(name: 'connection_state') String? connectionState,
       @JsonKey(name: 'signal_strength') int? signalStrength,
       @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -672,6 +675,7 @@ class __$$APModelImplCopyWithImpl<$Res>
     Object? images = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
+    Object? infrastructureLinkId = freezed,
     Object? connectionState = freezed,
     Object? signalStrength = freezed,
     Object? connectedClients = freezed,
@@ -751,6 +755,10 @@ class __$$APModelImplCopyWithImpl<$Res>
           ? _value.hnCounts
           : hnCounts // ignore: cast_nullable_to_non_nullable
               as HealthCountsModel?,
+      infrastructureLinkId: freezed == infrastructureLinkId
+          ? _value.infrastructureLinkId
+          : infrastructureLinkId // ignore: cast_nullable_to_non_nullable
+              as int?,
       connectionState: freezed == connectionState
           ? _value.connectionState
           : connectionState // ignore: cast_nullable_to_non_nullable
@@ -826,6 +834,7 @@ class _$APModelImpl extends APModel {
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts,
+      @JsonKey(name: 'infrastructure_link_id') this.infrastructureLinkId,
       @JsonKey(name: 'connection_state') this.connectionState,
       @JsonKey(name: 'signal_strength') this.signalStrength,
       @JsonKey(name: 'connected_clients') this.connectedClients,
@@ -845,7 +854,6 @@ class _$APModelImpl extends APModel {
   factory _$APModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$APModelImplFromJson(json);
 
-// Common fields
   @override
   final String id;
   @override
@@ -912,7 +920,9 @@ class _$APModelImpl extends APModel {
   @override
   @JsonKey(name: 'hn_counts')
   final HealthCountsModel? hnCounts;
-// AP-specific fields
+  @override
+  @JsonKey(name: 'infrastructure_link_id')
+  final int? infrastructureLinkId;
   @override
   @JsonKey(name: 'connection_state')
   final String? connectionState;
@@ -944,7 +954,7 @@ class _$APModelImpl extends APModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus)';
+    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, infrastructureLinkId: $infrastructureLinkId, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus)';
   }
 
   @override
@@ -978,6 +988,8 @@ class _$APModelImpl extends APModel {
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
                 other.hnCounts == hnCounts) &&
+            (identical(other.infrastructureLinkId, infrastructureLinkId) ||
+                other.infrastructureLinkId == infrastructureLinkId) &&
             (identical(other.connectionState, connectionState) ||
                 other.connectionState == connectionState) &&
             (identical(other.signalStrength, signalStrength) ||
@@ -1017,6 +1029,7 @@ class _$APModelImpl extends APModel {
         const DeepCollectionEquality().hash(_images),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts,
+        infrastructureLinkId,
         connectionState,
         signalStrength,
         connectedClients,
@@ -1056,6 +1069,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -1169,6 +1183,7 @@ class _$APModelImpl extends APModel {
         images,
         healthNotices,
         hnCounts,
+        infrastructureLinkId,
         connectionState,
         signalStrength,
         connectedClients,
@@ -1202,6 +1217,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -1315,6 +1331,7 @@ class _$APModelImpl extends APModel {
         images,
         healthNotices,
         hnCounts,
+        infrastructureLinkId,
         connectionState,
         signalStrength,
         connectedClients,
@@ -1348,6 +1365,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -1463,6 +1481,7 @@ class _$APModelImpl extends APModel {
           images,
           healthNotices,
           hnCounts,
+          infrastructureLinkId,
           connectionState,
           signalStrength,
           connectedClients,
@@ -1541,6 +1560,7 @@ abstract class APModel extends DeviceModelSealed {
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
+      @JsonKey(name: 'infrastructure_link_id') final int? infrastructureLinkId,
       @JsonKey(name: 'connection_state') final String? connectionState,
       @JsonKey(name: 'signal_strength') final int? signalStrength,
       @JsonKey(name: 'connected_clients') final int? connectedClients,
@@ -1555,7 +1575,7 @@ abstract class APModel extends DeviceModelSealed {
 
   factory APModel.fromJson(Map<String, dynamic> json) = _$APModelImpl.fromJson;
 
-  @override // Common fields
+  @override
   String get id;
   @override
   String get name;
@@ -1596,7 +1616,9 @@ abstract class APModel extends DeviceModelSealed {
   List<HealthNoticeModel>? get healthNotices;
   @override
   @JsonKey(name: 'hn_counts')
-  HealthCountsModel? get hnCounts; // AP-specific fields
+  HealthCountsModel? get hnCounts;
+  @JsonKey(name: 'infrastructure_link_id')
+  int? get infrastructureLinkId;
   @JsonKey(name: 'connection_state')
   String? get connectionState;
   @JsonKey(name: 'signal_strength')
@@ -1845,7 +1867,6 @@ class _$ONTModelImpl extends ONTModel {
   factory _$ONTModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$ONTModelImplFromJson(json);
 
-// Common fields
   @override
   final String id;
   @override
@@ -1912,7 +1933,6 @@ class _$ONTModelImpl extends ONTModel {
   @override
   @JsonKey(name: 'hn_counts')
   final HealthCountsModel? hnCounts;
-// ONT-specific fields
   @override
   @JsonKey(name: 'is_registered')
   final bool? isRegistered;
@@ -2053,6 +2073,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -2196,6 +2217,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -2339,6 +2361,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -2541,7 +2564,7 @@ abstract class ONTModel extends DeviceModelSealed {
   factory ONTModel.fromJson(Map<String, dynamic> json) =
       _$ONTModelImpl.fromJson;
 
-  @override // Common fields
+  @override
   String get id;
   @override
   String get name;
@@ -2582,7 +2605,7 @@ abstract class ONTModel extends DeviceModelSealed {
   List<HealthNoticeModel>? get healthNotices;
   @override
   @JsonKey(name: 'hn_counts')
-  HealthCountsModel? get hnCounts; // ONT-specific fields
+  HealthCountsModel? get hnCounts;
   @JsonKey(name: 'is_registered')
   bool? get isRegistered;
   @JsonKey(name: 'switch_port')
@@ -2817,7 +2840,6 @@ class _$SwitchModelImpl extends SwitchModel {
   factory _$SwitchModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$SwitchModelImplFromJson(json);
 
-// Common fields
   @override
   final String id;
   @override
@@ -2884,7 +2906,6 @@ class _$SwitchModelImpl extends SwitchModel {
   @override
   @JsonKey(name: 'hn_counts')
   final HealthCountsModel? hnCounts;
-// Switch-specific fields
   @override
   final String? host;
   final List<Map<String, dynamic>>? _ports;
@@ -3024,6 +3045,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -3168,6 +3190,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -3312,6 +3335,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -3516,7 +3540,7 @@ abstract class SwitchModel extends DeviceModelSealed {
   factory SwitchModel.fromJson(Map<String, dynamic> json) =
       _$SwitchModelImpl.fromJson;
 
-  @override // Common fields
+  @override
   String get id;
   @override
   String get name;
@@ -3557,7 +3581,7 @@ abstract class SwitchModel extends DeviceModelSealed {
   List<HealthNoticeModel>? get healthNotices;
   @override
   @JsonKey(name: 'hn_counts')
-  HealthCountsModel? get hnCounts; // Switch-specific fields
+  HealthCountsModel? get hnCounts;
   String? get host;
   @JsonKey(name: 'switch_ports')
   List<Map<String, dynamic>>? get ports;
@@ -3799,7 +3823,6 @@ class _$WLANModelImpl extends WLANModel {
   factory _$WLANModelImpl.fromJson(Map<String, dynamic> json) =>
       _$$WLANModelImplFromJson(json);
 
-// Common fields
   @override
   final String id;
   @override
@@ -3866,7 +3889,6 @@ class _$WLANModelImpl extends WLANModel {
   @override
   @JsonKey(name: 'hn_counts')
   final HealthCountsModel? hnCounts;
-// WLAN-specific fields
   @override
   @JsonKey(name: 'controller_type')
   final String? controllerType;
@@ -4004,6 +4026,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -4149,6 +4172,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -4294,6 +4318,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
             @JsonKey(name: 'connection_state') String? connectionState,
             @JsonKey(name: 'signal_strength') int? signalStrength,
             @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -4500,7 +4525,7 @@ abstract class WLANModel extends DeviceModelSealed {
   factory WLANModel.fromJson(Map<String, dynamic> json) =
       _$WLANModelImpl.fromJson;
 
-  @override // Common fields
+  @override
   String get id;
   @override
   String get name;
@@ -4541,7 +4566,7 @@ abstract class WLANModel extends DeviceModelSealed {
   List<HealthNoticeModel>? get healthNotices;
   @override
   @JsonKey(name: 'hn_counts')
-  HealthCountsModel? get hnCounts; // WLAN-specific fields
+  HealthCountsModel? get hnCounts;
   @JsonKey(name: 'controller_type')
   String? get controllerType;
   @JsonKey(name: 'managed_aps')
