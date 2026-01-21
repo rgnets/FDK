@@ -89,7 +89,8 @@ void main() {
       const state = PhaseFilterState(selectedPhase: 'Phase 1');
 
       final filtered = testDevices.where((device) {
-        final phase = device.metadata?['phase'] as String?;
+        final rawPhase = device.metadata?['phase'];
+        final phase = rawPhase?.toString();
         return state.matchesFilter(phase);
       }).toList();
 
@@ -101,7 +102,8 @@ void main() {
       const state = PhaseFilterState(selectedPhase: 'Unassigned');
 
       final filtered = testDevices.where((device) {
-        final phase = device.metadata?['phase'] as String?;
+        final rawPhase = device.metadata?['phase'];
+        final phase = rawPhase?.toString();
         return state.matchesFilter(phase);
       }).toList();
 

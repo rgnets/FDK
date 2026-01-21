@@ -104,8 +104,9 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
                              device.type.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
                              (device.location?.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ?? false);
 
-        // Filter by phase (using metadata)
-        final devicePhase = device.metadata?['phase'] as String?;
+        // Filter by phase (using metadata) - handle both String and int types
+        final rawPhase = device.metadata?['phase'];
+        final devicePhase = rawPhase?.toString();
         final matchesPhase = phaseFilter.matchesFilter(devicePhase);
 
         return matchesType && matchesSearch && matchesPhase;
