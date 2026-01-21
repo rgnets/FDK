@@ -136,6 +136,9 @@ flutter:
     - assets/config/onboarding_messages.json
 >>>>>>> 6a559fa (Draft for device onboarding)
 
+    # Speed test indicator images
+    - assets/speed_test_indicator_img/
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
