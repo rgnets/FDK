@@ -318,10 +318,14 @@ class _RoomHeader extends StatelessWidget {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 class _OverviewTab extends ConsumerWidget {
 =======
 class _OverviewTab extends StatelessWidget {
 >>>>>>> 24906fa (Add pms speed test)
+=======
+class _OverviewTab extends ConsumerWidget {
+>>>>>>> 47e623e (Json credential and room readiness (#18))
 
   const _OverviewTab({required this.roomVm});
   final RoomViewModel roomVm;

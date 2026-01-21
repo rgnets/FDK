@@ -182,6 +182,9 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final roomName = _buildRoomName(roomData);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     // DEBUG: Log room data structure
     _logger.i('DEBUG ROOM $roomId ($roomName): roomData keys = ${roomData.keys.toList()}');
     _logger.i('DEBUG ROOM $roomId: access_points = ${roomData['access_points']}');
@@ -189,17 +192,25 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     _logger.i('DEBUG ROOM $roomId: switch_ports = ${roomData['switch_ports']}');
     _logger.i('DEBUG ROOM $roomId: deviceModels count = ${deviceModels.length}');
 
+<<<<<<< HEAD
 =======
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     // Extract device references from room data
     final deviceRefs = _extractDeviceReferences(roomData);
     final totalDevices = deviceRefs.length;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     _logger.i('DEBUG ROOM $roomId: Extracted ${deviceRefs.length} device refs: $deviceRefs');
 
 =======
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+    _logger.i('DEBUG ROOM $roomId: Extracted ${deviceRefs.length} device refs: $deviceRefs');
+
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     if (totalDevices == 0) {
       return RoomReadinessMetrics(
         roomId: roomId,
@@ -221,12 +232,18 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     for (final ref in deviceRefs) {
       final device = _findDevice(ref, deviceModels);
 <<<<<<< HEAD
+<<<<<<< HEAD
       _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
       if (device == null) {
         _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
 =======
       if (device == null) {
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+      _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
+      if (device == null) {
+        _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
+>>>>>>> 47e623e (Json credential and room readiness (#18))
         // Device reference exists but device not found - critical issue
         issues.add(
           Issue(
@@ -377,13 +394,19 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final refId = ref['id']?.toString();
     final refType = ref['type'] as String?;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     if (refId == null) {
       _logger.w('DEBUG _findDevice: refId is null for ref=$ref');
       return null;
     }
+<<<<<<< HEAD
 =======
     if (refId == null) return null;
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
 
     // Build expected device ID with prefix
     final prefix = switch (refType) {
@@ -395,6 +418,9 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final prefixedId = '$prefix$refId';
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     _logger.i('DEBUG _findDevice: Looking for refId=$refId prefixedId=$prefixedId in ${deviceModels.length} devices');
 
     // Log first few device IDs for comparison
@@ -409,16 +435,23 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       _logger.i('DEBUG _findDevice: Sample device IDs in cache: $sampleIds');
     }
 
+<<<<<<< HEAD
 =======
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     for (final device in deviceModels) {
       try {
         final deviceId = device.id as String?;
         if (deviceId == prefixedId || deviceId == refId) {
 <<<<<<< HEAD
+<<<<<<< HEAD
           _logger.i('DEBUG _findDevice: MATCH FOUND deviceId=$deviceId');
 =======
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+          _logger.i('DEBUG _findDevice: MATCH FOUND deviceId=$deviceId');
+>>>>>>> 47e623e (Json credential and room readiness (#18))
           return device;
         }
       } catch (_) {
@@ -426,9 +459,13 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
         if (device is Map<String, dynamic>) {
           if (device['id']?.toString() == refId) {
 <<<<<<< HEAD
+<<<<<<< HEAD
             _logger.i('DEBUG _findDevice: MATCH FOUND (Map) id=${device['id']}');
 =======
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+            _logger.i('DEBUG _findDevice: MATCH FOUND (Map) id=${device['id']}');
+>>>>>>> 47e623e (Json credential and room readiness (#18))
             return device;
           }
         }
@@ -439,16 +476,22 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final refData = ref['data'];
     if (refData is Map<String, dynamic> && refData.containsKey('online')) {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
       _logger.i('DEBUG _findDevice: Using inline refData with online=${refData['online']}');
       return refData;
     }
 
     _logger.w('DEBUG _findDevice: NO MATCH for refId=$refId prefixedId=$prefixedId');
+<<<<<<< HEAD
 =======
       return refData;
     }
 
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+>>>>>>> 47e623e (Json credential and room readiness (#18))
     return null;
   }
 
@@ -537,6 +580,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     // Check for device-missing issues (always DOWN - device expected but not found)
     final hasMissingDevice = issues.any((i) => i.code == 'DEVICE_MISSING');
     if (hasMissingDevice) {
@@ -560,6 +604,21 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     // Check for any non-critical issues
     if (issues.isNotEmpty) {
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+    // Check for device-missing issues (always DOWN - device expected but not found)
+    final hasMissingDevice = issues.any((i) => i.code == 'DEVICE_MISSING');
+    if (hasMissingDevice) {
+      return RoomStatus.down;
+    }
+
+    // DOWN only if ALL devices are offline
+    if (onlineDevices == 0) {
+      return RoomStatus.down;
+    }
+
+    // PARTIAL if some devices offline OR any issues exist
+    if (onlineDevices < totalDevices || issues.isNotEmpty) {
+>>>>>>> 47e623e (Json credential and room readiness (#18))
       return RoomStatus.partial;
     }
 
