@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/utils/qr_decoder.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 
@@ -46,6 +47,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     logger.d('SPLASH_SCREEN: Starting 2-second initialization delay');
     await Future<void>.delayed(const Duration(seconds: 2));
     logger.d('SPLASH_SCREEN: Initialization delay complete');
+
+    // Check if deeplink is being processed - if so, let deeplink service handle navigation
+    final deeplinkService = ref.read(deeplinkServiceProvider);
+    if (deeplinkService.isProcessing || deeplinkService.hasPendingInitialLink) {
+      logger.i(
+        'SPLASH_SCREEN: Deeplink in progress (isProcessing=${deeplinkService.isProcessing}, '
+        'hasPendingInitialLink=${deeplinkService.hasPendingInitialLink}), deferring navigation',
+      );
+      return;
+    }
 
     // Handle different environments
     if (EnvironmentConfig.isDevelopment) {
