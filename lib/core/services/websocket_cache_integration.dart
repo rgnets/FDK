@@ -139,7 +139,9 @@ class WebSocketCacheIntegration {
       final hasHnCounts = deviceMap['hn_counts'] != null;
       final hasHealthNotices = deviceMap['health_notices'] != null;
       final phase = deviceMap['phase'];
-      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: hn_counts=$hasHnCounts, health_notices=$hasHealthNotices, phase=$phase');
+      final pmsRoomId = deviceMap['pms_room_id'];
+      final pmsRoom = deviceMap['pms_room'];
+      print('RAW DEVICE [$resourceType] id=${deviceMap['id']}: pms_room_id=$pmsRoomId, pms_room=$pmsRoom, hn_counts=$hasHnCounts, phase=$phase');
       if (hasHnCounts) {
         print('  hn_counts value: ${deviceMap['hn_counts']}');
       }
