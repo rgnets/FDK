@@ -132,10 +132,15 @@ class SpeedTestService {
         _statusMessageController.add(getMessage());
         break;
       case 'completed':
-        _updateStatus(SpeedTestStatus.completed);
-        _statusMessageController.add(getMessage());
-        _progress = 100.0;
-        _progressController.add(_progress);
+        // Don't set SpeedTestStatus.completed here - iperf3 sends 'completed' after
+        // each individual test (download/upload), but we want to wait until BOTH
+        // phases are done. The actual completion is handled in runSpeedTestWithFallback
+        // after both download and upload tests finish.
+        // Just update the message to show phase completion.
+        if (_isDownloadPhase) {
+          _statusMessageController.add('Download complete, starting upload...');
+        }
+        // Don't set progress to 100% here either - that happens after the full test
         break;
       case 'cancelled':
         _updateStatus(SpeedTestStatus.idle);
@@ -234,6 +239,9 @@ class SpeedTestService {
     _isRetryingFallback =
         true; // Enable fallback mode to suppress intermediate errors
 
+    // Capture test start time
+    final initiatedAt = DateTime.now();
+
     // Reset completed speeds from previous test
     _completedDownloadSpeed = 0.0;
     _completedUploadSpeed = 0.0;
@@ -260,7 +268,7 @@ class SpeedTestService {
 
       try {
         // Attempt test with this server
-        final result = await _runTestWithServer(serverHost, localIp);
+        final result = await _runTestWithServer(serverHost, localIp, initiatedAt);
 
         if (result != null) {
           // Success!
@@ -353,7 +361,7 @@ class SpeedTestService {
 
   /// Run test with a specific server, returns result or null if failed
   Future<SpeedTestResult?> _runTestWithServer(
-      String serverHost, String? localIp) async {
+      String serverHost, String? localIp, DateTime initiatedAt) async {
     try {
       // Update the current server host being tested
       _serverHost = serverHost;
@@ -417,6 +425,7 @@ class SpeedTestService {
         downloadMbps: (downloadSpeed as num).toDouble(),
         uploadMbps: (uploadSpeed as num).toDouble(),
         rtt: (latency as num).toDouble(),
+        initiatedAt: initiatedAt,
         completedAt: DateTime.now(),
         localIpAddress: localIp,
         serverHost: serverHost,

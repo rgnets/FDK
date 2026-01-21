@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
@@ -112,13 +113,27 @@ class _DeviceSpeedTestSectionState
   Future<void> _runSpeedTest() async {
     if (!mounted) return;
 
-    // Get adhoc config from cache
     final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-    final adhocConfig = cacheIntegration.getAdhocSpeedTestConfig();
 
-    if (adhocConfig != null) {
+    // Try to get config from the device's existing results (uses the same test config)
+    SpeedTestConfig? config;
+    if (_deviceResults.isNotEmpty) {
+      final speedTestId = _deviceResults.first.speedTestId;
+      config = cacheIntegration.getSpeedTestConfigById(speedTestId);
+      if (config != null) {
+        LoggerService.info(
+          'Running speed test for device ${_getPrefixedDeviceId()} with config from result: ${config.name} (id: $speedTestId)',
+          tag: 'DeviceSpeedTestSection',
+        );
+      }
+    }
+
+    // Fall back to adhoc config if no matching config found
+    config ??= cacheIntegration.getAdhocSpeedTestConfig();
+
+    if (config != null) {
       LoggerService.info(
-        'Running speed test for device ${_getPrefixedDeviceId()} with adhoc config: ${adhocConfig.name}',
+        'Running speed test for device ${_getPrefixedDeviceId()} with config: ${config.name}',
         tag: 'DeviceSpeedTestSection',
       );
     }
@@ -128,7 +143,7 @@ class _DeviceSpeedTestSectionState
       barrierDismissible: true,
       builder: (BuildContext context) {
         return SpeedTestPopup(
-          cachedTest: adhocConfig,
+          cachedTest: config,
           onCompleted: () {
             if (mounted) {
               // Reload results after test completion

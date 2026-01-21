@@ -93,17 +93,21 @@ class SpeedTestResult with _$SpeedTestResult {
 
   /// Pre-process JSON to detect and correct swapped download/upload values
   static Map<String, dynamic> _preprocessJson(Map<String, dynamic> json) {
-    final normalizedJson = _normalizeTestedViaAccessPointId(json);
+    // First extract IDs from nested association objects
+    var normalizedJson = _extractNestedAssociationIds(json);
+    // Then normalize any string IDs to ints
+    normalizedJson = _normalizeTestedViaAccessPointId(normalizedJson);
+
     final download = _parseDecimal(normalizedJson['download_mbps']);
     final upload = _parseDecimal(normalizedJson['upload_mbps']);
 
     if (download == null || upload == null) {
-      return json;
+      return normalizedJson;
     }
 
     // Both are 0 - likely incomplete test, don't swap
     if (download == 0 && upload == 0) {
-      return json;
+      return normalizedJson;
     }
 
     bool shouldSwap = false;
@@ -136,6 +140,41 @@ class SpeedTestResult with _$SpeedTestResult {
     }
 
     return normalizedJson;
+  }
+
+  /// Extract IDs from nested association objects
+  /// RESTFramework sends associations as objects like:
+  ///   "tested_via_access_point": { "id": 1309, "name": "..." }
+  /// instead of:
+  ///   "tested_via_access_point_id": 1309
+  static Map<String, dynamic> _extractNestedAssociationIds(
+    Map<String, dynamic> json,
+  ) {
+    final result = Map<String, dynamic>.from(json);
+
+    // Map of association name to the corresponding _id field
+    const associationMappings = {
+      'tested_via_access_point': 'tested_via_access_point_id',
+      'tested_via_media_converter': 'tested_via_media_converter_id',
+      'speed_test': 'speed_test_id',
+      'pms_room': 'pms_room_id',
+      'access_point': 'access_point_id',
+    };
+
+    for (final entry in associationMappings.entries) {
+      final associationKey = entry.key;
+      final idKey = entry.value;
+
+      // Only extract if the _id field is not already set
+      if (result[idKey] == null && result[associationKey] is Map) {
+        final association = result[associationKey] as Map;
+        if (association['id'] != null) {
+          result[idKey] = association['id'];
+        }
+      }
+    }
+
+    return result;
   }
 
   static Map<String, dynamic> _normalizeTestedViaAccessPointId(
