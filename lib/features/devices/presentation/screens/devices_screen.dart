@@ -326,6 +326,75 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     },
                   ),
                 
+                  // Phase filter dropdown
+                  Builder(
+                    builder: (context) {
+                      final uiState = ref.watch(deviceUIStateNotifierProvider);
+                      final phases = ref.watch(uniquePhasesProvider);
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              size: 20,
+                              color: uiState.isFilteringByPhase
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: uiState.selectedPhase,
+                                decoration: InputDecoration(
+                                  labelText: 'Phase Filter',
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  isDense: true,
+                                ),
+                                items: phases.map((phase) {
+                                  return DropdownMenuItem<String>(
+                                    value: phase,
+                                    child: Text(
+                                      phase,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    ref.read(deviceUIStateNotifierProvider.notifier).setPhase(value);
+                                  }
+                                },
+                              ),
+                            ),
+                            if (uiState.isFilteringByPhase) ...[
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  ref.read(deviceUIStateNotifierProvider.notifier).clearPhaseFilter();
+                                },
+                                tooltip: 'Clear phase filter',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 32,
+                                  minHeight: 32,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
                   // Device list
                   Expanded(
                     child: Consumer(
@@ -337,7 +406,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                               title: 'No devices found',
                               subtitle: uiState.searchQuery.isNotEmpty
                                 ? 'Try adjusting your search'
-                                : 'No devices match the current filter',
+                                : uiState.isFilteringByPhase
+                                    ? 'No devices match the selected phase'
+                                    : 'No devices match the current filter',
                             )
                           : ListView.builder(
                               controller: _scrollController,

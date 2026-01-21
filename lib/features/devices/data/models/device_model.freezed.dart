@@ -75,6 +75,7 @@ mixin _$DeviceModel {
       throw _privateConstructorUsedError;
   @JsonKey(name: 'hn_counts')
   HealthCountsModel? get hnCounts => throw _privateConstructorUsedError;
+  String? get phase => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -113,7 +114,8 @@ mixin _$DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -155,7 +157,8 @@ mixin _$DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -197,7 +200,8 @@ mixin _$DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -265,7 +269,8 @@ abstract class $DeviceModelCopyWith<$Res> {
       String? note,
       List<String>? images,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
-      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
+      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+      String? phase});
 
   $RoomModelCopyWith<$Res>? get pmsRoom;
   $HealthCountsModelCopyWith<$Res>? get hnCounts;
@@ -319,6 +324,7 @@ class _$DeviceModelCopyWithImpl<$Res, $Val extends DeviceModel>
     Object? images = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -461,6 +467,10 @@ class _$DeviceModelCopyWithImpl<$Res, $Val extends DeviceModel>
           ? _value.hnCounts
           : hnCounts // ignore: cast_nullable_to_non_nullable
               as HealthCountsModel?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 
@@ -532,7 +542,8 @@ abstract class _$$DeviceModelImplCopyWith<$Res>
       String? note,
       List<String>? images,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
-      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
+      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+      String? phase});
 
   @override
   $RoomModelCopyWith<$Res>? get pmsRoom;
@@ -586,6 +597,7 @@ class __$$DeviceModelImplCopyWithImpl<$Res>
     Object? images = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_$DeviceModelImpl(
       id: null == id
@@ -728,6 +740,10 @@ class __$$DeviceModelImplCopyWithImpl<$Res>
           ? _value.hnCounts
           : hnCounts // ignore: cast_nullable_to_non_nullable
               as HealthCountsModel?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -771,7 +787,8 @@ class _$DeviceModelImpl implements _DeviceModel {
       final List<String>? images,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
-      @JsonKey(name: 'hn_counts') this.hnCounts})
+      @JsonKey(name: 'hn_counts') this.hnCounts,
+      this.phase})
       : _metadata = metadata,
         _images = images,
         _healthNotices = healthNotices;
@@ -892,10 +909,12 @@ class _$DeviceModelImpl implements _DeviceModel {
   @override
   @JsonKey(name: 'hn_counts')
   final HealthCountsModel? hnCounts;
+  @override
+  final String? phase;
 
   @override
   String toString() {
-    return 'DeviceModel(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts)';
+    return 'DeviceModel(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, phase: $phase)';
   }
 
   @override
@@ -958,7 +977,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
-                other.hnCounts == hnCounts));
+                other.hnCounts == hnCounts) &&
+            (identical(other.phase, phase) || other.phase == phase));
   }
 
   @JsonKey(ignore: true)
@@ -999,7 +1019,8 @@ class _$DeviceModelImpl implements _DeviceModel {
         note,
         const DeepCollectionEquality().hash(_images),
         const DeepCollectionEquality().hash(_healthNotices),
-        hnCounts
+        hnCounts,
+        phase
       ]);
 
   @JsonKey(ignore: true)
@@ -1047,7 +1068,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)
         $default,
   ) {
     return $default(
@@ -1085,7 +1107,8 @@ class _$DeviceModelImpl implements _DeviceModel {
         note,
         images,
         healthNotices,
-        hnCounts);
+        hnCounts,
+        phase);
   }
 
   @override
@@ -1127,7 +1150,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)?
         $default,
   ) {
     return $default?.call(
@@ -1165,7 +1189,8 @@ class _$DeviceModelImpl implements _DeviceModel {
         note,
         images,
         healthNotices,
-        hnCounts);
+        hnCounts,
+        phase);
   }
 
   @override
@@ -1207,7 +1232,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             List<String>? images,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
-            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
+            @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+            String? phase)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1247,7 +1273,8 @@ class _$DeviceModelImpl implements _DeviceModel {
           note,
           images,
           healthNotices,
-          hnCounts);
+          hnCounts,
+          phase);
     }
     return orElse();
   }
@@ -1290,43 +1317,43 @@ class _$DeviceModelImpl implements _DeviceModel {
 
 abstract class _DeviceModel implements DeviceModel {
   const factory _DeviceModel(
-          {required final String id,
-          required final String name,
-          required final String type,
-          required final String status,
-          @JsonKey(name: 'pms_room') final RoomModel? pmsRoom,
-          @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
-          @JsonKey(name: 'ip_address') final String? ipAddress,
-          @JsonKey(name: 'mac_address') final String? macAddress,
-          final String? location,
-          @JsonKey(name: 'last_seen') final DateTime? lastSeen,
-          final Map<String, dynamic>? metadata,
-          final String? model,
-          @JsonKey(name: 'serial_number') final String? serialNumber,
-          final String? firmware,
-          @JsonKey(name: 'signal_strength') final int? signalStrength,
-          final int? uptime,
-          @JsonKey(name: 'connected_clients') final int? connectedClients,
-          final int? vlan,
-          final String? ssid,
-          final int? channel,
-          @JsonKey(name: 'total_upload') final int? totalUpload,
-          @JsonKey(name: 'total_download') final int? totalDownload,
-          @JsonKey(name: 'current_upload') final double? currentUpload,
-          @JsonKey(name: 'current_download') final double? currentDownload,
-          @JsonKey(name: 'packet_loss') final double? packetLoss,
-          final int? latency,
-          @JsonKey(name: 'cpu_usage') final int? cpuUsage,
-          @JsonKey(name: 'memory_usage') final int? memoryUsage,
-          final int? temperature,
-          @JsonKey(name: 'restart_count') final int? restartCount,
-          @JsonKey(name: 'max_clients') final int? maxClients,
-          final String? note,
-          final List<String>? images,
-          @JsonKey(name: 'health_notices')
-          final List<HealthNoticeModel>? healthNotices,
-          @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts}) =
-      _$DeviceModelImpl;
+      {required final String id,
+      required final String name,
+      required final String type,
+      required final String status,
+      @JsonKey(name: 'pms_room') final RoomModel? pmsRoom,
+      @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
+      @JsonKey(name: 'ip_address') final String? ipAddress,
+      @JsonKey(name: 'mac_address') final String? macAddress,
+      final String? location,
+      @JsonKey(name: 'last_seen') final DateTime? lastSeen,
+      final Map<String, dynamic>? metadata,
+      final String? model,
+      @JsonKey(name: 'serial_number') final String? serialNumber,
+      final String? firmware,
+      @JsonKey(name: 'signal_strength') final int? signalStrength,
+      final int? uptime,
+      @JsonKey(name: 'connected_clients') final int? connectedClients,
+      final int? vlan,
+      final String? ssid,
+      final int? channel,
+      @JsonKey(name: 'total_upload') final int? totalUpload,
+      @JsonKey(name: 'total_download') final int? totalDownload,
+      @JsonKey(name: 'current_upload') final double? currentUpload,
+      @JsonKey(name: 'current_download') final double? currentDownload,
+      @JsonKey(name: 'packet_loss') final double? packetLoss,
+      final int? latency,
+      @JsonKey(name: 'cpu_usage') final int? cpuUsage,
+      @JsonKey(name: 'memory_usage') final int? memoryUsage,
+      final int? temperature,
+      @JsonKey(name: 'restart_count') final int? restartCount,
+      @JsonKey(name: 'max_clients') final int? maxClients,
+      final String? note,
+      final List<String>? images,
+      @JsonKey(name: 'health_notices')
+      final List<HealthNoticeModel>? healthNotices,
+      @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
+      final String? phase}) = _$DeviceModelImpl;
 
   factory _DeviceModel.fromJson(Map<String, dynamic> json) =
       _$DeviceModelImpl.fromJson;
@@ -1420,6 +1447,8 @@ abstract class _DeviceModel implements DeviceModel {
   @override
   @JsonKey(name: 'hn_counts')
   HealthCountsModel? get hnCounts;
+  @override
+  String? get phase;
   @override
   @JsonKey(ignore: true)
   _$$DeviceModelImplCopyWith<_$DeviceModelImpl> get copyWith =>

@@ -7,7 +7,7 @@ part of 'device_ui_state_provider.dart';
 // **************************************************************************
 
 String _$filteredDevicesListHash() =>
-    r'eb08d75fe18e5b6dddaf44ecb541ccd0d035b2c6';
+    r'4281ae562a29a7253fa243e72890133263aecd05';
 
 /// Provider for filtered devices based on UI state
 ///
@@ -24,6 +24,22 @@ final filteredDevicesListProvider = AutoDisposeProvider<List<Device>>.internal(
 );
 
 typedef FilteredDevicesListRef = AutoDisposeProviderRef<List<Device>>;
+String _$uniquePhasesHash() => r'144138e9c0ad060659748f69495033f56f430cb8';
+
+/// Provider for unique phases from all devices
+///
+/// Copied from [uniquePhases].
+@ProviderFor(uniquePhases)
+final uniquePhasesProvider = AutoDisposeProvider<List<String>>.internal(
+  uniquePhases,
+  name: r'uniquePhasesProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$uniquePhasesHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef UniquePhasesRef = AutoDisposeProviderRef<List<String>>;
 String _$deviceStatisticsHash() => r'fa3514a939b5a66326e608b66302c1bbf1085133';
 
 /// Provider for device statistics
@@ -58,24 +74,8 @@ final mockDataStateProvider = AutoDisposeProvider<MockDataState>.internal(
 );
 
 typedef MockDataStateRef = AutoDisposeProviderRef<MockDataState>;
-String _$devicePhasesHash() => r'd612f94cb1c2a010320c0dc86197b072f6a333ec';
-
-/// Provider for available phases based on all devices
-///
-/// Copied from [devicePhases].
-@ProviderFor(devicePhases)
-final devicePhasesProvider = AutoDisposeProvider<List<String>>.internal(
-  devicePhases,
-  name: r'devicePhasesProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$devicePhasesHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef DevicePhasesRef = AutoDisposeProviderRef<List<String>>;
 String _$deviceUIStateNotifierHash() =>
-    r'a253fd0f2caf9a99163ab1bcfe9cacbcf3d51373';
+    r'cb2d326246c40052c56a5fe4a9bbac124ef6f4ba';
 
 /// Provider for device UI state (search, filters, etc.)
 ///

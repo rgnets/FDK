@@ -53,6 +53,7 @@ _$DeviceModelImpl _$$DeviceModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : HealthCountsModel.fromJson(
               json['hn_counts'] as Map<String, dynamic>),
+      phase: json['phase'] as String?,
     );
 
 Map<String, dynamic> _$$DeviceModelImplToJson(_$DeviceModelImpl instance) {
@@ -101,5 +102,6 @@ Map<String, dynamic> _$$DeviceModelImplToJson(_$DeviceModelImpl instance) {
   writeNotNull('health_notices',
       instance.healthNotices?.map((e) => e.toJson()).toList());
   writeNotNull('hn_counts', instance.hnCounts?.toJson());
+  writeNotNull('phase', instance.phase);
   return val;
 }

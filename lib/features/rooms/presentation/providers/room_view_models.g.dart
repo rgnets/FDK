@@ -6,11 +6,9 @@ part of 'room_view_models.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$roomViewModelsHash() => r'fd255023455699f0385a3474b7c07fd44b71892a';
+String _$roomViewModelsHash() => r'27867f4eaa0c4e928b36ee829e34270c940d43d7';
 
-/// Provider for room view models with display information
-///
-/// Copied from [roomViewModels].
+/// See also [roomViewModels].
 @ProviderFor(roomViewModels)
 final roomViewModelsProvider =
     AutoDisposeProvider<List<RoomViewModel>>.internal(
@@ -47,24 +45,16 @@ class _SystemHash {
   }
 }
 
-/// Provider for a single room view model by ID
-///
-/// Copied from [roomViewModelById].
+/// See also [roomViewModelById].
 @ProviderFor(roomViewModelById)
 const roomViewModelByIdProvider = RoomViewModelByIdFamily();
 
-/// Provider for a single room view model by ID
-///
-/// Copied from [roomViewModelById].
+/// See also [roomViewModelById].
 class RoomViewModelByIdFamily extends Family<RoomViewModel?> {
-  /// Provider for a single room view model by ID
-  ///
-  /// Copied from [roomViewModelById].
+  /// See also [roomViewModelById].
   const RoomViewModelByIdFamily();
 
-  /// Provider for a single room view model by ID
-  ///
-  /// Copied from [roomViewModelById].
+  /// See also [roomViewModelById].
   RoomViewModelByIdProvider call(
     String roomId,
   ) {
@@ -97,13 +87,9 @@ class RoomViewModelByIdFamily extends Family<RoomViewModel?> {
   String? get name => r'roomViewModelByIdProvider';
 }
 
-/// Provider for a single room view model by ID
-///
-/// Copied from [roomViewModelById].
+/// See also [roomViewModelById].
 class RoomViewModelByIdProvider extends AutoDisposeProvider<RoomViewModel?> {
-  /// Provider for a single room view model by ID
-  ///
-  /// Copied from [roomViewModelById].
+  /// See also [roomViewModelById].
   RoomViewModelByIdProvider(
     String roomId,
   ) : this._internal(
@@ -187,26 +173,18 @@ class _RoomViewModelByIdProviderElement
 }
 
 String _$filteredRoomViewModelsHash() =>
-    r'c4f8d9f36ebbf2eea084e9f4a5d45494abf7819a';
+    r'd9558c6c0b893f18928916875b14f884bb1028cd';
 
-/// Provider for filtered room view models
-///
-/// Copied from [filteredRoomViewModels].
+/// See also [filteredRoomViewModels].
 @ProviderFor(filteredRoomViewModels)
 const filteredRoomViewModelsProvider = FilteredRoomViewModelsFamily();
 
-/// Provider for filtered room view models
-///
-/// Copied from [filteredRoomViewModels].
+/// See also [filteredRoomViewModels].
 class FilteredRoomViewModelsFamily extends Family<List<RoomViewModel>> {
-  /// Provider for filtered room view models
-  ///
-  /// Copied from [filteredRoomViewModels].
+  /// See also [filteredRoomViewModels].
   const FilteredRoomViewModelsFamily();
 
-  /// Provider for filtered room view models
-  ///
-  /// Copied from [filteredRoomViewModels].
+  /// See also [filteredRoomViewModels].
   FilteredRoomViewModelsProvider call(
     String filter,
   ) {
@@ -239,14 +217,10 @@ class FilteredRoomViewModelsFamily extends Family<List<RoomViewModel>> {
   String? get name => r'filteredRoomViewModelsProvider';
 }
 
-/// Provider for filtered room view models
-///
-/// Copied from [filteredRoomViewModels].
+/// See also [filteredRoomViewModels].
 class FilteredRoomViewModelsProvider
     extends AutoDisposeProvider<List<RoomViewModel>> {
-  /// Provider for filtered room view models
-  ///
-  /// Copied from [filteredRoomViewModels].
+  /// See also [filteredRoomViewModels].
   FilteredRoomViewModelsProvider(
     String filter,
   ) : this._internal(
@@ -329,11 +303,24 @@ class _FilteredRoomViewModelsProviderElement
   String get filter => (origin as FilteredRoomViewModelsProvider).filter;
 }
 
+String _$uniqueRoomPhasesHash() => r'b816a47c75ba3f2700a77033a128e99c242e7ae2';
+
+/// See also [uniqueRoomPhases].
+@ProviderFor(uniqueRoomPhases)
+final uniqueRoomPhasesProvider = AutoDisposeProvider<List<String>>.internal(
+  uniqueRoomPhases,
+  name: r'uniqueRoomPhasesProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$uniqueRoomPhasesHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef UniqueRoomPhasesRef = AutoDisposeProviderRef<List<String>>;
 String _$roomStatsHash() => r'9008c72267275fc3749d0ee2607570b59f174d07';
 
-/// Provider for room statistics based on view models
-///
-/// Copied from [roomStats].
+/// See also [roomStats].
 @ProviderFor(roomStats)
 final roomStatsProvider = AutoDisposeProvider<RoomStats>.internal(
   roomStats,
@@ -345,5 +332,22 @@ final roomStatsProvider = AutoDisposeProvider<RoomStats>.internal(
 );
 
 typedef RoomStatsRef = AutoDisposeProviderRef<RoomStats>;
+String _$roomUIStateNotifierHash() =>
+    r'bbb23c35cc69438f5ecdc673ac005e4f9ed9d7ee';
+
+/// See also [RoomUIStateNotifier].
+@ProviderFor(RoomUIStateNotifier)
+final roomUIStateNotifierProvider =
+    AutoDisposeNotifierProvider<RoomUIStateNotifier, RoomUIState>.internal(
+  RoomUIStateNotifier.new,
+  name: r'roomUIStateNotifierProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$roomUIStateNotifierHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$RoomUIStateNotifier = AutoDisposeNotifier<RoomUIState>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

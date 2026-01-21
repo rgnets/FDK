@@ -45,6 +45,7 @@ class DeviceModel with _$DeviceModel {
     List<String>? images,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+    String? phase,
   }) = _DeviceModel;
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) =>
@@ -87,6 +88,7 @@ extension DeviceModelX on DeviceModel {
       maxClients: maxClients,
       note: note,
       images: images,
+      phase: phase,
     );
   }
 }

@@ -1,9 +1,11 @@
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
-import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'device_ui_state_provider.g.dart';
+
+/// Constant for "All Phases" filter option
+const String allPhases = 'All Phases';
 
 /// UI state for device list filtering and searching
 class DeviceUIState {
@@ -11,7 +13,7 @@ class DeviceUIState {
     this.searchQuery = '',
     this.filterType = 'access_point',  // Default to first tab (APs)
     this.isSearching = false,
-    this.selectedPhase = PhaseFilterState.allPhases,
+    this.selectedPhase = allPhases,
   });
 
   final String searchQuery;
@@ -20,7 +22,7 @@ class DeviceUIState {
   final String selectedPhase;
 
   /// Returns true if phase filtering is active
-  bool get isPhaseFiltering => selectedPhase != PhaseFilterState.allPhases;
+  bool get isFilteringByPhase => selectedPhase != allPhases;
 
   DeviceUIState copyWith({
     String? searchQuery,
@@ -42,16 +44,7 @@ class DeviceUIState {
 class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
   @override
   DeviceUIState build() {
-    // Listen to phase filter changes and update only selectedPhase
-    ref.listen<PhaseFilterState>(phaseFilterNotifierProvider, (previous, next) {
-      if (previous?.selectedPhase != next.selectedPhase) {
-        state = state.copyWith(selectedPhase: next.selectedPhase);
-      }
-    });
-
-    // Initialize with current phase filter state
-    final phaseState = ref.read(phaseFilterNotifierProvider);
-    return DeviceUIState(selectedPhase: phaseState.selectedPhase);
+    return const DeviceUIState();
   }
 
   void setSearchQuery(String query) {
@@ -73,14 +66,13 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
     );
   }
 
-  void setPhaseFilter(String phase) {
-    // Update both local state and the phase filter provider (for persistence)
+  void setPhase(String phase) {
+    if (state.selectedPhase == phase) return;
     state = state.copyWith(selectedPhase: phase);
-    ref.read(phaseFilterNotifierProvider.notifier).setPhase(phase);
   }
 
   void clearPhaseFilter() {
-    setPhaseFilter(PhaseFilterState.allPhases);
+    state = state.copyWith(selectedPhase: allPhases);
   }
 }
 
@@ -89,7 +81,6 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
 List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
   final uiState = ref.watch(deviceUIStateNotifierProvider);
-  final phaseFilter = ref.watch(phaseFilterNotifierProvider);
 
   return devices.when(
     data: (deviceList) {
@@ -104,10 +95,8 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
                              device.type.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
                              (device.location?.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ?? false);
 
-        // Filter by phase (using metadata) - handle both String and int types
-        final rawPhase = device.metadata?['phase'];
-        final devicePhase = rawPhase?.toString();
-        final matchesPhase = phaseFilter.matchesFilter(devicePhase);
+        // Filter by phase
+        final matchesPhase = _matchesPhaseFilter(device.phase, uiState.selectedPhase);
 
         return matchesType && matchesSearch && matchesPhase;
       }).toList()
@@ -117,6 +106,46 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
     },
     loading: () => [],
     error: (_, __) => [],
+  );
+}
+
+/// Helper function to check if device matches phase filter
+bool _matchesPhaseFilter(String? devicePhase, String selectedPhase) {
+  if (selectedPhase == allPhases) {
+    return true; // Show all when not filtering
+  }
+
+  // Handle null/empty phases
+  if (devicePhase == null || devicePhase.isEmpty) {
+    return selectedPhase == 'Unassigned';
+  }
+
+  return devicePhase == selectedPhase;
+}
+
+/// Provider for unique phases from all devices
+@riverpod
+List<String> uniquePhases(UniquePhasesRef ref) {
+  final devices = ref.watch(devicesNotifierProvider);
+
+  return devices.when(
+    data: (deviceList) {
+      final phases = <String>{};
+
+      for (final device in deviceList) {
+        final phase = device.phase;
+        if (phase != null && phase.isNotEmpty) {
+          phases.add(phase);
+        } else {
+          phases.add('Unassigned');
+        }
+      }
+
+      final phaseList = phases.toList()..sort();
+      return [allPhases, ...phaseList];
+    },
+    loading: () => [allPhases],
+    error: (_, __) => [allPhases],
   );
 }
 
@@ -183,16 +212,4 @@ class MockDataState {
 
   final bool isUsingMockData;
   final String? apiErrorMessage;
-}
-
-/// Provider for available phases based on all devices
-@riverpod
-List<String> devicePhases(DevicePhasesRef ref) {
-  final devices = ref.watch(devicesNotifierProvider);
-
-  return devices.when(
-    data: (deviceList) => PhaseFilterState.getUniquePhasesFromDevices(deviceList),
-    loading: () => [PhaseFilterState.allPhases],
-    error: (_, __) => [PhaseFilterState.allPhases],
-  );
 }

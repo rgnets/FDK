@@ -8,19 +8,59 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'room_view_models.g.dart';
 
-/// View model for room display information
+const String allPhasesRoom = 'All Phases';
+
+class RoomUIState {
+  const RoomUIState({
+    this.selectedPhase = allPhasesRoom,
+  });
+
+  final String selectedPhase;
+
+  bool get isFilteringByPhase => selectedPhase != allPhasesRoom;
+
+  RoomUIState copyWith({
+    String? selectedPhase,
+  }) {
+    return RoomUIState(
+      selectedPhase: selectedPhase ?? this.selectedPhase,
+    );
+  }
+}
+
+@riverpod
+class RoomUIStateNotifier extends _$RoomUIStateNotifier {
+  @override
+  RoomUIState build() {
+    return const RoomUIState();
+  }
+
+  void setPhase(String phase) {
+    if (state.selectedPhase == phase) {
+      return;
+    }
+    state = state.copyWith(selectedPhase: phase);
+  }
+
+  void clearPhaseFilter() {
+    state = state.copyWith(selectedPhase: allPhasesRoom);
+  }
+}
+
 class RoomViewModel {
-  RoomViewModel({
+  const RoomViewModel({
     required this.room,
     required this.deviceCount,
     required this.onlineDevices,
     required this.status,
+    this.devicePhases = const [],
   });
 
   final Room room;
   final int deviceCount;
   final int onlineDevices;
   final RoomStatus status;
+  final List<String> devicePhases;
 
   String get id => room.id.toString();
   String get name => room.name;
@@ -31,10 +71,8 @@ class RoomViewModel {
   double get onlinePercentage =>
       deviceCount > 0 ? (onlineDevices / deviceCount) * 100 : 0;
 
-  /// Returns true if room has issues (partial or down status)
   bool get hasIssues => status == RoomStatus.partial || status == RoomStatus.down;
 
-  /// Returns the display text for the room status
   String get statusText {
     switch (status) {
       case RoomStatus.ready:
@@ -47,16 +85,24 @@ class RoomViewModel {
         return 'Empty';
     }
   }
+
+  bool matchesPhase(String selectedPhase) {
+    if (selectedPhase == allPhasesRoom) {
+      return true;
+    }
+    if (selectedPhase == 'Unassigned') {
+      return devicePhases.isEmpty || devicePhases.any((p) => p.isEmpty);
+    }
+    return devicePhases.contains(selectedPhase);
+  }
 }
 
-/// Provider for room view models with display information
 @riverpod
 List<RoomViewModel> roomViewModels(RoomViewModelsRef ref) {
   final roomsAsync = ref.watch(roomsNotifierProvider);
   final devicesAsync = ref.watch(devicesNotifierProvider);
   final readinessAsync = ref.watch(roomReadinessNotifierProvider);
 
-  // Build a map of room ID to readiness metrics for efficient lookup
   final readinessMap = <int, RoomReadinessMetrics>{};
   readinessAsync.whenData((metrics) {
     for (final m in metrics) {
@@ -66,31 +112,34 @@ List<RoomViewModel> roomViewModels(RoomViewModelsRef ref) {
 
   return roomsAsync.when(
     data: (rooms) {
-      // Get all devices or empty list if loading/error
       final allDevices = devicesAsync.valueOrNull ?? [];
 
       return rooms.map((room) {
-        // Get devices for this room using consolidated logic
         final roomDevices = _getDevicesForRoom(room, allDevices);
 
-        // Calculate stats
         final deviceCount = roomDevices.length;
         final onlineDevices = roomDevices
             .where((device) => device.status.toLowerCase() == 'online')
             .length;
 
-        // Get status from readiness metrics, or derive from device counts
         final readinessMetrics = readinessMap[room.id];
         final status = readinessMetrics?.status ?? _deriveStatus(
           deviceCount: deviceCount,
           onlineDevices: onlineDevices,
         );
 
+        final devicePhases = roomDevices
+            .map((d) => d.metadata?['phase']?.toString() ?? '')
+            .where((p) => p.isNotEmpty)
+            .toSet()
+            .toList();
+
         return RoomViewModel(
           room: room,
           deviceCount: deviceCount,
           onlineDevices: onlineDevices,
           status: status,
+          devicePhases: devicePhases,
         );
       }).toList();
     },
@@ -99,7 +148,6 @@ List<RoomViewModel> roomViewModels(RoomViewModelsRef ref) {
   );
 }
 
-/// Derive RoomStatus from device counts when readiness data is unavailable
 RoomStatus _deriveStatus({
   required int deviceCount,
   required int onlineDevices,
@@ -116,11 +164,10 @@ RoomStatus _deriveStatus({
   return RoomStatus.ready;
 }
 
-/// Provider for a single room view model by ID
 @riverpod
 RoomViewModel? roomViewModelById(RoomViewModelByIdRef ref, String roomId) {
   final viewModels = ref.watch(roomViewModelsProvider);
-  
+
   for (final vm in viewModels) {
     if (vm.id == roomId) {
       return vm;
@@ -129,13 +176,13 @@ RoomViewModel? roomViewModelById(RoomViewModelByIdRef ref, String roomId) {
   return null;
 }
 
-/// Provider for filtered room view models
 @riverpod
 List<RoomViewModel> filteredRoomViewModels(
   FilteredRoomViewModelsRef ref,
   String filter,
 ) {
   final viewModels = ref.watch(roomViewModelsProvider);
+  final roomUIState = ref.watch(roomUIStateNotifierProvider);
 
   List<RoomViewModel> filtered;
   switch (filter) {
@@ -158,13 +205,41 @@ List<RoomViewModel> filteredRoomViewModels(
       filtered = List.from(viewModels);
   }
 
-  // Sort by room name alphabetically
+  if (roomUIState.isFilteringByPhase) {
+    filtered = filtered
+        .where((vm) => vm.matchesPhase(roomUIState.selectedPhase))
+        .toList();
+  }
+
   filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   return filtered;
 }
 
-/// Provider for room statistics based on view models
+@riverpod
+List<String> uniqueRoomPhases(UniqueRoomPhasesRef ref) {
+  final viewModels = ref.watch(roomViewModelsProvider);
+
+  final phases = <String>{};
+  var hasUnassigned = false;
+
+  for (final vm in viewModels) {
+    if (vm.devicePhases.isEmpty) {
+      hasUnassigned = true;
+    } else {
+      phases.addAll(vm.devicePhases);
+    }
+  }
+
+  final phaseList = phases.toList()..sort();
+
+  if (hasUnassigned) {
+    return [allPhasesRoom, 'Unassigned', ...phaseList];
+  }
+
+  return [allPhasesRoom, ...phaseList];
+}
+
 @riverpod
 RoomStats roomStats(RoomStatsRef ref) {
   final viewModels = ref.watch(roomViewModelsProvider);
@@ -186,7 +261,6 @@ RoomStats roomStats(RoomStatsRef ref) {
   );
 }
 
-/// Statistics for rooms display
 class RoomStats {
   const RoomStats({
     required this.total,
@@ -205,9 +279,11 @@ class RoomStats {
   final int empty;
 }
 
-/// Private helper to get devices for a room using unified approach
-/// Matches devices by pmsRoomId (consistent for both mock and API data)
 List<Device> _getDevicesForRoom(Room room, List<Device> allDevices) {
-  // Filter devices where pmsRoomId matches the room's numeric ID
-  return allDevices.where((device) => device.pmsRoomId == room.id).toList();
+  final roomDeviceIds = room.deviceIds ?? [];
+  if (roomDeviceIds.isEmpty) {
+    return [];
+  }
+
+  return allDevices.where((device) => roomDeviceIds.contains(device.id)).toList();
 }

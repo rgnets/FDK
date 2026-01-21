@@ -165,6 +165,7 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
           );
 
         case 'media_converters':
@@ -183,6 +184,7 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
           );
 
         case 'switch_devices':
@@ -203,6 +205,7 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
           );
 
         default:

@@ -113,12 +113,82 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                   },
                 ),
                 
+                // Phase filter dropdown
+                Builder(
+                  builder: (context) {
+                    final roomUIState = ref.watch(roomUIStateNotifierProvider);
+                    final phases = ref.watch(uniqueRoomPhasesProvider);
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.filter_list,
+                            size: 20,
+                            color: roomUIState.isFilteringByPhase
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: roomUIState.selectedPhase,
+                              decoration: InputDecoration(
+                                labelText: 'Phase Filter',
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                isDense: true,
+                              ),
+                              items: phases.map((phase) {
+                                return DropdownMenuItem<String>(
+                                  value: phase,
+                                  child: Text(
+                                    phase,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  ref.read(roomUIStateNotifierProvider.notifier).setPhase(value);
+                                }
+                              },
+                            ),
+                          ),
+                          if (roomUIState.isFilteringByPhase) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              onPressed: () {
+                                ref.read(roomUIStateNotifierProvider.notifier).clearPhaseFilter();
+                              },
+                              tooltip: 'Clear phase filter',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
                 // Rooms list
                 Expanded(
                   child: () {
+                    final roomUIState = ref.watch(roomUIStateNotifierProvider);
                     return filteredRooms.isEmpty
                       ? EmptyState(
-                          icon: _selectedTabIndex == 1 
+                          icon: _selectedTabIndex == 1
                             ? Icons.check_circle
                             : _selectedTabIndex == 2
                               ? Icons.warning
@@ -128,11 +198,13 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                             : _selectedTabIndex == 2
                               ? 'No rooms with issues'
                               : 'No rooms configured',
-                          subtitle: _selectedTabIndex == 0
-                            ? 'Rooms will appear here once synced'
-                            : 'No rooms match the selected filter',
+                          subtitle: roomUIState.isFilteringByPhase
+                            ? 'No rooms match the selected phase'
+                            : _selectedTabIndex == 0
+                              ? 'Rooms will appear here once synced'
+                              : 'No rooms match the selected filter',
                           actionLabel: _selectedTabIndex == 0 ? 'Sync Rooms' : null,
-                          onAction: _selectedTabIndex == 0 
+                          onAction: _selectedTabIndex == 0
                             ? () => ref.read(roomsNotifierProvider.notifier).refresh()
                             : null,
                         )
@@ -151,6 +223,11 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                                 icon: Icons.devices,
                                 text: '${roomVm.onlineDevices}/${roomVm.deviceCount} devices online',
                               ),
+                              if (roomVm.devicePhases.isNotEmpty)
+                                UnifiedInfoLine(
+                                  icon: Icons.label_outline,
+                                  text: 'Phase: ${roomVm.devicePhases.join(", ")}',
+                                ),
                             ];
 
                             return UnifiedListItem(

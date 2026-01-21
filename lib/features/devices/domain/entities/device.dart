@@ -39,6 +39,7 @@ class Device with _$Device {
     int? maxClients,
     String? note,
     List<String>? images,
+    String? phase,
   }) = _Device;
   
   const Device._();

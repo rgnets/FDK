@@ -49,6 +49,7 @@ mixin _$Device {
   int? get maxClients => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   List<String>? get images => throw _privateConstructorUsedError;
+  String? get phase => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -84,7 +85,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)
+            List<String>? images,
+            String? phase)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -123,7 +125,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            String? phase)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -162,7 +165,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            String? phase)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -226,7 +230,8 @@ abstract class $DeviceCopyWith<$Res> {
       int? restartCount,
       int? maxClients,
       String? note,
-      List<String>? images});
+      List<String>? images,
+      String? phase});
 
   $RoomCopyWith<$Res>? get pmsRoom;
 }
@@ -277,6 +282,7 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -411,6 +417,10 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
           ? _value.images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 
@@ -467,7 +477,8 @@ abstract class _$$DeviceImplCopyWith<$Res> implements $DeviceCopyWith<$Res> {
       int? restartCount,
       int? maxClients,
       String? note,
-      List<String>? images});
+      List<String>? images,
+      String? phase});
 
   @override
   $RoomCopyWith<$Res>? get pmsRoom;
@@ -517,6 +528,7 @@ class __$$DeviceImplCopyWithImpl<$Res>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_$DeviceImpl(
       id: null == id
@@ -651,6 +663,10 @@ class __$$DeviceImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -691,7 +707,8 @@ class _$DeviceImpl extends _Device {
       this.restartCount,
       this.maxClients,
       this.note,
-      final List<String>? images})
+      final List<String>? images,
+      this.phase})
       : _metadata = metadata,
         _images = images,
         super._();
@@ -779,8 +796,11 @@ class _$DeviceImpl extends _Device {
   }
 
   @override
+  final String? phase;
+
+  @override
   String toString() {
-    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images)';
+    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, phase: $phase)';
   }
 
   @override
@@ -839,7 +859,8 @@ class _$DeviceImpl extends _Device {
             (identical(other.maxClients, maxClients) ||
                 other.maxClients == maxClients) &&
             (identical(other.note, note) || other.note == note) &&
-            const DeepCollectionEquality().equals(other._images, _images));
+            const DeepCollectionEquality().equals(other._images, _images) &&
+            (identical(other.phase, phase) || other.phase == phase));
   }
 
   @override
@@ -877,7 +898,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        const DeepCollectionEquality().hash(_images)
+        const DeepCollectionEquality().hash(_images),
+        phase
       ]);
 
   @JsonKey(ignore: true)
@@ -922,7 +944,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)
+            List<String>? images,
+            String? phase)
         $default,
   ) {
     return $default(
@@ -958,7 +981,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        images);
+        images,
+        phase);
   }
 
   @override
@@ -997,7 +1021,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            String? phase)?
         $default,
   ) {
     return $default?.call(
@@ -1033,7 +1058,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        images);
+        images,
+        phase);
   }
 
   @override
@@ -1072,7 +1098,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            String? phase)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1110,7 +1137,8 @@ class _$DeviceImpl extends _Device {
           restartCount,
           maxClients,
           note,
-          images);
+          images,
+          phase);
     }
     return orElse();
   }
@@ -1178,7 +1206,8 @@ abstract class _Device extends Device {
       final int? restartCount,
       final int? maxClients,
       final String? note,
-      final List<String>? images}) = _$DeviceImpl;
+      final List<String>? images,
+      final String? phase}) = _$DeviceImpl;
   const _Device._() : super._();
 
   @override
@@ -1247,6 +1276,8 @@ abstract class _Device extends Device {
   String? get note;
   @override
   List<String>? get images;
+  @override
+  String? get phase;
   @override
   @JsonKey(ignore: true)
   _$$DeviceImplCopyWith<_$DeviceImpl> get copyWith =>
