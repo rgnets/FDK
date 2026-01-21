@@ -103,6 +103,7 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
         serverHost: testState.serverHost,
         speedTestId: _effectiveConfig?.id,
         passed: testState.testPassed ?? false,
+        initiatedAt: result.initiatedAt,
         completedAt: DateTime.now(),
         testType: 'iperf3',
         source: testState.localIpAddress,
@@ -202,22 +203,22 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
               color: AppColors.gray500,
             ),
           ),
-          if (minRequired != null) ...[
-            const SizedBox(height: 2),
-            SizedBox(
-              width: 110,
-              child: Text(
-                'Min: ${_formatSpeed(minRequired)}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 8,
-                  color: AppColors.gray400,
-                  fontStyle: FontStyle.italic,
-                  fontFamily: 'monospace',
-                ),
+          const SizedBox(height: 2),
+          SizedBox(
+            width: 110,
+            child: Text(
+              minRequired != null
+                  ? 'Min: ${_formatSpeed(minRequired)}'
+                  : 'Min: Not set',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 8,
+                color: AppColors.gray400,
+                fontStyle: FontStyle.italic,
+                fontFamily: 'monospace',
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
