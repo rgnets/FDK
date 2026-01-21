@@ -288,4 +288,190 @@ void main() {
       expect(showOverlay, isTrue);
     });
   });
+
+  // ============================================================
+  // Manual Test Coverage - Tests for scenarios difficult to test manually
+  // ============================================================
+
+  group('manual test coverage - retry scenarios', () {
+    test('error state contains correct retry count in state object', () async {
+      when(() => mockWebSocketService.isConnected).thenReturn(false);
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+
+      await notifier.initialize();
+      var state = container.read(initializationNotifierProvider);
+      expect(
+        state.maybeWhen(error: (_, count) => count, orElse: () => -1),
+        equals(0),
+      );
+
+      await notifier.retry();
+      state = container.read(initializationNotifierProvider);
+      expect(
+        state.maybeWhen(error: (_, count) => count, orElse: () => -1),
+        equals(1),
+      );
+
+      await notifier.retry();
+      state = container.read(initializationNotifierProvider);
+      expect(
+        state.maybeWhen(error: (_, count) => count, orElse: () => -1),
+        equals(2),
+      );
+    });
+
+    test('retry succeeds after previous failures', () async {
+      var callCount = 0;
+      when(() => mockWebSocketService.isConnected).thenAnswer((_) {
+        callCount++;
+        return callCount >= 3;
+      });
+
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+      await notifier.initialize();
+      await notifier.retry();
+      await notifier.retry();
+
+      final state = container.read(initializationNotifierProvider);
+      expect(state, const InitializationState.ready());
+    });
+  });
+
+  group('manual test coverage - state transitions', () {
+    test('captures all state transitions during successful init', () async {
+      final states = <InitializationState>[];
+      container.listen(
+        initializationNotifierProvider,
+        (_, state) => states.add(state),
+        fireImmediately: true,
+      );
+
+      when(
+        () => mockDataSyncService.syncInitialData(
+          timeout: any(named: 'timeout'),
+        ),
+      ).thenAnswer(
+        (_) async => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+
+      await container
+          .read(initializationNotifierProvider.notifier)
+          .initialize();
+
+      // Verify all expected states were captured
+      expect(
+        states.any(
+          (s) => s.maybeWhen(checkingConnection: () => true, orElse: () => false),
+        ),
+        isTrue,
+        reason: 'Should have checkingConnection state',
+      );
+      expect(
+        states.any(
+          (s) => s.maybeWhen(
+            validatingCredentials: () => true,
+            orElse: () => false,
+          ),
+        ),
+        isTrue,
+        reason: 'Should have validatingCredentials state',
+      );
+      expect(
+        states.any(
+          (s) => s.maybeWhen(loadingData: (_, __) => true, orElse: () => false),
+        ),
+        isTrue,
+        reason: 'Should have loadingData state',
+      );
+      expect(states.last, const InitializationState.ready());
+    });
+  });
+
+  group('manual test coverage - progress tracking', () {
+    test('bytes downloaded accumulates across multiple events', () async {
+      when(
+        () => mockDataSyncService.syncInitialData(
+          timeout: any(named: 'timeout'),
+        ),
+      ).thenAnswer(
+        (_) async => Future<void>.delayed(const Duration(milliseconds: 800)),
+      );
+
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+      final initFuture = notifier.initialize();
+
+      // Wait for loading state (200ms validatingCredentials delay + buffer)
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      // Emit progress events with delay > 100ms throttle
+      eventsController.add(WebSocketDataSyncEvent.devicesCached(count: 10));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      eventsController.add(WebSocketDataSyncEvent.roomsCached(count: 5));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      final state = container.read(initializationNotifierProvider);
+      final bytes =
+          state.maybeWhen(loadingData: (b, _) => b, orElse: () => 0);
+      expect(bytes, greaterThan(0));
+
+      await initFuture;
+    });
+
+    test('operation text updates with event type', () async {
+      when(
+        () => mockDataSyncService.syncInitialData(
+          timeout: any(named: 'timeout'),
+        ),
+      ).thenAnswer(
+        (_) async => Future<void>.delayed(const Duration(milliseconds: 600)),
+      );
+
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+      final initFuture = notifier.initialize();
+
+      // Wait for loading state (200ms validatingCredentials delay + buffer)
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      // Emit event with specific count (past 100ms throttle)
+      eventsController.add(WebSocketDataSyncEvent.devicesCached(count: 42));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      final state = container.read(initializationNotifierProvider);
+      final operation =
+          state.maybeWhen(loadingData: (_, op) => op, orElse: () => '');
+      expect(operation, contains('42'));
+      expect(operation.toLowerCase(), contains('device'));
+
+      await initFuture;
+    });
+  });
+
+  group('manual test coverage - reset behavior', () {
+    test('reset after error allows fresh initialization with canRetry true',
+        () async {
+      when(() => mockWebSocketService.isConnected).thenReturn(false);
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+
+      await notifier.initialize();
+      await notifier.retry();
+      await notifier.retry();
+      expect(notifier.retryCount, equals(2));
+
+      notifier.reset();
+      expect(notifier.retryCount, equals(0));
+      expect(notifier.canRetry, isTrue);
+
+      when(() => mockWebSocketService.isConnected).thenReturn(true);
+      await notifier.initialize();
+      expect(
+        container.read(initializationNotifierProvider),
+        const InitializationState.ready(),
+      );
+    });
+  });
 }

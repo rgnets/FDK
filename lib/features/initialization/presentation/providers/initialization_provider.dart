@@ -82,9 +82,9 @@ class InitializationNotifier extends _$InitializationNotifier {
       state = const InitializationState.checkingConnection();
 
       if (!_webSocketService.isConnected) {
-        state = const InitializationState.error(
+        state = InitializationState.error(
           message: 'Unable to connect to server',
-          retryCount: 0,
+          retryCount: _retryCount,
         );
         return;
       }
