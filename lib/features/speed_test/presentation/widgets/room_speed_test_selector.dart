@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
 /// Helper class to group test configuration with its results
@@ -44,6 +45,7 @@ class RoomSpeedTestSelector extends ConsumerStatefulWidget {
 class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
   List<SpeedTestWithResults> _speedTests = [];
   bool _isLoading = true;
+  bool _isUpdating = false;
   String? _errorMessage;
   SpeedTestResult? _selectedResult;
 
@@ -189,6 +191,81 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         _metricMeetsThreshold(result.uploadMbps, config.minUploadMbps);
 
     return result.passed || (downloadPass && uploadPass);
+  }
+
+  Future<void> _toggleApplicable(SpeedTestResult result) async {
+    if (_isUpdating) return;
+
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      // Create updated result with toggled isApplicable
+      final updatedResult = result.copyWith(
+        isApplicable: !result.isApplicable,
+      );
+
+      LoggerService.info(
+        'Toggling isApplicable for result ${result.id}: '
+        '${result.isApplicable} -> ${!result.isApplicable}',
+        tag: 'RoomSpeedTestSelector',
+      );
+
+      // Update via provider
+      final notifier = ref.read(
+        speedTestResultsNotifierProvider(
+          speedTestId: result.speedTestId,
+        ).notifier,
+      );
+
+      final updated = await notifier.updateResult(updatedResult);
+
+      if (updated != null) {
+        // Update the cache so _loadSpeedTests sees the new value
+        final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+        cacheIntegration.updateSpeedTestResultInCache(updated);
+
+        // Update the selected result locally
+        setState(() {
+          _selectedResult = updated;
+        });
+        // Reload to get fresh data from cache
+        await _loadSpeedTests();
+      } else {
+        LoggerService.error(
+          'Failed to update result ${result.id}',
+          tag: 'RoomSpeedTestSelector',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update result'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      LoggerService.error(
+        'Error toggling isApplicable: $e',
+        tag: 'RoomSpeedTestSelector',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    }
   }
 
   @override
@@ -417,39 +494,41 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
             const SizedBox(height: 16),
             _buildResultDetails(currentResult, selectedConfig),
 
-            const SizedBox(height: 16),
+            // Run test button (hidden when result is not applicable)
+            if (currentResult.isApplicable) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    int? testedViaAccessPointId =
+                        currentResult.testedViaAccessPointId;
+                    if (testedViaAccessPointId == null &&
+                        widget.apIds.isNotEmpty) {
+                      testedViaAccessPointId = widget.apIds.first;
+                    }
 
-            // Run test button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  int? testedViaAccessPointId =
-                      currentResult.testedViaAccessPointId;
-                  if (testedViaAccessPointId == null &&
-                      widget.apIds.isNotEmpty) {
-                    testedViaAccessPointId = widget.apIds.first;
-                  }
-
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => SpeedTestPopup(
-                      cachedTest: selectedConfig,
-                      onCompleted: () {
-                        _loadSpeedTests();
-                      },
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => SpeedTestPopup(
+                        cachedTest: selectedConfig,
+                        existingResult: currentResult,
+                        onCompleted: () {
+                          _loadSpeedTests();
+                        },
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Run Test'),
                 ),
-                child: const Text('Run Test'),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -831,6 +910,49 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
               ),
             ),
           ],
+
+          // Toggle applicable button
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _isUpdating ? null : () => _toggleApplicable(result),
+                icon: _isUpdating
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    : Icon(
+                        result.isApplicable
+                            ? Icons.block
+                            : Icons.check_circle_outline,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                label: Text(
+                  result.isApplicable
+                      ? 'Mark as Not Applicable'
+                      : 'Mark as Applicable',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  side: BorderSide(color: AppColors.gray600),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

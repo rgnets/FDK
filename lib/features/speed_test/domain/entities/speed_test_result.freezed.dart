@@ -80,8 +80,10 @@ mixin _$SpeedTestResult {
   DateTime? get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt =>
-      throw _privateConstructorUsedError; // Legacy fields for backwards compatibility
+      throw _privateConstructorUsedError; // Legacy fields for backwards compatibility (not sent to server)
+  @JsonKey(includeToJson: false)
   bool get hasError => throw _privateConstructorUsedError;
+  @JsonKey(name: 'error_message', includeToJson: false)
   String? get errorMessage => throw _privateConstructorUsedError;
   @JsonKey(name: 'local_ip_address')
   String? get localIpAddress => throw _privateConstructorUsedError;
@@ -130,7 +132,8 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)
@@ -180,7 +183,8 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -230,7 +234,8 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -303,7 +308,8 @@ abstract class $SpeedTestResultCopyWith<$Res> {
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      bool hasError,
+      @JsonKey(includeToJson: false) bool hasError,
+      @JsonKey(name: 'error_message', includeToJson: false)
       String? errorMessage,
       @JsonKey(name: 'local_ip_address') String? localIpAddress,
       @JsonKey(name: 'server_host') String? serverHost});
@@ -558,7 +564,8 @@ abstract class _$$SpeedTestResultImplCopyWith<$Res>
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      bool hasError,
+      @JsonKey(includeToJson: false) bool hasError,
+      @JsonKey(name: 'error_message', includeToJson: false)
       String? errorMessage,
       @JsonKey(name: 'local_ip_address') String? localIpAddress,
       @JsonKey(name: 'server_host') String? serverHost});
@@ -806,8 +813,8 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
       @JsonKey(name: 'updated_by') this.updatedBy,
       @JsonKey(name: 'created_at') this.createdAt,
       @JsonKey(name: 'updated_at') this.updatedAt,
-      this.hasError = false,
-      this.errorMessage,
+      @JsonKey(includeToJson: false) this.hasError = false,
+      @JsonKey(name: 'error_message', includeToJson: false) this.errorMessage,
       @JsonKey(name: 'local_ip_address') this.localIpAddress,
       @JsonKey(name: 'server_host') this.serverHost})
       : super._();
@@ -909,11 +916,12 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
-// Legacy fields for backwards compatibility
+// Legacy fields for backwards compatibility (not sent to server)
   @override
-  @JsonKey()
+  @JsonKey(includeToJson: false)
   final bool hasError;
   @override
+  @JsonKey(name: 'error_message', includeToJson: false)
   final String? errorMessage;
   @override
   @JsonKey(name: 'local_ip_address')
@@ -1094,7 +1102,8 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)
@@ -1184,7 +1193,8 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -1274,7 +1284,8 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(name: 'error_message', includeToJson: false)
             String? errorMessage,
             @JsonKey(name: 'local_ip_address') String? localIpAddress,
             @JsonKey(name: 'server_host') String? serverHost)?
@@ -1402,7 +1413,8 @@ abstract class _SpeedTestResult extends SpeedTestResult {
       @JsonKey(name: 'updated_by') final String? updatedBy,
       @JsonKey(name: 'created_at') final DateTime? createdAt,
       @JsonKey(name: 'updated_at') final DateTime? updatedAt,
-      final bool hasError,
+      @JsonKey(includeToJson: false) final bool hasError,
+      @JsonKey(name: 'error_message', includeToJson: false)
       final String? errorMessage,
       @JsonKey(name: 'local_ip_address') final String? localIpAddress,
       @JsonKey(name: 'server_host')
@@ -1505,9 +1517,11 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
-  @override // Legacy fields for backwards compatibility
+  @override // Legacy fields for backwards compatibility (not sent to server)
+  @JsonKey(includeToJson: false)
   bool get hasError;
   @override
+  @JsonKey(name: 'error_message', includeToJson: false)
   String? get errorMessage;
   @override
   @JsonKey(name: 'local_ip_address')

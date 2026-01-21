@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
@@ -16,11 +17,15 @@ class SpeedTestPopup extends ConsumerStatefulWidget {
   /// Callback when result should be submitted (auto-called when test passes)
   final void Function(SpeedTestResult result)? onResultSubmitted;
 
+  /// Existing result to update (instead of creating a new one)
+  final SpeedTestResult? existingResult;
+
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
     this.onCompleted,
     this.onResultSubmitted,
+    this.existingResult,
   });
 
   @override
@@ -32,6 +37,9 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _resultSubmitted = false;
+  bool _isSubmitting = false;
+  bool? _submissionSuccess;
+  String? _submissionError;
 
   @override
   void initState() {
@@ -85,7 +93,7 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
     }
   }
 
-  void _handleTestCompleted() {
+  Future<void> _handleTestCompleted() async {
     if (_resultSubmitted) return;
 
     final testState = ref.read(speedTestRunNotifierProvider);
@@ -113,13 +121,124 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
       );
 
       LoggerService.info(
-        'SpeedTestPopup: Auto-submitting result - passed=${testState.testPassed}, '
+        'SpeedTestPopup: Auto-submitting result via callback - passed=${testState.testPassed}, '
         'download=${testState.downloadSpeed}, upload=${testState.uploadSpeed}',
         tag: 'SpeedTestPopup',
       );
 
       widget.onResultSubmitted?.call(submitResult);
       _resultSubmitted = true;
+    } else if (_effectiveConfig != null) {
+      // No callback provided, submit internally via provider
+      await _submitResultInternally();
+    }
+  }
+
+  Future<void> _submitResultInternally() async {
+    if (_isSubmitting || _resultSubmitted) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _submissionSuccess = null;
+      _submissionError = null;
+    });
+
+    try {
+      final existingId = widget.existingResult?.id;
+      final isUpdate = existingId != null;
+
+      LoggerService.info(
+        'SpeedTestPopup: existingResult=${widget.existingResult != null}, '
+        'existingId=$existingId, isUpdate=$isUpdate, '
+        'configId=${_effectiveConfig?.id}',
+        tag: 'SpeedTestPopup',
+      );
+
+      SpeedTestResult? resultFromServer;
+
+      if (isUpdate) {
+        // Update existing result with new test data
+        final testState = ref.read(speedTestRunNotifierProvider);
+        final completedResult = testState.completedResult;
+
+        final updatedResult = widget.existingResult!.copyWith(
+          downloadMbps: testState.downloadSpeed,
+          uploadMbps: testState.uploadSpeed,
+          rtt: testState.latency,
+          passed: testState.testPassed ?? false,
+          initiatedAt: completedResult?.initiatedAt ?? DateTime.now(),
+          completedAt: DateTime.now(),
+          testType: 'iperf3',
+          source: testState.localIpAddress,
+          destination: testState.serverHost,
+          port: testState.serverPort,
+          iperfProtocol: testState.useUdp ? 'udp' : 'tcp',
+        );
+
+        LoggerService.info(
+          'SpeedTestPopup: Updating result id=$existingId with '
+          'download=${testState.downloadSpeed}, upload=${testState.uploadSpeed}, '
+          'source=${testState.localIpAddress}, destination=${testState.serverHost}',
+          tag: 'SpeedTestPopup',
+        );
+
+        final notifier = ref.read(
+          speedTestResultsNotifierProvider(
+            speedTestId: updatedResult.speedTestId,
+          ).notifier,
+        );
+        resultFromServer = await notifier.updateResult(updatedResult);
+      } else {
+        // Create new result
+        LoggerService.info(
+          'SpeedTestPopup: Creating new result (no existing result to update)',
+          tag: 'SpeedTestPopup',
+        );
+        resultFromServer = await ref
+            .read(speedTestRunNotifierProvider.notifier)
+            .submitResult();
+      }
+
+      final success = resultFromServer != null;
+
+      // Update the WebSocket cache so it appears in the list
+      if (resultFromServer != null) {
+        ref
+            .read(webSocketCacheIntegrationProvider)
+            .updateSpeedTestResultInCache(resultFromServer);
+        LoggerService.info(
+          'SpeedTestPopup: ${isUpdate ? "Updated" : "Added"} result ${resultFromServer.id} in cache',
+          tag: 'SpeedTestPopup',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submissionSuccess = success;
+          _resultSubmitted = true;
+          if (!success) {
+            _submissionError = 'Failed to ${isUpdate ? "update" : "submit"} result';
+          }
+        });
+      }
+
+      LoggerService.info(
+        'SpeedTestPopup: ${isUpdate ? "Update" : "Submission"} ${success ? "succeeded" : "failed"}',
+        tag: 'SpeedTestPopup',
+      );
+    } catch (e) {
+      LoggerService.error(
+        'SpeedTestPopup: Error submitting result: $e',
+        tag: 'SpeedTestPopup',
+      );
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submissionSuccess = false;
+          _submissionError = e.toString();
+        });
+      }
     }
   }
 
@@ -721,6 +840,111 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
                   ),
                 ],
 
+                // Submission status feedback
+                if (status == SpeedTestStatus.completed && _effectiveConfig != null) ...[
+                  const SizedBox(height: 16),
+                  if (_isSubmitting)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Submitting result...',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_submissionSuccess == true)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Result submitted successfully',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_submissionSuccess == false)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _submissionError ?? 'Failed to submit result',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _submitResultInternally,
+                            child: Text(
+                              'Retry',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+
                 // Action buttons
                 const SizedBox(height: 16),
 
@@ -796,7 +1020,12 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            _resultSubmitted = false;
+                            setState(() {
+                              _resultSubmitted = false;
+                              _isSubmitting = false;
+                              _submissionSuccess = null;
+                              _submissionError = null;
+                            });
                             ref
                                 .read(speedTestRunNotifierProvider.notifier)
                                 .reset();
@@ -838,7 +1067,12 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            _resultSubmitted = false;
+                            setState(() {
+                              _resultSubmitted = false;
+                              _isSubmitting = false;
+                              _submissionSuccess = null;
+                              _submissionError = null;
+                            });
                             ref
                                 .read(speedTestRunNotifierProvider.notifier)
                                 .reset();

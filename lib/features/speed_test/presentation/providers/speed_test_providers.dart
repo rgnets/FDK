@@ -321,10 +321,10 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
     _syncConfigFromService();
   }
 
-  /// Submit result to API (for config-based tests)
-  /// Returns true if submission succeeded
-  Future<bool> submitResult({int? accessPointId}) async {
-    if (state.completedResult == null) return false;
+  /// Submit result via WebSocket (for config-based tests)
+  /// Returns the created result if submission succeeded, null otherwise
+  Future<SpeedTestResult?> submitResult({int? accessPointId}) async {
+    if (state.completedResult == null) return null;
 
     final result = state.completedResult!.copyWith(
       speedTestId: state.config?.id,
@@ -335,16 +335,16 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
     );
 
     try {
-      await ref
+      final created = await ref
           .read(speedTestResultsNotifierProvider(
             speedTestId: state.config?.id,
             accessPointId: accessPointId,
           ).notifier)
           .createResult(result);
-      return true;
+      return created;
     } catch (e) {
       state = state.copyWith(errorMessage: 'Submission failed: $e');
-      return false;
+      return null;
     }
   }
 

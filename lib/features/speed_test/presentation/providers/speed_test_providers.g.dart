@@ -249,7 +249,7 @@ class _SpeedTestResultsNotifierProviderElement
 }
 
 String _$speedTestRunNotifierHash() =>
-    r'76bfa7b486be1d8d9b2e3ed1c36b42f6ed9676b7';
+    r'83cb66e1211ab3f3b1f5a9f72b96c8189b0b8cb5';
 
 /// See also [SpeedTestRunNotifier].
 @ProviderFor(SpeedTestRunNotifier)

@@ -61,9 +61,9 @@ class SpeedTestResult with _$SpeedTestResult {
     @JsonKey(name: 'updated_by') String? updatedBy,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
-    // Legacy fields for backwards compatibility
-    @Default(false) bool hasError,
-    String? errorMessage,
+    // Legacy fields for backwards compatibility (not sent to server)
+    @JsonKey(includeToJson: false) @Default(false) bool hasError,
+    @JsonKey(name: 'error_message', includeToJson: false) String? errorMessage,
     @JsonKey(name: 'local_ip_address') String? localIpAddress,
     @JsonKey(name: 'server_host') String? serverHost,
   }) = _SpeedTestResult;

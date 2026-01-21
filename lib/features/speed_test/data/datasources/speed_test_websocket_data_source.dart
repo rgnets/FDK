@@ -210,9 +210,37 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw StateError('WebSocket not connected');
     }
 
-    final jsonToSend = result.toJson();
+    // Build params with only fields the backend accepts (same format as adhoc submission)
+    final params = <String, dynamic>{
+      if (result.speedTestId != null) 'speed_test_id': result.speedTestId,
+      if (result.downloadMbps != null) 'download_mbps': result.downloadMbps,
+      if (result.uploadMbps != null) 'upload_mbps': result.uploadMbps,
+      if (result.rtt != null) 'rtt': result.rtt,
+      if (result.jitter != null) 'jitter': result.jitter,
+      if (result.packetLoss != null) 'packet_loss': result.packetLoss,
+      'passed': result.passed,
+      'is_applicable': result.isApplicable,
+      if (result.initiatedAt != null) 'initiated_at': result.initiatedAt!.toIso8601String(),
+      if (result.completedAt != null) 'completed_at': result.completedAt!.toIso8601String(),
+      if (result.testType != null) 'test_type': result.testType,
+      if (result.source != null) 'source': result.source,
+      if (result.destination != null) 'destination': result.destination,
+      if (result.port != null) 'port': result.port,
+      if (result.iperfProtocol != null) 'iperf_protocol': result.iperfProtocol,
+      if (result.accessPointId != null) 'access_point_id': result.accessPointId,
+      if (result.testedViaAccessPointId != null) 'tested_via_access_point_id': result.testedViaAccessPointId,
+      if (result.testedViaAccessPointRadioId != null) 'tested_via_access_point_radio_id': result.testedViaAccessPointRadioId,
+      if (result.testedViaMediaConverterId != null) 'tested_via_media_converter_id': result.testedViaMediaConverterId,
+      if (result.uplinkId != null) 'uplink_id': result.uplinkId,
+      if (result.wlanId != null) 'wlan_id': result.wlanId,
+      if (result.pmsRoomId != null) 'pms_room_id': result.pmsRoomId,
+      if (result.roomType != null) 'room_type': result.roomType,
+      if (result.note != null) 'note': result.note,
+      if (result.raw != null) 'raw': result.raw,
+    };
+
     LoggerService.info(
-      'createSpeedTestResult sending: $jsonToSend',
+      'createSpeedTestResult sending: $params',
       tag: 'SpeedTestWS',
     );
 
@@ -220,7 +248,7 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       action: 'create_resource',
       resourceType: _speedTestResultResourceType,
       additionalData: {
-        'params': jsonToSend,
+        'params': params,
       },
       timeout: const Duration(seconds: 15),
     );
@@ -257,12 +285,46 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw ArgumentError('Cannot update speed test result without id');
     }
 
+    // Build params with only fields the backend accepts
+    final params = <String, dynamic>{
+      if (result.speedTestId != null) 'speed_test_id': result.speedTestId,
+      if (result.downloadMbps != null) 'download_mbps': result.downloadMbps,
+      if (result.uploadMbps != null) 'upload_mbps': result.uploadMbps,
+      if (result.rtt != null) 'rtt': result.rtt,
+      if (result.jitter != null) 'jitter': result.jitter,
+      if (result.packetLoss != null) 'packet_loss': result.packetLoss,
+      'passed': result.passed,
+      'is_applicable': result.isApplicable,
+      if (result.initiatedAt != null) 'initiated_at': result.initiatedAt!.toIso8601String(),
+      if (result.completedAt != null) 'completed_at': result.completedAt!.toIso8601String(),
+      if (result.testType != null) 'test_type': result.testType,
+      if (result.source != null) 'source': result.source,
+      if (result.destination != null) 'destination': result.destination,
+      if (result.port != null) 'port': result.port,
+      if (result.iperfProtocol != null) 'iperf_protocol': result.iperfProtocol,
+      if (result.accessPointId != null) 'access_point_id': result.accessPointId,
+      if (result.testedViaAccessPointId != null) 'tested_via_access_point_id': result.testedViaAccessPointId,
+      if (result.testedViaAccessPointRadioId != null) 'tested_via_access_point_radio_id': result.testedViaAccessPointRadioId,
+      if (result.testedViaMediaConverterId != null) 'tested_via_media_converter_id': result.testedViaMediaConverterId,
+      if (result.uplinkId != null) 'uplink_id': result.uplinkId,
+      if (result.wlanId != null) 'wlan_id': result.wlanId,
+      if (result.pmsRoomId != null) 'pms_room_id': result.pmsRoomId,
+      if (result.roomType != null) 'room_type': result.roomType,
+      if (result.note != null) 'note': result.note,
+      if (result.raw != null) 'raw': result.raw,
+    };
+
+    LoggerService.info(
+      'updateSpeedTestResult sending: $params',
+      tag: 'SpeedTestWS',
+    );
+
     final response = await _webSocketService.requestActionCable(
       action: 'update_resource',
       resourceType: _speedTestResultResourceType,
       additionalData: {
         'id': result.id,
-        'params': result.toJson(),
+        'params': params,
       },
       timeout: const Duration(seconds: 15),
     );
