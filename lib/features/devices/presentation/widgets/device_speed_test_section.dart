@@ -144,6 +144,9 @@ class _DeviceSpeedTestSectionState
       builder: (BuildContext context) {
         return SpeedTestPopup(
           cachedTest: config,
+          apId: widget.device.type == DeviceTypes.accessPoint
+              ? _getNumericDeviceId()
+              : null,
           onCompleted: () {
             if (mounted) {
               // Reload results after test completion

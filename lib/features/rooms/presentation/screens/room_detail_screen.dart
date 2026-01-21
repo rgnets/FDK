@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -428,6 +431,7 @@ class _DevicesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Use the new RoomDeviceNotifier for proper MVVM architecture
     final roomDeviceState = ref.watch(roomDeviceNotifierProvider(roomVm.id));
+    final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
     
     if (roomDeviceState.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -537,6 +541,14 @@ class _DevicesTab extends ConsumerWidget {
             itemCount: filteredDevices.length,
             itemBuilder: (context, index) {
               final device = filteredDevices[index];
+              Color? titleColor;
+              if (device.type == DeviceTypes.accessPoint) {
+                final apId = _extractApId(device.id);
+                if (apId != null) {
+                  ref.watch(apUplinkInfoProvider(apId));
+                  titleColor = _getAPNameColor(apId, cacheIntegration);
+                }
+              }
               return _DeviceListItem(
                 device: {
                   'id': device.id,
@@ -545,6 +557,7 @@ class _DevicesTab extends ConsumerWidget {
                   'status': device.status,
                   'ipAddress': device.ipAddress,
                 },
+                titleColor: titleColor,
                 onTap: () {
                   // Navigate to device detail
                   context.push('/devices/${device.id}');
@@ -673,6 +686,23 @@ class _AnalyticsTab extends StatelessWidget {
   }
 }
 
+int? _extractApId(String deviceId) {
+  final parts = deviceId.split('_');
+  final rawId = parts.length >= 2 ? parts.sublist(1).join('_') : deviceId;
+  return int.tryParse(rawId);
+}
+
+Color _getAPNameColor(int apId, WebSocketCacheIntegration cache) {
+  final uplink = cache.getCachedAPUplink(apId);
+  if (uplink == null) {
+    return AppColors.error;
+  }
+  if (uplink.speedInBps != null && uplink.speedInBps! < 2500000000) {
+    return AppColors.error;
+  }
+  return AppColors.textPrimary;
+}
+
 class _DeviceTypeChip extends StatelessWidget {
   
   const _DeviceTypeChip({
@@ -713,9 +743,11 @@ class _DeviceListItem extends StatelessWidget {
   
   const _DeviceListItem({
     required this.device,
+    this.titleColor,
     this.onTap,
   });
   final Map<String, dynamic> device;
+  final Color? titleColor;
   final VoidCallback? onTap;
   
   @override
@@ -747,7 +779,10 @@ class _DeviceListItem extends StatelessWidget {
         ),
         title: Text(
           device['name'] as String,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: titleColor,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -505,6 +505,9 @@ class WebSocketDataSyncService {
       note: data['note']?.toString(),
       images: _extractImages(data),
       metadata: data,
+      infrastructureLinkId: _parseOptionalInt(
+        data['infrastructure_link_id'],
+      ),
       connectionState: data['connection_state']?.toString(),
       signalStrength: data['signal_strength'] as int?,
       connectedClients: data['connected_clients'] as int?,
@@ -678,6 +681,19 @@ class WebSocketDataSyncService {
     }
 
     return null;
+  }
+
+  int? _parseOptionalInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    if (value is double) {
+      return value.toInt();
+    }
+    return int.tryParse(value.toString());
   }
 
   List<String>? _extractImages(Map<String, dynamic> deviceMap) {

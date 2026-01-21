@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/utils/list_item_helpers.dart';
 import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
 import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/device_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -24,6 +28,23 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   
+  int? _extractApId(String deviceId) {
+    final parts = deviceId.split('_');
+    final rawId = parts.length >= 2 ? parts.sublist(1).join('_') : deviceId;
+    return int.tryParse(rawId);
+  }
+
+  Color _getAPNameColor(int apId, WebSocketCacheIntegration cache) {
+    final uplink = cache.getCachedAPUplink(apId);
+    if (uplink == null) {
+      return AppColors.error;
+    }
+    if (uplink.speedInBps != null && uplink.speedInBps! < 2500000000) {
+      return AppColors.error;
+    }
+    return AppColors.textPrimary;
+  }
+
   String _formatNetworkInfo(Device device) {
     // Safely handle null and empty values using null-aware operators
     final ip = (device.ipAddress?.trim().isEmpty ?? true) 
@@ -340,9 +361,12 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 
                   // Device list
                   Expanded(
-                    child: Consumer(
+                child: Consumer(
                       builder: (context, ref, child) {
                         final uiState = ref.watch(deviceUIStateNotifierProvider);
+                        final cacheIntegration = ref.watch(
+                          webSocketCacheIntegrationProvider,
+                        );
                         return filteredDevices.isEmpty
                           ? EmptyState(
                               icon: Icons.devices_other,
@@ -357,8 +381,20 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                               itemCount: filteredDevices.length,
                               itemBuilder: (context, index) {
                                 final device = filteredDevices[index];
+                                Color? titleColor;
+                                if (device.type == DeviceTypes.accessPoint) {
+                                  final apId = _extractApId(device.id);
+                                  if (apId != null) {
+                                    ref.watch(apUplinkInfoProvider(apId));
+                                    titleColor = _getAPNameColor(
+                                      apId,
+                                      cacheIntegration,
+                                    );
+                                  }
+                                }
                                 return UnifiedListItem(
                                   title: device.name,
+                                  titleColor: titleColor,
                                   icon: ListItemHelpers.getDeviceIcon(device.type),
                                   status: ListItemHelpers.mapDeviceStatus(device.status),
                                   subtitleLines: [

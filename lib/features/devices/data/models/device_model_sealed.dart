@@ -17,10 +17,6 @@ part 'device_model_sealed.g.dart';
 sealed class DeviceModelSealed with _$DeviceModelSealed {
   const DeviceModelSealed._();
 
-  // ============================================================================
-  // Device Type Constants
-  // ============================================================================
-
   /// Device type identifier for Access Points
   static const String typeAccessPoint = 'access_point';
 
@@ -70,13 +66,8 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     return deviceTypeToResourceType[deviceType];
   }
 
-  // ============================================================================
-  // Access Point Model
-  // ============================================================================
-
   @FreezedUnionValue('access_point')
   const factory DeviceModelSealed.ap({
-    // Common fields
     required String id,
     required String name,
     required String status,
@@ -95,8 +86,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
-
-    // AP-specific fields
+    @JsonKey(name: 'infrastructure_link_id') int? infrastructureLinkId,
     @JsonKey(name: 'connection_state') String? connectionState,
     @JsonKey(name: 'signal_strength') int? signalStrength,
     @JsonKey(name: 'connected_clients') int? connectedClients,
@@ -108,13 +98,8 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'ap_onboarding_status') OnboardingStatusPayload? onboardingStatus,
   }) = APModel;
 
-  // ============================================================================
-  // ONT (Optical Network Terminal) Model
-  // ============================================================================
-
   @FreezedUnionValue('ont')
   const factory DeviceModelSealed.ont({
-    // Common fields
     required String id,
     required String name,
     required String status,
@@ -133,8 +118,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
-
-    // ONT-specific fields
     @JsonKey(name: 'is_registered') bool? isRegistered,
     @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
     @JsonKey(name: 'ont_onboarding_status') OnboardingStatusPayload? onboardingStatus,
@@ -143,13 +126,8 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     String? phase,
   }) = ONTModel;
 
-  // ============================================================================
-  // Switch Model
-  // ============================================================================
-
   @FreezedUnionValue('switch')
   const factory DeviceModelSealed.switchDevice({
-    // Common fields
     required String id,
     required String name,
     required String status,
@@ -168,8 +146,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
-
-    // Switch-specific fields
     String? host,
     @JsonKey(name: 'switch_ports') List<Map<String, dynamic>>? ports,
     @JsonKey(name: 'last_config_sync_at') DateTime? lastConfigSync,
@@ -179,13 +155,8 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     int? temperature,
   }) = SwitchModel;
 
-  // ============================================================================
-  // WLAN Controller Model
-  // ============================================================================
-
   @FreezedUnionValue('wlan_controller')
   const factory DeviceModelSealed.wlan({
-    // Common fields
     required String id,
     required String name,
     required String status,
@@ -204,8 +175,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
-
-    // WLAN-specific fields
     @JsonKey(name: 'controller_type') String? controllerType,
     @JsonKey(name: 'managed_aps') int? managedAPs,
     int? vlan,
@@ -219,10 +188,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
   factory DeviceModelSealed.fromJson(Map<String, dynamic> json) =>
       _$DeviceModelSealedFromJson(json);
 }
-
-// ============================================================================
-// Extension for converting to Domain Entity
-// ============================================================================
 
 extension DeviceModelSealedX on DeviceModelSealed {
   /// Converts this model to the unified [Device] domain entity

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notices_summary_model.dart';
 
@@ -14,6 +13,7 @@ class HealthNoticesRemoteDataSource {
   final WebSocketService _socketService;
 
   /// Fetches health notices summary (notices list + counts) from backend
+<<<<<<< HEAD
   Future<HealthNoticesSummaryModel> fetchSummary() async {
     if (kDebugMode) {
       print('HealthNoticesDataSource: fetchSummary called, isConnected=${_socketService.isConnected}');
@@ -24,14 +24,14 @@ class HealthNoticesRemoteDataSource {
         print('HealthNoticesDataSource: WebSocket not connected, returning empty');
       }
       return const HealthNoticesSummaryModel();
+=======
+  Future<HealthNoticesSummary> fetchSummary() async {
+    if (!_socketService.isConnected) {
+      return HealthNoticesSummary.empty();
+>>>>>>> 3bdf0aa (Uplink added)
     }
 
     try {
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Sending request via requestActionCable...');
-      }
-
-      // Use the WebSocket service's built-in request/response correlation
       final response = await _socketService.requestActionCable(
         action: 'resource_action',
         resourceType: 'health_notices',
@@ -39,26 +39,20 @@ class HealthNoticesRemoteDataSource {
         timeout: const Duration(seconds: 10),
       );
 
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Got response type=${response.type}');
-      }
-
-      // Check for error response
       if (response.type == 'error') {
+<<<<<<< HEAD
         if (kDebugMode) {
           print('HealthNoticesDataSource: Error response received');
         }
         return const HealthNoticesSummaryModel();
+=======
+        return HealthNoticesSummary.empty();
+>>>>>>> 3bdf0aa (Uplink added)
       }
 
-      // For resource_response, the data is in payload['data']
-      // which contains { notices: [...], counts: {...} }
       final responseData = response.payload['data'];
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: responseData type=${responseData.runtimeType}');
-      }
-
       if (responseData is! Map<String, dynamic>) {
+<<<<<<< HEAD
         if (kDebugMode) {
           print('HealthNoticesDataSource: responseData is not a Map, returning empty');
         }
@@ -80,6 +74,16 @@ class HealthNoticesRemoteDataSource {
         print('HealthNoticesDataSource: Request failed: $e');
       }
       return const HealthNoticesSummaryModel();
+=======
+        return HealthNoticesSummary.empty();
+      }
+
+      return HealthNoticesSummary.fromJson(responseData);
+    } on TimeoutException {
+      return HealthNoticesSummary.empty();
+    } on Exception {
+      return HealthNoticesSummary.empty();
+>>>>>>> 3bdf0aa (Uplink added)
     }
   }
 

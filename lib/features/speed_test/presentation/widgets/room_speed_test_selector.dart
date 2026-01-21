@@ -514,6 +514,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                       builder: (context) => SpeedTestPopup(
                         cachedTest: selectedConfig,
                         existingResult: currentResult,
+                        apId: testedViaAccessPointId,
                         onCompleted: () {
                           _loadSpeedTests();
                         },

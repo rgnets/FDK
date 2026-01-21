@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/core/theme/app_colors.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 
 class SpeedTestPopup extends ConsumerStatefulWidget {
@@ -20,12 +20,16 @@ class SpeedTestPopup extends ConsumerStatefulWidget {
   /// Existing result to update (instead of creating a new one)
   final SpeedTestResult? existingResult;
 
+  /// Optional AP ID to display uplink speed (for AP speed tests)
+  final int? apId;
+
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
     this.onCompleted,
     this.onResultSubmitted,
     this.existingResult,
+    this.apId,
   });
 
   @override
@@ -558,6 +562,79 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
                           ],
                         ],
                       ),
+                      // Uplink speed row (for AP speed tests)
+                      if (widget.apId != null) ...[
+                        const SizedBox(height: 6),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final uplinkAsync =
+                                ref.watch(apUplinkInfoProvider(widget.apId!));
+                            return Row(
+                              children: [
+                                const Icon(
+                                  Icons.cable,
+                                  size: 16,
+                                  color: AppColors.gray500,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Uplink: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.gray500,
+                                  ),
+                                ),
+                                uplinkAsync.when(
+                                  data: (uplink) {
+                                    if (uplink == null) {
+                                      return const Text(
+                                        'Not available',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.warning,
+                                        ),
+                                      );
+                                    }
+                                    final speedBps = uplink.speedInBps;
+                                    final speedGbps = speedBps != null
+                                        ? speedBps / 1000000000
+                                        : null;
+                                    final isSlowUplink = speedBps != null &&
+                                        speedBps < 2500000000;
+                                    return Text(
+                                      speedGbps != null
+                                          ? '${speedGbps.toStringAsFixed(1)} Gbps'
+                                          : 'Unknown',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isSlowUplink
+                                            ? AppColors.error
+                                            : AppColors.gray300,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    );
+                                  },
+                                  loading: () => const Text(
+                                    'Loading...',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.gray500,
+                                    ),
+                                  ),
+                                  error: (_, __) => const Text(
+                                    'Error',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
