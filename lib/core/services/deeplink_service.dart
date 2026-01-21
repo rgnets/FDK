@@ -62,6 +62,13 @@ class DeeplinkService {
   String? _lastProcessedUri;
   DateTime? _lastProcessedTime;
   bool _isProcessing = false;
+  bool _hasPendingInitialLink = false;
+
+  /// Whether a deeplink is currently being processed.
+  bool get isProcessing => _isProcessing;
+
+  /// Whether there's a pending initial link (cold start deeplink) being processed.
+  bool get hasPendingInitialLink => _hasPendingInitialLink;
 
   // Callbacks
   Future<bool> Function(DeeplinkCredentials credentials)? _confirmCallback;
@@ -104,9 +111,15 @@ class DeeplinkService {
       final initialUri = await _appLinks.getInitialLink();
       LoggerService.info('Initial URI: $initialUri', tag: _tag);
       if (initialUri != null) {
-        await _handleUri(initialUri);
+        _hasPendingInitialLink = true;
+        try {
+          await _handleUri(initialUri);
+        } finally {
+          _hasPendingInitialLink = false;
+        }
       }
     } on Exception catch (e) {
+      _hasPendingInitialLink = false;
       LoggerService.error('Error getting initial URI: $e', tag: _tag);
     }
 
@@ -308,5 +321,6 @@ class DeeplinkService {
     _lastProcessedUri = null;
     _lastProcessedTime = null;
     _isProcessing = false;
+    _hasPendingInitialLink = false;
   }
 }
