@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
+import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -96,7 +97,39 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       ref.read(authSignOutCleanupProvider);
       // Initialize deeplink service for handling fdk:// URLs
       _initializeDeeplinkService();
+      // Set up initialization listener to trigger data load when authenticated
+      _setupInitializationListener();
     });
+  }
+
+  /// Set up a listener that triggers initialization when user becomes authenticated.
+  void _setupInitializationListener() {
+    ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
+      final wasAuthenticated = previous ?? false;
+      if (isAuthenticated && !wasAuthenticated) {
+        LoggerService.info(
+          'User authenticated, starting initialization',
+          tag: 'Init',
+        );
+        ref.read(initializationNotifierProvider.notifier).initialize();
+      } else if (!isAuthenticated && wasAuthenticated) {
+        LoggerService.info(
+          'User signed out, resetting initialization state',
+          tag: 'Init',
+        );
+        ref.read(initializationNotifierProvider.notifier).reset();
+      }
+    });
+
+    // Also check if already authenticated on startup
+    final isAuthenticated = ref.read(isAuthenticatedProvider);
+    if (isAuthenticated) {
+      LoggerService.info(
+        'User already authenticated, starting initialization',
+        tag: 'Init',
+      );
+      ref.read(initializationNotifierProvider.notifier).initialize();
+    }
   }
 
   /// Initialize the deeplink service with callbacks for confirmation and authentication.

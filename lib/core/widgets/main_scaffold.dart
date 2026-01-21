@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/providers/app_bar_provider.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/widgets/fdk_app_bar.dart';
+import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
 
 /// Main app scaffold with top app bar and enhanced bottom navigation
@@ -69,10 +70,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
       _lastIndex = currentIndex;
     }
 
-    return Scaffold(
-      appBar: const FDKAppBar(),
-      body: widget.child,
-      bottomNavigationBar: DecoratedBox(
+    final showOverlay = ref.watch(showInitializationOverlayProvider);
+
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: const FDKAppBar(),
+          body: widget.child,
+          bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(0, -2)),
@@ -103,6 +108,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
           ],
         ),
       ),
+    ),
+        // Initialization overlay
+        if (showOverlay)
+          const Positioned.fill(
+            child: InitializationOverlay(),
+          ),
+      ],
     );
   }
 
