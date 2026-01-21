@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/widgets/connection_details_dialog.dart';
+import 'package:rgnets_fdk/core/widgets/hold_to_confirm_button.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -573,25 +574,33 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text(
-          'Are you sure you want to sign out? You will need to scan the QR code again to reconnect.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to sign out? You will need to scan the QR code again to reconnect.',
+            ),
+            const SizedBox(height: 24),
+            HoldToConfirmButton(
+              text: 'Hold to Sign Out',
+              icon: Icons.logout,
+              holdDuration: const Duration(milliseconds: 1500),
+              onConfirmed: () {
+                // Pop dialog first
+                Navigator.of(dialogContext).pop();
+                // Navigate immediately using captured router (before provider invalidation)
+                router.go('/auth');
+                // Then sign out (this can happen in background)
+                unawaited(ref.read(authProvider.notifier).signOut());
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              // Pop dialog first
-              Navigator.of(dialogContext).pop();
-              // Navigate immediately using captured router (before provider invalidation)
-              router.go('/auth');
-              // Then sign out (this can happen in background)
-              unawaited(ref.read(authProvider.notifier).signOut());
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Sign Out'),
           ),
         ],
       ),
