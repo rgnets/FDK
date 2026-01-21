@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readines
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/widgets/room_speed_test_selector.dart';
 
 /// Room detail screen with device management
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -310,7 +311,11 @@ class _RoomHeader extends StatelessWidget {
   }
 }
 
+<<<<<<< HEAD
 class _OverviewTab extends ConsumerWidget {
+=======
+class _OverviewTab extends StatelessWidget {
+>>>>>>> 24906fa (Add pms speed test)
 
   const _OverviewTab({required this.roomVm});
   final RoomViewModel roomVm;
@@ -325,6 +330,14 @@ class _OverviewTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Speed Test Results for this room
+          RoomSpeedTestSelector(
+            pmsRoomId: roomVm.room.id,
+            roomName: roomVm.name,
+            apIds: const [], // TODO: Get AP IDs from room devices
+          ),
+          const SizedBox(height: 16),
+
           // Room Information
           _SectionCard(
             title: 'Room Information',
