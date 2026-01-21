@@ -291,6 +291,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                         ],
                       ),
                     ),
+<<<<<<< HEAD
 
                   // Search bar
                   SearchBarWidget(
@@ -304,6 +305,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     },
                   ),
 
+=======
+                  
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
                   // Phase filter bar
                   _buildPhaseFilterBar(ref, devices),
 

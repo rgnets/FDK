@@ -688,7 +688,11 @@ class WebSocketCacheIntegration {
             infrastructureLinkId: _parseOptionalInt(
               deviceMap['infrastructure_link_id'],
             ),
+<<<<<<< HEAD
 >>>>>>> 3bdf0aa (Uplink added)
+=======
+            metadata: deviceMap,
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
           );
 
         case 'media_converters':
@@ -708,11 +712,14 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+<<<<<<< HEAD
             onboardingStatus: deviceMap['ont_onboarding_status'] != null
                 ? OnboardingStatusPayload.fromJson(
                     deviceMap['ont_onboarding_status'] as Map<String, dynamic>,
                   )
                 : null,
+=======
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
           );
 
         case 'switch_devices':
