@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/core/providers/use_case_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 
 /// Widget for controlling AP LED (Blink, On, Off)

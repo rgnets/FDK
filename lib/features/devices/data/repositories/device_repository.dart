@@ -14,6 +14,7 @@ import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_s
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 
 class DeviceRepositoryImpl implements DeviceRepository {
   DeviceRepositoryImpl({
@@ -354,6 +355,62 @@ class DeviceRepositoryImpl implements DeviceRepository {
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
       return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> controlLed(
+    String deviceId,
+    LedAction action,
+  ) async {
+    try {
+      if (!_isAuthenticated()) {
+        return const Left(DeviceFailure(message: 'Not authenticated'));
+      }
+
+      // Get the device to find its serial number
+      final deviceResult = await getDevice(deviceId);
+
+      return deviceResult.fold(
+        (failure) => Left(failure),
+        (device) {
+          final serialNumber = device.serialNumber;
+          if (serialNumber == null || serialNumber.isEmpty) {
+            _logger.e('DeviceRepositoryImpl: Device $deviceId has no serial number');
+            return const Left(
+              DeviceFailure(message: 'Device has no serial number for LED control'),
+            );
+          }
+
+          // Send the LED control command via WebSocket
+          if (webSocketCacheIntegration == null) {
+            _logger.e('DeviceRepositoryImpl: WebSocket integration not available');
+            return const Left(
+              DeviceFailure(message: 'WebSocket not available for LED control'),
+            );
+          }
+
+          final success = webSocketCacheIntegration!.sendLedControlCommand(
+            deviceSerialNumber: serialNumber,
+            action: action.value,
+          );
+
+          if (success) {
+            _logger.i(
+              'DeviceRepositoryImpl: LED ${action.value} command sent for device $deviceId (serial: $serialNumber)',
+            );
+            return const Right(null);
+          } else {
+            _logger.e('DeviceRepositoryImpl: Failed to send LED command');
+            return const Left(
+              DeviceFailure(message: 'Failed to send LED control command'),
+            );
+          }
+        },
+      );
+    } on Exception catch (e) {
+      _logger.e('DeviceRepositoryImpl: Error controlling LED: $e');
+      return Left(DeviceFailure(message: 'Failed to control LED: $e'));
     }
   }
 

@@ -949,6 +949,52 @@ class WebSocketCacheIntegration {
 
   /// Expose the WebSocket service for direct requests.
   WebSocketService get webSocketService => _webSocketService;
+
+  /// Send an infrastructure command to a device via WebSocket.
+  ///
+  /// This sends a command to the InfraCommandChannel which broadcasts
+  /// to the device stream: "infra_command_#{device_serial_number}"
+  ///
+  /// [deviceSerialNumber] - The serial number of the target device
+  /// [commandType] - The type of command (e.g., 'led_control')
+  /// [data] - The command data (e.g., {'action': 'blink'})
+  bool sendInfraCommand({
+    required String deviceSerialNumber,
+    required String commandType,
+    required Map<String, dynamic> data,
+  }) {
+    if (!_webSocketService.isConnected) {
+      _logger.w('WebSocketCacheIntegration: Cannot send infra command, WebSocket not connected');
+      return false;
+    }
+
+    _logger.i(
+      'WebSocketCacheIntegration: Sending infra command - '
+      'type: $commandType, device: $deviceSerialNumber, data: $data',
+    );
+
+    return _sendActionCableMessage({
+      'action': 'infra_command',
+      'device_serial_number': deviceSerialNumber,
+      'command_type': commandType,
+      'data': data,
+    });
+  }
+
+  /// Send an LED control command to a device.
+  ///
+  /// [deviceSerialNumber] - The serial number of the target device
+  /// [action] - The LED action: 'on', 'off', or 'blink'
+  bool sendLedControlCommand({
+    required String deviceSerialNumber,
+    required String action,
+  }) {
+    return sendInfraCommand(
+      deviceSerialNumber: deviceSerialNumber,
+      commandType: 'led_control',
+      data: {'action': action},
+    );
+  }
 }
 
 class _SnapshotAccumulator {

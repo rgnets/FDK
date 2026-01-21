@@ -16,6 +16,7 @@ import 'package:rgnets_fdk/features/devices/data/datasources/device_websocket_da
 import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
     as device_impl;
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 import 'package:rgnets_fdk/features/notifications/data/repositories/notification_repository_impl.dart'
     as notification_impl;
 import 'package:rgnets_fdk/features/notifications/domain/repositories/notification_repository.dart';
@@ -236,3 +237,13 @@ final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>(
     );
   },
 );
+
+// ============================================================================
+// Use Cases
+// ============================================================================
+
+/// Control LED use case provider
+final controlLedProvider = Provider<ControlLed>((ref) {
+  final deviceRepository = ref.watch(deviceRepositoryProvider);
+  return ControlLed(deviceRepository);
+});

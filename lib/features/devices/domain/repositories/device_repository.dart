@@ -2,6 +2,7 @@ import 'package:fpdart/fpdart.dart';
 
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/devices/domain/usecases/control_led.dart';
 
 abstract class DeviceRepository {
   Future<Either<Failure, List<Device>>> getDevices({
@@ -20,4 +21,5 @@ abstract class DeviceRepository {
     String deviceId,
     String imageUrl,
   );
+  Future<Either<Failure, void>> controlLed(String deviceId, LedAction action);
 }

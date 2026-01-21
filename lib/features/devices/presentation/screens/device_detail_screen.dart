@@ -7,6 +7,7 @@ import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provi
 import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/led_control_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/unified_summary_card.dart';
 
 /// Default networking configuration values
@@ -434,6 +435,12 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         // Unified Summary Card at the top
         UnifiedSummaryCard(device: widget.device),
         const SizedBox(height: 16),
+
+        // LED Control Section (for Access Points only)
+        if (widget.device.type == DeviceTypes.accessPoint) ...[
+          LedControlSection(deviceId: widget.device.id),
+          const SizedBox(height: 16),
+        ],
 
         // Device detail sections
         DeviceDetailSections(
