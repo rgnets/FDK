@@ -90,7 +90,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus)
         ap,
     required TResult Function(
             String id,
@@ -114,7 +114,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)
@@ -207,7 +207,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult? Function(
             String id,
@@ -231,7 +231,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -324,7 +324,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult Function(
             String id,
@@ -348,7 +348,7 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -635,12 +635,13 @@ abstract class _$$APModelImplCopyWith<$Res>
       @JsonKey(name: 'current_upload') double? currentUpload,
       @JsonKey(name: 'current_download') double? currentDownload,
       @JsonKey(name: 'ap_onboarding_status')
-      Map<String, dynamic>? onboardingStatus});
+      OnboardingStatusPayload? onboardingStatus});
 
   @override
   $RoomModelCopyWith<$Res>? get pmsRoom;
   @override
   $HealthCountsModelCopyWith<$Res>? get hnCounts;
+  $OnboardingStatusPayloadCopyWith<$Res>? get onboardingStatus;
 }
 
 /// @nodoc
@@ -783,10 +784,23 @@ class __$$APModelImplCopyWithImpl<$Res>
           : currentDownload // ignore: cast_nullable_to_non_nullable
               as double?,
       onboardingStatus: freezed == onboardingStatus
-          ? _value._onboardingStatus
+          ? _value.onboardingStatus
           : onboardingStatus // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
+              as OnboardingStatusPayload?,
     ));
+  }
+
+  @override
+  @pragma('vm:prefer-inline')
+  $OnboardingStatusPayloadCopyWith<$Res>? get onboardingStatus {
+    if (_value.onboardingStatus == null) {
+      return null;
+    }
+
+    return $OnboardingStatusPayloadCopyWith<$Res>(_value.onboardingStatus!,
+        (value) {
+      return _then(_value.copyWith(onboardingStatus: value));
+    });
   }
 }
 
@@ -820,13 +834,11 @@ class _$APModelImpl extends APModel {
       @JsonKey(name: 'max_clients') this.maxClients,
       @JsonKey(name: 'current_upload') this.currentUpload,
       @JsonKey(name: 'current_download') this.currentDownload,
-      @JsonKey(name: 'ap_onboarding_status')
-      final Map<String, dynamic>? onboardingStatus,
+      @JsonKey(name: 'ap_onboarding_status') this.onboardingStatus,
       final String? $type})
       : _metadata = metadata,
         _images = images,
         _healthNotices = healthNotices,
-        _onboardingStatus = onboardingStatus,
         $type = $type ?? 'access_point',
         super._();
 
@@ -923,16 +935,9 @@ class _$APModelImpl extends APModel {
   @override
   @JsonKey(name: 'current_download')
   final double? currentDownload;
-  final Map<String, dynamic>? _onboardingStatus;
   @override
   @JsonKey(name: 'ap_onboarding_status')
-  Map<String, dynamic>? get onboardingStatus {
-    final value = _onboardingStatus;
-    if (value == null) return null;
-    if (_onboardingStatus is EqualUnmodifiableMapView) return _onboardingStatus;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
+  final OnboardingStatusPayload? onboardingStatus;
 
   @JsonKey(name: 'device_type')
   final String $type;
@@ -987,8 +992,8 @@ class _$APModelImpl extends APModel {
                 other.currentUpload == currentUpload) &&
             (identical(other.currentDownload, currentDownload) ||
                 other.currentDownload == currentDownload) &&
-            const DeepCollectionEquality()
-                .equals(other._onboardingStatus, _onboardingStatus));
+            (identical(other.onboardingStatus, onboardingStatus) ||
+                other.onboardingStatus == onboardingStatus));
   }
 
   @JsonKey(ignore: true)
@@ -1020,7 +1025,7 @@ class _$APModelImpl extends APModel {
         maxClients,
         currentUpload,
         currentDownload,
-        const DeepCollectionEquality().hash(_onboardingStatus)
+        onboardingStatus
       ]);
 
   @JsonKey(ignore: true)
@@ -1060,7 +1065,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus)
         ap,
     required TResult Function(
             String id,
@@ -1084,7 +1089,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)
@@ -1206,7 +1211,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult? Function(
             String id,
@@ -1230,7 +1235,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -1352,7 +1357,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult Function(
             String id,
@@ -1376,7 +1381,7 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -1545,7 +1550,7 @@ abstract class APModel extends DeviceModelSealed {
       @JsonKey(name: 'current_upload') final double? currentUpload,
       @JsonKey(name: 'current_download') final double? currentDownload,
       @JsonKey(name: 'ap_onboarding_status')
-      final Map<String, dynamic>? onboardingStatus}) = _$APModelImpl;
+      final OnboardingStatusPayload? onboardingStatus}) = _$APModelImpl;
   const APModel._() : super._();
 
   factory APModel.fromJson(Map<String, dynamic> json) = _$APModelImpl.fromJson;
@@ -1607,7 +1612,7 @@ abstract class APModel extends DeviceModelSealed {
   @JsonKey(name: 'current_download')
   double? get currentDownload;
   @JsonKey(name: 'ap_onboarding_status')
-  Map<String, dynamic>? get onboardingStatus;
+  OnboardingStatusPayload? get onboardingStatus;
   @override
   @JsonKey(ignore: true)
   _$$APModelImplCopyWith<_$APModelImpl> get copyWith =>
@@ -1643,7 +1648,7 @@ abstract class _$$ONTModelImplCopyWith<$Res>
       @JsonKey(name: 'is_registered') bool? isRegistered,
       @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
       @JsonKey(name: 'ont_onboarding_status')
-      Map<String, dynamic>? onboardingStatus,
+      OnboardingStatusPayload? onboardingStatus,
       @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
       String? uptime,
       String? phase});
@@ -1652,6 +1657,7 @@ abstract class _$$ONTModelImplCopyWith<$Res>
   $RoomModelCopyWith<$Res>? get pmsRoom;
   @override
   $HealthCountsModelCopyWith<$Res>? get hnCounts;
+  $OnboardingStatusPayloadCopyWith<$Res>? get onboardingStatus;
 }
 
 /// @nodoc
@@ -1767,9 +1773,9 @@ class __$$ONTModelImplCopyWithImpl<$Res>
           : switchPort // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       onboardingStatus: freezed == onboardingStatus
-          ? _value._onboardingStatus
+          ? _value.onboardingStatus
           : onboardingStatus // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
+              as OnboardingStatusPayload?,
       ports: freezed == ports
           ? _value._ports
           : ports // ignore: cast_nullable_to_non_nullable
@@ -1783,6 +1789,19 @@ class __$$ONTModelImplCopyWithImpl<$Res>
           : phase // ignore: cast_nullable_to_non_nullable
               as String?,
     ));
+  }
+
+  @override
+  @pragma('vm:prefer-inline')
+  $OnboardingStatusPayloadCopyWith<$Res>? get onboardingStatus {
+    if (_value.onboardingStatus == null) {
+      return null;
+    }
+
+    return $OnboardingStatusPayloadCopyWith<$Res>(_value.onboardingStatus!,
+        (value) {
+      return _then(_value.copyWith(onboardingStatus: value));
+    });
   }
 }
 
@@ -1810,8 +1829,7 @@ class _$ONTModelImpl extends ONTModel {
       @JsonKey(name: 'hn_counts') this.hnCounts,
       @JsonKey(name: 'is_registered') this.isRegistered,
       @JsonKey(name: 'switch_port') final Map<String, dynamic>? switchPort,
-      @JsonKey(name: 'ont_onboarding_status')
-      final Map<String, dynamic>? onboardingStatus,
+      @JsonKey(name: 'ont_onboarding_status') this.onboardingStatus,
       @JsonKey(name: 'ont_ports') final List<Map<String, dynamic>>? ports,
       this.uptime,
       this.phase,
@@ -1820,7 +1838,6 @@ class _$ONTModelImpl extends ONTModel {
         _images = images,
         _healthNotices = healthNotices,
         _switchPort = switchPort,
-        _onboardingStatus = onboardingStatus,
         _ports = ports,
         $type = $type ?? 'ont',
         super._();
@@ -1910,17 +1927,9 @@ class _$ONTModelImpl extends ONTModel {
     return EqualUnmodifiableMapView(value);
   }
 
-  final Map<String, dynamic>? _onboardingStatus;
   @override
   @JsonKey(name: 'ont_onboarding_status')
-  Map<String, dynamic>? get onboardingStatus {
-    final value = _onboardingStatus;
-    if (value == null) return null;
-    if (_onboardingStatus is EqualUnmodifiableMapView) return _onboardingStatus;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
+  final OnboardingStatusPayload? onboardingStatus;
   final List<Map<String, dynamic>>? _ports;
   @override
   @JsonKey(name: 'ont_ports')
@@ -1980,8 +1989,8 @@ class _$ONTModelImpl extends ONTModel {
                 other.isRegistered == isRegistered) &&
             const DeepCollectionEquality()
                 .equals(other._switchPort, _switchPort) &&
-            const DeepCollectionEquality()
-                .equals(other._onboardingStatus, _onboardingStatus) &&
+            (identical(other.onboardingStatus, onboardingStatus) ||
+                other.onboardingStatus == onboardingStatus) &&
             const DeepCollectionEquality().equals(other._ports, _ports) &&
             (identical(other.uptime, uptime) || other.uptime == uptime) &&
             (identical(other.phase, phase) || other.phase == phase));
@@ -2010,7 +2019,7 @@ class _$ONTModelImpl extends ONTModel {
         hnCounts,
         isRegistered,
         const DeepCollectionEquality().hash(_switchPort),
-        const DeepCollectionEquality().hash(_onboardingStatus),
+        onboardingStatus,
         const DeepCollectionEquality().hash(_ports),
         uptime,
         phase
@@ -2053,7 +2062,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus)
         ap,
     required TResult Function(
             String id,
@@ -2077,7 +2086,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)
@@ -2196,7 +2205,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult? Function(
             String id,
@@ -2220,7 +2229,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -2339,7 +2348,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult Function(
             String id,
@@ -2363,7 +2372,7 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -2523,7 +2532,7 @@ abstract class ONTModel extends DeviceModelSealed {
       @JsonKey(name: 'is_registered') final bool? isRegistered,
       @JsonKey(name: 'switch_port') final Map<String, dynamic>? switchPort,
       @JsonKey(name: 'ont_onboarding_status')
-      final Map<String, dynamic>? onboardingStatus,
+      final OnboardingStatusPayload? onboardingStatus,
       @JsonKey(name: 'ont_ports') final List<Map<String, dynamic>>? ports,
       final String? uptime,
       final String? phase}) = _$ONTModelImpl;
@@ -2579,7 +2588,7 @@ abstract class ONTModel extends DeviceModelSealed {
   @JsonKey(name: 'switch_port')
   Map<String, dynamic>? get switchPort;
   @JsonKey(name: 'ont_onboarding_status')
-  Map<String, dynamic>? get onboardingStatus;
+  OnboardingStatusPayload? get onboardingStatus;
   @JsonKey(name: 'ont_ports')
   List<Map<String, dynamic>>? get ports;
   String? get uptime;
@@ -3024,7 +3033,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus)
         ap,
     required TResult Function(
             String id,
@@ -3048,7 +3057,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)
@@ -3168,7 +3177,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult? Function(
             String id,
@@ -3192,7 +3201,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -3312,7 +3321,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult Function(
             String id,
@@ -3336,7 +3345,7 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -4004,7 +4013,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus)
         ap,
     required TResult Function(
             String id,
@@ -4028,7 +4037,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)
@@ -4149,7 +4158,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult? Function(
             String id,
@@ -4173,7 +4182,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?
@@ -4294,7 +4303,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            Map<String, dynamic>? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus)?
         ap,
     TResult Function(
             String id,
@@ -4318,7 +4327,7 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'is_registered') bool? isRegistered,
             @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
             @JsonKey(name: 'ont_onboarding_status')
-            Map<String, dynamic>? onboardingStatus,
+            OnboardingStatusPayload? onboardingStatus,
             @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
             String? uptime,
             String? phase)?

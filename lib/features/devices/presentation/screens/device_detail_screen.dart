@@ -476,6 +476,9 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         ),
         const SizedBox(height: 16),
 
+        // Onboarding Status Card (for AP/ONT devices)
+        OnboardingStatusCard(deviceId: widget.device.id),
+
         // Device detail sections
         DeviceDetailSections(
           device: widget.device,

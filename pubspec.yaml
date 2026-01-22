@@ -124,12 +124,17 @@ flutter:
     - assets/mac_unified.csv
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     # Configuration files
     - assets/config/onboarding_messages.json
 =======
     # Speed test indicator images
     - assets/speed_test_indicator_img/
 >>>>>>> 24906fa (Add pms speed test)
+=======
+    # Configuration files
+    - assets/config/onboarding_messages.json
+>>>>>>> 6a559fa (Draft for device onboarding)
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

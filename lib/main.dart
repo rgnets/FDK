@@ -17,7 +17,10 @@ import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.da
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
+<<<<<<< HEAD
 import 'package:sentry_flutter/sentry_flutter.dart';
+=======
+>>>>>>> 6a559fa (Draft for device onboarding)
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -78,6 +81,7 @@ void main() async {
       }
     };
 
+<<<<<<< HEAD
     // Initialize providers with error handling
     late final SharedPreferences sharedPreferences;
     try {
@@ -107,6 +111,24 @@ void main() async {
   }, (error, stackTrace) async {
     await ErrorReporter.report(error, stackTrace: stackTrace);
   });
+=======
+  // Initialize onboarding configuration
+  try {
+    await OnboardingConfig.initialize();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize OnboardingConfig: $e');
+    // Non-fatal - app can continue without onboarding UI
+  }
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const FDKApp(),
+    ),
+  );
+>>>>>>> 6a559fa (Draft for device onboarding)
 }
 
 class FDKApp extends ConsumerStatefulWidget {
