@@ -547,12 +547,15 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
     if (wasAuthenticated && isNowUnauthenticated) {
       logger.i('AUTH_CLEANUP: Detected sign-out, clearing caches and invalidating providers');
 
-      // Clear device local cache
+      // Clear typed device caches
       try {
-        ref.read(deviceLocalDataSourceProvider).clearCache();
-        logger.d('AUTH_CLEANUP: Device local cache cleared');
+        unawaited(ref.read(apLocalDataSourceProvider).clearCache());
+        unawaited(ref.read(ontLocalDataSourceProvider).clearCache());
+        unawaited(ref.read(switchLocalDataSourceProvider).clearCache());
+        unawaited(ref.read(wlanLocalDataSourceProvider).clearCache());
+        logger.d('AUTH_CLEANUP: Typed device caches cleared');
       } on Exception catch (e) {
-        logger.w('AUTH_CLEANUP: Failed to clear device local cache: $e');
+        logger.w('AUTH_CLEANUP: Failed to clear typed device caches: $e');
       }
 
       // Clear WebSocket cache integration

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:logger/logger.dart';
@@ -10,19 +11,25 @@ import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
 
 class DeviceRepositoryImpl implements DeviceRepository {
   DeviceRepositoryImpl({
     required this.dataSource,
-    required this.localDataSource,
+    required this.apLocalDataSource,
+    required this.ontLocalDataSource,
+    required this.switchLocalDataSource,
+    required this.wlanLocalDataSource,
     required this.storageService,
     this.webSocketCacheIntegration,
   }) {
     _logger.i('DEVICE_REPOSITORY: Constructor called');
+
+    // Load ID-to-Type index from storage
+    _loadIdToTypeIndex();
 
     // Initialize pagination service for incremental loading
     _initializePaginationService();
@@ -34,11 +41,168 @@ class DeviceRepositoryImpl implements DeviceRepository {
   static final _logger = Logger();
 
   final DeviceDataSource dataSource;
-  final DeviceLocalDataSource localDataSource;
+  final APLocalDataSource apLocalDataSource;
+  final ONTLocalDataSource ontLocalDataSource;
+  final SwitchLocalDataSource switchLocalDataSource;
+  final WLANLocalDataSource wlanLocalDataSource;
   final StorageService storageService;
   final WebSocketCacheIntegration? webSocketCacheIntegration;
-  
-  
+
+  /// ID-to-Type index for routing device lookups
+  Map<String, String> _idToTypeIndex = {};
+
+  void _loadIdToTypeIndex() {
+    final indexJson = storageService.getString(DeviceModelSealed.idTypeIndexKey);
+    if (indexJson != null) {
+      try {
+        _idToTypeIndex = Map<String, String>.from(
+          json.decode(indexJson) as Map<String, dynamic>,
+        );
+        _logger.d('Loaded ID-to-Type index with ${_idToTypeIndex.length} entries');
+      } on Exception catch (e) {
+        _logger.w('Failed to load ID-to-Type index: $e');
+      }
+    }
+  }
+
+  // ============================================================================
+  // Typed Cache Aggregation Helpers
+  // ============================================================================
+
+  /// Get all devices from all 4 typed caches
+  Future<List<DeviceModelSealed>> _getAllCachedDevices({bool allowStale = false}) async {
+    final results = await Future.wait([
+      apLocalDataSource.getCachedDevices(allowStale: allowStale),
+      ontLocalDataSource.getCachedDevices(allowStale: allowStale),
+      switchLocalDataSource.getCachedDevices(allowStale: allowStale),
+      wlanLocalDataSource.getCachedDevices(allowStale: allowStale),
+    ]);
+    return [
+      ...results[0],
+      ...results[1],
+      ...results[2],
+      ...results[3],
+    ];
+  }
+
+  /// Get a single device by ID using the ID-to-Type index
+  Future<DeviceModelSealed?> _getCachedDeviceById(String id) async {
+    final deviceType = _idToTypeIndex[id];
+
+    // Route to the correct typed cache
+    switch (deviceType) {
+      case DeviceModelSealed.typeAccessPoint:
+        return apLocalDataSource.getCachedDevice(id);
+      case DeviceModelSealed.typeONT:
+        return ontLocalDataSource.getCachedDevice(id);
+      case DeviceModelSealed.typeSwitch:
+        return switchLocalDataSource.getCachedDevice(id);
+      case DeviceModelSealed.typeWLAN:
+        return wlanLocalDataSource.getCachedDevice(id);
+      default:
+        // Fallback: search all caches
+        return _searchAllCachesForDevice(id);
+    }
+  }
+
+  /// Search all caches for a device (fallback when not in index)
+  Future<DeviceModelSealed?> _searchAllCachesForDevice(String id) async {
+    final ap = await apLocalDataSource.getCachedDevice(id);
+    if (ap != null) {
+      return ap;
+    }
+
+    final ont = await ontLocalDataSource.getCachedDevice(id);
+    if (ont != null) {
+      return ont;
+    }
+
+    final sw = await switchLocalDataSource.getCachedDevice(id);
+    if (sw != null) {
+      return sw;
+    }
+
+    final wlan = await wlanLocalDataSource.getCachedDevice(id);
+    if (wlan != null) {
+      return wlan;
+    }
+
+    return null;
+  }
+
+  /// Check if any cache is valid
+  Future<bool> _isAnyCacheValid() async {
+    final results = await Future.wait([
+      apLocalDataSource.isCacheValid(),
+      ontLocalDataSource.isCacheValid(),
+      switchLocalDataSource.isCacheValid(),
+      wlanLocalDataSource.isCacheValid(),
+    ]);
+    return results.any((valid) => valid);
+  }
+
+  /// Cache a list of devices to their appropriate typed caches
+  Future<void> _cacheDevicesToTypedCaches(List<DeviceModelSealed> devices) async {
+    final apDevices = <APModel>[];
+    final ontDevices = <ONTModel>[];
+    final switchDevices = <SwitchModel>[];
+    final wlanDevices = <WLANModel>[];
+
+    for (final device in devices) {
+      switch (device) {
+        case APModel():
+          apDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeAccessPoint;
+        case ONTModel():
+          ontDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeONT;
+        case SwitchModel():
+          switchDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeSwitch;
+        case WLANModel():
+          wlanDevices.add(device);
+          _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeWLAN;
+      }
+    }
+
+    await Future.wait([
+      if (apDevices.isNotEmpty) apLocalDataSource.cacheDevices(apDevices),
+      if (ontDevices.isNotEmpty) ontLocalDataSource.cacheDevices(ontDevices),
+      if (switchDevices.isNotEmpty) switchLocalDataSource.cacheDevices(switchDevices),
+      if (wlanDevices.isNotEmpty) wlanLocalDataSource.cacheDevices(wlanDevices),
+    ]);
+
+    // Persist the ID-to-Type index
+    _persistIdToTypeIndex();
+  }
+
+  /// Cache a single device to the appropriate typed cache
+  Future<void> _cacheDeviceToTypedCache(DeviceModelSealed device) async {
+    switch (device) {
+      case APModel():
+        await apLocalDataSource.cacheDevice(device);
+        _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeAccessPoint;
+      case ONTModel():
+        await ontLocalDataSource.cacheDevice(device);
+        _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeONT;
+      case SwitchModel():
+        await switchLocalDataSource.cacheDevice(device);
+        _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeSwitch;
+      case WLANModel():
+        await wlanLocalDataSource.cacheDevice(device);
+        _idToTypeIndex[device.deviceId] = DeviceModelSealed.typeWLAN;
+    }
+    _persistIdToTypeIndex();
+  }
+
+  /// Persist the ID-to-Type index to storage
+  void _persistIdToTypeIndex() {
+    storageService.setString(
+      DeviceModelSealed.idTypeIndexKey,
+      json.encode(_idToTypeIndex),
+    );
+  }
+
   // Pagination service for efficient loading
   late final PaginationService<Device> _paginationService;
   
@@ -98,8 +262,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
       // Update the stream with new data
       _devicesStreamController.add(allDevices);
 
-      // Also cache locally for offline access
-      unawaited(localDataSource.cacheDevices(allModels));
+      // Note: WebSocketDataSyncService now handles caching to typed data sources
     });
   }
 
@@ -138,16 +301,16 @@ class DeviceRepositoryImpl implements DeviceRepository {
       }
 
       // Try to use cached data first if valid
-      if (await localDataSource.isCacheValid()) {
+      if (await _isAnyCacheValid()) {
         _logger.i('DeviceRepositoryImpl: Cache is valid, loading from cache');
-        final cachedModels = await localDataSource.getCachedDevices();
+        final cachedModels = await _getAllCachedDevices();
         if (cachedModels.isNotEmpty) {
           final devices = cachedModels.map((model) => model.toEntity()).toList();
           _logger.i('DeviceRepositoryImpl: Loaded ${devices.length} devices from cache');
-          
+
           // Start background refresh for fresh data
           unawaited(_refreshInBackground());
-          
+
           return Right(devices);
         }
       }
@@ -165,7 +328,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
       // Cache in background to avoid blocking
       unawaited(PerformanceMonitorService.instance.trackFuture(
         'DeviceRepository.cache',
-        () => localDataSource.cacheDevices(deviceModels),
+        () => _cacheDevicesToTypedCaches(deviceModels),
         metadata: {'count': deviceModels.length},
       ));
       
@@ -181,7 +344,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
         ..d('DeviceRepositoryImpl: Trying cache fallback');
       try {
         // Fallback to cached data ONLY in development/production
-        final cachedModels = await localDataSource.getCachedDevices();
+        final cachedModels = await _getAllCachedDevices(allowStale: true);
         final devices = cachedModels.map((model) => model.toEntity()).toList();
         _logger.i('DeviceRepositoryImpl: Fallback successful, returning ${devices.length} cached devices');
         return Right(devices);
@@ -201,12 +364,12 @@ class DeviceRepositoryImpl implements DeviceRepository {
       }
       _logger.d('DeviceRepositoryImpl: Starting background refresh');
       final deviceModels = await dataSource.getDevices();
-      await localDataSource.cacheDevices(deviceModels);
-      
+      await _cacheDevicesToTypedCaches(deviceModels);
+
       // Update stream with fresh data
       final devices = deviceModels.map((model) => model.toEntity()).toList();
       _devicesStreamController.add(devices);
-      
+
       _logger.i('DeviceRepositoryImpl: Background refresh completed with ${devices.length} devices');
     } on Exception catch (e) {
       _logger.e('DeviceRepositoryImpl: Background refresh failed: $e');
@@ -224,14 +387,14 @@ class DeviceRepositoryImpl implements DeviceRepository {
       }
       // Use data source
       final deviceModel = await dataSource.getDevice(id, fields: fields);
-      await localDataSource.cacheDevice(deviceModel);
+      await _cacheDeviceToTypedCache(deviceModel);
       return Right(deviceModel.toEntity());
     } on Object catch (e) {
       // Catch both Exception and Error (e.g., StateError from WebSocket)
       _logger.w('DeviceRepositoryImpl: getDevice failed, trying cache fallback: $e');
       try {
-        // Fallback to cached data
-        final cachedModel = await localDataSource.getCachedDevice(id);
+        // Fallback to cached data using ID-to-Type index
+        final cachedModel = await _getCachedDeviceById(id);
         if (cachedModel != null) {
           _logger.i('DeviceRepositoryImpl: Found device $id in local cache');
           return Right(cachedModel.toEntity());
@@ -278,42 +441,113 @@ class DeviceRepositoryImpl implements DeviceRepository {
       if (!_isAuthenticated()) {
         return const Left(DeviceFailure(message: 'Not authenticated'));
       }
-      final deviceModel = DeviceModel(
-        id: device.id,
-        name: device.name,
-        type: device.type,
-        status: device.status,
-        ipAddress: device.ipAddress,
-        macAddress: device.macAddress,
-        location: device.location,
-        lastSeen: device.lastSeen,
-        metadata: device.metadata,
-        model: device.model,
-        serialNumber: device.serialNumber,
-        firmware: device.firmware,
-        signalStrength: device.signalStrength,
-        uptime: device.uptime,
-        connectedClients: device.connectedClients,
-        vlan: device.vlan,
-        ssid: device.ssid,
-        channel: device.channel,
-        totalUpload: device.totalUpload,
-        totalDownload: device.totalDownload,
-        currentUpload: device.currentUpload,
-        currentDownload: device.currentDownload,
-        packetLoss: device.packetLoss,
-        latency: device.latency,
-        cpuUsage: device.cpuUsage,
-        memoryUsage: device.memoryUsage,
-        temperature: device.temperature,
-        restartCount: device.restartCount,
-        maxClients: device.maxClients,
-      );
+      final deviceModel = _deviceToSealedModel(device);
       final updatedModel = await dataSource.updateDevice(deviceModel);
-      await localDataSource.cacheDevice(updatedModel);
+      await _cacheDeviceToTypedCache(updatedModel);
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
       return Left(DeviceFailure(message: 'Failed to update device: $e'));
+    }
+  }
+
+  /// Convert a Device entity to the appropriate DeviceModelSealed variant
+  DeviceModelSealed _deviceToSealedModel(Device device) {
+    switch (device.type) {
+      case DeviceModelSealed.typeAccessPoint:
+        return DeviceModelSealed.ap(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          signalStrength: device.signalStrength,
+          connectedClients: device.connectedClients,
+          ssid: device.ssid,
+          channel: device.channel,
+        );
+      case DeviceModelSealed.typeONT:
+        return DeviceModelSealed.ont(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          uptime: device.uptime?.toString(),
+        );
+      case DeviceModelSealed.typeSwitch:
+        return DeviceModelSealed.switchDevice(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          cpuUsage: device.cpuUsage,
+          memoryUsage: device.memoryUsage,
+          temperature: device.temperature,
+        );
+      case DeviceModelSealed.typeWLAN:
+        return DeviceModelSealed.wlan(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          firmware: device.firmware,
+          note: device.note,
+          images: device.images,
+          vlan: device.vlan,
+          latency: device.latency,
+        );
+      default:
+        // Fallback to AP type for unknown types
+        return DeviceModelSealed.ap(
+          id: device.id,
+          name: device.name,
+          status: device.status,
+          pmsRoomId: device.pmsRoomId,
+          ipAddress: device.ipAddress,
+          macAddress: device.macAddress,
+          location: device.location,
+          lastSeen: device.lastSeen,
+          metadata: device.metadata,
+          model: device.model,
+          serialNumber: device.serialNumber,
+          note: device.note,
+          images: device.images,
+        );
     }
   }
 
@@ -350,7 +584,7 @@ class DeviceRepositoryImpl implements DeviceRepository {
         deviceId,
         imageUrl,
       );
-      await localDataSource.cacheDevice(updatedModel);
+      await _cacheDeviceToTypedCache(updatedModel);
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
       return Left(DeviceFailure(message: 'Failed to delete device image: $e'));

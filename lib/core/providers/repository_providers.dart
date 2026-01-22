@@ -10,9 +10,9 @@ import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
     as auth_impl;
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/datasources/device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_mock_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_websocket_data_source.dart';
+import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
     as device_impl;
 import 'package:rgnets_fdk/features/devices/domain/repositories/device_repository.dart';
@@ -44,10 +44,32 @@ final authLocalDataSourceProvider = Provider<AuthLocalDataSource>((ref) {
   return AuthLocalDataSourceImpl(storageService: storage);
 });
 
-/// Device local data source provider
-final deviceLocalDataSourceProvider = Provider<DeviceLocalDataSource>((ref) {
+// ============================================================================
+// Typed Device Local Data Sources
+// ============================================================================
+
+/// AP (Access Point) local data source provider
+final apLocalDataSourceProvider = Provider<APLocalDataSource>((ref) {
   final storage = ref.watch(storageServiceProvider);
-  return DeviceLocalDataSourceImpl(storageService: storage);
+  return APLocalDataSource(storageService: storage);
+});
+
+/// ONT (Optical Network Terminal) local data source provider
+final ontLocalDataSourceProvider = Provider<ONTLocalDataSource>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return ONTLocalDataSource(storageService: storage);
+});
+
+/// Switch local data source provider
+final switchLocalDataSourceProvider = Provider<SwitchLocalDataSource>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return SwitchLocalDataSource(storageService: storage);
+});
+
+/// WLAN Controller local data source provider
+final wlanLocalDataSourceProvider = Provider<WLANLocalDataSource>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return WLANLocalDataSource(storageService: storage);
 });
 
 /// Device mock data source provider
@@ -121,14 +143,22 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 /// Device repository provider
 final deviceRepositoryProvider = Provider<DeviceRepository>((ref) {
   final dataSource = ref.watch(deviceDataSourceProvider);
-  final localDataSource = ref.watch(deviceLocalDataSourceProvider);
   final storageService = ref.watch(storageServiceProvider);
   final webSocketCacheIntegration =
       ref.watch(webSocketCacheIntegrationProvider);
 
+  // Typed local data sources (new architecture)
+  final apLocalDataSource = ref.watch(apLocalDataSourceProvider);
+  final ontLocalDataSource = ref.watch(ontLocalDataSourceProvider);
+  final switchLocalDataSource = ref.watch(switchLocalDataSourceProvider);
+  final wlanLocalDataSource = ref.watch(wlanLocalDataSourceProvider);
+
   return device_impl.DeviceRepositoryImpl(
     dataSource: dataSource,
-    localDataSource: localDataSource,
+    apLocalDataSource: apLocalDataSource,
+    ontLocalDataSource: ontLocalDataSource,
+    switchLocalDataSource: switchLocalDataSource,
+    wlanLocalDataSource: wlanLocalDataSource,
     storageService: storageService,
     webSocketCacheIntegration: webSocketCacheIntegration,
   );
@@ -218,16 +248,24 @@ final roomReadinessRepositoryProvider = Provider<RoomReadinessRepository>((ref) 
 final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>(
   (ref) {
     final deviceDataSource = ref.watch(deviceDataSourceProvider);
-    final deviceLocalDataSource = ref.watch(deviceLocalDataSourceProvider);
     final roomRepository = ref.watch(roomRepositoryProvider);
     final notificationService = ref.watch(notificationGenerationServiceProvider);
     final storageService = ref.watch(storageServiceProvider);
     final webSocketService = ref.watch(webSocketServiceProvider);
     final webSocketDataSyncService = ref.watch(webSocketDataSyncServiceProvider);
 
+    // Typed device local data sources (new architecture)
+    final apLocalDataSource = ref.watch(apLocalDataSourceProvider);
+    final ontLocalDataSource = ref.watch(ontLocalDataSourceProvider);
+    final switchLocalDataSource = ref.watch(switchLocalDataSourceProvider);
+    final wlanLocalDataSource = ref.watch(wlanLocalDataSourceProvider);
+
     return BackgroundRefreshService(
       deviceDataSource: deviceDataSource,
-      deviceLocalDataSource: deviceLocalDataSource,
+      apLocalDataSource: apLocalDataSource,
+      ontLocalDataSource: ontLocalDataSource,
+      switchLocalDataSource: switchLocalDataSource,
+      wlanLocalDataSource: wlanLocalDataSource,
       roomRepository: roomRepository,
       notificationGenerationService: notificationService,
       storageService: storageService,
