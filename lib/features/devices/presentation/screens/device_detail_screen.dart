@@ -432,12 +432,20 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Unified Summary Card at the top
-        UnifiedSummaryCard(device: widget.device),
-        const SizedBox(height: 16),
+        // Combined Summary + Onboarding Card
+        Card(
+          elevation: 2,
+          child: Column(
+            children: [
+              // Unified Summary section at the top
+              UnifiedSummaryCardContent(device: widget.device),
 
-        // Onboarding Status Card (for AP/ONT devices)
-        OnboardingStatusCard(deviceId: widget.device.id),
+              // Onboarding Status section (for AP/ONT devices)
+              OnboardingStatusCard(deviceId: widget.device.id),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
         // Device detail sections
         DeviceDetailSections(

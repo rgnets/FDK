@@ -14,72 +14,93 @@ class UnifiedSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      child: UnifiedSummaryCardContent(device: device),
+    );
+  }
+}
+
+/// Content-only version without Card wrapper (for combining with other sections).
+class UnifiedSummaryCardContent extends StatelessWidget {
+  const UnifiedSummaryCardContent({
+    required this.device,
+    this.issueCount,
+    super.key,
+  });
+
+  final Device device;
+  final int? issueCount;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isOnline = device.status.toLowerCase() == 'online';
     final statusColor = isOnline ? Colors.green : Colors.red;
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Device Icon
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _getDeviceIcon(device.type),
-                size: 32,
-                color: statusColor,
-              ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Device Icon
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 16),
-
-            // Device Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Device Name
-                  Text(
-                    device.name,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Device Type Label
-                  Text(
-                    _getDeviceTypeLabel(device.type),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
+            child: Icon(
+              _getDeviceIcon(device.type),
+              size: 32,
+              color: statusColor,
             ),
+          ),
+          const SizedBox(width: 16),
 
-            // Status Column
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          // Device Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Online/Offline Status Badge
-                _StatusBadge(
-                  isOnline: isOnline,
+                // Device Name
+                Text(
+                  device.name,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+
+                // Device Type Label
+                Text(
+                  _getDeviceTypeLabel(device.type),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.grey[600],
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+
+          // Status Column
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Online/Offline Status Badge
+              _StatusBadge(isOnline: isOnline),
+
+              // Issue count badge (if there are issues)
+              if (issueCount != null && issueCount! > 0) ...[
+                const SizedBox(height: 8),
+                _IssueBadge(count: issueCount!),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -160,6 +181,49 @@ class _StatusBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Issue count badge showing number of health issues.
+class _IssueBadge extends StatelessWidget {
+  const _IssueBadge({
+    required this.count,
+  });
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = Colors.orange;
+    final text = '$count Issue${count == 1 ? '' : 's'}';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
           Text(
             text,
             style: TextStyle(

@@ -4,11 +4,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 
 /// Callback type for when device data is received via WebSocket.
 typedef DeviceDataCallback = void Function(
@@ -139,6 +141,36 @@ class WebSocketCacheIntegration {
       final hnCounts = _extractHealthCounts(deviceMap);
       final healthNotices = _extractHealthNotices(deviceMap);
 
+      // Debug: Log onboarding status fields
+      if (resourceType == 'access_points') {
+        final hasOnboarding = deviceMap['ap_onboarding_status'] != null;
+        LoggerService.debug(
+          'ONBOARDING: AP ${deviceMap['name']} (${deviceMap['id']}) - '
+          'has ap_onboarding_status: $hasOnboarding',
+          tag: 'WebSocket',
+        );
+        if (hasOnboarding) {
+          LoggerService.info(
+            'ONBOARDING: AP data: ${deviceMap['ap_onboarding_status']}',
+            tag: 'WebSocket',
+          );
+        }
+      }
+      if (resourceType == 'media_converters') {
+        final hasOnboarding = deviceMap['ont_onboarding_status'] != null;
+        LoggerService.debug(
+          'ONBOARDING: ONT ${deviceMap['name']} (${deviceMap['id']}) - '
+          'has ont_onboarding_status: $hasOnboarding',
+          tag: 'WebSocket',
+        );
+        if (hasOnboarding) {
+          LoggerService.info(
+            'ONBOARDING: ONT data: ${deviceMap['ont_onboarding_status']}',
+            tag: 'WebSocket',
+          );
+        }
+      }
+
       switch (resourceType) {
         case 'access_points':
           return DeviceModelSealed.ap(
@@ -155,6 +187,11 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+            onboardingStatus: deviceMap['ap_onboarding_status'] != null
+                ? OnboardingStatusPayload.fromJson(
+                    deviceMap['ap_onboarding_status'] as Map<String, dynamic>,
+                  )
+                : null,
           );
 
         case 'media_converters':
@@ -172,6 +209,11 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+            onboardingStatus: deviceMap['ont_onboarding_status'] != null
+                ? OnboardingStatusPayload.fromJson(
+                    deviceMap['ont_onboarding_status'] as Map<String, dynamic>,
+                  )
+                : null,
           );
 
         case 'switch_devices':

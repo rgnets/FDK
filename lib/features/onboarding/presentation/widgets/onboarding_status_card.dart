@@ -46,6 +46,7 @@ class OnboardingStatusCardContent extends StatelessWidget {
     required this.title,
     required this.resolution,
     this.onTap,
+    this.showDivider = true,
     super.key,
   });
 
@@ -53,74 +54,97 @@ class OnboardingStatusCardContent extends StatelessWidget {
   final String title;
   final String resolution;
   final VoidCallback? onTap;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+    final isComplete = state.isComplete;
+
+    // Use orange/warning styling when not complete
+    final titleColor = isComplete ? Colors.black87 : Colors.white;
+    final stageColor = isComplete ? Colors.green : Colors.orange;
+    final titleBgColor = isComplete ? null : Colors.orange;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Divider line at top (matches design) - only for complete state
+        if (showDivider && isComplete)
+          Divider(
+            color: Colors.grey[300],
+            thickness: 1,
+            height: 1,
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title header (orange text)
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.orange,
-                  ),
-                ),
 
-                const SizedBox(height: 12),
-
-                // Error box (if error exists)
-                if (state.errorText != null && state.errorText!.isNotEmpty)
-                  _buildErrorBox(context),
-
-                if (state.errorText != null && state.errorText!.isNotEmpty)
-                  const SizedBox(height: 12),
-
-                // Stage indicator row
-                _buildStageRow(context),
-
-                const SizedBox(height: 16),
-
-                // Stage progress circles
-                _buildStageCircles(context),
-
-                const SizedBox(height: 16),
-
-                // Resolution text
-                Text(
-                  resolution,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ],
+        // Title header with background when not complete
+        if (!isComplete)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: titleBgColor,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: titleColor,
+              ),
             ),
           ),
+
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Error box (if error exists) - show at top
+              if (state.errorText != null && state.errorText!.isNotEmpty) ...[
+                _buildErrorBox(context),
+                const SizedBox(height: 12),
+              ],
+
+              // Title header (black text, bold) - only for complete state
+              if (isComplete)
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+
+              if (isComplete) const SizedBox(height: 4),
+
+              // Stage indicator
+              Text(
+                'Stage ${state.currentStage}/${state.maxStages}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: stageColor,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Stage progress circles
+              _buildStageCircles(context),
+
+              const SizedBox(height: 16),
+
+              // Resolution text
+              Text(
+                resolution,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -152,43 +176,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStageRow(BuildContext context) {
-    final elapsedText = state.elapsedTimeFormatted;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Stage indicator
-        Text(
-          'Stage ${state.currentStage}/${state.maxStages}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.orange,
-          ),
-        ),
-
-        // Elapsed time
-        if (elapsedText != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              elapsedText,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange,
-              ),
-            ),
-          ),
-      ],
     );
   }
 

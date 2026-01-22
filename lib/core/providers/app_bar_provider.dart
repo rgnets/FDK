@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 
 /// State class for app bar
 class AppBarState {
