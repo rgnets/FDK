@@ -43,7 +43,10 @@ _$APModelImpl _$$APModelImplFromJson(Map<String, dynamic> json) =>
       maxClients: (json['max_clients'] as num?)?.toInt(),
       currentUpload: (json['current_upload'] as num?)?.toDouble(),
       currentDownload: (json['current_download'] as num?)?.toDouble(),
-      onboardingStatus: json['ap_onboarding_status'] as Map<String, dynamic>?,
+      onboardingStatus: json['ap_onboarding_status'] == null
+          ? null
+          : OnboardingStatusPayload.fromJson(
+              json['ap_onboarding_status'] as Map<String, dynamic>),
       $type: json['device_type'] as String?,
     );
 
@@ -83,7 +86,7 @@ Map<String, dynamic> _$$APModelImplToJson(_$APModelImpl instance) {
   writeNotNull('max_clients', instance.maxClients);
   writeNotNull('current_upload', instance.currentUpload);
   writeNotNull('current_download', instance.currentDownload);
-  writeNotNull('ap_onboarding_status', instance.onboardingStatus);
+  writeNotNull('ap_onboarding_status', instance.onboardingStatus?.toJson());
   val['device_type'] = instance.$type;
   return val;
 }
@@ -119,7 +122,10 @@ _$ONTModelImpl _$$ONTModelImplFromJson(Map<String, dynamic> json) =>
               json['hn_counts'] as Map<String, dynamic>),
       isRegistered: json['is_registered'] as bool?,
       switchPort: json['switch_port'] as Map<String, dynamic>?,
-      onboardingStatus: json['ont_onboarding_status'] as Map<String, dynamic>?,
+      onboardingStatus: json['ont_onboarding_status'] == null
+          ? null
+          : OnboardingStatusPayload.fromJson(
+              json['ont_onboarding_status'] as Map<String, dynamic>),
       ports: (json['ont_ports'] as List<dynamic>?)
           ?.map((e) => e as Map<String, dynamic>)
           .toList(),
@@ -158,7 +164,7 @@ Map<String, dynamic> _$$ONTModelImplToJson(_$ONTModelImpl instance) {
   writeNotNull('hn_counts', instance.hnCounts?.toJson());
   writeNotNull('is_registered', instance.isRegistered);
   writeNotNull('switch_port', instance.switchPort);
-  writeNotNull('ont_onboarding_status', instance.onboardingStatus);
+  writeNotNull('ont_onboarding_status', instance.onboardingStatus?.toJson());
   writeNotNull('ont_ports', instance.ports);
   writeNotNull('uptime', instance.uptime);
   writeNotNull('phase', instance.phase);

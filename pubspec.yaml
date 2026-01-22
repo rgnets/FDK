@@ -122,6 +122,9 @@ flutter:
     # MAC address database for OUI lookup
     - assets/mac_unified.csv
 
+    # Configuration files
+    - assets/config/onboarding_messages.json
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
