@@ -468,6 +468,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
             children: [
               // Unified Summary section at the top
               UnifiedSummaryCardContent(device: widget.device),
+<<<<<<< HEAD
 
               // Onboarding Status section (for AP/ONT devices)
               OnboardingStatusCard(deviceId: widget.device.id),
@@ -475,9 +476,15 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
           ),
         ),
         const SizedBox(height: 16),
+=======
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
 
-        // Onboarding Status Card (for AP/ONT devices)
-        OnboardingStatusCard(deviceId: widget.device.id),
+              // Onboarding Status section (for AP/ONT devices)
+              OnboardingStatusCard(deviceId: widget.device.id),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
 
         // Device detail sections
         DeviceDetailSections(
