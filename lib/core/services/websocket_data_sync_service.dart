@@ -750,7 +750,7 @@ class WebSocketDataSyncService {
       return [];
     }
 
-    void addDevices(List<dynamic>? list) {
+    void addDevices(List<dynamic>? list, {String prefix = ''}) {
       if (list == null) {
         return;
       }
@@ -760,7 +760,7 @@ class WebSocketDataSyncService {
         }
         final id = entry['id'];
         if (id != null) {
-          deviceIds.add(id.toString());
+          deviceIds.add('$prefix$id');
         }
 
         final nested = entry['devices'];
