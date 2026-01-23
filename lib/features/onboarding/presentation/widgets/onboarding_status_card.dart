@@ -59,11 +59,17 @@ class OnboardingStatusCardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isComplete = state.isComplete;
+    final isStageOne = state.currentStage == 1;
 
-    // Use orange/warning styling when not complete
-    final titleColor = isComplete ? Colors.black87 : Colors.white;
+
+    
+    final titleColor = isComplete
+        ? Colors.black87
+        : isStageOne
+            ? Colors.orange
+            : Colors.white;
     final stageColor = isComplete ? Colors.green : Colors.orange;
-    final titleBgColor = isComplete ? null : Colors.orange;
+    final titleBgColor = isComplete || isStageOne ? null : Colors.orange;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,12 +82,26 @@ class OnboardingStatusCardContent extends StatelessWidget {
             height: 1,
           ),
 
-        // Title header with background when not complete
-        if (!isComplete)
+        // Title header with background when not complete (except stage 1)
+        if (!isComplete && !isStageOne)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: titleBgColor,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: titleColor,
+              ),
+            ),
+          ),
+
+        // Stage 1: title without background (yellow/orange text)
+        if (!isComplete && isStageOne)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
               title,
               style: TextStyle(
@@ -184,7 +204,7 @@ class OnboardingStatusCardContent extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: List.generate(state.maxStages, (index) {
         final stageNumber = index + 1;
-        final isCompleted = stageNumber < state.currentStage;
+        final isCompleted = stageNumber <= state.currentStage;
         final isCurrent = stageNumber == state.currentStage;
         final isComplete = state.isComplete;
 
