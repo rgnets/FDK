@@ -49,6 +49,10 @@ mixin _$Device {
   int? get maxClients => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   List<String>? get images => throw _privateConstructorUsedError;
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  List<String>? get imageSignedIds => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -84,7 +88,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)
+            List<String>? images,
+            List<String>? imageSignedIds)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -123,7 +128,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            List<String>? imageSignedIds)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -162,7 +168,8 @@ mixin _$Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            List<String>? imageSignedIds)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -226,7 +233,8 @@ abstract class $DeviceCopyWith<$Res> {
       int? restartCount,
       int? maxClients,
       String? note,
-      List<String>? images});
+      List<String>? images,
+      List<String>? imageSignedIds});
 
   $RoomCopyWith<$Res>? get pmsRoom;
 }
@@ -277,6 +285,7 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -411,6 +420,10 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
           ? _value.images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value.imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
     ) as $Val);
   }
 
@@ -467,7 +480,8 @@ abstract class _$$DeviceImplCopyWith<$Res> implements $DeviceCopyWith<$Res> {
       int? restartCount,
       int? maxClients,
       String? note,
-      List<String>? images});
+      List<String>? images,
+      List<String>? imageSignedIds});
 
   @override
   $RoomCopyWith<$Res>? get pmsRoom;
@@ -517,6 +531,7 @@ class __$$DeviceImplCopyWithImpl<$Res>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
   }) {
     return _then(_$DeviceImpl(
       id: null == id
@@ -651,6 +666,10 @@ class __$$DeviceImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
     ));
   }
 }
@@ -691,9 +710,11 @@ class _$DeviceImpl extends _Device {
       this.restartCount,
       this.maxClients,
       this.note,
-      final List<String>? images})
+      final List<String>? images,
+      final List<String>? imageSignedIds})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         super._();
 
   @override
@@ -778,9 +799,24 @@ class _$DeviceImpl extends _Device {
     return EqualUnmodifiableListView(value);
   }
 
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  final List<String>? _imageSignedIds;
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  @override
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   @override
   String toString() {
-    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images)';
+    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds)';
   }
 
   @override
@@ -839,7 +875,9 @@ class _$DeviceImpl extends _Device {
             (identical(other.maxClients, maxClients) ||
                 other.maxClients == maxClients) &&
             (identical(other.note, note) || other.note == note) &&
-            const DeepCollectionEquality().equals(other._images, _images));
+            const DeepCollectionEquality().equals(other._images, _images) &&
+            const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds));
   }
 
   @override
@@ -877,7 +915,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        const DeepCollectionEquality().hash(_images)
+        const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds)
       ]);
 
   @JsonKey(ignore: true)
@@ -922,7 +961,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)
+            List<String>? images,
+            List<String>? imageSignedIds)
         $default,
   ) {
     return $default(
@@ -958,7 +998,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        images);
+        images,
+        imageSignedIds);
   }
 
   @override
@@ -997,7 +1038,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            List<String>? imageSignedIds)?
         $default,
   ) {
     return $default?.call(
@@ -1033,7 +1075,8 @@ class _$DeviceImpl extends _Device {
         restartCount,
         maxClients,
         note,
-        images);
+        images,
+        imageSignedIds);
   }
 
   @override
@@ -1072,7 +1115,8 @@ class _$DeviceImpl extends _Device {
             int? restartCount,
             int? maxClients,
             String? note,
-            List<String>? images)?
+            List<String>? images,
+            List<String>? imageSignedIds)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1110,7 +1154,8 @@ class _$DeviceImpl extends _Device {
           restartCount,
           maxClients,
           note,
-          images);
+          images,
+          imageSignedIds);
     }
     return orElse();
   }
@@ -1178,7 +1223,8 @@ abstract class _Device extends Device {
       final int? restartCount,
       final int? maxClients,
       final String? note,
-      final List<String>? images}) = _$DeviceImpl;
+      final List<String>? images,
+      final List<String>? imageSignedIds}) = _$DeviceImpl;
   const _Device._() : super._();
 
   @override
@@ -1247,6 +1293,11 @@ abstract class _Device extends Device {
   String? get note;
   @override
   List<String>? get images;
+  @override
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  List<String>? get imageSignedIds;
   @override
   @JsonKey(ignore: true)
   _$$DeviceImplCopyWith<_$DeviceImpl> get copyWith =>

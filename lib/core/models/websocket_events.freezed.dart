@@ -1237,6 +1237,8 @@ abstract class _$$RoomCreatedImplCopyWith<$Res> {
       __$$RoomCreatedImplCopyWithImpl<$Res>;
   @useResult
   $Res call({Room room});
+
+  $RoomCopyWith<$Res> get room;
 }
 
 /// @nodoc
@@ -1250,14 +1252,22 @@ class __$$RoomCreatedImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? room = freezed,
+    Object? room = null,
   }) {
     return _then(_$RoomCreatedImpl(
-      freezed == room
+      null == room
           ? _value.room
           : room // ignore: cast_nullable_to_non_nullable
               as Room,
     ));
+  }
+
+  @override
+  @pragma('vm:prefer-inline')
+  $RoomCopyWith<$Res> get room {
+    return $RoomCopyWith<$Res>(_value.room, (value) {
+      return _then(_value.copyWith(room: value));
+    });
   }
 }
 
@@ -1279,12 +1289,11 @@ class _$RoomCreatedImpl implements RoomCreated {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$RoomCreatedImpl &&
-            const DeepCollectionEquality().equals(other.room, room));
+            (identical(other.room, room) || other.room == room));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, const DeepCollectionEquality().hash(room));
+  int get hashCode => Object.hash(runtimeType, room);
 
   @JsonKey(ignore: true)
   @override
@@ -1389,6 +1398,8 @@ abstract class _$$RoomUpdatedImplCopyWith<$Res> {
       __$$RoomUpdatedImplCopyWithImpl<$Res>;
   @useResult
   $Res call({Room room});
+
+  $RoomCopyWith<$Res> get room;
 }
 
 /// @nodoc
@@ -1402,14 +1413,22 @@ class __$$RoomUpdatedImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? room = freezed,
+    Object? room = null,
   }) {
     return _then(_$RoomUpdatedImpl(
-      freezed == room
+      null == room
           ? _value.room
           : room // ignore: cast_nullable_to_non_nullable
               as Room,
     ));
+  }
+
+  @override
+  @pragma('vm:prefer-inline')
+  $RoomCopyWith<$Res> get room {
+    return $RoomCopyWith<$Res>(_value.room, (value) {
+      return _then(_value.copyWith(room: value));
+    });
   }
 }
 
@@ -1431,12 +1450,11 @@ class _$RoomUpdatedImpl implements RoomUpdated {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$RoomUpdatedImpl &&
-            const DeepCollectionEquality().equals(other.room, room));
+            (identical(other.room, room) || other.room == room));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, const DeepCollectionEquality().hash(room));
+  int get hashCode => Object.hash(runtimeType, room);
 
   @JsonKey(ignore: true)
   @override

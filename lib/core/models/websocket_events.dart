@@ -1,6 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 
 part 'websocket_events.freezed.dart';
 

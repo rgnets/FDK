@@ -7,12 +7,16 @@ class ImageViewerDialog extends StatefulWidget {
     required this.images,
     required this.initialIndex,
     this.onDelete,
+    this.apiKey,
     super.key,
   });
 
   final List<String> images;
   final int initialIndex;
   final void Function(String imageUrl)? onDelete;
+  /// Optional API key for authenticating image URLs.
+  /// If provided, will be appended to image URLs that don't already have it.
+  final String? apiKey;
 
   @override
   State<ImageViewerDialog> createState() => _ImageViewerDialogState();

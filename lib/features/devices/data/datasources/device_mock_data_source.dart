@@ -34,7 +34,9 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
   Future<DeviceModel> getDevice(
     String id, {
     List<String>? fields,
+    bool forceRefresh = false,
   }) async {
+    // Mock data source doesn't have caching, so forceRefresh is a no-op
     final allDevices = await getDevices(fields: fields);
     return allDevices.firstWhere(
       (device) => device.id == id,
@@ -105,6 +107,24 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
 
     final updatedImages =
         currentImages.where((image) => image != imageUrl).toList();
+    return device.copyWith(images: updatedImages);
+  }
+
+  @override
+  Future<DeviceModel> uploadDeviceImages(
+    String deviceId,
+    List<String> base64Images,
+  ) async {
+    final device = await getDevice(deviceId);
+    final currentImages = device.images ?? const [];
+
+    // For mock, simulate converting base64 to URLs
+    // In production, the server would return actual URLs
+    final newImageUrls = base64Images.asMap().entries.map((entry) {
+      return 'https://mock.example.com/images/$deviceId/${DateTime.now().millisecondsSinceEpoch}_${entry.key}.jpg';
+    }).toList();
+
+    final updatedImages = [...currentImages, ...newImageUrls];
     return device.copyWith(images: updatedImages);
   }
 

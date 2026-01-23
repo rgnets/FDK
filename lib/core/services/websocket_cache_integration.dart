@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
@@ -444,7 +445,12 @@ class WebSocketCacheIntegration {
 
     var allSent = true;
     for (final resource in _resourceTypes) {
-      final sent = _requestSnapshot(resource);
+      // Use field selection for device resources to optimize payload size
+      // Rooms don't need field selection (already small)
+      final fields = _deviceResourceTypes.contains(resource)
+          ? DeviceFieldSets.listFields
+          : null;
+      final sent = _requestSnapshot(resource, fields: fields);
       if (!sent) {
         allSent = false;
       }
@@ -456,24 +462,33 @@ class WebSocketCacheIntegration {
     }
   }
 
-  bool _requestSnapshot(String resourceType) {
+  bool _requestSnapshot(String resourceType, {List<String>? fields}) {
     if (_requestedSnapshots.contains(resourceType)) return true;
     if (!_webSocketService.isConnected || !_channelConfirmed) {
       return false;
     }
 
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
+    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType'
+        '${fields != null ? " with ${fields.length} fields" : ""}');
     _requestedSnapshots.add(resourceType);
 
     // Send ActionCable formatted resource_action index request
-    final sent = _sendActionCableMessage({
+    final payload = <String, dynamic>{
       'action': 'resource_action',
       'resource_type': resourceType,
       'crud_action': 'index',
       'page': 1,
       'page_size': 10000,
       'request_id': 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
-    });
+    };
+
+    // Add field selection to optimize payload size (reduces by ~80%)
+    // Must be comma-separated string, not array - RESTFramework expects string format
+    if (fields != null && fields.isNotEmpty) {
+      payload['only'] = fields.join(',');
+    }
+
+    final sent = _sendActionCableMessage(payload);
     if (!sent) {
       _requestedSnapshots.remove(resourceType);
       return false;

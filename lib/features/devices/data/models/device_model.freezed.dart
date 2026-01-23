@@ -70,6 +70,11 @@ mixin _$DeviceModel {
   int? get maxClients => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   List<String>? get images => throw _privateConstructorUsedError;
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  List<String>? get imageSignedIds => throw _privateConstructorUsedError;
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices =>
       throw _privateConstructorUsedError;
@@ -111,6 +116,8 @@ mixin _$DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)
@@ -153,6 +160,8 @@ mixin _$DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
@@ -195,6 +204,8 @@ mixin _$DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
@@ -264,6 +275,8 @@ abstract class $DeviceModelCopyWith<$Res> {
       @JsonKey(name: 'max_clients') int? maxClients,
       String? note,
       List<String>? images,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
 
@@ -317,6 +330,7 @@ class _$DeviceModelCopyWithImpl<$Res, $Val extends DeviceModel>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
   }) {
@@ -453,6 +467,10 @@ class _$DeviceModelCopyWithImpl<$Res, $Val extends DeviceModel>
           ? _value.images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value.imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value.healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -531,6 +549,8 @@ abstract class _$$DeviceModelImplCopyWith<$Res>
       @JsonKey(name: 'max_clients') int? maxClients,
       String? note,
       List<String>? images,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
 
@@ -584,6 +604,7 @@ class __$$DeviceModelImplCopyWithImpl<$Res>
     Object? maxClients = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
   }) {
@@ -720,6 +741,10 @@ class __$$DeviceModelImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value._healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -769,11 +794,14 @@ class _$DeviceModelImpl implements _DeviceModel {
       @JsonKey(name: 'max_clients') this.maxClients,
       this.note,
       final List<String>? images,
+      @JsonKey(includeFromJson: false, includeToJson: false)
+      final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices;
 
   factory _$DeviceModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -878,6 +906,22 @@ class _$DeviceModelImpl implements _DeviceModel {
     return EqualUnmodifiableListView(value);
   }
 
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  final List<String>? _imageSignedIds;
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<HealthNoticeModel>? _healthNotices;
   @override
   @JsonKey(name: 'health_notices')
@@ -895,7 +939,7 @@ class _$DeviceModelImpl implements _DeviceModel {
 
   @override
   String toString() {
-    return 'DeviceModel(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts)';
+    return 'DeviceModel(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts)';
   }
 
   @override
@@ -956,6 +1000,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
             const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds) &&
+            const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
                 other.hnCounts == hnCounts));
@@ -998,6 +1044,7 @@ class _$DeviceModelImpl implements _DeviceModel {
         maxClients,
         note,
         const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts
       ]);
@@ -1045,6 +1092,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)
@@ -1084,6 +1133,7 @@ class _$DeviceModelImpl implements _DeviceModel {
         maxClients,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts);
   }
@@ -1125,6 +1175,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
@@ -1164,6 +1216,7 @@ class _$DeviceModelImpl implements _DeviceModel {
         maxClients,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts);
   }
@@ -1205,6 +1258,8 @@ class _$DeviceModelImpl implements _DeviceModel {
             @JsonKey(name: 'max_clients') int? maxClients,
             String? note,
             List<String>? images,
+            @JsonKey(includeFromJson: false, includeToJson: false)
+            List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts)?
@@ -1246,6 +1301,7 @@ class _$DeviceModelImpl implements _DeviceModel {
           maxClients,
           note,
           images,
+          imageSignedIds,
           healthNotices,
           hnCounts);
     }
@@ -1323,6 +1379,8 @@ abstract class _DeviceModel implements DeviceModel {
           @JsonKey(name: 'max_clients') final int? maxClients,
           final String? note,
           final List<String>? images,
+          @JsonKey(includeFromJson: false, includeToJson: false)
+          final List<String>? imageSignedIds,
           @JsonKey(name: 'health_notices')
           final List<HealthNoticeModel>? healthNotices,
           @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts}) =
@@ -1414,6 +1472,12 @@ abstract class _DeviceModel implements DeviceModel {
   String? get note;
   @override
   List<String>? get images;
+  @override
+
+  /// Signed IDs for images - used for API operations (upload/delete).
+  /// When updating images, the server expects signed IDs for existing images.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  List<String>? get imageSignedIds;
   @override
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices;

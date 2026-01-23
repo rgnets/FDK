@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';

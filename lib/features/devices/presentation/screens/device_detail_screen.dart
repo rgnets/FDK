@@ -385,6 +385,11 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     }
   }
 
+  void _handleUploadComplete() {
+    // Refresh device data to show newly uploaded images
+    ref.read(deviceNotifierProvider(widget.device.id).notifier).refresh();
+  }
+
   void _handleEditNote() {
     // TODO(note-api): Navigate to note edit screen.
     ScaffoldMessenger.of(context).showSnackBar(
@@ -439,6 +444,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         DeviceDetailSections(
           device: widget.device,
           onImageDeleted: _handleImageDeleted,
+          onUploadComplete: _handleUploadComplete,
         ),
 
         // Editable Note Section

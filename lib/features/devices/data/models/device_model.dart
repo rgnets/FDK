@@ -43,6 +43,10 @@ class DeviceModel with _$DeviceModel {
     @JsonKey(name: 'max_clients') int? maxClients,
     String? note,
     List<String>? images,
+    /// Signed IDs for images - used for API operations (upload/delete).
+    /// When updating images, the server expects signed IDs for existing images.
+    @JsonKey(includeFromJson: false, includeToJson: false)
+    List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
   }) = _DeviceModel;
@@ -87,6 +91,7 @@ extension DeviceModelX on DeviceModel {
       maxClients: maxClients,
       note: note,
       images: images,
+      imageSignedIds: imageSignedIds,
     );
   }
 }

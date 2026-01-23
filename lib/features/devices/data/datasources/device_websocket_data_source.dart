@@ -83,15 +83,24 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
-  Future<DeviceModel> getDevice(String id, {List<String>? fields}) async {
-    _logger.i('DeviceWebSocketDataSource: getDevice($id) called');
+  Future<DeviceModel> getDevice(
+    String id, {
+    List<String>? fields,
+    bool forceRefresh = false,
+  }) async {
+    _logger.i('DeviceWebSocketDataSource: getDevice($id, forceRefresh: $forceRefresh) called');
 
-    // First try to find in cache
-    final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
-    final cached = cachedModels.where((d) => d.id == id).firstOrNull;
-    if (cached != null) {
-      _logger.i('DeviceWebSocketDataSource: Found device $id in cache');
-      return cached;
+    // Skip cache if force refresh requested
+    if (!forceRefresh) {
+      // First try to find in cache
+      final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
+      final cached = cachedModels.where((d) => d.id == id).firstOrNull;
+      if (cached != null) {
+        _logger.i('DeviceWebSocketDataSource: Found device $id in cache');
+        return cached;
+      }
+    } else {
+      _logger.i('DeviceWebSocketDataSource: Bypassing cache due to forceRefresh');
     }
 
     // If WebSocket not connected, we can't fetch - throw so repository can use cache fallback
@@ -331,6 +340,9 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     String resourceType,
     Map<String, dynamic> deviceMap,
   ) {
+    // Extract images with both URLs and signed IDs
+    final imageData = _extractImagesData(deviceMap);
+
     switch (resourceType) {
       case 'access_points':
         return DeviceModel(
@@ -344,7 +356,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
           model: deviceMap['model']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
-          images: _extractImages(deviceMap),
+          images: imageData?.urls,
+          imageSignedIds: imageData?.signedIds,
         );
 
       case 'media_converters':
@@ -359,7 +372,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
           model: deviceMap['model']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
-          images: _extractImages(deviceMap),
+          images: imageData?.urls,
+          imageSignedIds: imageData?.signedIds,
         );
 
       case 'switch_devices':
@@ -377,7 +391,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
               deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
-          images: _extractImages(deviceMap),
+          images: imageData?.urls,
+          imageSignedIds: imageData?.signedIds,
         );
 
       case 'wlan_devices':
@@ -394,7 +409,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
               deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
-          images: _extractImages(deviceMap),
+          images: imageData?.urls,
+          imageSignedIds: imageData?.signedIds,
         );
 
       default:
@@ -420,8 +436,52 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     return null;
   }
 
-  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
+  /// Extract images with both URLs (for display) and signed IDs (for API operations)
+  ImageExtraction? _extractImagesData(Map<String, dynamic> deviceMap) {
     final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
-    return normalizeImageUrls(imagesValue, baseUrl: _imageBaseUrl);
+    return extractImagesWithSignedIds(imagesValue, baseUrl: _imageBaseUrl);
+  }
+
+  @override
+  Future<DeviceModel> uploadDeviceImages(
+    String deviceId,
+    List<String> images,
+  ) async {
+    _logger.i(
+      'DeviceWebSocketDataSource: uploadDeviceImages($deviceId, ${images.length} images) called',
+    );
+
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $deviceId');
+    }
+
+    // Note: The caller (ImageUploadService) is responsible for combining
+    // existing images (using signed IDs) with new images (data URLs).
+    // We just pass through the complete list to the server.
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: resourceType,
+        additionalData: {
+          'id': rawId,
+          'params': {'images': images},
+        },
+        timeout: const Duration(seconds: 30),
+      );
+
+      final deviceData = _extractDeviceData(response.payload, response.raw);
+      if (deviceData != null) {
+        return _mapToDeviceModel(resourceType, deviceData);
+      }
+
+      // Return updated device if no response data
+      return await getDevice(deviceId);
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to upload device images: $e');
+      throw Exception('Failed to upload device images: $e');
+    }
   }
 }

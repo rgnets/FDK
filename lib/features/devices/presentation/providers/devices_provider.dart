@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
 import 'package:rgnets_fdk/core/utils/logging_utils.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/devices/data/repositories/device_repository.dart'
@@ -15,6 +16,7 @@ import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/get_devices_params.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/reboot_device.dart';
 import 'package:rgnets_fdk/features/devices/domain/usecases/search_devices.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/image_upload_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'devices_provider.g.dart';
@@ -273,11 +275,30 @@ class DevicesNotifier extends _$DevicesNotifier {
 @Riverpod(keepAlive: true)
 class DeviceNotifier extends _$DeviceNotifier {
   Logger get _logger => ref.read(loggerProvider);
+  StreamSubscription<CacheInvalidationEvent>? _cacheInvalidationSub;
 
   GetDevice get _getDevice => GetDevice(ref.read(deviceRepositoryProvider));
 
   @override
   Future<Device?> build(String deviceId) async {
+    // Subscribe to cache invalidation events for this device
+    // This enables automatic UI refresh after image uploads
+    final eventBus = ref.watch(imageUploadEventBusProvider);
+    _cacheInvalidationSub?.cancel();
+    _cacheInvalidationSub = eventBus.cacheInvalidated
+        .where((event) => event.deviceId == deviceId)
+        .listen((event) {
+      _logger.i(
+        'DeviceNotifier: Cache invalidated for $deviceId, refreshing...',
+      );
+      _silentRefresh();
+    });
+
+    ref.onDispose(() {
+      _cacheInvalidationSub?.cancel();
+      _cacheInvalidationSub = null;
+    });
+
     // For detail view, fetch all fields
     final getDevice = _getDevice;
     final result = await getDevice(
@@ -312,6 +333,35 @@ class DeviceNotifier extends _$DeviceNotifier {
     } on Object catch (e, stack) {
       _logger.e('DeviceNotifier: Unexpected error in refresh: $e');
       state = AsyncValue.error(e.toString(), stack);
+    }
+  }
+
+  /// Silent refresh without showing loading state.
+  /// Used for automatic updates after image upload.
+  Future<void> _silentRefresh() async {
+    try {
+      final getDevice = _getDevice;
+      final result = await getDevice(
+        GetDeviceParams(
+          id: deviceId,
+          fields: DeviceFieldSets.detailFields,
+        ),
+      );
+
+      result.fold(
+        (failure) {
+          _logger.w('DeviceNotifier: Silent refresh failed: ${failure.message}');
+        },
+        (device) {
+          // Only update if we still have data (avoid overwriting error states)
+          if (state.hasValue) {
+            state = AsyncValue.data(device);
+            _logger.i('DeviceNotifier: Silent refresh completed for $deviceId');
+          }
+        },
+      );
+    } on Object catch (e) {
+      _logger.w('DeviceNotifier: Silent refresh exception: $e');
     }
   }
 

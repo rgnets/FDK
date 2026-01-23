@@ -25,7 +25,7 @@ final showInitializationOverlayProvider = AutoDisposeProvider<bool>.internal(
 
 typedef ShowInitializationOverlayRef = AutoDisposeProviderRef<bool>;
 String _$initializationNotifierHash() =>
-    r'ad19d0699d76b22de9f634312fe6c7ab41ad6757';
+    r'68630dda0ea24699e3393c43d6a5a21530f89da1';
 
 /// Manages the app initialization state and progress.
 ///

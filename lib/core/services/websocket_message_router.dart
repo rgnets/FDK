@@ -4,9 +4,9 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/models/websocket_events.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/rooms/data/models/room_model.dart';
-import 'package:rgnets_fdk/features/rooms/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 
 /// Routes raw WebSocket messages to typed events.
 ///

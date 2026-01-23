@@ -1,24 +1,31 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/core/widgets/section_card.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/image_upload_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/copyable_field.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/image_viewer_dialog.dart';
 
 /// Widget for displaying all device fields in organized sections
-class DeviceDetailSections extends StatelessWidget {
+class DeviceDetailSections extends ConsumerWidget {
   const DeviceDetailSections({
     required this.device,
     this.onImageDeleted,
+    this.onUploadComplete,
     super.key,
   });
 
   final Device device;
   final void Function(String imageUrl)? onImageDeleted;
+  final VoidCallback? onUploadComplete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -36,7 +43,7 @@ class DeviceDetailSections extends StatelessWidget {
         const SizedBox(height: 16),
         _buildSystemSection(context),
         const SizedBox(height: 16),
-        _buildImagesSection(context),
+        _buildImagesSection(context, ref),
       ],
     );
   }
@@ -204,7 +211,7 @@ class DeviceDetailSections extends StatelessWidget {
     );
   }
 
-  /// Filter to only valid HTTP/HTTPS image URLs
+  /// Filter to only valid HTTP/HTTPS image URLs (for display)
   List<String> get _validImages {
     final images = device.images;
     if (images == null || images.isEmpty) {
@@ -219,8 +226,65 @@ class DeviceDetailSections extends StatelessWidget {
     }).toList();
   }
 
-  Widget _buildImagesSection(BuildContext context) {
+  /// Get signed IDs for valid images (for API operations).
+  /// The server expects signed IDs for existing images when updating.
+  List<String> get _validImageSignedIds {
+    final images = device.images;
+    final signedIds = device.imageSignedIds;
+
+    if (images == null || images.isEmpty) {
+      return [];
+    }
+
+    // If we have signed IDs, filter them to match valid images
+    if (signedIds != null && signedIds.length == images.length) {
+      final result = <String>[];
+      for (var i = 0; i < images.length; i++) {
+        final url = images[i];
+        if (url.isNotEmpty) {
+          final lower = url.toLowerCase();
+          if (lower.startsWith('http://') || lower.startsWith('https://')) {
+            result.add(signedIds[i]);
+          }
+        }
+      }
+      return result;
+    }
+
+    // Fall back to URLs if signed IDs are not available
+    return _validImages;
+  }
+
+  Widget _buildImagesSection(BuildContext context, WidgetRef ref) {
     final validImages = _validImages;
+    // Authenticate image URLs with api_key for RXG backend access
+    final authenticateUrls = ref.watch(authenticatedImageUrlsProvider);
+    final authenticatedImages = authenticateUrls(validImages);
+    final uploadState = ref.watch(imageUploadNotifierProvider(device.id));
+
+    // Listen for upload state changes to show snackbars and refresh
+    ref.listen<ImageUploadViewState>(
+      imageUploadNotifierProvider(device.id),
+      (previous, next) {
+        if (next.successMessage != null && previous?.successMessage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next.successMessage!),
+              backgroundColor: Colors.green,
+            ),
+          );
+          onUploadComplete?.call();
+        }
+        if (next.errorMessage != null && previous?.errorMessage == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next.errorMessage!),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+    );
 
     return SectionCard(
       title: validImages.isEmpty ? 'Images' : 'Images (${validImages.length})',
@@ -228,89 +292,112 @@ class DeviceDetailSections extends StatelessWidget {
       children: [
         SizedBox(
           height: 120,
-          child: validImages.isEmpty
-              ? _buildEmptyImagesPlaceholder(context)
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: validImages.length,
-                  itemBuilder: (context, index) {
-                    final imageUrl = validImages[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () => _showImageViewer(
-                          context,
-                          validImages,
-                          index,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: 120,
-                            height: 120,
-                            child: CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              memCacheWidth: 240,
-                              memCacheHeight: 240,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey[300],
-                                child: const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child:
-                                        CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                color: Colors.grey[300],
-                                child: const Icon(
-                                  Icons.broken_image,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                              ),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: authenticatedImages.length + 1, // +1 for add button
+            itemBuilder: (context, index) {
+              // Last item is the add button
+              if (index == authenticatedImages.length) {
+                return _buildAddImageButton(context, ref, uploadState);
+              }
+
+              final imageUrl = authenticatedImages[index];
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => _showImageViewer(
+                    context,
+                    ref,
+                    authenticatedImages,
+                    index,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 240,
+                        memCacheHeight: 240,
+                        placeholder: (context, url) => Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
                         ),
+                        errorWidget: (context, url, error) => Container(
+                          color: Colors.grey[300],
+                          child: const Icon(
+                            Icons.broken_image,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildEmptyImagesPlaceholder(BuildContext context) {
-    return Center(
+  Widget _buildAddImageButton(
+    BuildContext context,
+    WidgetRef ref,
+    ImageUploadViewState uploadState,
+  ) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final isLoading = uploadState.isLoading;
+
+    return GestureDetector(
+      onTap: isLoading ? null : () => _showImageSourceDialog(context, ref),
       child: Container(
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.grey[200],
+          color: Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: Colors.grey[400]!,
-            style: BorderStyle.solid,
+            color: isLoading ? Colors.grey[300]! : primaryColor.withValues(alpha: 0.5),
+            width: 1.5,
           ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.add_photo_alternate_outlined,
-              size: 40,
-              color: Colors.grey[500],
-            ),
+            if (isLoading)
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: primaryColor,
+                ),
+              )
+            else
+              Icon(
+                Icons.add_photo_alternate,
+                size: 36,
+                color: primaryColor,
+              ),
             const SizedBox(height: 4),
             Text(
-              'No images',
+              isLoading ? 'Uploading...' : 'Add Photo',
               style: TextStyle(
-                color: Colors.grey[500],
+                color: isLoading ? Colors.grey[500] : primaryColor,
                 fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -319,18 +406,73 @@ class DeviceDetailSections extends StatelessWidget {
     );
   }
 
+  Future<void> _showImageSourceDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              subtitle: const Text('Take a new photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              subtitle: const Text('Choose existing photos'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) {
+      return;
+    }
+
+    await ref.read(imageUploadNotifierProvider(device.id).notifier).pickAndUploadImages(
+      source: source,
+      deviceType: device.type,  // Pass entity type, not API resource type
+      roomId: device.pmsRoomId?.toString(),
+      // Use signed IDs for existing images - server expects signed IDs, not URLs
+      existingImages: _validImageSignedIds,
+    );
+  }
+
+
   void _showImageViewer(
     BuildContext context,
+    WidgetRef ref,
     List<String> images,
     int initialIndex,
   ) {
+    // Get api_key for passing to the dialog (images are already authenticated,
+    // but we pass api_key for any additional operations the dialog may need)
+    final apiKey = ref.read(apiKeyProvider);
     showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
       builder: (context) => ImageViewerDialog(
         images: images,
         initialIndex: initialIndex,
-        onDelete: onImageDeleted,
+        // Strip api_key from URL before passing to delete handler,
+        // since the backend expects the original URL without auth params
+        onDelete: onImageDeleted != null
+            ? (authenticatedUrl) {
+                final originalUrl = stripApiKeyFromUrl(authenticatedUrl);
+                if (originalUrl != null) {
+                  onImageDeleted!(originalUrl);
+                }
+              }
+            : null,
+        apiKey: apiKey,
       ),
     );
   }
