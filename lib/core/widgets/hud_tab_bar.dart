@@ -110,6 +110,7 @@ class _HUDTabBarState extends State<HUDTabBar> with SingleTickerProviderStateMix
 
     return Container(
       height: widget.height,
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.3),
         border: Border(

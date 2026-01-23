@@ -4,6 +4,7 @@ import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/screens/note_edit_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
@@ -385,11 +386,21 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     }
   }
 
-  void _handleEditNote() {
-    // TODO(note-api): Navigate to note edit screen.
+  Future<void> _handleSaveNote(String note) async {
+    final success = await ref
+        .read(deviceNotifierProvider(widget.device.id).notifier)
+        .updateNote(note);
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Note editing not yet implemented'),
+      SnackBar(
+        content: Text(
+          success
+              ? (note.isEmpty ? 'Note cleared' : 'Note saved')
+              : 'Failed to save note',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
       ),
     );
   }
@@ -412,16 +423,28 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
           ),
         ],
       ),
-    ).then((confirmed) {
+    ).then((confirmed) async {
       if ((confirmed ?? false) && mounted) {
-        // TODO(note-api): Implement note clearing via API.
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Note clearing not yet implemented'),
-          ),
-        );
+        // Clear note by saving empty string
+        await _handleSaveNote('');
       }
     });
+  }
+
+  Future<void> _handleEditNote() async {
+    final result = await Navigator.of(context).push<String?>(
+      MaterialPageRoute<String?>(
+        builder: (context) => NoteEditScreen(
+          deviceName: widget.device.name,
+          initialNote: widget.device.note,
+        ),
+      ),
+    );
+
+    // If user saved a note (result is not null), save it
+    if (result != null && mounted) {
+      await _handleSaveNote(result);
+    }
   }
 
   @override
