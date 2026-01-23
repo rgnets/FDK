@@ -3,6 +3,7 @@ import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/presentation/providers/room_readiness_provider.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -136,6 +137,8 @@ List<RoomViewModel> filteredRoomViewModels(
   String filter,
 ) {
   final viewModels = ref.watch(roomViewModelsProvider);
+  final uiState = ref.watch(roomUIStateNotifierProvider);
+  final searchQuery = uiState.searchQuery.toLowerCase();
 
   List<RoomViewModel> filtered;
   switch (filter) {
@@ -156,6 +159,14 @@ List<RoomViewModel> filteredRoomViewModels(
       break;
     default:
       filtered = List.from(viewModels);
+  }
+
+  // Apply search filter
+  if (searchQuery.isNotEmpty) {
+    filtered = filtered.where((vm) {
+      return vm.name.toLowerCase().contains(searchQuery) ||
+          (vm.roomNumber?.toLowerCase().contains(searchQuery) ?? false);
+    }).toList();
   }
 
   // Sort by room name alphabetically

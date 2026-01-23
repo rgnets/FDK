@@ -8,4 +8,5 @@ export 'empty_state.dart';
 export 'hold_to_confirm_button.dart';
 export 'loading_indicator.dart';
 export 'main_scaffold.dart';
+export 'search_bar_widget.dart';
 export 'section_card.dart';

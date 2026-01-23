@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
 import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
@@ -20,6 +21,7 @@ class RoomsScreen extends ConsumerStatefulWidget {
 class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   int _selectedTabIndex = 0; // 0=All, 1=Ready, 2=Issues
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   @override
   void initState() {
     super.initState();
@@ -32,6 +34,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
   
@@ -74,6 +77,18 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                 onRefresh: () => ref.read(roomsNotifierProvider.notifier).refresh(),
             child: Column(
               children: [
+                // Search bar
+                SearchBarWidget(
+                  controller: _searchController,
+                  hintText: 'Search rooms...',
+                  onChanged: (query) {
+                    ref.read(roomUIStateNotifierProvider.notifier).setSearchQuery(query);
+                  },
+                  onClear: () {
+                    ref.read(roomUIStateNotifierProvider.notifier).clearSearch();
+                  },
+                ),
+
                 // HUD Tab Bar - taller with full data
                 HUDTabBar(
                   height: 80,

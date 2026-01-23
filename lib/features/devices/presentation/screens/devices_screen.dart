@@ -270,7 +270,19 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                         ],
                       ),
                     ),
-                  
+
+                  // Search bar
+                  SearchBarWidget(
+                    controller: _searchController,
+                    hintText: 'Search devices...',
+                    onChanged: (query) {
+                      ref.read(deviceUIStateNotifierProvider.notifier).setSearchQuery(query);
+                    },
+                    onClear: () {
+                      ref.read(deviceUIStateNotifierProvider.notifier).clearSearch();
+                    },
+                  ),
+
                   // Phase filter bar
                   _buildPhaseFilterBar(ref, devices),
 

@@ -26,15 +26,11 @@ class DeviceDetailSections extends StatelessWidget {
         const SizedBox(height: 16),
         _buildLocationSection(context),
         const SizedBox(height: 16),
-        _buildNetworkSection(context),
-        const SizedBox(height: 16),
         _buildWirelessSection(context),
         const SizedBox(height: 16),
         _buildPerformanceSection(context),
         const SizedBox(height: 16),
         _buildTrafficSection(context),
-        const SizedBox(height: 16),
-        _buildSystemSection(context),
         const SizedBox(height: 16),
         _buildImagesSection(context),
       ],
@@ -55,6 +51,22 @@ class DeviceDetailSections extends StatelessWidget {
         ),
         if (device.lastSeen != null)
           _DetailRow('Last Seen', _formatDateTime(device.lastSeen!)),
+        // Network Configuration
+        if (device.ipAddress != null)
+          CopyableField(label: 'IP Address', value: device.ipAddress!),
+        if (device.macAddress != null)
+          CopyableField(label: 'MAC Address', value: device.macAddress!),
+        if (device.vlan != null)
+          _DetailRow('VLAN', device.vlan.toString()),
+        // System Information
+        if (device.model != null)
+          CopyableField(label: 'Model', value: device.model!),
+        if (device.serialNumber != null)
+          CopyableField(label: 'Serial Number', value: device.serialNumber!),
+        if (device.firmware != null)
+          _DetailRow('Firmware', device.firmware!),
+        if (device.restartCount != null)
+          _DetailRow('Restart Count', device.restartCount.toString()),
       ],
     );
   }
@@ -79,21 +91,6 @@ class DeviceDetailSections extends StatelessWidget {
         if (device.location != null) _DetailRow('Location', device.location!),
         if (device.pmsRoomId != null)
           _DetailRow('PMS Room ID', device.pmsRoomId.toString()),
-      ],
-    );
-  }
-
-  Widget _buildNetworkSection(BuildContext context) {
-    return SectionCard(
-      title: 'Network Configuration',
-      icon: Icons.network_check,
-      children: [
-        if (device.ipAddress != null)
-          CopyableField(label: 'IP Address', value: device.ipAddress!),
-        if (device.macAddress != null)
-          CopyableField(label: 'MAC Address', value: device.macAddress!),
-        if (device.vlan != null)
-          _DetailRow('VLAN', device.vlan.toString()),
       ],
     );
   }
@@ -176,30 +173,6 @@ class DeviceDetailSections extends StatelessWidget {
           _DetailRow('Total Upload', _formatBytes(device.totalUpload!)),
         if (device.totalDownload != null)
           _DetailRow('Total Download', _formatBytes(device.totalDownload!)),
-      ],
-    );
-  }
-
-  Widget _buildSystemSection(BuildContext context) {
-    if (device.model == null &&
-        device.serialNumber == null &&
-        device.firmware == null &&
-        device.restartCount == null) {
-      return const SizedBox.shrink();
-    }
-
-    return SectionCard(
-      title: 'System Information',
-      icon: Icons.computer,
-      children: [
-        if (device.model != null)
-          CopyableField(label: 'Model', value: device.model!),
-        if (device.serialNumber != null)
-          CopyableField(label: 'Serial Number', value: device.serialNumber!),
-        if (device.firmware != null)
-          _DetailRow('Firmware', device.firmware!),
-        if (device.restartCount != null)
-          _DetailRow('Restart Count', device.restartCount.toString()),
       ],
     );
   }

@@ -253,17 +253,6 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
           },
           badgeColor: Colors.red,
         ),
-        const SizedBox(width: 8),
-        // Connection status
-        _buildActionButton(
-          icon: isConnected ? Icons.check_circle_outline : Icons.error_outline,
-          onTap: () {
-            LoggerService.debug('Connection status button tapped', tag: 'AppBar');
-            HapticFeedback.lightImpact();
-            _showConnectionStatus(context, isConnected);
-          },
-          iconColor: isConnected ? Colors.green : Colors.orange,
-        ),
       ],
     );
   }

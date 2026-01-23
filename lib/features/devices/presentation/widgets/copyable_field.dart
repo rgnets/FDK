@@ -33,9 +33,9 @@ class CopyableField extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Label
           Expanded(
@@ -47,38 +47,30 @@ class CopyableField extends StatelessWidget {
               ),
             ),
           ),
-          // Value with optional copy button
+          // Value
           Expanded(
             flex: 3,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    value,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: valueColor != null ? FontWeight.bold : null,
-                      color: valueColor,
-                    ),
-                  ),
-                ),
-                if (showCopyButton && value.isNotEmpty)
-                  IconButton(
-                    icon: Icon(
-                      Icons.copy,
-                      size: 18,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.7),
-                    ),
-                    onPressed: () => _copyToClipboard(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 32,
-                      minHeight: 32,
-                    ),
-                    tooltip: 'Copy $label',
-                  ),
-              ],
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: valueColor != null ? FontWeight.bold : null,
+                color: valueColor,
+              ),
             ),
           ),
+          // Copy button (outside flex containers)
+          if (showCopyButton && value.isNotEmpty)
+            GestureDetector(
+              onTap: () => _copyToClipboard(context),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(
+                  Icons.copy,
+                  size: 18,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
         ],
       ),
     );
