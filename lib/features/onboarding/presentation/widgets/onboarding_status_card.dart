@@ -74,7 +74,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Divider line at top (matches design) - only for complete state
         if (showDivider && isComplete)
           Divider(
             color: Colors.grey[300],
@@ -82,7 +81,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
             height: 1,
           ),
 
-        // Title header with background when not complete (except stage 1)
         if (!isComplete && !isStageOne)
           Container(
             width: double.infinity,
@@ -98,7 +96,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
             ),
           ),
 
-        // Stage 1: title without background (yellow/orange text)
         if (!isComplete && isStageOne)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -117,13 +114,11 @@ class OnboardingStatusCardContent extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Error box (if error exists) - show at top
               if (state.errorText != null && state.errorText!.isNotEmpty) ...[
                 _buildErrorBox(context),
                 const SizedBox(height: 12),
               ],
 
-              // Title header (black text, bold) - only for complete state
               if (isComplete)
                 Text(
                   title,
@@ -136,7 +131,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
 
               if (isComplete) const SizedBox(height: 4),
 
-              // Stage indicator
               Text(
                 'Stage ${state.currentStage}/${state.maxStages}',
                 style: TextStyle(
@@ -148,12 +142,10 @@ class OnboardingStatusCardContent extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Stage progress circles
               _buildStageCircles(context),
 
               const SizedBox(height: 16),
 
-              // Resolution text
               Text(
                 resolution,
                 style: TextStyle(
@@ -208,17 +200,14 @@ class OnboardingStatusCardContent extends StatelessWidget {
         final isCurrent = stageNumber == state.currentStage;
         final isComplete = state.isComplete;
 
-        // If onboarding is complete, all stages show as completed
         if (isComplete) {
           return _buildCompletedCircle();
         }
 
-        // Current stage or completed stages
         if (isCompleted || (isCurrent && state.isComplete)) {
           return _buildCompletedCircle();
         }
 
-        // Pending stages (including current if not complete)
         return _buildPendingCircle();
       }),
     );
