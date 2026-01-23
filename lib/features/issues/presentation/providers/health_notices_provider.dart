@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_counts.dart';
@@ -134,12 +135,23 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     // Get cached devices with health notice data from in-memory WebSocket cache
     final devices = cacheIntegration.getAllCachedDeviceModels();
 
+    LoggerService.debug(
+      'HEALTH: Found ${devices.length} cached devices',
+      tag: 'HealthNotices',
+    );
+
     // Collect all health notices from devices (server-side only)
     final notices = <HealthNotice>[];
+    var devicesWithNotices = 0;
 
     for (final device in devices) {
       final deviceNotices = device.healthNotices;
-      if (deviceNotices != null) {
+      if (deviceNotices != null && deviceNotices.isNotEmpty) {
+        devicesWithNotices++;
+        LoggerService.debug(
+          'HEALTH: Device ${device.deviceName} (${device.deviceType}) has ${deviceNotices.length} notices',
+          tag: 'HealthNotices',
+        );
         for (final noticeModel in deviceNotices) {
           notices.add(noticeModel.toEntity().copyWith(
             deviceId: device.deviceId,
@@ -149,6 +161,11 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
         }
       }
     }
+
+    LoggerService.debug(
+      'HEALTH: Extracted ${notices.length} total notices from $devicesWithNotices devices with notices',
+      tag: 'HealthNotices',
+    );
 
     if (kDebugMode) {
       print('HealthNoticesNotifier: Found ${notices.length} total notices from ${devices.length} devices');

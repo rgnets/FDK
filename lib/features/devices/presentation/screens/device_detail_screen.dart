@@ -9,6 +9,7 @@ import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_s
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/unified_summary_card.dart';
+import 'package:rgnets_fdk/features/onboarding/presentation/widgets/onboarding_status_card.dart';
 
 /// Default networking configuration values
 class _NetworkDefaults {
@@ -454,8 +455,19 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Unified Summary Card at the top
-        UnifiedSummaryCard(device: widget.device),
+        // Combined Summary + Onboarding Card
+        Card(
+          elevation: 2,
+          child: Column(
+            children: [
+              // Unified Summary section at the top
+              UnifiedSummaryCardContent(device: widget.device),
+
+              // Onboarding Status section (for AP/ONT devices)
+              OnboardingStatusCard(deviceId: widget.device.id),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
 
         // Device detail sections

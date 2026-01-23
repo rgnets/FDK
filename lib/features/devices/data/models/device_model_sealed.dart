@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart'; // Assuming this path
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 
@@ -103,7 +104,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'max_clients') int? maxClients,
     @JsonKey(name: 'current_upload') double? currentUpload,
     @JsonKey(name: 'current_download') double? currentDownload,
-    @JsonKey(name: 'ap_onboarding_status') Map<String, dynamic>? onboardingStatus,
+    @JsonKey(name: 'ap_onboarding_status') OnboardingStatusPayload? onboardingStatus,
   }) = APModel;
 
   // ============================================================================
@@ -134,7 +135,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     // ONT-specific fields
     @JsonKey(name: 'is_registered') bool? isRegistered,
     @JsonKey(name: 'switch_port') Map<String, dynamic>? switchPort,
-    @JsonKey(name: 'ont_onboarding_status') Map<String, dynamic>? onboardingStatus,
+    @JsonKey(name: 'ont_onboarding_status') OnboardingStatusPayload? onboardingStatus,
     @JsonKey(name: 'ont_ports') List<Map<String, dynamic>>? ports,
     String? uptime,
     String? phase,

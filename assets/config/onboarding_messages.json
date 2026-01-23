@@ -1,0 +1,101 @@
+{
+  "version": "1.2.0",
+  "strict_mode": true,
+  "display_settings": {
+    "show_elapsed_time": true,
+    "show_overdue_warning": true,
+    "refresh_interval_seconds": 10,
+    "overdue_threshold_multiplier": 1.0
+  },
+  "devices": {
+    "AP": {
+      "max_stages": 6,
+      "success_stage": 6,
+      "stages": {
+        "1": {
+          "title": "Awaiting MAC address registration",
+          "description": "The AP has been physically installed and powered on (LEDs visible), but the rXg has not yet detected it.",
+          "resolution": "If the AP remains in this state, confirm it has power and check the Ethernet cable.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "2": {
+          "title": "AP is reachable, awaiting import",
+          "description": "The AP has received an IP address and is pingable by the rXg, but has not yet completed the import process.",
+          "resolution": "If stuck, try a pin factory reset. Hold the pin until LED behavior clearly differs from a normal reset. Repeat if unsure.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "3": {
+          "title": "Onboarding import running",
+          "description": "The rXg is importing the AP. Most steps are fast, but PKI certificate generation may take time.",
+          "resolution": "If stuck here, perform a pin factory reset.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "4": {
+          "title": "Registered, but not approved",
+          "description": "The AP is onboarded but awaits manual approval by a field engineer.",
+          "resolution": "Sites with full ZTP (Zero Touch Provisioning) auto-approve APs and may skip this step.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "5": {
+          "title": "Registered and approved, but offline",
+          "description": "The AP has completed onboarding and approval, but is currently unreachable.",
+          "resolution": "The state is commonly found when an AP has been unplugged or lost network connectivity.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "6": {
+          "title": "Registered, approved, and online",
+          "description": "The AP is fully operational and connected to the OpenWiFi controller.",
+          "resolution": "No action required.",
+          "typical_duration_minutes": null,
+          "is_success": true
+        }
+      }
+    },
+    "ONT": {
+      "max_stages": 5,
+      "success_stage": 5,
+      "stages": {
+        "1": {
+          "title": "ONT not registered with the OLT",
+          "description": "The ONT has been scanned in but has never been seen by the OLT.",
+          "resolution": "Inspect the fiber connection if the ONT has power and remains in this state.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "2": {
+          "title": "ONT seen by OLT, awaiting registration",
+          "description": "The ONT is visible to the OLT but has not yet completed registration.",
+          "resolution": "This state may persist if the ONT is undergoing a firmware update. Please be patient.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "3": {
+          "title": "ONT registered, awaiting port provisioning",
+          "description": "The ONT has registered with the OLT, but service ports are not yet provisioned.",
+          "resolution": "This state will take longer for multiport ONTs. A prolonged state here may indicate that Altiplano has crashed.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "4": {
+          "title": "ONT offline, but fully provisioned",
+          "description": "All provisioning steps are complete, but the ONT is not currently reachable.",
+          "resolution": "The state is commonly found when an ONT has been unplugged or lost network connectivity.",
+          "typical_duration_minutes": 6,
+          "is_success": false
+        },
+        "5": {
+          "title": "ONT online and fully provisioned",
+          "description": "The ONT is fully registered, provisioned, and online.",
+          "resolution": "No action required.",
+          "typical_duration_minutes": null,
+          "is_success": true
+        }
+      }
+    }
+  }
+}

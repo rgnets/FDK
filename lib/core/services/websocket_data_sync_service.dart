@@ -9,6 +9,7 @@ import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 
 class WebSocketDataSyncService {
@@ -512,7 +513,11 @@ class WebSocketDataSyncService {
       maxClients: data['max_clients'] as int?,
       currentUpload: (data['current_upload'] as num?)?.toDouble(),
       currentDownload: (data['current_download'] as num?)?.toDouble(),
-      onboardingStatus: data['ap_onboarding_status'] as Map<String, dynamic>?,
+      onboardingStatus: data['ap_onboarding_status'] != null
+          ? OnboardingStatusPayload.fromJson(
+              data['ap_onboarding_status'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 
@@ -533,7 +538,11 @@ class WebSocketDataSyncService {
       metadata: data,
       isRegistered: data['is_registered'] as bool?,
       switchPort: data['switch_port'] as Map<String, dynamic>?,
-      onboardingStatus: data['ont_onboarding_status'] as Map<String, dynamic>?,
+      onboardingStatus: data['ont_onboarding_status'] != null
+          ? OnboardingStatusPayload.fromJson(
+              data['ont_onboarding_status'] as Map<String, dynamic>,
+            )
+          : null,
       ports: (data['ont_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
       uptime: data['uptime']?.toString(),
       phase: data['phase']?.toString(),
