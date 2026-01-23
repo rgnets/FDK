@@ -338,6 +338,38 @@ class DeviceNotifier extends _$DeviceNotifier {
       return false;
     }
   }
+
+  /// Updates the device note via WebSocket
+  Future<bool> updateNote(String note) async {
+    final currentDevice = state.valueOrNull;
+    if (currentDevice == null) {
+      _logger.e('Cannot update note: device not loaded');
+      return false;
+    }
+
+    try {
+      final repository = ref.read(deviceRepositoryProvider);
+      // Create updated device with new note
+      final updatedDevice = currentDevice.copyWith(note: note.isEmpty ? null : note);
+      final result = await repository.updateDevice(updatedDevice);
+
+      return result.fold(
+        (failure) {
+          _logger.e('Failed to update note: ${failure.message}');
+          return false;
+        },
+        (Device device) {
+          // Update the state with the new device data
+          state = AsyncValue.data(device);
+          _logger.i('Successfully updated note for device $deviceId');
+          return true;
+        },
+      );
+    } on Exception catch (e) {
+      _logger.e('Exception updating note: $e');
+      return false;
+    }
+  }
 }
 
 // Search provider

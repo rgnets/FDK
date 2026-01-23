@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// A section widget for displaying and editing device notes.
-/// Matches the ATT-FE-Tool's technician note section layout.
+/// Uses callback to trigger edit - parent handles navigation.
 class EditableNoteSection extends StatelessWidget {
   const EditableNoteSection({
     required this.note,
@@ -13,7 +13,7 @@ class EditableNoteSection extends StatelessWidget {
   /// The current note text, or null if no note exists.
   final String? note;
 
-  /// Callback when the user wants to add or edit the note.
+  /// Callback when the user wants to edit the note.
   final VoidCallback? onEditNote;
 
   /// Callback when the user wants to clear the note.
@@ -50,24 +50,29 @@ class EditableNoteSection extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Note content
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _hasNote
-                    ? theme.colorScheme.surfaceContainerHighest
-                    : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.grey[300]!,
+            // Note content (read-only display)
+            GestureDetector(
+              onTap: onEditNote,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(minHeight: 80),
+                decoration: BoxDecoration(
+                  color: _hasNote
+                      ? theme.colorScheme.surfaceContainerHighest
+                      : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey[300]!,
+                  ),
                 ),
-              ),
-              child: Text(
-                _hasNote ? note! : 'No note added.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: _hasNote ? null : Colors.grey[500],
-                  fontStyle: _hasNote ? null : FontStyle.italic,
+                child: Text(
+                  _hasNote ? note! : 'No note added.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: _hasNote ? null : Colors.grey[500],
+                    fontStyle: _hasNote ? null : FontStyle.italic,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ),
@@ -80,27 +85,26 @@ class EditableNoteSection extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: onEditNote,
-                    icon: Icon(_hasNote ? Icons.edit : Icons.add),
-                    label: Text(_hasNote ? 'Edit Note' : 'Add Note'),
+                    icon: Icon(_hasNote ? Icons.edit : Icons.add, size: 18),
+                    label: Text(_hasNote ? 'Edit' : 'Add Note'),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     ),
                   ),
                 ),
 
                 // Clear button (only shows if note exists)
                 if (_hasNote) ...[
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
+                  const SizedBox(width: 8),
+                  OutlinedButton(
                     onPressed: onClearNote,
-                    icon: const Icon(Icons.clear, color: Colors.red),
-                    label: const Text(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      side: const BorderSide(color: Colors.red),
+                    ),
+                    child: const Text(
                       'Clear',
                       style: TextStyle(color: Colors.red),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: const BorderSide(color: Colors.red),
                     ),
                   ),
                 ],
