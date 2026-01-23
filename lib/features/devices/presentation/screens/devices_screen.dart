@@ -292,6 +292,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                       ),
                     ),
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
 
                   // Search bar
                   SearchBarWidget(
@@ -305,9 +308,12 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     },
                   ),
 
+<<<<<<< HEAD
 =======
                   
 >>>>>>> 81c4e9a (Add deployment phase filtering (#13))
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
                   // Phase filter bar
                   _buildPhaseFilterBar(ref, devices),
 

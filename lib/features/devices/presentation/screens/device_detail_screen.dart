@@ -388,11 +388,14 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     }
   }
 
+<<<<<<< HEAD
   void _handleUploadComplete() {
     // Refresh device data to show newly uploaded images
     ref.read(deviceNotifierProvider(widget.device.id).notifier).refresh();
   }
 
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
   Future<void> _handleSaveNote(String note) async {
     final success = await ref
         .read(deviceNotifierProvider(widget.device.id).notifier)

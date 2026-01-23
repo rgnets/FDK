@@ -188,10 +188,14 @@ class _RoomViewModelByIdProviderElement
 
 String _$filteredRoomViewModelsHash() =>
 <<<<<<< HEAD
+<<<<<<< HEAD
     r'6fe8852fd0d485183dde0dee1d150dba626a92bc';
 =======
     r'c4f8d9f36ebbf2eea084e9f4a5d45494abf7819a';
 >>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+    r'6fe8852fd0d485183dde0dee1d150dba626a92bc';
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
 
 /// Provider for filtered room view models
 ///

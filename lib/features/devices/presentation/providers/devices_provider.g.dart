@@ -37,7 +37,11 @@ final devicesNotifierProvider =
 );
 
 typedef _$DevicesNotifier = AsyncNotifier<List<Device>>;
+<<<<<<< HEAD
 String _$deviceNotifierHash() => r'46818e2910dc06852fcac29e0ef4473d423c34f0';
+=======
+String _$deviceNotifierHash() => r'6575f26908f09f5a5bae476dedfe95eac4e2567a';
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
 
 /// Copied from Dart SDK
 class _SystemHash {

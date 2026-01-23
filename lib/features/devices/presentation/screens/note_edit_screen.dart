@@ -63,6 +63,30 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           icon: const Icon(Icons.close),
           onPressed: _cancel,
         ),
+<<<<<<< HEAD
+=======
+        actions: [
+          TextButton(
+            onPressed: _isSaving ? null : _saveNote,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Save',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+          ),
+        ],
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
       ),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
