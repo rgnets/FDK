@@ -380,7 +380,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             flex: 2,
@@ -401,6 +401,8 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
           ),
+          // Reserve space for alignment with CopyableField
+          const SizedBox(width: 26),
         ],
       ),
     );
