@@ -63,27 +63,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           icon: const Icon(Icons.close),
           onPressed: _cancel,
         ),
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _saveNote,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text(
-                    'Save',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-          ),
-        ],
       ),
       resizeToAvoidBottomInset: true,
       body: SafeArea(
