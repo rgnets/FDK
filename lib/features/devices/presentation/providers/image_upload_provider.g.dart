@@ -127,7 +127,7 @@ final cacheInvalidationEventsProvider =
 
 typedef CacheInvalidationEventsRef = StreamProviderRef<CacheInvalidationEvent>;
 String _$imageUploadNotifierHash() =>
-    r'b4d97f88ba1795dcf46224e3bd850a146f5427cf';
+    r'ad3876fbcf972dddb303ed50cd83976df61b053e';
 
 /// Copied from Dart SDK
 class _SystemHash {

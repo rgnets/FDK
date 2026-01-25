@@ -5,7 +5,7 @@ import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 
 /// WebSocket-based data source for fetching devices.
 /// Replaces DeviceRemoteDataSource with a WebSocket-backed implementation.
@@ -32,7 +32,7 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   WebSocketService get _webSocketService => _cacheIntegration.webSocketService;
 
   @override
-  Future<List<DeviceModel>> getDevices({List<String>? fields}) async {
+  Future<List<DeviceModelSealed>> getDevices({List<String>? fields}) async {
     _logger
       ..i('DeviceWebSocketDataSource: getDevices() called')
       ..i('DeviceWebSocketDataSource: WebSocket service hashCode: ${_webSocketService.hashCode}')
@@ -85,7 +85,7 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
-  Future<DeviceModel> getDevice(
+  Future<DeviceModelSealed> getDevice(
     String id, {
     List<String>? fields,
     bool forceRefresh = false,
@@ -96,7 +96,7 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     if (!forceRefresh) {
       // First try to find in cache
       final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
-      final cached = cachedModels.where((d) => d.id == id).firstOrNull;
+      final cached = cachedModels.where((d) => d.deviceId == id).firstOrNull;
       if (cached != null) {
         _logger.i('DeviceWebSocketDataSource: Found device $id in cache');
         return cached;
@@ -143,19 +143,24 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
-  Future<List<DeviceModel>> getDevicesByRoom(String roomId) async {
+  Future<List<DeviceModelSealed>> getDevicesByRoom(String roomId) async {
     _logger.i('DeviceWebSocketDataSource: getDevicesByRoom($roomId) called');
 
     // Get all devices and filter by room
     final allDevices = await getDevices();
     return allDevices.where((device) {
-      final pmsRoomId = device.pmsRoomId?.toString();
+      final pmsRoomId = device.map(
+        ap: (d) => d.pmsRoomId?.toString(),
+        ont: (d) => d.pmsRoomId?.toString(),
+        switchDevice: (d) => d.pmsRoomId?.toString(),
+        wlan: (d) => d.pmsRoomId?.toString(),
+      );
       return pmsRoomId == roomId;
     }).toList();
   }
 
   @override
-  Future<List<DeviceModel>> searchDevices(String query) async {
+  Future<List<DeviceModelSealed>> searchDevices(String query) async {
     _logger.i('DeviceWebSocketDataSource: searchDevices($query) called');
 
     // Get all devices and filter locally
@@ -163,22 +168,38 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     final lowerQuery = query.toLowerCase();
 
     return allDevices.where((device) {
-      return device.name.toLowerCase().contains(lowerQuery) ||
-          device.id.toLowerCase().contains(lowerQuery) ||
-          (device.serialNumber?.toLowerCase().contains(lowerQuery) ?? false) ||
-          (device.macAddress?.toLowerCase().contains(lowerQuery) ?? false);
+      final name = device.deviceName.toLowerCase();
+      final id = device.deviceId.toLowerCase();
+      final serialNumber = device.map(
+        ap: (d) => d.serialNumber?.toLowerCase(),
+        ont: (d) => d.serialNumber?.toLowerCase(),
+        switchDevice: (d) => d.serialNumber?.toLowerCase(),
+        wlan: (d) => d.serialNumber?.toLowerCase(),
+      );
+      final macAddress = device.map(
+        ap: (d) => d.macAddress?.toLowerCase(),
+        ont: (d) => d.macAddress?.toLowerCase(),
+        switchDevice: (d) => d.macAddress?.toLowerCase(),
+        wlan: (d) => d.macAddress?.toLowerCase(),
+      );
+
+      return name.contains(lowerQuery) ||
+          id.contains(lowerQuery) ||
+          (serialNumber?.contains(lowerQuery) ?? false) ||
+          (macAddress?.contains(lowerQuery) ?? false);
     }).toList();
   }
 
   @override
-  Future<DeviceModel> updateDevice(DeviceModel device) async {
-    _logger.i('DeviceWebSocketDataSource: updateDevice(${device.id}) called');
+  Future<DeviceModelSealed> updateDevice(DeviceModelSealed device) async {
+    final deviceId = device.deviceId;
+    _logger.i('DeviceWebSocketDataSource: updateDevice($deviceId) called');
 
-    final resourceType = _getResourceTypeFromId(device.id);
-    final rawId = _extractRawId(device.id);
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
 
     if (resourceType == null) {
-      throw Exception('Unknown device type for ID: ${device.id}');
+      throw Exception('Unknown device type for ID: $deviceId');
     }
 
     try {
@@ -187,7 +208,12 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         resourceType: resourceType,
         additionalData: {
           'id': rawId,
-          'params': device.toJson(),
+          'params': device.map(
+            ap: (d) => d.toJson(),
+            ont: (d) => d.toJson(),
+            switchDevice: (d) => d.toJson(),
+            wlan: (d) => d.toJson(),
+          ),
         },
         timeout: const Duration(seconds: 15),
       );
@@ -262,12 +288,10 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
-  Future<DeviceModel> deleteDeviceImage(
+  Future<DeviceModelSealed> deleteDeviceImage(
     String deviceId,
     String signedIdToDelete,
   ) async {
-    print('=== DELETE IMAGE START ===');
-    print('DeviceWebSocketDataSource: deleteDeviceImage($deviceId, signedId: $signedIdToDelete)');
     _logger.i(
       'DeviceWebSocketDataSource: deleteDeviceImage($deviceId, signedId: $signedIdToDelete)',
     );
@@ -281,10 +305,12 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
 
     // Get current device to access imageSignedIds
     final device = await getDevice(deviceId);
-    final currentSignedIds = device.imageSignedIds ?? [];
-
-    print('Current signedIds (${currentSignedIds.length}): $currentSignedIds');
-    print('SignedId to delete: $signedIdToDelete');
+    final currentSignedIds = device.map(
+      ap: (d) => d.imageSignedIds ?? [],
+      ont: (d) => d.imageSignedIds ?? [],
+      switchDevice: (d) => d.imageSignedIds ?? [],
+      wlan: (d) => d.imageSignedIds ?? [],
+    );
 
     // Filter out the signed ID to delete (like ATT-FE-Tool does)
     final updatedSignedIds = currentSignedIds
@@ -297,9 +323,6 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
       );
       throw Exception('SignedId not found in device images.');
     }
-
-    print('Sending delete request - keeping ${updatedSignedIds.length} images');
-    print('updatedSignedIds: $updatedSignedIds');
 
     try {
       // Send update request without waiting for response (fire-and-forget)
@@ -320,21 +343,23 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         'data': jsonEncode(data),
       });
 
-      print('Update request sent (fire-and-forget)');
       _logger.i('DeviceWebSocketDataSource: Image delete request sent');
 
       // Wait briefly for the backend to process the update
       await Future<void>.delayed(const Duration(milliseconds: 1500));
 
       // Verify the change by fetching the updated device
-      print('Verifying delete by fetching device...');
-      final updatedDevice = await getDevice(deviceId);
+      final updatedDevice = await getDevice(deviceId, forceRefresh: true);
 
-      final newImageCount = updatedDevice.images?.length ?? 0;
-      print('Verification: device now has $newImageCount images');
+      final newImageCount = updatedDevice.map(
+        ap: (d) => d.images?.length ?? 0,
+        ont: (d) => d.images?.length ?? 0,
+        switchDevice: (d) => d.images?.length ?? 0,
+        wlan: (d) => d.images?.length ?? 0,
+      );
 
       if (newImageCount < currentSignedIds.length) {
-        print('Image deletion verified successfully');
+        _logger.i('DeviceWebSocketDataSource: Image deletion verified successfully');
         return updatedDevice;
       } else {
         _logger.w('DeviceWebSocketDataSource: Image count unchanged after delete');
@@ -379,7 +404,7 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     return null;
   }
 
-  DeviceModel _mapToDeviceModel(
+  DeviceModelSealed _mapToDeviceModel(
     String resourceType,
     Map<String, dynamic> deviceMap,
   ) {
@@ -388,14 +413,13 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
 
     switch (resourceType) {
       case 'access_points':
-        return DeviceModel(
+        return DeviceModelSealed.ap(
           id: 'ap_${deviceMap['id']}',
           name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
-          type: 'access_point',
           status: _determineStatus(deviceMap),
           pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['mac']?.toString() ?? '',
-          ipAddress: deviceMap['ip']?.toString() ?? '',
+          macAddress: deviceMap['mac']?.toString(),
+          ipAddress: deviceMap['ip']?.toString(),
           model: deviceMap['model']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
@@ -404,14 +428,13 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         );
 
       case 'media_converters':
-        return DeviceModel(
+        return DeviceModelSealed.ont(
           id: 'ont_${deviceMap['id']}',
           name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
-          type: 'ont',
           status: _determineStatus(deviceMap),
           pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['mac']?.toString() ?? '',
-          ipAddress: deviceMap['ip']?.toString() ?? '',
+          macAddress: deviceMap['mac']?.toString(),
+          ipAddress: deviceMap['ip']?.toString(),
           model: deviceMap['model']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
           note: deviceMap['note']?.toString(),
@@ -420,16 +443,16 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         );
 
       case 'switch_devices':
-        return DeviceModel(
+        return DeviceModelSealed.switchDevice(
           id: 'sw_${deviceMap['id']}',
           name: deviceMap['name']?.toString() ??
               deviceMap['nickname']?.toString() ??
               'Switch-${deviceMap['id']}',
-          type: 'switch',
           status: _determineStatus(deviceMap),
           pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['scratch']?.toString() ?? '',
-          ipAddress: deviceMap['host']?.toString() ?? '',
+          macAddress: deviceMap['scratch']?.toString(),
+          ipAddress: deviceMap['host']?.toString(),
+          host: deviceMap['host']?.toString(),
           model:
               deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
@@ -439,15 +462,13 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         );
 
       case 'wlan_devices':
-        return DeviceModel(
+        return DeviceModelSealed.wlan(
           id: 'wlan_${deviceMap['id']}',
           name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
-          type: 'wlan_controller',
           status: _determineStatus(deviceMap),
-          macAddress: deviceMap['mac']?.toString() ?? '',
+          macAddress: deviceMap['mac']?.toString(),
           ipAddress: deviceMap['host']?.toString() ??
-              deviceMap['ip']?.toString() ??
-              '',
+              deviceMap['ip']?.toString(),
           model:
               deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
           serialNumber: deviceMap['serial_number']?.toString(),
@@ -486,7 +507,7 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
-  Future<DeviceModel> uploadDeviceImages(
+  Future<DeviceModelSealed> uploadDeviceImages(
     String deviceId,
     List<String> images,
   ) async {

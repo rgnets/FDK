@@ -33,8 +33,6 @@ class DeviceDetailSections extends ConsumerWidget {
         const SizedBox(height: 16),
         _buildLocationSection(context),
         const SizedBox(height: 16),
-        _buildNetworkSection(context),
-        const SizedBox(height: 16),
         _buildWirelessSection(context),
         const SizedBox(height: 16),
         _buildPerformanceSection(context),
@@ -62,6 +60,22 @@ class DeviceDetailSections extends ConsumerWidget {
         ),
         if (device.lastSeen != null)
           _DetailRow('Last Seen', _formatDateTime(device.lastSeen!)),
+        // Network Configuration
+        if (device.ipAddress != null)
+          CopyableField(label: 'IP Address', value: device.ipAddress!),
+        if (device.macAddress != null)
+          CopyableField(label: 'MAC Address', value: device.macAddress!),
+        if (device.vlan != null)
+          _DetailRow('VLAN', device.vlan.toString()),
+        // System Information
+        if (device.model != null)
+          CopyableField(label: 'Model', value: device.model!),
+        if (device.serialNumber != null)
+          CopyableField(label: 'Serial Number', value: device.serialNumber!),
+        if (device.firmware != null)
+          _DetailRow('Firmware', device.firmware!),
+        if (device.restartCount != null)
+          _DetailRow('Restart Count', device.restartCount.toString()),
       ],
     );
   }
@@ -86,21 +100,6 @@ class DeviceDetailSections extends ConsumerWidget {
         if (device.location != null) _DetailRow('Location', device.location!),
         if (device.pmsRoomId != null)
           _DetailRow('PMS Room ID', device.pmsRoomId.toString()),
-      ],
-    );
-  }
-
-  Widget _buildNetworkSection(BuildContext context) {
-    return SectionCard(
-      title: 'Network Configuration',
-      icon: Icons.network_check,
-      children: [
-        if (device.ipAddress != null)
-          CopyableField(label: 'IP Address', value: device.ipAddress!),
-        if (device.macAddress != null)
-          CopyableField(label: 'MAC Address', value: device.macAddress!),
-        if (device.vlan != null)
-          _DetailRow('VLAN', device.vlan.toString()),
       ],
     );
   }
@@ -550,7 +549,7 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             flex: 2,
@@ -571,6 +570,8 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
           ),
+          // Reserve space for alignment with CopyableField
+          const SizedBox(width: 26),
         ],
       ),
     );

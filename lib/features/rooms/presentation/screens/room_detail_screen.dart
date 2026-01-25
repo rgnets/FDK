@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/onboarding/presentation/widgets/onboarding_stage_badge.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
@@ -767,6 +768,12 @@ class _DeviceListItem extends StatelessWidget {
                   color: statusColor,
                 ),
               ),
+            ),
+            const SizedBox(height: 4),
+            // Onboarding stage badge for AP/ONT devices
+            OnboardingStageBadge(
+              deviceId: device['id'] as String,
+              compact: true,
             ),
             const SizedBox(height: 4),
             const Icon(Icons.chevron_right, size: 20),

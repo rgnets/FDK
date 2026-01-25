@@ -12,6 +12,7 @@ import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
+import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -65,6 +66,14 @@ void main() async {
     // If SharedPreferences fails, provide a fallback or exit gracefully
     debugPrint('Failed to initialize SharedPreferences: $e');
     return;
+  }
+
+  // Initialize onboarding configuration
+  try {
+    await OnboardingConfig.initialize();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize OnboardingConfig: $e');
+    // Non-fatal - app can continue without onboarding UI
   }
 
   runApp(
