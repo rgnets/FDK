@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
 import 'package:rgnets_fdk/core/utils/logging_utils.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
@@ -276,13 +277,18 @@ class DevicesNotifier extends _$DevicesNotifier {
 class DeviceNotifier extends _$DeviceNotifier {
   Logger get _logger => ref.read(loggerProvider);
   StreamSubscription<CacheInvalidationEvent>? _cacheInvalidationSub;
+  StreamSubscription<DeviceUpdateEvent>? _deviceUpdateSub;
+  Timer? _refreshDebounceTimer;
+
+  /// Debounce duration for coalescing rapid update events
+  static const _refreshDebounceDuration = Duration(milliseconds: 500);
 
   GetDevice get _getDevice => GetDevice(ref.read(deviceRepositoryProvider));
 
   @override
   Future<Device?> build(String deviceId) async {
     // Subscribe to cache invalidation events for this device
-    // This enables automatic UI refresh after image uploads
+    // This enables automatic UI refresh after image uploads from FDK
     final eventBus = ref.watch(imageUploadEventBusProvider);
     _cacheInvalidationSub?.cancel();
     _cacheInvalidationSub = eventBus.cacheInvalidated
@@ -291,12 +297,37 @@ class DeviceNotifier extends _$DeviceNotifier {
       _logger.i(
         'DeviceNotifier: Cache invalidated for $deviceId, refreshing...',
       );
-      _silentRefresh();
+      _debouncedSilentRefresh();
+    });
+
+    // Subscribe to WebSocket device updates for external changes
+    // This enables automatic UI refresh when external apps modify device data
+    final deviceUpdateBus = ref.watch(deviceUpdateEventBusProvider);
+    _deviceUpdateSub?.cancel();
+    _deviceUpdateSub = deviceUpdateBus.updates
+        .where((event) => event.deviceId == deviceId)
+        .listen((event) {
+      _logger.i(
+        'DeviceNotifier: External update for $deviceId (action: ${event.action})',
+      );
+
+      if (event.action == DeviceUpdateAction.destroyed) {
+        // Handle device deletion - show error state immediately
+        _refreshDebounceTimer?.cancel();
+        state = AsyncValue.error('Device has been removed', StackTrace.current);
+      } else {
+        // Debounce refresh to coalesce rapid updates (e.g., multi-image uploads)
+        _debouncedSilentRefresh();
+      }
     });
 
     ref.onDispose(() {
       _cacheInvalidationSub?.cancel();
       _cacheInvalidationSub = null;
+      _deviceUpdateSub?.cancel();
+      _deviceUpdateSub = null;
+      _refreshDebounceTimer?.cancel();
+      _refreshDebounceTimer = null;
     });
 
     // For detail view, fetch all fields
@@ -323,6 +354,7 @@ class DeviceNotifier extends _$DeviceNotifier {
           id: deviceId,
           fields: DeviceFieldSets
               .detailFields, // Refresh with all fields for detail view
+          forceRefresh: true, // Bypass cache to get latest data from server
         ),
       );
 
@@ -345,6 +377,7 @@ class DeviceNotifier extends _$DeviceNotifier {
         GetDeviceParams(
           id: deviceId,
           fields: DeviceFieldSets.detailFields,
+          forceRefresh: true, // Bypass cache to get latest data from server
         ),
       );
 
@@ -365,11 +398,21 @@ class DeviceNotifier extends _$DeviceNotifier {
     }
   }
 
-  /// Deletes an image from the device
-  Future<bool> deleteDeviceImage(String imageUrl) async {
+  /// Debounced version of _silentRefresh to coalesce rapid update events.
+  /// This prevents multiple refreshes when receiving burst updates (e.g., multi-image uploads).
+  void _debouncedSilentRefresh() {
+    _refreshDebounceTimer?.cancel();
+    _refreshDebounceTimer = Timer(_refreshDebounceDuration, () {
+      _refreshDebounceTimer = null;
+      _silentRefresh();
+    });
+  }
+
+  /// Deletes an image from the device by its signed ID
+  Future<bool> deleteDeviceImage(String signedIdToDelete) async {
     try {
       final repository = ref.read(deviceRepositoryProvider);
-      final result = await repository.deleteDeviceImage(deviceId, imageUrl);
+      final result = await repository.deleteDeviceImage(deviceId, signedIdToDelete);
 
       return result.fold(
         (failure) {

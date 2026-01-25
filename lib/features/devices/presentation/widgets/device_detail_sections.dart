@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
-import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/core/widgets/section_card.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/image_upload_provider.dart';
@@ -15,13 +14,14 @@ import 'package:rgnets_fdk/features/devices/presentation/widgets/image_viewer_di
 class DeviceDetailSections extends ConsumerWidget {
   const DeviceDetailSections({
     required this.device,
-    this.onImageDeleted,
+    this.onImageDeletedBySignedId,
     this.onUploadComplete,
     super.key,
   });
 
   final Device device;
-  final void Function(String imageUrl)? onImageDeleted;
+  /// Callback when an image is deleted, provides the signedId
+  final void Function(String signedId)? onImageDeletedBySignedId;
   final VoidCallback? onUploadComplete;
 
   @override
@@ -456,19 +456,20 @@ class DeviceDetailSections extends ConsumerWidget {
     // Get api_key for passing to the dialog (images are already authenticated,
     // but we pass api_key for any additional operations the dialog may need)
     final apiKey = ref.read(apiKeyProvider);
+    final signedIds = _validImageSignedIds;
+
     showDialog<void>(
       context: context,
       barrierColor: Colors.black87,
       builder: (context) => ImageViewerDialog(
         images: images,
         initialIndex: initialIndex,
-        // Strip api_key from URL before passing to delete handler,
-        // since the backend expects the original URL without auth params
-        onDelete: onImageDeleted != null
-            ? (authenticatedUrl) {
-                final originalUrl = stripApiKeyFromUrl(authenticatedUrl);
-                if (originalUrl != null) {
-                  onImageDeleted!(originalUrl);
+        // Pass the index and look up the signedId for deletion
+        // This avoids URL mismatch issues since signedIds are stable
+        onDeleteAtIndex: onImageDeletedBySignedId != null
+            ? (index) {
+                if (index >= 0 && index < signedIds.length) {
+                  onImageDeletedBySignedId!(signedIds[index]);
                 }
               }
             : null,

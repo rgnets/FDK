@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
@@ -262,10 +264,12 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   @override
   Future<DeviceModel> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
   ) async {
+    print('=== DELETE IMAGE START ===');
+    print('DeviceWebSocketDataSource: deleteDeviceImage($deviceId, signedId: $signedIdToDelete)');
     _logger.i(
-      'DeviceWebSocketDataSource: deleteDeviceImage($deviceId, $imageUrl) called',
+      'DeviceWebSocketDataSource: deleteDeviceImage($deviceId, signedId: $signedIdToDelete)',
     );
 
     final resourceType = _getResourceTypeFromId(deviceId);
@@ -275,29 +279,68 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
       throw Exception('Unknown device type for ID: $deviceId');
     }
 
-    // Get current device to get its images
+    // Get current device to access imageSignedIds
     final device = await getDevice(deviceId);
-    final currentImages = device.images ?? [];
-    final updatedImages = currentImages.where((img) => img != imageUrl).toList();
+    final currentSignedIds = device.imageSignedIds ?? [];
+
+    print('Current signedIds (${currentSignedIds.length}): $currentSignedIds');
+    print('SignedId to delete: $signedIdToDelete');
+
+    // Filter out the signed ID to delete (like ATT-FE-Tool does)
+    final updatedSignedIds = currentSignedIds
+        .where((id) => id != signedIdToDelete)
+        .toList();
+
+    if (updatedSignedIds.length == currentSignedIds.length) {
+      _logger.e(
+        'DeviceWebSocketDataSource: SignedId not found in device images: $signedIdToDelete',
+      );
+      throw Exception('SignedId not found in device images.');
+    }
+
+    print('Sending delete request - keeping ${updatedSignedIds.length} images');
+    print('updatedSignedIds: $updatedSignedIds');
 
     try {
-      final response = await _webSocketService.requestActionCable(
-        action: 'update_resource',
-        resourceType: resourceType,
-        additionalData: {
-          'id': rawId,
-          'params': {'pictures': updatedImages},
-        },
-        timeout: const Duration(seconds: 15),
-      );
+      // Send update request without waiting for response (fire-and-forget)
+      // The backend broadcasts resource_updated without request_id, causing timeouts
+      // Instead, we send and verify by fetching the updated device
+      final requestId = 'req-$resourceType-${DateTime.now().millisecondsSinceEpoch}';
+      final data = {
+        'action': 'update_resource',
+        'resource_type': resourceType,
+        'request_id': requestId,
+        'id': rawId,
+        'params': {'images': updatedSignedIds},
+      };
 
-      final deviceData = _extractDeviceData(response.payload, response.raw);
-      if (deviceData != null) {
-        return _mapToDeviceModel(resourceType, deviceData);
+      _webSocketService.send({
+        'command': 'message',
+        'identifier': '{"channel":"RxgChannel"}',
+        'data': jsonEncode(data),
+      });
+
+      print('Update request sent (fire-and-forget)');
+      _logger.i('DeviceWebSocketDataSource: Image delete request sent');
+
+      // Wait briefly for the backend to process the update
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+
+      // Verify the change by fetching the updated device
+      print('Verifying delete by fetching device...');
+      final updatedDevice = await getDevice(deviceId);
+
+      final newImageCount = updatedDevice.images?.length ?? 0;
+      print('Verification: device now has $newImageCount images');
+
+      if (newImageCount < currentSignedIds.length) {
+        print('Image deletion verified successfully');
+        return updatedDevice;
+      } else {
+        _logger.w('DeviceWebSocketDataSource: Image count unchanged after delete');
+        // Still return the device - the cache may update later via WebSocket broadcast
+        return updatedDevice;
       }
-
-      // Return updated device
-      return await getDevice(deviceId);
     } on Exception catch (e) {
       _logger.e('DeviceWebSocketDataSource: Failed to delete device image: $e');
       throw Exception('Failed to delete device image: $e');

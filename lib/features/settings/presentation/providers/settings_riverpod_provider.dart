@@ -1,6 +1,8 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart'
     show notificationGenerationServiceProvider;
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart'
+    show webSocketCacheIntegrationProvider;
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
@@ -105,6 +107,14 @@ class SettingsNotifier extends _$SettingsNotifier {
       // Clear SharedPreferences cache
       await repository.clearCache();
 
+      // Clear WebSocket data caches and request fresh data from server
+      try {
+        ref.read(webSocketCacheIntegrationProvider).clearDataAndRefresh();
+        _logger.d('WebSocket data cleared and refresh requested');
+      } on Exception catch (e) {
+        _logger.w('Failed to clear WebSocket cache: $e');
+      }
+
       // Reset in-memory notification state (clears _notifications and _previousDeviceStates)
       ref.read(notificationGenerationServiceProvider).reset();
       _logger.d('Notification generation service reset');
@@ -112,6 +122,7 @@ class SettingsNotifier extends _$SettingsNotifier {
       // Invalidate data providers so they refetch fresh data on next access
       ref
         ..invalidate(devicesNotifierProvider)
+        ..invalidate(deviceNotifierProvider) // Device detail provider family
         ..invalidate(roomsNotifierProvider)
         ..invalidate(deviceNotificationsNotifierProvider);
 

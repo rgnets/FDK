@@ -32,8 +32,8 @@ abstract class DeviceDataSource {
   /// Resets a device to factory defaults
   Future<void> resetDevice(String deviceId);
 
-  /// Deletes an image from a device
-  Future<DeviceModel> deleteDeviceImage(String deviceId, String imageUrl);
+  /// Deletes an image from a device by its signed ID
+  Future<DeviceModel> deleteDeviceImage(String deviceId, String signedIdToDelete);
 
   /// Uploads images to a device
   ///

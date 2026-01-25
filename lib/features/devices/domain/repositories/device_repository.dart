@@ -19,7 +19,7 @@ abstract class DeviceRepository {
   Future<Either<Failure, void>> resetDevice(String deviceId);
   Future<Either<Failure, Device>> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
   );
 
   /// Upload images to a device

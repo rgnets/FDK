@@ -271,11 +271,19 @@ class ImageUploadNotifier extends _$ImageUploadNotifier {
         existingImages: existingImages,
       );
 
-      state = state.copyWith(
-        isUploading: false,
-        successMessage: result.message,
-        uploadProgress: processedImages.length,
-      );
+      if (result.success) {
+        state = state.copyWith(
+          isUploading: false,
+          successMessage: result.message,
+          uploadProgress: processedImages.length,
+        );
+      } else {
+        state = state.copyWith(
+          isUploading: false,
+          errorMessage: result.message,
+          uploadProgress: processedImages.length,
+        );
+      }
 
       return result.success;
     } catch (e) {

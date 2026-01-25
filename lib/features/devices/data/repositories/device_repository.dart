@@ -345,19 +345,26 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<Failure, Device>> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
   ) async {
+    print('=== REPOSITORY DELETE IMAGE ===');
+    print('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
+    _logger.i('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
     try {
       if (!_isAuthenticated()) {
+        _logger.w('DeviceRepositoryImpl: Not authenticated');
         return const Left(DeviceFailure(message: 'Not authenticated'));
       }
+      _logger.i('DeviceRepositoryImpl: Calling dataSource.deleteDeviceImage');
       final updatedModel = await dataSource.deleteDeviceImage(
         deviceId,
-        imageUrl,
+        signedIdToDelete,
       );
+      _logger.i('DeviceRepositoryImpl: Delete successful, caching device');
       await localDataSource.cacheDevice(updatedModel);
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
+      _logger.e('DeviceRepositoryImpl: Failed to delete device image: $e');
       return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
     }
   }

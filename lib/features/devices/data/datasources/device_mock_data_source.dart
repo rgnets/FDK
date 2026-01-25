@@ -97,17 +97,30 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
   @override
   Future<DeviceModel> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
   ) async {
     final device = await getDevice(deviceId);
+    final currentSignedIds = device.imageSignedIds ?? const [];
     final currentImages = device.images ?? const [];
-    if (currentImages.isEmpty) {
+    if (currentSignedIds.isEmpty) {
       return device;
     }
 
-    final updatedImages =
-        currentImages.where((image) => image != imageUrl).toList();
-    return device.copyWith(images: updatedImages);
+    // Filter out the signed ID to delete
+    final updatedSignedIds =
+        currentSignedIds.where((id) => id != signedIdToDelete).toList();
+    // Also update images list to match
+    final deleteIndex = currentSignedIds.indexOf(signedIdToDelete);
+    List<String> updatedImages;
+    if (deleteIndex >= 0 && deleteIndex < currentImages.length) {
+      updatedImages = List<String>.from(currentImages)..removeAt(deleteIndex);
+    } else {
+      updatedImages = List<String>.from(currentImages);
+    }
+    return device.copyWith(
+      images: updatedImages,
+      imageSignedIds: updatedSignedIds,
+    );
   }
 
   @override

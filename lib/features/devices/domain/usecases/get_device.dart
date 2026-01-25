@@ -12,7 +12,11 @@ final class GetDevice extends UseCase<Device, GetDeviceParams> {
 
   @override
   Future<Either<Failure, Device>> call(GetDeviceParams params) async {
-    return repository.getDevice(params.id, fields: params.fields);
+    return repository.getDevice(
+      params.id,
+      fields: params.fields,
+      forceRefresh: params.forceRefresh,
+    );
   }
 }
 
@@ -20,11 +24,13 @@ class GetDeviceParams extends Params {
   const GetDeviceParams({
     required this.id,
     this.fields,
+    this.forceRefresh = false,
   });
 
   final String id;
   final List<String>? fields;
+  final bool forceRefresh;
 
   @override
-  List<Object?> get props => [id, fields];
+  List<Object?> get props => [id, fields, forceRefresh];
 }

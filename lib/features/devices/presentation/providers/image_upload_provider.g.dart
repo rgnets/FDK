@@ -48,8 +48,8 @@ String _$restImageUploadServiceHash() =>
 
 /// Provider for RestImageUploadService
 ///
-/// Uses [SecureHttpClient] internally for certificate validation,
-/// so no external HTTP client is needed.
+/// Uses Dio internally with certificate validation for handling
+/// self-signed certificates. No external client needed.
 ///
 /// Copied from [restImageUploadService].
 @ProviderFor(restImageUploadService)
@@ -67,7 +67,7 @@ final restImageUploadServiceProvider =
 typedef RestImageUploadServiceRef
     = AutoDisposeProviderRef<RestImageUploadService>;
 String _$imageUploadServiceHash() =>
-    r'a0115e6fb6263c044c6119d5ee65b179c36fcc99';
+    r'3db2c9c2681ec8ca771a30d09805f6c8f3576250';
 
 /// Provider for ImageUploadService
 ///

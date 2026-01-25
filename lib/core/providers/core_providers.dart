@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
@@ -58,6 +59,16 @@ final notificationGenerationServiceProvider =
     Provider<NotificationGenerationService>((ref) {
       return NotificationGenerationService();
     });
+
+/// Device update event bus provider
+///
+/// Enables the device detail view to refresh when external apps
+/// modify device data (especially images) via WebSocket notifications.
+final deviceUpdateEventBusProvider = Provider<DeviceUpdateEventBus>((ref) {
+  final bus = DeviceUpdateEventBus();
+  ref.onDispose(bus.dispose);
+  return bus;
+});
 
 /// Provider for the current API key used for authenticated HTTP requests.
 /// This is the token stored during authentication, used to authenticate
