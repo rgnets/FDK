@@ -1,0 +1,337 @@
+/// Riverpod providers for image upload functionality.
+///
+/// Provides state management for image upload operations
+/// including picking, processing, uploading, and verification.
+///
+/// Image uploads use REST API (HTTP PUT) for reliability with large payloads.
+/// The REST service uses [SecureHttpClient] to handle self-signed certificates.
+/// Verification and metadata fetching still use WebSocket via the repository.
+library;
+
+import 'package:image_picker/image_picker.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
+import 'package:rgnets_fdk/features/devices/domain/config/image_upload_config.dart';
+import 'package:rgnets_fdk/features/devices/domain/services/image_processor.dart';
+import 'package:rgnets_fdk/features/devices/domain/services/image_upload_service.dart';
+import 'package:rgnets_fdk/features/devices/domain/services/image_upload_verifier.dart';
+
+part 'image_upload_provider.g.dart';
+
+/// Provider for the ImageUploadEventBus singleton
+@Riverpod(keepAlive: true)
+ImageUploadEventBus imageUploadEventBus(ImageUploadEventBusRef ref) {
+  return ImageUploadEventBus();
+}
+
+/// Provider for ImageUploadVerifier
+@riverpod
+ImageUploadVerifier imageUploadVerifier(ImageUploadVerifierRef ref) {
+  final repository = ref.watch(deviceRepositoryProvider);
+
+  return ImageUploadVerifier(
+    fetchImagesCallback: (deviceType, deviceId) async {
+      // Use forceRefresh: true to bypass cache and make a fresh WebSocket request
+      // This ensures we get the actual current images from the server after upload
+      final result = await repository.getDevice(deviceId, forceRefresh: true);
+      return result.fold(
+        (failure) => throw Exception(failure.message),
+        (device) => device.images ?? [],
+      );
+    },
+  );
+}
+
+/// Provider for RestImageUploadService
+///
+/// Uses Dio internally with certificate validation for handling
+/// self-signed certificates. No external client needed.
+@riverpod
+RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
+  final storage = ref.watch(storageServiceProvider);
+
+  final siteUrl = storage.siteUrl ?? '';
+  final apiKey = storage.token ?? '';
+
+  if (siteUrl.isEmpty || apiKey.isEmpty) {
+    throw StateError('Not authenticated: missing siteUrl or apiKey');
+  }
+
+  return RestImageUploadService(
+    siteUrl: siteUrl,
+    apiKey: apiKey,
+  );
+}
+
+/// Provider for ImageUploadService
+///
+/// Uses REST API (HTTP PUT) for uploading images instead of WebSocket.
+/// This provides better reliability for large base64 payloads.
+/// After upload, requests updated device data via WebSocket to ensure
+/// the UI automatically updates with the new images.
+@riverpod
+ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
+  final restService = ref.watch(restImageUploadServiceProvider);
+  final verifier = ref.watch(imageUploadVerifierProvider);
+  final eventBus = ref.watch(imageUploadEventBusProvider);
+  final repository = ref.watch(deviceRepositoryProvider);
+
+  return ImageUploadService(
+    uploadCallback: (resourceType, deviceId, params) async {
+      final images = params['images'] as List<String>;
+
+      LoggerService.info(
+        'Uploading ${images.length} images via REST API to $resourceType/$deviceId',
+        tag: 'ImageUploadProvider',
+      );
+
+      final result = await restService.uploadImages(
+        deviceId: deviceId,
+        resourceType: resourceType,
+        images: images,
+      );
+
+      if (result.success) {
+        return {'success': true, 'device_id': deviceId};
+      } else {
+        throw Exception(result.errorMessage ?? 'Upload failed');
+      }
+    },
+    verifier: verifier,
+    eventBus: eventBus,
+    restUploadService: restService,
+    refreshCallback: (deviceType, deviceId) async {
+      // Request updated device data via WebSocket
+      // The repository.getDevice() triggers a WebSocket request which updates the cache
+      // The full device ID includes the prefix (e.g., ap_123)
+      LoggerService.info(
+        'Requesting device refresh via repository for $deviceType-$deviceId',
+        tag: 'ImageUploadProvider',
+      );
+      await repository.getDevice(deviceId);
+    },
+  );
+}
+
+/// Reconstruct full device ID from resource type and raw ID
+String _reconstructDeviceId(String resourceType, String rawId) {
+  switch (resourceType) {
+    case 'access_points':
+      return 'ap_$rawId';
+    case 'media_converters':
+      return 'ont_$rawId';
+    case 'switch_devices':
+      return 'sw_$rawId';
+    case 'wlan_devices':
+      return 'wlan_$rawId';
+    default:
+      return rawId;
+  }
+}
+
+/// State for image upload operations
+class ImageUploadViewState {
+  final bool isUploading;
+  final bool isPickingImage;
+  final String? errorMessage;
+  final String? successMessage;
+  final int uploadProgress;
+  final int totalImages;
+
+  const ImageUploadViewState({
+    this.isUploading = false,
+    this.isPickingImage = false,
+    this.errorMessage,
+    this.successMessage,
+    this.uploadProgress = 0,
+    this.totalImages = 0,
+  });
+
+  factory ImageUploadViewState.initial() => const ImageUploadViewState();
+
+  ImageUploadViewState copyWith({
+    bool? isUploading,
+    bool? isPickingImage,
+    String? errorMessage,
+    String? successMessage,
+    int? uploadProgress,
+    int? totalImages,
+  }) {
+    return ImageUploadViewState(
+      isUploading: isUploading ?? this.isUploading,
+      isPickingImage: isPickingImage ?? this.isPickingImage,
+      errorMessage: errorMessage,
+      successMessage: successMessage,
+      uploadProgress: uploadProgress ?? this.uploadProgress,
+      totalImages: totalImages ?? this.totalImages,
+    );
+  }
+
+  bool get isLoading => isUploading || isPickingImage;
+}
+
+/// Notifier for image upload state per device
+@riverpod
+class ImageUploadNotifier extends _$ImageUploadNotifier {
+  @override
+  ImageUploadViewState build(String deviceId) {
+    return ImageUploadViewState.initial();
+  }
+
+  /// Pick and upload images
+  Future<bool> pickAndUploadImages({
+    required ImageSource source,
+    required String deviceType,
+    String? roomId,
+    required List<String> existingImages,
+  }) async {
+    if (state.isLoading) {
+      return false;
+    }
+
+    state = state.copyWith(
+      isPickingImage: true,
+      errorMessage: null,
+      successMessage: null,
+    );
+
+    try {
+      // Pick image(s)
+      final picker = ImagePicker();
+      List<XFile> pickedFiles = [];
+
+      if (source == ImageSource.camera) {
+        final file = await picker.pickImage(
+          source: source,
+          maxWidth: ImageUploadConfig.enableDownsampling
+              ? ImageUploadConfig.maxDimension
+              : null,
+          maxHeight: ImageUploadConfig.enableDownsampling
+              ? ImageUploadConfig.maxDimension
+              : null,
+          imageQuality: ImageUploadConfig.imageQuality,
+        );
+        if (file != null) {
+          pickedFiles = [file];
+        }
+      } else {
+        pickedFiles = await picker.pickMultiImage(
+          maxWidth: ImageUploadConfig.enableDownsampling
+              ? ImageUploadConfig.maxDimension
+              : null,
+          maxHeight: ImageUploadConfig.enableDownsampling
+              ? ImageUploadConfig.maxDimension
+              : null,
+          imageQuality: ImageUploadConfig.imageQuality,
+        );
+      }
+
+      if (pickedFiles.isEmpty) {
+        state = state.copyWith(isPickingImage: false);
+        return false;
+      }
+
+      // Process images
+      state = state.copyWith(
+        isPickingImage: false,
+        isUploading: true,
+        totalImages: pickedFiles.length,
+        uploadProgress: 0,
+      );
+
+      final processedImages = <ProcessedImage>[];
+      for (final file in pickedFiles) {
+        final bytes = await file.readAsBytes();
+
+        // Validate file size
+        if (!ImageProcessor.validateFileSize(bytes)) {
+          throw ImageTooLargeException(bytes.length);
+        }
+
+        processedImages.add(ProcessedImage(
+          bytes: bytes,
+          base64Data: ImageProcessor.createBase64DataUrl(bytes, file.path),
+          fileName: file.name,
+          sizeBytes: bytes.length,
+        ));
+      }
+
+      // Upload images
+      final uploadService = ref.read(imageUploadServiceProvider);
+      final result = await uploadService.uploadImages(
+        deviceType: deviceType,
+        deviceId: deviceId,
+        roomId: roomId,
+        images: processedImages,
+        existingImages: existingImages,
+      );
+
+      if (result.success) {
+        state = state.copyWith(
+          isUploading: false,
+          successMessage: result.message,
+          uploadProgress: processedImages.length,
+        );
+      } else {
+        state = state.copyWith(
+          isUploading: false,
+          errorMessage: result.message,
+          uploadProgress: processedImages.length,
+        );
+      }
+
+      return result.success;
+    } catch (e) {
+      LoggerService.error(
+        'Image upload failed',
+        tag: 'ImageUploadNotifier',
+        error: e,
+      );
+
+      state = state.copyWith(
+        isPickingImage: false,
+        isUploading: false,
+        errorMessage: _getErrorMessage(e),
+      );
+
+      return false;
+    }
+  }
+
+  /// Clear any messages
+  void clearMessages() {
+    state = state.copyWith(
+      errorMessage: null,
+      successMessage: null,
+    );
+  }
+
+  String _getErrorMessage(Object error) {
+    if (error is ImageTooLargeException) {
+      return error.message;
+    }
+    if (error is Exception) {
+      return error.toString().replaceFirst('Exception: ', '');
+    }
+    return 'An unexpected error occurred';
+  }
+}
+
+/// Stream provider for image upload events
+@Riverpod(keepAlive: true)
+Stream<ImageUploadEvent> imageUploadEvents(ImageUploadEventsRef ref) {
+  return ref.watch(imageUploadEventBusProvider).imageUploaded;
+}
+
+/// Stream provider for cache invalidation events
+@Riverpod(keepAlive: true)
+Stream<CacheInvalidationEvent> cacheInvalidationEvents(
+  CacheInvalidationEventsRef ref,
+) {
+  return ref.watch(imageUploadEventBusProvider).cacheInvalidated;
+}

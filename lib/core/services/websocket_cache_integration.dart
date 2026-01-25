@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
+import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
@@ -25,13 +27,16 @@ class WebSocketCacheIntegration {
     required WebSocketService webSocketService,
     String? imageBaseUrl,
     Logger? logger,
+    DeviceUpdateEventBus? deviceUpdateEventBus,
   })  : _webSocketService = webSocketService,
         _imageBaseUrl = imageBaseUrl,
-        _logger = logger ?? Logger();
+        _logger = logger ?? Logger(),
+        _deviceUpdateEventBus = deviceUpdateEventBus;
 
   final WebSocketService _webSocketService;
   final String? _imageBaseUrl;
   final Logger _logger;
+  final DeviceUpdateEventBus? _deviceUpdateEventBus;
 
   /// Device resource types to subscribe to.
   static const List<String> _deviceResourceTypes = [
@@ -173,6 +178,7 @@ class WebSocketCacheIntegration {
 
       switch (resourceType) {
         case 'access_points':
+          final apImageData = _extractImagesData(deviceMap);
           return DeviceModelSealed.ap(
             id: 'ap_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
@@ -183,7 +189,8 @@ class WebSocketCacheIntegration {
             model: deviceMap['model']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
-            images: _extractImages(deviceMap),
+            images: apImageData?.urls,
+            imageSignedIds: apImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
@@ -195,6 +202,7 @@ class WebSocketCacheIntegration {
           );
 
         case 'media_converters':
+          final mcImageData = _extractImagesData(deviceMap);
           return DeviceModelSealed.ont(
             id: 'ont_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
@@ -205,7 +213,8 @@ class WebSocketCacheIntegration {
             model: deviceMap['model']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
-            images: _extractImages(deviceMap),
+            images: mcImageData?.urls,
+            imageSignedIds: mcImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
@@ -217,6 +226,7 @@ class WebSocketCacheIntegration {
           );
 
         case 'switch_devices':
+          final swImageData = _extractImagesData(deviceMap);
           return DeviceModelSealed.switchDevice(
             id: 'sw_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ??
@@ -230,12 +240,15 @@ class WebSocketCacheIntegration {
             model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
-            images: _extractImages(deviceMap),
+            images: swImageData?.urls,
+            imageSignedIds: swImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
+            metadata: deviceMap,
           );
 
         case 'wlan_devices':
+          final wlanImageData = _extractImagesData(deviceMap);
           return DeviceModelSealed.wlan(
             id: 'wlan_${deviceMap['id']}',
             name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
@@ -245,7 +258,8 @@ class WebSocketCacheIntegration {
             model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
             serialNumber: deviceMap['serial_number']?.toString(),
             note: deviceMap['note']?.toString(),
-            images: _extractImages(deviceMap),
+            images: wlanImageData?.urls,
+            imageSignedIds: wlanImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
@@ -291,9 +305,10 @@ class WebSocketCacheIntegration {
     return null;
   }
 
-  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
+  /// Extract images with both URLs and signed IDs.
+  ImageExtraction? _extractImagesData(Map<String, dynamic> deviceMap) {
     final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
-    return normalizeImageUrls(imagesValue, baseUrl: _imageBaseUrl);
+    return extractImagesWithSignedIds(imagesValue, baseUrl: _imageBaseUrl);
   }
 
   HealthCountsModel? _extractHealthCounts(Map<String, dynamic> deviceMap) {
@@ -493,7 +508,12 @@ class WebSocketCacheIntegration {
 
     var allSent = true;
     for (final resource in _resourceTypes) {
-      final sent = _requestSnapshot(resource);
+      // Use field selection for device resources to optimize payload size
+      // Rooms don't need field selection (already small)
+      final fields = _deviceResourceTypes.contains(resource)
+          ? DeviceFieldSets.listFields
+          : null;
+      final sent = _requestSnapshot(resource, fields: fields);
       if (!sent) {
         allSent = false;
       }
@@ -505,24 +525,33 @@ class WebSocketCacheIntegration {
     }
   }
 
-  bool _requestSnapshot(String resourceType) {
+  bool _requestSnapshot(String resourceType, {List<String>? fields}) {
     if (_requestedSnapshots.contains(resourceType)) return true;
     if (!_webSocketService.isConnected || !_channelConfirmed) {
       return false;
     }
 
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
+    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType'
+        '${fields != null ? " with ${fields.length} fields" : ""}');
     _requestedSnapshots.add(resourceType);
 
     // Send ActionCable formatted resource_action index request
-    final sent = _sendActionCableMessage({
+    final payload = <String, dynamic>{
       'action': 'resource_action',
       'resource_type': resourceType,
       'crud_action': 'index',
       'page': 1,
       'page_size': 10000,
       'request_id': 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
-    });
+    };
+
+    // Add field selection to optimize payload size (reduces by ~80%)
+    // Must be comma-separated string, not array - RESTFramework expects string format
+    if (fields != null && fields.isNotEmpty) {
+      payload['only'] = fields.join(',');
+    }
+
+    final sent = _sendActionCableMessage(payload);
     if (!sent) {
       _requestedSnapshots.remove(resourceType);
       return false;
@@ -608,7 +637,7 @@ class WebSocketCacheIntegration {
     final resourceData = _extractResourceData(payload, raw);
     if (resourceData != null) {
       if (_isUpsertAction(action)) {
-        _applyUpsert(resourceType, resourceData);
+        _applyUpsert(resourceType, resourceData, action: action);
       } else if (_isDeleteAction(action)) {
         _applyDelete(resourceType, resourceData);
       }
@@ -710,6 +739,59 @@ class WebSocketCacheIntegration {
         action == 'destroyed' ||
         action == 'deleted' ||
         action == 'destroy';
+  }
+
+  /// Returns true for mutation actions that should emit update events.
+  /// Excludes 'show' to prevent feedback loops when DeviceNotifier refreshes.
+  bool _isMutationAction(String action) {
+    return action == 'resource_created' ||
+        action == 'resource_updated' ||
+        action == 'created' ||
+        action == 'updated' ||
+        action == 'create' ||
+        action == 'update';
+  }
+
+  /// Maps resource type and raw ID to prefixed device ID (e.g., 'ap_123').
+  String? _mapToDeviceId(String resourceType, dynamic id) {
+    if (id == null) return null;
+    switch (resourceType) {
+      case 'access_points':
+        return 'ap_$id';
+      case 'media_converters':
+        return 'ont_$id';
+      case 'switch_devices':
+        return 'sw_$id';
+      default:
+        return null;
+    }
+  }
+
+  /// Emits a device update event if the event bus is available.
+  void _emitDeviceUpdateEvent(
+    String resourceType,
+    dynamic id,
+    DeviceUpdateAction action, {
+    List<String>? changedFields,
+  }) {
+    if (_deviceUpdateEventBus == null) return;
+    if (!_deviceResourceTypes.contains(resourceType)) return;
+
+    final deviceId = _mapToDeviceId(resourceType, id);
+    if (deviceId == null) return;
+
+    _logger.d(
+      'WebSocketCacheIntegration: Emitting device update event - '
+      'deviceId=$deviceId, action=$action',
+    );
+
+    _deviceUpdateEventBus.emit(
+      DeviceUpdateEvent(
+        deviceId: deviceId,
+        action: action,
+        changedFields: changedFields,
+      ),
+    );
   }
 
   List<Map<String, dynamic>>? _extractSnapshotItems(
@@ -865,7 +947,11 @@ class WebSocketCacheIntegration {
     });
   }
 
-  void _applyUpsert(String resourceType, Map<String, dynamic> data) {
+  void _applyUpsert(
+    String resourceType,
+    Map<String, dynamic> data, {
+    String? action,
+  }) {
     final id = data['id'];
     if (id == null) return;
 
@@ -887,10 +973,11 @@ class WebSocketCacheIntegration {
       // Handle device upsert
       final cache = _deviceCache[resourceType] ?? [];
       final index = cache.indexWhere((item) => item['id'] == id);
-      if (index >= 0) {
-        cache[index] = data;
-      } else {
+      final isNew = index < 0;
+      if (isNew) {
         cache.add(data);
+      } else {
+        cache[index] = data;
       }
       _deviceCache[resourceType] = cache;
       _bumpLastUpdate();
@@ -899,6 +986,16 @@ class WebSocketCacheIntegration {
       // Notify device callbacks
       for (final callback in _deviceDataCallbacks) {
         callback(resourceType, cache);
+      }
+
+      // Emit device update event only for mutation actions (not 'show')
+      // to prevent feedback loops when DeviceNotifier refreshes
+      if (action != null && _isMutationAction(action)) {
+        _emitDeviceUpdateEvent(
+          resourceType,
+          id,
+          isNew ? DeviceUpdateAction.created : DeviceUpdateAction.updated,
+        );
       }
     }
   }
@@ -928,6 +1025,13 @@ class WebSocketCacheIntegration {
       for (final callback in _deviceDataCallbacks) {
         callback(resourceType, cache);
       }
+
+      // Emit device update event for external apps to trigger refresh
+      _emitDeviceUpdateEvent(
+        resourceType,
+        id,
+        DeviceUpdateAction.destroyed,
+      );
     }
   }
 
@@ -947,6 +1051,26 @@ class WebSocketCacheIntegration {
 
   void _bumpDeviceUpdate() {
     lastDeviceUpdate.value = DateTime.now();
+  }
+
+  /// Clears device/room data caches and requests fresh data from server.
+  /// Use this for "Clear Cache" in settings - keeps WebSocket connection alive.
+  void clearDataAndRefresh() {
+    _logger.i('WebSocketCacheIntegration: Clearing data caches and requesting refresh');
+
+    // Clear only device and room caches
+    _deviceCache.clear();
+    _roomCache.clear();
+
+    // Request fresh snapshots if connected
+    if (_webSocketService.isConnected && _channelConfirmed) {
+      _needsSnapshot = true;
+      _snapshotInFlight = false;
+      _requestFullSnapshots();
+    } else {
+      _logger.w('WebSocketCacheIntegration: Not connected, will request data when reconnected');
+      _needsSnapshot = true;
+    }
   }
 
   /// Clears all cached data without disposing the integration.

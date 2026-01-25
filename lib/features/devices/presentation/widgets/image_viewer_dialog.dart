@@ -1,18 +1,24 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:rgnets_fdk/core/widgets/hold_to_confirm_button.dart';
 
 /// Full-screen image viewer dialog with zoom and delete functionality
 class ImageViewerDialog extends StatefulWidget {
   const ImageViewerDialog({
     required this.images,
     required this.initialIndex,
-    this.onDelete,
+    this.onDeleteAtIndex,
+    this.apiKey,
     super.key,
   });
 
   final List<String> images;
   final int initialIndex;
-  final void Function(String imageUrl)? onDelete;
+  /// Callback when an image is deleted, provides the index of the deleted image
+  final void Function(int index)? onDeleteAtIndex;
+  /// Optional API key for authenticating image URLs.
+  /// If provided, will be appended to image URLs that don't already have it.
+  final String? apiKey;
 
   @override
   State<ImageViewerDialog> createState() => _ImageViewerDialogState();
@@ -35,34 +41,42 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
     super.dispose();
   }
 
-  void _handleDelete() {
-    final imageUrl = widget.images[_currentIndex];
-
-    showDialog<bool>(
+  void _showDeleteConfirmation() {
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Image'),
-        content: const Text(
-          'Are you sure you want to delete this image? This action cannot be undone.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'This action cannot be undone.',
+            ),
+            const SizedBox(height: 24),
+            HoldToConfirmButton(
+              text: 'Hold to Delete',
+              icon: Icons.delete,
+              holdDuration: const Duration(milliseconds: 1500),
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+              height: 48,
+              width: double.infinity,
+              onConfirmed: () {
+                Navigator.of(dialogContext).pop();
+                widget.onDeleteAtIndex?.call(_currentIndex);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
           ),
         ],
       ),
-    ).then((confirmed) {
-      if ((confirmed ?? false) && mounted) {
-        widget.onDelete?.call(imageUrl);
-        Navigator.of(context).pop();
-      }
-    });
+    );
   }
 
   @override
@@ -163,10 +177,10 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
                       ),
 
                     // Delete button
-                    if (widget.onDelete != null)
+                    if (widget.onDeleteAtIndex != null)
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.white),
-                        onPressed: _handleDelete,
+                        onPressed: _showDeleteConfirmation,
                       )
                     else
                       const SizedBox(width: 48),

@@ -380,13 +380,18 @@ class DeviceRepositoryImpl implements DeviceRepository {
   Future<Either<Failure, Device>> getDevice(
     String id, {
     List<String>? fields,
+    bool forceRefresh = false,
   }) async {
     try {
       if (!_isAuthenticated()) {
         return const Left(DeviceFailure(message: 'Not authenticated'));
       }
       // Use data source
-      final deviceModel = await dataSource.getDevice(id, fields: fields);
+      final deviceModel = await dataSource.getDevice(
+        id,
+        fields: fields,
+        forceRefresh: forceRefresh,
+      );
       await _cacheDeviceToTypedCache(deviceModel);
       return Right(deviceModel.toEntity());
     } on Object catch (e) {
@@ -574,20 +579,50 @@ class DeviceRepositoryImpl implements DeviceRepository {
   @override
   Future<Either<Failure, Device>> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
+  ) async {
+    print('=== REPOSITORY DELETE IMAGE ===');
+    print('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
+    _logger.i('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
+    try {
+      if (!_isAuthenticated()) {
+        _logger.w('DeviceRepositoryImpl: Not authenticated');
+        return const Left(DeviceFailure(message: 'Not authenticated'));
+      }
+      _logger.i('DeviceRepositoryImpl: Calling dataSource.deleteDeviceImage');
+      final updatedModel = await dataSource.deleteDeviceImage(
+        deviceId,
+        signedIdToDelete,
+      );
+      _logger.i('DeviceRepositoryImpl: Delete successful, caching device');
+      await _cacheDeviceToTypedCache(updatedModel);
+      return Right(updatedModel.toEntity());
+    } on Exception catch (e) {
+      _logger.e('DeviceRepositoryImpl: Failed to delete device image: $e');
+      return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Device>> uploadDeviceImages(
+    String deviceId,
+    List<String> base64Images,
   ) async {
     try {
       if (!_isAuthenticated()) {
         return const Left(DeviceFailure(message: 'Not authenticated'));
       }
-      final updatedModel = await dataSource.deleteDeviceImage(
+      _logger.i('DeviceRepositoryImpl: Uploading ${base64Images.length} images to $deviceId');
+      final updatedModel = await dataSource.uploadDeviceImages(
         deviceId,
-        imageUrl,
+        base64Images,
       );
       await _cacheDeviceToTypedCache(updatedModel);
+      _logger.i('DeviceRepositoryImpl: Successfully uploaded images to $deviceId');
       return Right(updatedModel.toEntity());
     } on Exception catch (e) {
-      return Left(DeviceFailure(message: 'Failed to delete device image: $e'));
+      _logger.e('DeviceRepositoryImpl: Failed to upload images: $e');
+      return Left(DeviceFailure(message: 'Failed to upload device images: $e'));
     }
   }
 

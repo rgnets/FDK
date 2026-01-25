@@ -55,6 +55,8 @@ mixin _$DeviceModelSealed {
   String? get firmware => throw _privateConstructorUsedError;
   String? get note => throw _privateConstructorUsedError;
   List<String>? get images => throw _privateConstructorUsedError;
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds => throw _privateConstructorUsedError;
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices =>
       throw _privateConstructorUsedError;
@@ -78,6 +80,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -108,6 +111,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -135,6 +139,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -163,6 +168,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -195,6 +201,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -225,6 +232,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -252,6 +260,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -280,6 +289,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -312,6 +322,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -342,6 +353,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -369,6 +381,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -397,6 +410,7 @@ mixin _$DeviceModelSealed {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -465,6 +479,7 @@ abstract class $DeviceModelSealedCopyWith<$Res> {
       String? firmware,
       String? note,
       List<String>? images,
+      @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
 
@@ -500,6 +515,7 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
     Object? firmware = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
   }) {
@@ -564,6 +580,10 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
           ? _value.images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value.imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value.healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -624,6 +644,7 @@ abstract class _$$APModelImplCopyWith<$Res>
       String? firmware,
       String? note,
       List<String>? images,
+      @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
       @JsonKey(name: 'connection_state') String? connectionState,
@@ -670,6 +691,7 @@ class __$$APModelImplCopyWithImpl<$Res>
     Object? firmware = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
     Object? connectionState = freezed,
@@ -742,6 +764,10 @@ class __$$APModelImplCopyWithImpl<$Res>
       images: freezed == images
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
               as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value._healthNotices
@@ -823,6 +849,7 @@ class _$APModelImpl extends APModel {
       this.firmware,
       this.note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts,
@@ -838,6 +865,7 @@ class _$APModelImpl extends APModel {
       final String? $type})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         $type = $type ?? 'access_point',
         super._();
@@ -898,6 +926,17 @@ class _$APModelImpl extends APModel {
     return EqualUnmodifiableListView(value);
   }
 
+  final List<String>? _imageSignedIds;
+  @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<HealthNoticeModel>? _healthNotices;
   @override
   @JsonKey(name: 'health_notices')
@@ -944,7 +983,7 @@ class _$APModelImpl extends APModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus)';
+    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus)';
   }
 
   @override
@@ -974,6 +1013,8 @@ class _$APModelImpl extends APModel {
                 other.firmware == firmware) &&
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
+            const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds) &&
             const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
@@ -1015,6 +1056,7 @@ class _$APModelImpl extends APModel {
         firmware,
         note,
         const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts,
         connectionState,
@@ -1053,6 +1095,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1083,6 +1126,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1110,6 +1154,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1138,6 +1183,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1167,6 +1213,7 @@ class _$APModelImpl extends APModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         connectionState,
@@ -1199,6 +1246,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1229,6 +1277,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1256,6 +1305,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1284,6 +1334,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1313,6 +1364,7 @@ class _$APModelImpl extends APModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         connectionState,
@@ -1345,6 +1397,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1375,6 +1428,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1402,6 +1456,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1430,6 +1485,7 @@ class _$APModelImpl extends APModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -1461,6 +1517,7 @@ class _$APModelImpl extends APModel {
           firmware,
           note,
           images,
+          imageSignedIds,
           healthNotices,
           hnCounts,
           connectionState,
@@ -1538,6 +1595,7 @@ abstract class APModel extends DeviceModelSealed {
       final String? firmware,
       final String? note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
@@ -1592,6 +1650,9 @@ abstract class APModel extends DeviceModelSealed {
   @override
   List<String>? get images;
   @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds;
+  @override
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices;
   @override
@@ -1643,6 +1704,7 @@ abstract class _$$ONTModelImplCopyWith<$Res>
       String? firmware,
       String? note,
       List<String>? images,
+      @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
       @JsonKey(name: 'is_registered') bool? isRegistered,
@@ -1686,6 +1748,7 @@ class __$$ONTModelImplCopyWithImpl<$Res>
     Object? firmware = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
     Object? isRegistered = freezed,
@@ -1756,6 +1819,10 @@ class __$$ONTModelImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value._healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -1824,6 +1891,7 @@ class _$ONTModelImpl extends ONTModel {
       this.firmware,
       this.note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts,
@@ -1836,6 +1904,7 @@ class _$ONTModelImpl extends ONTModel {
       final String? $type})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         _switchPort = switchPort,
         _ports = ports,
@@ -1898,6 +1967,17 @@ class _$ONTModelImpl extends ONTModel {
     return EqualUnmodifiableListView(value);
   }
 
+  final List<String>? _imageSignedIds;
+  @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<HealthNoticeModel>? _healthNotices;
   @override
   @JsonKey(name: 'health_notices')
@@ -1951,7 +2031,7 @@ class _$ONTModelImpl extends ONTModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.ont(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, isRegistered: $isRegistered, switchPort: $switchPort, onboardingStatus: $onboardingStatus, ports: $ports, uptime: $uptime, phase: $phase)';
+    return 'DeviceModelSealed.ont(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, isRegistered: $isRegistered, switchPort: $switchPort, onboardingStatus: $onboardingStatus, ports: $ports, uptime: $uptime, phase: $phase)';
   }
 
   @override
@@ -1981,6 +2061,8 @@ class _$ONTModelImpl extends ONTModel {
                 other.firmware == firmware) &&
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
+            const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds) &&
             const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
@@ -2015,6 +2097,7 @@ class _$ONTModelImpl extends ONTModel {
         firmware,
         note,
         const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts,
         isRegistered,
@@ -2050,6 +2133,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2080,6 +2164,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2107,6 +2192,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2135,6 +2221,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2164,6 +2251,7 @@ class _$ONTModelImpl extends ONTModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         isRegistered,
@@ -2193,6 +2281,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2223,6 +2312,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2250,6 +2340,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2278,6 +2369,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2307,6 +2399,7 @@ class _$ONTModelImpl extends ONTModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         isRegistered,
@@ -2336,6 +2429,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2366,6 +2460,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2393,6 +2488,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2421,6 +2517,7 @@ class _$ONTModelImpl extends ONTModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -2452,6 +2549,7 @@ class _$ONTModelImpl extends ONTModel {
           firmware,
           note,
           images,
+          imageSignedIds,
           healthNotices,
           hnCounts,
           isRegistered,
@@ -2526,6 +2624,7 @@ abstract class ONTModel extends DeviceModelSealed {
       final String? firmware,
       final String? note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
@@ -2578,6 +2677,9 @@ abstract class ONTModel extends DeviceModelSealed {
   @override
   List<String>? get images;
   @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds;
+  @override
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices;
   @override
@@ -2623,6 +2725,7 @@ abstract class _$$SwitchModelImplCopyWith<$Res>
       String? firmware,
       String? note,
       List<String>? images,
+      @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
       String? host,
@@ -2666,6 +2769,7 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
     Object? firmware = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
     Object? host = freezed,
@@ -2737,6 +2841,10 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value._healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -2796,6 +2904,7 @@ class _$SwitchModelImpl extends SwitchModel {
       this.firmware,
       this.note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts,
@@ -2809,6 +2918,7 @@ class _$SwitchModelImpl extends SwitchModel {
       final String? $type})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         _ports = ports,
         $type = $type ?? 'switch',
@@ -2870,6 +2980,17 @@ class _$SwitchModelImpl extends SwitchModel {
     return EqualUnmodifiableListView(value);
   }
 
+  final List<String>? _imageSignedIds;
+  @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<HealthNoticeModel>? _healthNotices;
   @override
   @JsonKey(name: 'health_notices')
@@ -2918,7 +3039,7 @@ class _$SwitchModelImpl extends SwitchModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature)';
+    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature)';
   }
 
   @override
@@ -2948,6 +3069,8 @@ class _$SwitchModelImpl extends SwitchModel {
                 other.firmware == firmware) &&
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
+            const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds) &&
             const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
@@ -2985,6 +3108,7 @@ class _$SwitchModelImpl extends SwitchModel {
         firmware,
         note,
         const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts,
         host,
@@ -3021,6 +3145,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3051,6 +3176,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3078,6 +3204,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3106,6 +3233,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3135,6 +3263,7 @@ class _$SwitchModelImpl extends SwitchModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         host,
@@ -3165,6 +3294,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3195,6 +3325,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3222,6 +3353,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3250,6 +3382,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3279,6 +3412,7 @@ class _$SwitchModelImpl extends SwitchModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         host,
@@ -3309,6 +3443,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3339,6 +3474,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3366,6 +3502,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3394,6 +3531,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -3425,6 +3563,7 @@ class _$SwitchModelImpl extends SwitchModel {
           firmware,
           note,
           images,
+          imageSignedIds,
           healthNotices,
           hnCounts,
           host,
@@ -3500,6 +3639,7 @@ abstract class SwitchModel extends DeviceModelSealed {
       final String? firmware,
       final String? note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
@@ -3553,6 +3693,9 @@ abstract class SwitchModel extends DeviceModelSealed {
   @override
   List<String>? get images;
   @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds;
+  @override
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices;
   @override
@@ -3600,6 +3743,7 @@ abstract class _$$WLANModelImplCopyWith<$Res>
       String? firmware,
       String? note,
       List<String>? images,
+      @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
       @JsonKey(name: 'controller_type') String? controllerType,
@@ -3643,6 +3787,7 @@ class __$$WLANModelImplCopyWithImpl<$Res>
     Object? firmware = freezed,
     Object? note = freezed,
     Object? images = freezed,
+    Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
     Object? controllerType = freezed,
@@ -3715,6 +3860,10 @@ class __$$WLANModelImplCopyWithImpl<$Res>
           ? _value._images
           : images // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      imageSignedIds: freezed == imageSignedIds
+          ? _value._imageSignedIds
+          : imageSignedIds // ignore: cast_nullable_to_non_nullable
+              as List<String>?,
       healthNotices: freezed == healthNotices
           ? _value._healthNotices
           : healthNotices // ignore: cast_nullable_to_non_nullable
@@ -3778,6 +3927,7 @@ class _$WLANModelImpl extends WLANModel {
       this.firmware,
       this.note,
       final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices')
       final List<HealthNoticeModel>? healthNotices,
       @JsonKey(name: 'hn_counts') this.hnCounts,
@@ -3792,6 +3942,7 @@ class _$WLANModelImpl extends WLANModel {
       final String? $type})
       : _metadata = metadata,
         _images = images,
+        _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         $type = $type ?? 'wlan_controller',
         super._();
@@ -3852,6 +4003,17 @@ class _$WLANModelImpl extends WLANModel {
     return EqualUnmodifiableListView(value);
   }
 
+  final List<String>? _imageSignedIds;
+  @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds {
+    final value = _imageSignedIds;
+    if (value == null) return null;
+    if (_imageSignedIds is EqualUnmodifiableListView) return _imageSignedIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   final List<HealthNoticeModel>? _healthNotices;
   @override
   @JsonKey(name: 'health_notices')
@@ -3895,7 +4057,7 @@ class _$WLANModelImpl extends WLANModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.wlan(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, healthNotices: $healthNotices, hnCounts: $hnCounts, controllerType: $controllerType, managedAPs: $managedAPs, vlan: $vlan, totalUpload: $totalUpload, totalDownload: $totalDownload, packetLoss: $packetLoss, latency: $latency, restartCount: $restartCount)';
+    return 'DeviceModelSealed.wlan(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, controllerType: $controllerType, managedAPs: $managedAPs, vlan: $vlan, totalUpload: $totalUpload, totalDownload: $totalDownload, packetLoss: $packetLoss, latency: $latency, restartCount: $restartCount)';
   }
 
   @override
@@ -3925,6 +4087,8 @@ class _$WLANModelImpl extends WLANModel {
                 other.firmware == firmware) &&
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
+            const DeepCollectionEquality()
+                .equals(other._imageSignedIds, _imageSignedIds) &&
             const DeepCollectionEquality()
                 .equals(other._healthNotices, _healthNotices) &&
             (identical(other.hnCounts, hnCounts) ||
@@ -3964,6 +4128,7 @@ class _$WLANModelImpl extends WLANModel {
         firmware,
         note,
         const DeepCollectionEquality().hash(_images),
+        const DeepCollectionEquality().hash(_imageSignedIds),
         const DeepCollectionEquality().hash(_healthNotices),
         hnCounts,
         controllerType,
@@ -4001,6 +4166,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4031,6 +4197,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4058,6 +4225,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4086,6 +4254,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4115,6 +4284,7 @@ class _$WLANModelImpl extends WLANModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         controllerType,
@@ -4146,6 +4316,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4176,6 +4347,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4203,6 +4375,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4231,6 +4404,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4260,6 +4434,7 @@ class _$WLANModelImpl extends WLANModel {
         firmware,
         note,
         images,
+        imageSignedIds,
         healthNotices,
         hnCounts,
         controllerType,
@@ -4291,6 +4466,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4321,6 +4497,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4348,6 +4525,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4376,6 +4554,7 @@ class _$WLANModelImpl extends WLANModel {
             String? firmware,
             String? note,
             List<String>? images,
+            @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
             @JsonKey(name: 'health_notices')
             List<HealthNoticeModel>? healthNotices,
             @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
@@ -4407,6 +4586,7 @@ class _$WLANModelImpl extends WLANModel {
           firmware,
           note,
           images,
+          imageSignedIds,
           healthNotices,
           hnCounts,
           controllerType,
@@ -4483,6 +4663,7 @@ abstract class WLANModel extends DeviceModelSealed {
           final String? firmware,
           final String? note,
           final List<String>? images,
+          @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
           @JsonKey(name: 'health_notices')
           final List<HealthNoticeModel>? healthNotices,
           @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
@@ -4536,6 +4717,9 @@ abstract class WLANModel extends DeviceModelSealed {
   String? get note;
   @override
   List<String>? get images;
+  @override
+  @JsonKey(name: 'image_signed_ids')
+  List<String>? get imageSignedIds;
   @override
   @JsonKey(name: 'health_notices')
   List<HealthNoticeModel>? get healthNotices;

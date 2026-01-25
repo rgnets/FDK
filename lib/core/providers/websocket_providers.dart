@@ -145,11 +145,13 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
   final webSocketService = ref.watch(webSocketServiceProvider);
   final logger = LoggerConfig.getLogger();
   final storageService = ref.watch(storageServiceProvider);
+  final deviceUpdateEventBus = ref.watch(deviceUpdateEventBusProvider);
 
   final integration = WebSocketCacheIntegration(
     webSocketService: webSocketService,
     imageBaseUrl: storageService.siteUrl,
     logger: logger,
+    deviceUpdateEventBus: deviceUpdateEventBus,
   );
 
   // Initialize the integration

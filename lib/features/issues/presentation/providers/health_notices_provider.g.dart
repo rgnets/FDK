@@ -99,7 +99,7 @@ final aggregateHealthCountsNotifierProvider =
 
 typedef _$AggregateHealthCountsNotifier = AsyncNotifier<HealthCounts>;
 String _$healthNoticesNotifierHash() =>
-    r'835fd10f5faa1a91d54c54502d813c54c2ca7fee';
+    r'249e101081f539d2eceef8523c67a68998788c67';
 
 /// Provider that extracts health notices from cached device data
 ///

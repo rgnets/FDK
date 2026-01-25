@@ -371,9 +371,9 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
   @override
   bool get wantKeepAlive => true;
 
-  Future<void> _handleImageDeleted(String imageUrl) async {
+  Future<void> _handleImageDeleted(String signedId) async {
     final notifier = ref.read(deviceNotifierProvider(widget.device.id).notifier);
-    final success = await notifier.deleteDeviceImage(imageUrl);
+    final success = await notifier.deleteDeviceImage(signedId);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -385,6 +385,11 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         ),
       );
     }
+  }
+
+  void _handleUploadComplete() {
+    // Refresh device data to show newly uploaded images
+    ref.read(deviceNotifierProvider(widget.device.id).notifier).refresh();
   }
 
   Future<void> _handleSaveNote(String note) async {
@@ -473,7 +478,8 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         // Device detail sections
         DeviceDetailSections(
           device: widget.device,
-          onImageDeleted: _handleImageDeleted,
+          onImageDeletedBySignedId: _handleImageDeleted,
+          onUploadComplete: _handleUploadComplete,
         ),
 
         // Editable Note Section

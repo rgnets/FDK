@@ -34,7 +34,9 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
   Future<DeviceModelSealed> getDevice(
     String id, {
     List<String>? fields,
+    bool forceRefresh = false,
   }) async {
+    // Mock data source doesn't have caching, so forceRefresh is a no-op
     final allDevices = await getDevices(fields: fields);
     return allDevices.firstWhere(
       (device) => device.deviceId == id,
@@ -129,7 +131,7 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
   @override
   Future<DeviceModelSealed> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
   ) async {
     final device = await getDevice(deviceId);
     final currentImages = device.map(
@@ -138,14 +140,58 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
       switchDevice: (d) => d.images ?? const [],
       wlan: (d) => d.images ?? const [],
     );
-    if (currentImages.isEmpty) {
+    final currentSignedIds = device.map(
+      ap: (d) => d.imageSignedIds ?? const [],
+      ont: (d) => d.imageSignedIds ?? const [],
+      switchDevice: (d) => d.imageSignedIds ?? const [],
+      wlan: (d) => d.imageSignedIds ?? const [],
+    );
+    if (currentSignedIds.isEmpty) {
       return device;
     }
 
-    final updatedImages =
-        currentImages.where((image) => image != imageUrl).toList();
+    // Filter out the signed ID to delete
+    final updatedSignedIds =
+        currentSignedIds.where((id) => id != signedIdToDelete).toList();
+    // Also update images list to match
+    final deleteIndex = currentSignedIds.indexOf(signedIdToDelete);
+    List<String> updatedImages;
+    if (deleteIndex >= 0 && deleteIndex < currentImages.length) {
+      updatedImages = List<String>.from(currentImages)..removeAt(deleteIndex);
+    } else {
+      updatedImages = List<String>.from(currentImages);
+    }
 
     // Return a copy with updated images
+    return device.map(
+      ap: (d) => d.copyWith(images: updatedImages, imageSignedIds: updatedSignedIds),
+      ont: (d) => d.copyWith(images: updatedImages, imageSignedIds: updatedSignedIds),
+      switchDevice: (d) => d.copyWith(images: updatedImages, imageSignedIds: updatedSignedIds),
+      wlan: (d) => d.copyWith(images: updatedImages, imageSignedIds: updatedSignedIds),
+    );
+  }
+
+  @override
+  Future<DeviceModelSealed> uploadDeviceImages(
+    String deviceId,
+    List<String> base64Images,
+  ) async {
+    final device = await getDevice(deviceId);
+    final currentImages = device.map(
+      ap: (d) => d.images ?? const [],
+      ont: (d) => d.images ?? const [],
+      switchDevice: (d) => d.images ?? const [],
+      wlan: (d) => d.images ?? const [],
+    );
+
+    // For mock, simulate converting base64 to URLs
+    // In production, the server would return actual URLs
+    final newImageUrls = base64Images.asMap().entries.map((entry) {
+      return 'https://mock.example.com/images/$deviceId/${DateTime.now().millisecondsSinceEpoch}_${entry.key}.jpg';
+    }).toList();
+
+    final updatedImages = [...currentImages, ...newImageUrls];
+
     return device.map(
       ap: (d) => d.copyWith(images: updatedImages),
       ont: (d) => d.copyWith(images: updatedImages),

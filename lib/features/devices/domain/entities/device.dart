@@ -39,6 +39,9 @@ class Device with _$Device {
     int? maxClients,
     String? note,
     List<String>? images,
+    /// Signed IDs for images - used for API operations (upload/delete).
+    /// When updating images, the server expects signed IDs for existing images.
+    List<String>? imageSignedIds,
   }) = _Device;
   
   const Device._();

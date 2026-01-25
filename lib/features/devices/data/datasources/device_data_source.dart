@@ -9,9 +9,12 @@ abstract class DeviceDataSource {
   });
 
   /// Fetches a specific device by ID with optional field selection
+  ///
+  /// Set [forceRefresh] to true to bypass cache and make a fresh request.
   Future<DeviceModelSealed> getDevice(
     String id, {
     List<String>? fields,
+    bool forceRefresh = false,
   });
 
   /// Fetches devices for a specific room
@@ -29,6 +32,17 @@ abstract class DeviceDataSource {
   /// Resets a device to factory defaults
   Future<void> resetDevice(String deviceId);
 
-  /// Deletes an image from a device
-  Future<DeviceModelSealed> deleteDeviceImage(String deviceId, String imageUrl);
+  /// Deletes an image from a device by its signed ID
+  Future<DeviceModelSealed> deleteDeviceImage(String deviceId, String signedIdToDelete);
+
+  /// Uploads images to a device
+  ///
+  /// [deviceId] - The device ID (with prefix like ap_123)
+  /// [base64Images] - List of base64-encoded image data URLs
+  ///
+  /// Returns the updated device model with new images
+  Future<DeviceModelSealed> uploadDeviceImages(
+    String deviceId,
+    List<String> base64Images,
+  );
 }

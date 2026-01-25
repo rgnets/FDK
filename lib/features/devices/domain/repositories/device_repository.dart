@@ -10,6 +10,7 @@ abstract class DeviceRepository {
   Future<Either<Failure, Device>> getDevice(
     String id, {
     List<String>? fields,
+    bool forceRefresh = false,
   });
   Future<Either<Failure, List<Device>>> getDevicesByRoom(String roomId);
   Future<Either<Failure, List<Device>>> searchDevices(String query);
@@ -18,6 +19,12 @@ abstract class DeviceRepository {
   Future<Either<Failure, void>> resetDevice(String deviceId);
   Future<Either<Failure, Device>> deleteDeviceImage(
     String deviceId,
-    String imageUrl,
+    String signedIdToDelete,
+  );
+
+  /// Upload images to a device
+  Future<Either<Failure, Device>> uploadDeviceImages(
+    String deviceId,
+    List<String> base64Images,
   );
 }

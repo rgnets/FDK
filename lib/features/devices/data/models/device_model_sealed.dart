@@ -92,6 +92,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     String? firmware,
     String? note,
     List<String>? images,
+    @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
 
@@ -129,6 +130,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     String? firmware,
     String? note,
     List<String>? images,
+    @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
 
@@ -163,6 +165,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     String? firmware,
     String? note,
     List<String>? images,
+    @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
 
@@ -198,6 +201,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     String? firmware,
     String? note,
     List<String>? images,
+    @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
     @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
     @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
 
@@ -241,6 +245,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         firmware: ap.firmware,
         note: ap.note,
         images: ap.images,
+        imageSignedIds: ap.imageSignedIds,
         signalStrength: ap.signalStrength,
         connectedClients: ap.connectedClients,
         ssid: ap.ssid,
@@ -266,6 +271,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         firmware: ont.firmware,
         note: ont.note,
         images: ont.images,
+        imageSignedIds: ont.imageSignedIds,
       ),
       switchDevice: (sw) => Device(
         id: sw.id,
@@ -284,6 +290,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         firmware: sw.firmware,
         note: sw.note,
         images: sw.images,
+        imageSignedIds: sw.imageSignedIds,
         cpuUsage: sw.cpuUsage,
         memoryUsage: sw.memoryUsage,
         temperature: sw.temperature,
@@ -305,6 +312,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         firmware: wlan.firmware,
         note: wlan.note,
         images: wlan.images,
+        imageSignedIds: wlan.imageSignedIds,
         vlan: wlan.vlan,
         totalUpload: wlan.totalUpload,
         totalDownload: wlan.totalDownload,
