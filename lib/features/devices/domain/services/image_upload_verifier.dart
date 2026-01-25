@@ -67,7 +67,6 @@ class ImageUploadVerifier {
     var attempts = 0;
     List<String> verifiedImages = [];
     var foundNewImages = false;
-    Exception? lastError;
 
     while (attempts < _maxAttempts && stopwatch.elapsed < _maxTotalWaitTime) {
       attempts++;
@@ -118,12 +117,11 @@ class ImageUploadVerifier {
         if (attempts < _maxAttempts) {
           await Future<void>.delayed(_betweenAttempts);
         }
-      } on TimeoutException catch (e) {
+      } on TimeoutException {
         LoggerService.warning(
           'Verification timeout on attempt $attempts',
           tag: 'ImageUploadVerifier',
         );
-        lastError = Exception('Verification timeout: ${e.message}');
 
         // If we found new images before timeout, it's partial success
         if (foundNewImages) {
@@ -135,7 +133,6 @@ class ImageUploadVerifier {
           tag: 'ImageUploadVerifier',
           error: e,
         );
-        lastError = e is Exception ? e : Exception(e.toString());
 
         // If we found new images before error, consider it partial success
         if (foundNewImages) {
@@ -144,7 +141,8 @@ class ImageUploadVerifier {
 
         // Continue trying unless this was the last attempt
         if (attempts >= _maxAttempts) {
-          return VerificationResult.failed;
+          // Don't return failed - the REST upload succeeded, we just couldn't verify
+          return VerificationResult.timeout;
         }
 
         // Wait before retry
@@ -155,25 +153,20 @@ class ImageUploadVerifier {
     }
 
     // After all attempts, determine result
+    // Note: We never return 'failed' here because the REST upload already succeeded.
+    // Verification failure just means we couldn't confirm, not that upload failed.
     if (foundNewImages) {
       LoggerService.info(
         'Partial success - some images uploaded',
         tag: 'ImageUploadVerifier',
       );
       return VerificationResult.partialSuccess;
-    } else if (verifiedImages.length == previousCount) {
+    } else {
       LoggerService.warning(
-        'Timeout - no change detected (upload may still be in progress)',
+        'Timeout - could not verify upload (may still be processing)',
         tag: 'ImageUploadVerifier',
       );
       return VerificationResult.timeout;
-    } else {
-      LoggerService.error(
-        'Verification failed after $attempts attempts',
-        tag: 'ImageUploadVerifier',
-        error: lastError,
-      );
-      return VerificationResult.failed;
     }
   }
 

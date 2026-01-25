@@ -41,6 +41,44 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
     super.dispose();
   }
 
+  void _showDeleteConfirmation() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Image'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'This action cannot be undone.',
+            ),
+            const SizedBox(height: 24),
+            HoldToConfirmButton(
+              text: 'Hold to Delete',
+              icon: Icons.delete,
+              holdDuration: const Duration(milliseconds: 1500),
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+              height: 48,
+              width: double.infinity,
+              onConfirmed: () {
+                Navigator.of(dialogContext).pop();
+                widget.onDeleteAtIndex?.call(_currentIndex);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -140,18 +178,9 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
 
                     // Delete button
                     if (widget.onDeleteAtIndex != null)
-                      HoldToConfirmButton(
-                        text: 'Delete',
-                        icon: Icons.delete,
-                        holdDuration: const Duration(milliseconds: 1500),
-                        backgroundColor: Colors.red.withValues(alpha: 0.8),
-                        textColor: Colors.white,
-                        height: 36,
-                        width: 100,
-                        onConfirmed: () {
-                          widget.onDeleteAtIndex?.call(_currentIndex);
-                          Navigator.of(context).pop();
-                        },
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.white),
+                        onPressed: _showDeleteConfirmation,
                       )
                     else
                       const SizedBox(width: 48),
