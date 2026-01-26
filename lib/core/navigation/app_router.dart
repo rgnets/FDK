@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/features/devices/presentation/screens/device_detail_s
 import 'package:rgnets_fdk/features/devices/presentation/screens/devices_screen.dart';
 import 'package:rgnets_fdk/features/home/presentation/screens/home_screen.dart';
 import 'package:rgnets_fdk/features/issues/presentation/screens/health_notices_screen.dart';
+import 'package:rgnets_fdk/features/messages/presentation/screens/message_monitoring_dashboard.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/room_detail_screen.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/rooms_screen.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/screens/scanner_screen.dart';
@@ -58,6 +59,12 @@ class AppRouter {
       GoRoute(
         path: '/debug',
         builder: (context, state) => const DebugScreen(),
+      ),
+
+      // Message monitoring dashboard (outside of shell for full-screen view)
+      GoRoute(
+        path: '/messages/monitor',
+        builder: (context, state) => const MessageMonitoringDashboard(),
       ),
       
       // Main app shell with bottom navigation

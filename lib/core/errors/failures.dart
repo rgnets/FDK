@@ -125,3 +125,11 @@ class RoomReadinessFailure extends Failure {
     super.statusCode,
   });
 }
+
+/// Message-related failures
+class MessageFailure extends Failure {
+  const MessageFailure({
+    required super.message,
+    super.statusCode,
+  });
+}

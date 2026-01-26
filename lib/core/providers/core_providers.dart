@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
+import 'package:rgnets_fdk/core/services/message_persistence_service.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
@@ -89,6 +90,12 @@ final authenticatedImageUrlProvider = Provider<String? Function(String?)>((ref) 
 final authenticatedImageUrlsProvider = Provider<List<String> Function(List<String>)>((ref) {
   final apiKey = ref.watch(apiKeyProvider);
   return (List<String> imageUrls) => authenticateImageUrls(imageUrls, apiKey);
+});
+
+/// Message persistence service provider
+final messagePersistenceServiceProvider = Provider<MessagePersistenceService>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return MessagePersistenceService(prefs);
 });
 
 /// Initialize providers that need async initialization
