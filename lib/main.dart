@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
@@ -6,13 +8,16 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/app_initializer.dart';
 import 'package:rgnets_fdk/core/services/deeplink_service.dart';
+import 'package:rgnets_fdk/core/services/error_reporter.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void _configureImageCache() {
@@ -30,60 +35,78 @@ void _configureImageCache() {
 }
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Set environment from dart-define
-  const envString = String.fromEnvironment(
-    'ENVIRONMENT',
-    defaultValue: 'development',
-  );
-  // Starting app - environment info available via EnvironmentConfig
+    // Set environment from dart-define
+    const envString = String.fromEnvironment(
+      'ENVIRONMENT',
+      defaultValue: 'development',
+    );
+    // Starting app - environment info available via EnvironmentConfig
 
-  Environment env;
-  switch (envString.toLowerCase()) {
-    case 'staging':
-      env = Environment.staging;
-      break;
-    case 'production':
-      env = Environment.production;
-      break;
-    case 'development':
-    default:
-      env = Environment.development;
-      break;
-  }
+    Environment env;
+    switch (envString.toLowerCase()) {
+      case 'staging':
+        env = Environment.staging;
+        break;
+      case 'production':
+        env = Environment.production;
+        break;
+      case 'development':
+      default:
+        env = Environment.development;
+        break;
+    }
 
-  EnvironmentConfig.setEnvironment(env);
-  LoggerService.configure();
-  _configureImageCache();
-  // Environment configuration complete - details available via EnvironmentConfig getters
+    EnvironmentConfig.setEnvironment(env);
+    await AppInitializer.initializeSentry();
+    final enableCrashReporting = EnvironmentConfig.sentryDsn.isNotEmpty;
+    LoggerService.configure(enableCrashReporting: enableCrashReporting);
+    _configureImageCache();
+    // Environment configuration complete - details available via EnvironmentConfig getters
 
-  // Initialize providers with error handling
-  late final SharedPreferences sharedPreferences;
-  try {
-    sharedPreferences = await SharedPreferences.getInstance();
-  } on Exception catch (e) {
-    // If SharedPreferences fails, provide a fallback or exit gracefully
-    debugPrint('Failed to initialize SharedPreferences: $e');
-    return;
-  }
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      if (ErrorReporter.isEnabled) {
+        unawaited(
+          Sentry.captureException(
+            details.exception,
+            stackTrace: details.stack,
+          ),
+        );
+      }
+    };
 
-  // Initialize onboarding configuration
-  try {
-    await OnboardingConfig.initialize();
-  } on Exception catch (e) {
-    debugPrint('Failed to initialize OnboardingConfig: $e');
-    // Non-fatal - app can continue without onboarding UI
-  }
+    // Initialize providers with error handling
+    late final SharedPreferences sharedPreferences;
+    try {
+      sharedPreferences = await SharedPreferences.getInstance();
+    } on Exception catch (e) {
+      // If SharedPreferences fails, provide a fallback or exit gracefully
+      debugPrint('Failed to initialize SharedPreferences: $e');
+      return;
+    }
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-      ],
-      child: const FDKApp(),
-    ),
-  );
+    // Initialize onboarding configuration
+    try {
+      await OnboardingConfig.initialize();
+    } on Exception catch (e) {
+      debugPrint('Failed to initialize OnboardingConfig: $e');
+      // Non-fatal - app can continue without onboarding UI
+    }
+
+    runApp(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        ],
+        child: const FDKApp(),
+      ),
+    );
+  }, (error, stackTrace) async {
+    await ErrorReporter.report(error, stackTrace: stackTrace);
+  });
 }
 
 class FDKApp extends ConsumerStatefulWidget {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/logging_config.dart';
 import 'package:rgnets_fdk/core/services/error_reporter.dart';
@@ -68,10 +70,12 @@ class LoggerService {
     );
 
     final reportPayload = error ?? message;
-    ErrorReporter.report(
-      reportPayload,
-      stackTrace: stackTrace,
-      hint: tag ?? message,
+    unawaited(
+      ErrorReporter.report(
+        reportPayload,
+        stackTrace: stackTrace,
+        hint: tag ?? message,
+      ),
     );
   }
 
