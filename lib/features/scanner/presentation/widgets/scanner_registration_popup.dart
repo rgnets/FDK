@@ -5,9 +5,11 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/scanner/domain/entities/device_category.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
+import 'package:rgnets_fdk/features/scanner/domain/services/device_classifier.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/device_registration_provider.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
@@ -538,9 +540,10 @@ class _ScannerRegistrationPopupState
         ? allDevices.where((d) => d.type == deviceTypeFilter).toList()
         : allDevices;
 
-    // Categorize devices
-    final designedDevices = filteredDevices.where(_isDesignedDevice).toList();
-    final assignedDevices = filteredDevices.where(_isAssignedDevice).toList();
+    // Categorize devices using DeviceClassifier (excludes ephemeral and invalid)
+    final categorized = DeviceClassifier.categorizeDevices(filteredDevices);
+    final designedDevices = categorized[DeviceCategory.designed] ?? [];
+    final assignedDevices = categorized[DeviceCategory.assigned] ?? [];
 
     // Build dropdown items
     final items = <DropdownMenuItem<String>>[];
@@ -652,7 +655,7 @@ class _ScannerRegistrationPopupState
     // Current selection value
     String currentValue = 'create_new';
     if (!_createNewDevice && _selectedDevice != null) {
-      final category = _isDesignedDevice(_selectedDevice!) ? 'designed' : 'assigned';
+      final category = DeviceClassifier.isDesignedDevice(_selectedDevice!) ? 'designed' : 'assigned';
       currentValue = '${category}_${_selectedDevice!.id}';
     }
 
@@ -689,24 +692,6 @@ class _ScannerRegistrationPopupState
         });
       },
     );
-  }
-
-  /// Check if device is "designed" (placeholder - has name but missing MAC or Serial)
-  bool _isDesignedDevice(Device device) {
-    final hasName = device.name.isNotEmpty;
-    final hasMac = device.macAddress?.isNotEmpty ?? false;
-    final hasSerial = device.serialNumber?.isNotEmpty ?? false;
-    // Designed = has name but missing MAC or Serial
-    return hasName && (!hasMac || !hasSerial);
-  }
-
-  /// Check if device is "assigned" (has both MAC and Serial)
-  bool _isAssignedDevice(Device device) {
-    final hasName = device.name.isNotEmpty;
-    final hasMac = device.macAddress?.isNotEmpty ?? false;
-    final hasSerial = device.serialNumber?.isNotEmpty ?? false;
-    // Assigned = has name AND both MAC and Serial
-    return hasName && hasMac && hasSerial;
   }
 
   String? _getDeviceTypeForMode(ScanMode mode) {
@@ -754,10 +739,10 @@ class _ScannerRegistrationPopupState
     } else if (_createNewDevice) {
       buttonText = 'Create New';
       buttonColor = Colors.green;
-    } else if (_selectedDevice != null && _isDesignedDevice(_selectedDevice!)) {
+    } else if (_selectedDevice != null && DeviceClassifier.isDesignedDevice(_selectedDevice!)) {
       buttonText = 'Assign';
       buttonColor = Colors.blue;
-    } else if (_selectedDevice != null && _isAssignedDevice(_selectedDevice!)) {
+    } else if (_selectedDevice != null && DeviceClassifier.isFullyAssignedDevice(_selectedDevice!)) {
       buttonText = 'Replace';
       buttonColor = Colors.orange;
     } else {
@@ -884,7 +869,7 @@ class _ScannerRegistrationPopupState
           } else if (_createNewDevice) {
             actionText = 'Device created';
             snackBarColor = Colors.green;
-          } else if (_selectedDevice != null && _isDesignedDevice(_selectedDevice!)) {
+          } else if (_selectedDevice != null && DeviceClassifier.isDesignedDevice(_selectedDevice!)) {
             actionText = 'Device assigned';
             snackBarColor = Colors.blue;
           } else {
