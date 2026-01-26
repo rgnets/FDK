@@ -1,18 +1,29 @@
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
-/// Lightweight error reporter stub to centralise crash/telemetry forwarding.
+/// Lightweight error reporter to centralise crash/telemetry forwarding.
 ///
-/// Implements a toggleable reporting layer so we can plug in Sentry or another
-/// backend without changing call sites.
+/// Implements a toggleable reporting layer so we can swap backends without
+/// changing call sites.
 class ErrorReporter {
   ErrorReporter._();
 
   static bool isEnabled = false;
+  static bool _isInResumeGracePeriod = false;
 
-  /// Report an error to the configured backend. Currently this is a stub that
-  /// simply writes to the debug console when enabled.
-  static void report(Object error, {StackTrace? stackTrace, String? hint}) {
-    if (!isEnabled) {
+  static bool get isInResumeGracePeriod => _isInResumeGracePeriod;
+
+  static void setResumeGracePeriod(bool value) {
+    _isInResumeGracePeriod = value;
+  }
+
+  /// Report an error to the configured backend.
+  static Future<void> report(
+    Object error, {
+    StackTrace? stackTrace,
+    String? hint,
+  }) async {
+    if (!isEnabled || _isInResumeGracePeriod) {
       if (kDebugMode) {
         debugPrint('[ErrorReporter] (disabled) $hint -> $error');
         if (stackTrace != null) {
@@ -22,10 +33,10 @@ class ErrorReporter {
       return;
     }
 
-    // TODO(rgnets): Integrate real crash/telemetry backend (e.g., Sentry).
-    debugPrint('[ErrorReporter] $hint -> $error');
-    if (stackTrace != null) {
-      debugPrint(stackTrace.toString());
-    }
+    await Sentry.captureException(
+      error,
+      stackTrace: stackTrace,
+      hint: hint != null ? Hint.withMap({'message': hint}) : null,
+    );
   }
 }
