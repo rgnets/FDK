@@ -11,12 +11,19 @@ import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/services/device_classifier.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/device_registration_provider.dart';
-import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier_v2.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
 
 /// Registration popup shown when scan is complete.
 ///
-/// Displays scanned data, device match status, room picker, and action buttons.
+/// Styled like ATT-FE-Tool with:
+/// - Color-coded top border (green=new, orange=move, red=mismatch)
+/// - Header with action icon, title, device type icon
+/// - Scanned data display
+/// - Room selection with search
+/// - Device selection (Designed/Assigned/Create New)
+/// - Move/Reset indicator
+/// - Cancel and Register buttons
 class ScannerRegistrationPopup extends ConsumerStatefulWidget {
   const ScannerRegistrationPopup({
     super.key,
@@ -46,29 +53,27 @@ class _ScannerRegistrationPopupState
     extends ConsumerState<ScannerRegistrationPopup> {
   bool _isLoading = false;
   Device? _selectedDevice;
-  bool _createNewDevice = true; // Default to create new
+  bool _createNewDevice = true;
 
   @override
   void initState() {
     super.initState();
-    // Notify scanner that popup is showing
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(scannerNotifierProvider.notifier).showRegistrationPopup();
       _checkDeviceMatch();
     });
   }
 
   Future<void> _checkDeviceMatch() async {
-    final scannerState = ref.read(scannerNotifierProvider);
+    final scannerState = ref.read(scannerNotifierV2Provider);
     final scanData = scannerState.scanData;
 
-    if (scanData.mac.isEmpty || scanData.serialNumber.isEmpty) {
+    if (scanData.mac.isEmpty && scanData.serialNumber.isEmpty) {
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Check for existing device
+    // Check for existing device via WebSocket query
     await ref.read(deviceRegistrationNotifierProvider.notifier).checkDeviceMatch(
           mac: scanData.mac,
           serial: scanData.serialNumber,
@@ -78,9 +83,9 @@ class _ScannerRegistrationPopupState
     if (mounted) {
       setState(() => _isLoading = false);
 
-      // Update scanner with match status and room info
+      // Sync the match status to scanner state
       final regState = ref.read(deviceRegistrationNotifierProvider);
-      ref.read(scannerNotifierProvider.notifier).setDeviceMatchStatus(
+      ref.read(scannerNotifierV2Provider.notifier).setDeviceMatchStatus(
             status: regState.matchStatus,
             deviceId: regState.matchedDeviceId,
             deviceName: regState.matchedDeviceName,
@@ -90,10 +95,120 @@ class _ScannerRegistrationPopupState
     }
   }
 
+  /// Get status color based on match status.
+  Color _getStatusColor(DeviceMatchStatus status) {
+    switch (status) {
+      case DeviceMatchStatus.noMatch:
+      case DeviceMatchStatus.unchecked:
+        return Colors.green;
+      case DeviceMatchStatus.fullMatch:
+        return Colors.orange;
+      case DeviceMatchStatus.mismatch:
+      case DeviceMatchStatus.multipleMatch:
+        return Colors.red;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scannerState = ref.watch(scannerNotifierProvider);
+    final scannerState = ref.watch(scannerNotifierV2Provider);
+
+    // Show loading view while checking device status
+    if (_isLoading) {
+      return _buildLoadingView(context, theme, scannerState);
+    }
+
+    // Show appropriate UI based on match status
+    final scanData = scannerState.scanData;
+    final statusColor = _getStatusColor(scannerState.matchStatus);
+    final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
+    final isMismatch = scannerState.matchStatus == DeviceMatchStatus.mismatch ||
+        scannerState.matchStatus == DeviceMatchStatus.multipleMatch;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Color-coded top border (ATT-FE-Tool style)
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: statusColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+          ),
+
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  // Header row (ATT-FE-Tool style)
+                  _buildHeader(context, scannerState, statusColor, isExisting, isMismatch),
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  _buildSubtitle(context, isExisting, isMismatch),
+                  const SizedBox(height: 20),
+
+                  // Scanned data summary
+                  _buildDataSummary(context, scanData, scannerState.scanMode),
+                  const SizedBox(height: 16),
+
+                  // Existing device banner (if device exists)
+                  if (isExisting) _buildExistingDeviceBanner(context, scannerState),
+
+                  // Room selection
+                  _buildRoomSelector(context, scannerState),
+                  const SizedBox(height: 16),
+
+                  // Move indicator (when room selected and device exists)
+                  if (isExisting && scannerState.selectedRoomId != null)
+                    _buildMoveIndicator(context, scannerState),
+
+                  // Device selection (only if not mismatch)
+                  if (!isMismatch && scannerState.selectedRoomId != null) ...[
+                    const SizedBox(height: 16),
+                    _buildDeviceSelector(context, scannerState),
+                  ],
+
+                  const SizedBox(height: 24),
+
+                  // Action buttons
+                  _buildActionButtons(context, scannerState, isMismatch),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build a simple loading view while checking device status.
+  Widget _buildLoadingView(BuildContext context, ThemeData theme, ScannerState scannerState) {
     final scanData = scannerState.scanData;
 
     return Container(
@@ -101,105 +216,125 @@ class _ScannerRegistrationPopupState
         color: theme.colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Handle bar
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Title
-              Text(
-                'Register Device',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Device type badge
-              _buildDeviceTypeBadge(context, scannerState.scanMode),
-              const SizedBox(height: 20),
-
-              // Scanned data summary
-              _buildDataSummary(context, scanData),
-              const SizedBox(height: 16),
-
-              // Match status
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else
-                _buildMatchStatus(context, scannerState),
-              const SizedBox(height: 12),
-
-              // Move/Reset indicator (shown when room is selected and device exists)
-              _buildMoveIndicator(context, scannerState),
-              const SizedBox(height: 20),
-
-              // Room selection
-              _buildRoomSelector(context, scannerState),
-              const SizedBox(height: 24),
-
-              // Action buttons
-              _buildActionButtons(context),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeviceTypeBadge(BuildContext context, ScanMode mode) {
-    final theme = Theme.of(context);
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              ScannerUtils.getModeIcon(mode),
-              size: 16,
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              mode.displayName,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.w500,
+            // Drag handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
+
+            // Loading spinner
+            const CircularProgressIndicator(),
+            const SizedBox(height: 24),
+
+            // Loading text
+            Text(
+              'Checking device...',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Show what we're checking
+            Text(
+              scanData.serialNumber.isNotEmpty
+                  ? 'Serial: ${scanData.serialNumber}'
+                  : 'MAC: ${scanData.mac}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDataSummary(BuildContext context, AccumulatedScanData data) {
+  Widget _buildHeader(
+    BuildContext context,
+    ScannerState state,
+    Color statusColor,
+    bool isExisting,
+    bool isMismatch,
+  ) {
+    final theme = Theme.of(context);
+
+    IconData actionIcon;
+    String titleText;
+
+    if (isMismatch) {
+      actionIcon = Icons.error;
+      titleText = 'Data Mismatch Detected';
+    } else if (isExisting) {
+      actionIcon = Icons.swap_horiz;
+      titleText = 'Existing ${_getDeviceTypeName(state.scanMode)} Found';
+    } else {
+      actionIcon = Icons.add_circle_outline;
+      titleText = 'New ${_getDeviceTypeName(state.scanMode)}';
+    }
+
+    return Row(
+      children: [
+        Icon(actionIcon, color: statusColor, size: 28),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            titleText,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: statusColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        Icon(
+          ScannerUtils.getModeIcon(state.scanMode),
+          color: theme.colorScheme.onSurfaceVariant,
+          size: 24,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubtitle(BuildContext context, bool isExisting, bool isMismatch) {
+    final theme = Theme.of(context);
+
+    String subtitle;
+    if (isMismatch) {
+      subtitle = 'Scanned data does not match existing device records';
+    } else if (isExisting) {
+      subtitle = 'This device will be moved to a new room';
+    } else {
+      subtitle = 'This device will be registered as new';
+    }
+
+    return Text(
+      subtitle,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontStyle: FontStyle.italic,
+      ),
+    );
+  }
+
+  Widget _buildDataSummary(BuildContext context, AccumulatedScanData data, ScanMode mode) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
@@ -214,6 +349,7 @@ class _ScannerRegistrationPopupState
             _buildDataRow(context, 'Part Number', data.partNumber),
           if (data.model.isNotEmpty)
             _buildDataRow(context, 'Model', data.model),
+          _buildDataRow(context, 'Device Type', _getDeviceTypeName(mode)),
         ],
       ),
     );
@@ -225,10 +361,9 @@ class _ScannerRegistrationPopupState
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 120,
             child: Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -239,10 +374,12 @@ class _ScannerRegistrationPopupState
           Expanded(
             child: Text(
               value,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w500,
               ),
+              textAlign: TextAlign.end,
             ),
           ),
         ],
@@ -250,141 +387,50 @@ class _ScannerRegistrationPopupState
     );
   }
 
-  Widget _buildMatchStatus(BuildContext context, ScannerState scannerState) {
+  Widget _buildExistingDeviceBanner(BuildContext context, ScannerState state) {
     final theme = Theme.of(context);
-    final status = scannerState.matchStatus;
-
-    Color backgroundColor;
-    Color foregroundColor;
-    IconData icon;
-    String message;
-    String? subtitle;
-
-    switch (status) {
-      case DeviceMatchStatus.noMatch:
-        backgroundColor = Colors.green.shade50;
-        foregroundColor = Colors.green.shade700;
-        icon = Icons.add_circle_outline;
-        message = 'New device - ready to register';
-      case DeviceMatchStatus.fullMatch:
-        backgroundColor = Colors.orange.shade50;
-        foregroundColor = Colors.orange.shade700;
-        icon = Icons.info_outline;
-        message = 'Existing Device Found';
-        // Show current room if available
-        final roomName = scannerState.matchedDeviceRoomName;
-        if (roomName != null) {
-          subtitle = 'Currently in: $roomName';
-        } else if (scannerState.matchedDeviceName != null) {
-          subtitle = scannerState.matchedDeviceName;
-        }
-      case DeviceMatchStatus.mismatch:
-        backgroundColor = Colors.orange.shade50;
-        foregroundColor = Colors.orange.shade700;
-        icon = Icons.warning_amber_outlined;
-        message = 'Device found with different data';
-      case DeviceMatchStatus.multipleMatch:
-        backgroundColor = Colors.red.shade50;
-        foregroundColor = Colors.red.shade700;
-        icon = Icons.error_outline;
-        message = 'Multiple devices match - please verify';
-      case DeviceMatchStatus.unchecked:
-        backgroundColor = theme.colorScheme.surfaceContainerHighest;
-        foregroundColor = theme.colorScheme.onSurfaceVariant;
-        icon = Icons.help_outline;
-        message = 'Checking device status...';
-    }
+    final currentRoom = state.matchedDeviceRoomName ?? 'Unknown Room';
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: Colors.orange.shade50,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
       ),
       child: Row(
         children: [
-          Icon(icon, color: foregroundColor, size: 24),
+          Icon(Icons.info_outline, color: Colors.orange.shade700),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  message,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: foregroundColor,
-                    fontWeight: FontWeight.w500,
+                  'Device Already Registered',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: Colors.orange.shade900,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (subtitle != null)
+                const SizedBox(height: 4),
+                Text(
+                  'Currently in: $currentRoom',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+                if (state.matchedDeviceName != null) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    subtitle,
+                    'Device: ${state.matchedDeviceName}',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: foregroundColor.withValues(alpha: 0.8),
+                      color: Colors.orange.shade700,
                     ),
                   ),
+                ],
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Build move/reset indicator based on matched device room vs selected room.
-  Widget _buildMoveIndicator(BuildContext context, ScannerState scannerState) {
-    // Only show for existing devices when a room is selected
-    if (scannerState.matchStatus != DeviceMatchStatus.fullMatch) {
-      return const SizedBox.shrink();
-    }
-
-    // Don't show until a room is selected
-    if (scannerState.selectedRoomId == null) {
-      return const SizedBox.shrink();
-    }
-
-    final theme = Theme.of(context);
-    final currentRoomId = scannerState.matchedDeviceRoomId;
-    final currentRoomName = scannerState.matchedDeviceRoomName ?? 'Unknown';
-    final targetRoomName = scannerState.selectedRoomNumber ?? 'Selected Room';
-    final isSameRoom = currentRoomId == scannerState.selectedRoomId;
-
-    Color backgroundColor;
-    Color foregroundColor;
-    IconData icon;
-    String message;
-
-    if (isSameRoom) {
-      // Same room - reset operation
-      backgroundColor = Colors.red.shade50;
-      foregroundColor = Colors.red.shade700;
-      icon = Icons.refresh;
-      message = 'Will reset existing device in this room';
-    } else {
-      // Different room - move operation
-      backgroundColor = Colors.orange.shade50;
-      foregroundColor = Colors.orange.shade700;
-      icon = Icons.swap_horiz;
-      message = 'Will move from "$currentRoomName" → "$targetRoomName"';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: foregroundColor, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: foregroundColor,
-                fontWeight: FontWeight.w500,
-              ),
             ),
           ),
         ],
@@ -398,11 +444,10 @@ class _ScannerRegistrationPopupState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Room Selection
         Text(
           'Select Room',
           style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -412,14 +457,23 @@ class _ScannerRegistrationPopupState
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
+              border: Border.all(
+                color: state.selectedRoomId != null
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
+              ),
               borderRadius: BorderRadius.circular(12),
+              color: state.selectedRoomId != null
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+                  : null,
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.meeting_room_outlined,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: state.selectedRoomId != null
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -429,6 +483,9 @@ class _ScannerRegistrationPopupState
                       color: state.selectedRoomNumber != null
                           ? theme.colorScheme.onSurface
                           : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: state.selectedRoomNumber != null
+                          ? FontWeight.w500
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -440,13 +497,55 @@ class _ScannerRegistrationPopupState
             ),
           ),
         ),
-
-        // Device Selection (shown after room is selected)
-        if (state.selectedRoomId != null) ...[
-          const SizedBox(height: 16),
-          _buildDeviceSelector(context, state),
-        ],
       ],
+    );
+  }
+
+  Widget _buildMoveIndicator(BuildContext context, ScannerState state) {
+    final theme = Theme.of(context);
+    final currentRoom = state.matchedDeviceRoomName ?? 'Unknown';
+    final targetRoom = state.selectedRoomNumber ?? 'Selected Room';
+    final isSameRoom = state.matchedDeviceRoomId == state.selectedRoomId;
+
+    Color backgroundColor;
+    Color foregroundColor;
+    IconData icon;
+    String message;
+
+    if (isSameRoom) {
+      backgroundColor = Colors.red.shade50;
+      foregroundColor = Colors.red.shade700;
+      icon = Icons.refresh;
+      message = 'Will RESET device in this room';
+    } else {
+      backgroundColor = Colors.orange.shade50;
+      foregroundColor = Colors.orange.shade700;
+      icon = Icons.swap_horiz;
+      message = 'Will move from "$currentRoom" → "$targetRoom"';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: foregroundColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: foregroundColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: foregroundColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -454,17 +553,15 @@ class _ScannerRegistrationPopupState
     final theme = Theme.of(context);
     final roomId = state.selectedRoomId?.toString() ?? '';
     final deviceState = ref.watch(roomDeviceNotifierProvider(roomId));
-
-    // Get the device type to filter based on scan mode
     final deviceTypeFilter = _getDeviceTypeForMode(state.scanMode);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select ${ScannerUtils.getDeviceTypeName(state.scanMode)} or Create New',
+          'Select Designed ${_getDeviceTypeName(state.scanMode)} or Create New',
           style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
@@ -535,20 +632,20 @@ class _ScannerRegistrationPopupState
   ) {
     final theme = Theme.of(context);
 
-    // Filter devices by type
+    // Filter by type
     final filteredDevices = deviceTypeFilter != null
         ? allDevices.where((d) => d.type == deviceTypeFilter).toList()
         : allDevices;
 
-    // Categorize devices using DeviceClassifier (excludes ephemeral and invalid)
+    // Categorize
     final categorized = DeviceClassifier.categorizeDevices(filteredDevices);
     final designedDevices = categorized[DeviceCategory.designed] ?? [];
     final assignedDevices = categorized[DeviceCategory.assigned] ?? [];
 
-    // Build dropdown items
+    // Build items
     final items = <DropdownMenuItem<String>>[];
 
-    // Create New option (always first)
+    // Create New option (always first, green)
     items.add(
       DropdownMenuItem(
         value: 'create_new',
@@ -556,11 +653,15 @@ class _ScannerRegistrationPopupState
           children: [
             const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Create New ${ScannerUtils.getDeviceTypeName(scanMode)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                'Create New ${_getDeviceTypeName(scanMode)}',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -568,7 +669,7 @@ class _ScannerRegistrationPopupState
       ),
     );
 
-    // Designed devices (placeholders waiting to be assigned)
+    // Designed devices (blue)
     if (designedDevices.isNotEmpty) {
       items.add(
         DropdownMenuItem(
@@ -595,6 +696,7 @@ class _ScannerRegistrationPopupState
                   child: Text(
                     device.name,
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ],
@@ -604,7 +706,7 @@ class _ScannerRegistrationPopupState
       }
     }
 
-    // Assigned devices (can be replaced)
+    // Assigned devices (purple)
     if (assignedDevices.isNotEmpty) {
       items.add(
         DropdownMenuItem(
@@ -632,12 +734,11 @@ class _ScannerRegistrationPopupState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        device.name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(device.name, overflow: TextOverflow.ellipsis, maxLines: 1),
                       Text(
                         'MAC: ${ScannerUtils.formatMac(device.macAddress ?? '')}',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -652,12 +753,16 @@ class _ScannerRegistrationPopupState
       }
     }
 
-    // Current selection value
+    // Current value
     String currentValue = 'create_new';
     if (!_createNewDevice && _selectedDevice != null) {
       final category = DeviceClassifier.isDesignedDevice(_selectedDevice!) ? 'designed' : 'assigned';
       currentValue = '${category}_${_selectedDevice!.id}';
     }
+
+    // Build a combined list for selectedItemBuilder lookups
+    // This prevents vertical overflow when a two-line item (assigned device) is selected
+    final combinedDevices = [...designedDevices, ...assignedDevices];
 
     return DropdownButtonFormField<String>(
       value: currentValue,
@@ -667,6 +772,70 @@ class _ScannerRegistrationPopupState
       ),
       isExpanded: true,
       items: items,
+      // Use selectedItemBuilder to provide single-line display for selected value
+      // This prevents vertical overflow when assigned devices (which have 2-line layout
+      // in dropdown menu) are selected
+      selectedItemBuilder: (context) {
+        return items.map((item) {
+          final value = item.value;
+          if (value == null) {
+            // Separator/header items - return empty container (won't be selected)
+            return const SizedBox.shrink();
+          } else if (value == 'create_new') {
+            return Row(
+              children: [
+                const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Create New ${_getDeviceTypeName(scanMode)}',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          } else if (value.startsWith('designed_')) {
+            final deviceId = value.substring('designed_'.length);
+            final device = combinedDevices.where((d) => d.id == deviceId).firstOrNull;
+            return Row(
+              children: [
+                Icon(ScannerUtils.getModeIcon(scanMode), color: Colors.blue, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device?.name ?? 'Unknown Device',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            );
+          } else if (value.startsWith('assigned_')) {
+            final deviceId = value.substring('assigned_'.length);
+            final device = combinedDevices.where((d) => d.id == deviceId).firstOrNull;
+            // Single-line display for assigned devices to prevent overflow
+            return Row(
+              children: [
+                Icon(ScannerUtils.getModeIcon(scanMode), color: Colors.purple, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device?.name ?? 'Unknown Device',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            );
+          }
+          return const SizedBox.shrink();
+        }).toList();
+      },
       onChanged: (value) {
         if (value == null) return;
 
@@ -676,14 +845,11 @@ class _ScannerRegistrationPopupState
             _selectedDevice = null;
           } else {
             _createNewDevice = false;
-            // Extract device ID from value (format: "category_id")
             final parts = value.split('_');
             if (parts.length >= 2) {
               final deviceId = parts.sublist(1).join('_');
-              // Safely find device, fallback to null if not found
               final found = filteredDevices.where((d) => d.id == deviceId);
               _selectedDevice = found.isNotEmpty ? found.first : null;
-              // Revert to create new if device not found
               if (_selectedDevice == null) {
                 _createNewDevice = true;
               }
@@ -694,59 +860,39 @@ class _ScannerRegistrationPopupState
     );
   }
 
-  String? _getDeviceTypeForMode(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return DeviceTypes.accessPoint;
-      case ScanMode.ont:
-        return DeviceTypes.ont;
-      case ScanMode.switchDevice:
-        return DeviceTypes.networkSwitch;
-      case ScanMode.auto:
-      case ScanMode.rxg:
-        return null; // Show all types
-    }
-  }
+  Widget _buildActionButtons(BuildContext context, ScannerState state, bool isMismatch) {
+    final isExisting = state.matchStatus == DeviceMatchStatus.fullMatch;
+    final isSameRoom = isExisting && state.matchedDeviceRoomId == state.selectedRoomId;
+    final canRegister = state.selectedRoomId != null && !isMismatch;
 
-  Widget _buildActionButtons(BuildContext context) {
-    final scannerState = ref.watch(scannerNotifierProvider);
-    final canRegister = scannerState.selectedRoomId != null &&
-        scannerState.matchStatus != DeviceMatchStatus.multipleMatch;
-
-    // Determine operation type for existing devices
-    final isExistingDevice = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
-    final isSameRoom = isExistingDevice &&
-        scannerState.matchedDeviceRoomId == scannerState.selectedRoomId;
-    final isMove = isExistingDevice && !isSameRoom && scannerState.selectedRoomId != null;
-
-    // Determine button text and color based on operation
+    // Determine button text and color
     String buttonText;
     Color? buttonColor;
 
-    if (isExistingDevice) {
+    if (isMismatch) {
+      buttonText = 'Cannot Register';
+    } else if (isExisting) {
       if (isSameRoom) {
-        // Same room - reset operation
         buttonText = 'Reset Device';
         buttonColor = Colors.red;
-      } else if (isMove) {
-        // Different room - move operation
+      } else if (state.selectedRoomId != null) {
         buttonText = 'Move Device';
         buttonColor = Colors.orange;
       } else {
-        // Room not selected yet
-        buttonText = 'Select Room';
+        buttonText = 'Select Room First';
       }
     } else if (_createNewDevice) {
       buttonText = 'Create New';
       buttonColor = Colors.green;
     } else if (_selectedDevice != null && DeviceClassifier.isDesignedDevice(_selectedDevice!)) {
-      buttonText = 'Assign';
+      buttonText = 'Assign to Designed';
       buttonColor = Colors.blue;
-    } else if (_selectedDevice != null && DeviceClassifier.isFullyAssignedDevice(_selectedDevice!)) {
-      buttonText = 'Replace';
+    } else if (_selectedDevice != null) {
+      buttonText = 'Replace Existing';
       buttonColor = Colors.orange;
     } else {
       buttonText = 'Register';
+      buttonColor = Colors.green;
     }
 
     return Row(
@@ -754,6 +900,9 @@ class _ScannerRegistrationPopupState
         Expanded(
           child: OutlinedButton(
             onPressed: _handleCancel,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
             child: const Text('Cancel'),
           ),
         ),
@@ -763,8 +912,13 @@ class _ScannerRegistrationPopupState
           child: FilledButton(
             onPressed: canRegister ? _handleRegister : null,
             style: buttonColor != null
-                ? FilledButton.styleFrom(backgroundColor: buttonColor)
-                : null,
+                ? FilledButton.styleFrom(
+                    backgroundColor: buttonColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  )
+                : FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
             child: Text(buttonText),
           ),
         ),
@@ -784,21 +938,9 @@ class _ScannerRegistrationPopupState
       ),
     ).then((selectedRoom) {
       if (selectedRoom != null) {
-        final roomId = int.tryParse(selectedRoom.id);
-        if (roomId == null) {
-          // Invalid room ID - show error
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Invalid room ID format'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
-        final displayName = selectedRoom.roomNumber ?? selectedRoom.name;
-        ref.read(scannerNotifierProvider.notifier).setRoomSelection(
+        final roomId = selectedRoom.id;
+        final displayName = selectedRoom.number ?? selectedRoom.shortName;
+        ref.read(scannerNotifierV2Provider.notifier).setRoomSelection(
               roomId,
               displayName,
             );
@@ -807,35 +949,28 @@ class _ScannerRegistrationPopupState
   }
 
   void _handleCancel() {
-    ref.read(scannerNotifierProvider.notifier).hideRegistrationPopup();
-    ref.read(scannerNotifierProvider.notifier).clearScanData();
+    ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
+    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
     Navigator.pop(context, false);
     widget.onCancel?.call();
   }
 
   Future<void> _handleRegister() async {
-    final scannerState = ref.read(scannerNotifierProvider);
+    final scannerState = ref.read(scannerNotifierV2Provider);
 
-    ref.read(scannerNotifierProvider.notifier).setRegistrationInProgress(true);
+    ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(true);
 
-    // Determine operation type
-    final isExistingDevice = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
-    final isSameRoom = isExistingDevice &&
-        scannerState.matchedDeviceRoomId == scannerState.selectedRoomId;
-    final isMove = isExistingDevice && !isSameRoom;
+    final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
+    final isSameRoom = isExisting && scannerState.matchedDeviceRoomId == scannerState.selectedRoomId;
 
-    // Get existing device ID for move/reset operations or manual selection
     int? existingDeviceId;
-    if (isExistingDevice) {
-      // Use matched device ID for move/reset
+    if (isExisting) {
       existingDeviceId = scannerState.matchedDeviceId;
     } else if (!_createNewDevice && _selectedDevice != null) {
-      // Use manually selected device ID
       existingDeviceId = int.tryParse(_selectedDevice!.id);
     }
 
     try {
-      // Register device via WebSocket
       final result = await ref
           .read(deviceRegistrationNotifierProvider.notifier)
           .registerDevice(
@@ -850,20 +985,17 @@ class _ScannerRegistrationPopupState
           );
 
       if (mounted) {
-        ref
-            .read(scannerNotifierProvider.notifier)
-            .setRegistrationInProgress(false);
-        ref.read(scannerNotifierProvider.notifier).hideRegistrationPopup();
+        ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(false);
+        ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
 
         if (result.isSuccess) {
-          // Show success message based on operation type
           String actionText;
           Color snackBarColor;
 
           if (isSameRoom) {
             actionText = 'Device reset';
             snackBarColor = Colors.red;
-          } else if (isMove) {
+          } else if (isExisting) {
             actionText = 'Device moved';
             snackBarColor = Colors.orange;
           } else if (_createNewDevice) {
@@ -879,19 +1011,14 @@ class _ScannerRegistrationPopupState
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$actionText successfully'),
+              content: Text('$actionText successfully!'),
               backgroundColor: snackBarColor,
             ),
           );
 
-          // Navigate to device details
           Navigator.pop(context, true);
           widget.onRegister?.call();
-
-          // TODO(scanner): Navigate to device details page
-          // context.push('/devices/${result.deviceId}');
         } else {
-          // Show error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result.message ?? 'Registration failed'),
@@ -902,9 +1029,7 @@ class _ScannerRegistrationPopupState
       }
     } on Exception catch (e) {
       if (mounted) {
-        ref
-            .read(scannerNotifierProvider.notifier)
-            .setRegistrationInProgress(false);
+        ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -912,6 +1037,34 @@ class _ScannerRegistrationPopupState
           ),
         );
       }
+    }
+  }
+
+  String _getDeviceTypeName(ScanMode mode) {
+    switch (mode) {
+      case ScanMode.accessPoint:
+        return 'Access Point';
+      case ScanMode.ont:
+        return 'ONT';
+      case ScanMode.switchDevice:
+        return 'Switch';
+      case ScanMode.auto:
+      case ScanMode.rxg:
+        return 'Device';
+    }
+  }
+
+  String? _getDeviceTypeForMode(ScanMode mode) {
+    switch (mode) {
+      case ScanMode.accessPoint:
+        return DeviceTypes.accessPoint;
+      case ScanMode.ont:
+        return DeviceTypes.ont;
+      case ScanMode.switchDevice:
+        return DeviceTypes.networkSwitch;
+      case ScanMode.auto:
+      case ScanMode.rxg:
+        return null;
     }
   }
 
@@ -925,10 +1078,9 @@ class _ScannerRegistrationPopupState
         return DeviceType.switchDevice;
       case ScanMode.auto:
       case ScanMode.rxg:
-        return DeviceType.accessPoint; // Default fallback
+        return DeviceType.accessPoint;
     }
   }
-
 }
 
 extension on RegistrationResult {
@@ -942,7 +1094,7 @@ extension on RegistrationResult {
   }
 }
 
-/// Room picker bottom sheet with search functionality.
+/// Room picker bottom sheet with search.
 class _RoomPickerSheet extends ConsumerStatefulWidget {
   const _RoomPickerSheet({required this.onRoomSelected});
 
@@ -967,11 +1119,9 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
     final query = _searchQuery.toLowerCase();
     return rooms.where((room) {
       final name = room.name.toLowerCase();
-      final number = room.roomNumber?.toLowerCase() ?? '';
+      final number = room.number?.toLowerCase() ?? '';
       final location = room.location?.toLowerCase() ?? '';
-      return name.contains(query) ||
-          number.contains(query) ||
-          location.contains(query);
+      return name.contains(query) || number.contains(query) || location.contains(query);
     }).toList();
   }
 
@@ -988,7 +1138,7 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
       ),
       child: Column(
         children: [
-          // Handle bar
+          // Handle
           Padding(
             padding: const EdgeInsets.only(top: 12, bottom: 8),
             child: Container(
@@ -1008,9 +1158,7 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
               children: [
                 Text(
                   'Select Room',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 IconButton(
@@ -1021,7 +1169,7 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
             ),
           ),
 
-          // Search bar
+          // Search
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: TextField(
@@ -1038,9 +1186,7 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
                         icon: const Icon(Icons.clear),
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest,
               ),
@@ -1058,16 +1204,9 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: theme.colorScheme.error,
-                    ),
+                    Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
                     const SizedBox(height: 16),
-                    Text(
-                      'Failed to load rooms',
-                      style: theme.textTheme.titleMedium,
-                    ),
+                    Text('Failed to load rooms', style: theme.textTheme.titleMedium),
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () => ref.invalidate(roomsNotifierProvider),
@@ -1077,41 +1216,28 @@ class _RoomPickerSheetState extends ConsumerState<_RoomPickerSheet> {
                 ),
               ),
               data: (rooms) {
-                final filteredRooms = _filterRooms(rooms);
-
-                if (filteredRooms.isEmpty) {
+                final filtered = _filterRooms(rooms);
+                if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.meeting_room_outlined,
-                          size: 48,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        Icon(Icons.meeting_room_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
                         const SizedBox(height: 16),
                         Text(
-                          _searchQuery.isEmpty
-                              ? 'No rooms available'
-                              : 'No rooms match "$_searchQuery"',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          _searchQuery.isEmpty ? 'No rooms available' : 'No rooms match "$_searchQuery"',
+                          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
                   );
                 }
-
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: filteredRooms.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final room = filteredRooms[index];
-                    return _RoomListTile(
-                      room: room,
-                      onTap: () => widget.onRoomSelected(room),
-                    );
+                    final room = filtered[index];
+                    return _RoomListTile(room: room, onTap: () => widget.onRoomSelected(room));
                   },
                 );
               },
@@ -1140,28 +1266,23 @@ class _RoomListTile extends StatelessWidget {
         onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primaryContainer,
-          child: Icon(
-            Icons.meeting_room,
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
+          child: Icon(Icons.meeting_room, color: theme.colorScheme.onPrimaryContainer),
         ),
         title: Text(
-          room.roomNumber ?? room.name,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+          room.number ?? room.name,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (room.roomNumber != null && room.name != room.roomNumber)
-              Text(room.name),
+            if (room.number != null && room.name != room.number)
+              Text(room.name, overflow: TextOverflow.ellipsis),
             if (room.location != null)
               Text(
                 room.location!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
           ],
         ),
@@ -1178,9 +1299,7 @@ class _RoomListTile extends StatelessWidget {
                 ),
                 child: Text(
                   '$deviceCount device${deviceCount == 1 ? '' : 's'}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
-                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSecondaryContainer),
                 ),
               ),
             const Icon(Icons.chevron_right),
