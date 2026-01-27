@@ -230,17 +230,10 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
           onDetect: _handleBarcode,
         ),
 
-        // Mode selector chip
-        Positioned(
-          top: 50,
-          left: 16,
-          child: _buildModeChip(state),
-        ),
+        // Compact top bar with device type and collected items
+        _buildTopBar(state),
 
-        // Scan progress panel
-        if (state.isScanning || state.isScanComplete) _buildProgressPanel(state),
-
-        // Scanning overlay
+        // Scanning overlay (frame only, no dimming)
         if (state.isScanning) _buildScanningOverlay(state),
 
         // Control buttons
@@ -249,145 +242,157 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     );
   }
 
-  Widget _buildModeChip(ScannerState state) {
-    return GestureDetector(
-      onTap: state.isScanning ? null : _showModeSelector,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: state.isAutoLocked
-              ? Colors.green.withValues(alpha: 0.9)
-              : Colors.black87,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _getModeIcon(state.scanMode),
-              color: Colors.white,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              state.isAutoLocked
-                  ? '${state.scanMode.displayName} (Auto)'
-                  : state.scanMode.displayName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (!state.isScanning) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  /// Compact top bar showing device type and collected items as chips.
+  Widget _buildTopBar(ScannerState state) {
+    final hasData = state.collectedFields.isNotEmpty || state.isScanning;
 
-  Widget _buildProgressPanel(ScannerState state) {
     return Positioned(
-      top: 100,
+      top: 50,
       left: 16,
       right: 16,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Device type selector
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(
-                    _getModeIcon(state.scanMode),
-                    color: Theme.of(context).colorScheme.primary,
+              GestureDetector(
+                onTap: state.isScanning ? null : _showModeSelector,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: state.isAutoLocked
+                        ? Colors.green.withValues(alpha: 0.9)
+                        : Colors.black87,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${state.scanMode.displayName} Scanner',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (state.isScanning)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getModeIcon(state.scanMode),
+                        color: Colors.white,
+                        size: 18,
                       ),
-                      child: const Text(
-                        'ACTIVE',
+                      const SizedBox(width: 8),
+                      Text(
+                        state.isAutoLocked
+                            ? '${state.scanMode.displayName} (Auto)'
+                            : state.scanMode.displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (!state.isScanning) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // Scanning indicator
+              if (state.isScanning)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'SCANNING',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                ],
-              ),
-
-              if (state.collectedFields.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 8),
-                Text(
-                  'Collected (${state.collectedFields.length}):',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                ...state.collectedFields.map((field) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                      const SizedBox(width: 8),
-                      Text(field, style: const TextStyle(fontSize: 12)),
                     ],
                   ),
-                )),
-              ],
-
-              if (state.missingFields.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Missing:',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange,
-                  ),
                 ),
-                const SizedBox(height: 4),
-                ...state.missingFields.map((field) => Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.radio_button_unchecked, color: Colors.orange, size: 16),
-                      const SizedBox(width: 8),
-                      Text(field, style: const TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                )),
-              ],
-
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: state.scanProgress,
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  state.isScanComplete ? Colors.green : Theme.of(context).colorScheme.primary,
-                ),
-              ),
             ],
           ),
-        ),
+
+          // Collected items as compact chips
+          if (hasData && state.collectedFields.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: state.collectedFields.map((field) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check, color: Colors.white, size: 12),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          field,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+
+          // Missing items as subtle indicators
+          if (hasData && state.missingFields.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: state.missingFields.map((field) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 150),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange, width: 1),
+                  ),
+                  child: Text(
+                    field,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.orange,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -631,8 +636,43 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
               ),
               const SizedBox(height: 32),
 
-              // Mode selector
-              _buildModeChip(state),
+              // Mode selector (inline for web)
+              GestureDetector(
+                onTap: state.isScanning ? null : _showModeSelector,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: state.isAutoLocked
+                        ? Colors.green.withValues(alpha: 0.9)
+                        : Colors.black87,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getModeIcon(state.scanMode),
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        state.isAutoLocked
+                            ? '${state.scanMode.displayName} (Auto)'
+                            : state.scanMode.displayName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (!state.isScanning) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_drop_down, color: Colors.white, size: 18),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Manual barcode entry
@@ -672,9 +712,36 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
               ),
               const SizedBox(height: 16),
 
-              // Progress
+              // Progress (compact chips for web)
               if (state.collectedFields.isNotEmpty || state.missingFields.isNotEmpty)
-                _buildProgressPanel(state),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (state.collectedFields.isNotEmpty)
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: state.collectedFields.map((field) => Chip(
+                          avatar: const Icon(Icons.check, color: Colors.white, size: 16),
+                          label: Text(field, style: const TextStyle(fontSize: 12)),
+                          backgroundColor: Colors.green,
+                          labelStyle: const TextStyle(color: Colors.white),
+                        )).toList(),
+                      ),
+                    if (state.missingFields.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: state.missingFields.map((field) => Chip(
+                          label: Text(field, style: const TextStyle(fontSize: 12)),
+                          backgroundColor: Colors.orange.shade100,
+                          side: const BorderSide(color: Colors.orange),
+                        )).toList(),
+                      ),
+                    ],
+                  ],
+                ),
             ],
           ),
         ),

@@ -293,6 +293,7 @@ class _ScannerRegistrationPopupState
         Expanded(
           child: Text(
             titleText,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleLarge?.copyWith(
               color: statusColor,
               fontWeight: FontWeight.bold,
@@ -373,6 +374,7 @@ class _ScannerRegistrationPopupState
           Expanded(
             child: Text(
               value,
+              overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w500,
@@ -651,11 +653,15 @@ class _ScannerRegistrationPopupState
           children: [
             const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
             const SizedBox(width: 8),
-            Text(
-              'Create New ${_getDeviceTypeName(scanMode)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                'Create New ${_getDeviceTypeName(scanMode)}',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -690,6 +696,7 @@ class _ScannerRegistrationPopupState
                   child: Text(
                     device.name,
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ],
@@ -727,10 +734,11 @@ class _ScannerRegistrationPopupState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(device.name, overflow: TextOverflow.ellipsis),
+                      Text(device.name, overflow: TextOverflow.ellipsis, maxLines: 1),
                       Text(
                         'MAC: ${ScannerUtils.formatMac(device.macAddress ?? '')}',
                         overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -752,6 +760,10 @@ class _ScannerRegistrationPopupState
       currentValue = '${category}_${_selectedDevice!.id}';
     }
 
+    // Build a combined list for selectedItemBuilder lookups
+    // This prevents vertical overflow when a two-line item (assigned device) is selected
+    final combinedDevices = [...designedDevices, ...assignedDevices];
+
     return DropdownButtonFormField<String>(
       value: currentValue,
       decoration: InputDecoration(
@@ -760,6 +772,70 @@ class _ScannerRegistrationPopupState
       ),
       isExpanded: true,
       items: items,
+      // Use selectedItemBuilder to provide single-line display for selected value
+      // This prevents vertical overflow when assigned devices (which have 2-line layout
+      // in dropdown menu) are selected
+      selectedItemBuilder: (context) {
+        return items.map((item) {
+          final value = item.value;
+          if (value == null) {
+            // Separator/header items - return empty container (won't be selected)
+            return const SizedBox.shrink();
+          } else if (value == 'create_new') {
+            return Row(
+              children: [
+                const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Create New ${_getDeviceTypeName(scanMode)}',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          } else if (value.startsWith('designed_')) {
+            final deviceId = value.substring('designed_'.length);
+            final device = combinedDevices.where((d) => d.id == deviceId).firstOrNull;
+            return Row(
+              children: [
+                Icon(ScannerUtils.getModeIcon(scanMode), color: Colors.blue, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device?.name ?? 'Unknown Device',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            );
+          } else if (value.startsWith('assigned_')) {
+            final deviceId = value.substring('assigned_'.length);
+            final device = combinedDevices.where((d) => d.id == deviceId).firstOrNull;
+            // Single-line display for assigned devices to prevent overflow
+            return Row(
+              children: [
+                Icon(ScannerUtils.getModeIcon(scanMode), color: Colors.purple, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    device?.name ?? 'Unknown Device',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            );
+          }
+          return const SizedBox.shrink();
+        }).toList();
+      },
       onChanged: (value) {
         if (value == null) return;
 
