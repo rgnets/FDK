@@ -73,7 +73,10 @@ void main() {
         expect(callCount, greaterThan(1)); // Should have retried
       });
 
-      test('should return failed when fetch throws error', () async {
+      test('should return timeout when fetch throws error (REST upload already succeeded)', () async {
+        // Note: Verification never returns 'failed' because the REST upload
+        // already succeeded. Errors during verification just mean we couldn't
+        // confirm the upload, not that it actually failed.
         final verifier = ImageUploadVerifier(
           fetchImagesCallback: (deviceType, deviceId) async {
             throw Exception('Network error');
@@ -90,7 +93,7 @@ void main() {
           previousCount: 1,
         );
 
-        expect(result, equals(VerificationResult.failed));
+        expect(result, equals(VerificationResult.timeout));
       });
 
       test('should return success even if it takes multiple attempts', () async {

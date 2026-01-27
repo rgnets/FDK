@@ -61,10 +61,10 @@ void main() {
         expect(ImageUploadConfig.maxRetries, equals(3));
       });
 
-      test('uploadTimeout should be 30 seconds', () {
+      test('uploadTimeout should be 90 seconds', () {
         expect(
           ImageUploadConfig.uploadTimeout,
-          equals(const Duration(seconds: 30)),
+          equals(const Duration(seconds: 90)),
         );
       });
 

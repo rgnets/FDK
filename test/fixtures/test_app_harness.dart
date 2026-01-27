@@ -10,7 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class NoopBackgroundRefreshService extends BackgroundRefreshService {
   NoopBackgroundRefreshService({
     required super.deviceDataSource,
-    required super.deviceLocalDataSource,
+    required super.apLocalDataSource,
+    required super.ontLocalDataSource,
+    required super.switchLocalDataSource,
+    required super.wlanLocalDataSource,
     required super.roomRepository,
     required super.notificationGenerationService,
     required super.storageService,
@@ -35,7 +38,10 @@ ProviderContainer createTestContainer({
       backgroundRefreshServiceProvider.overrideWith((ref) {
         final service = NoopBackgroundRefreshService(
           deviceDataSource: ref.watch(deviceDataSourceProvider),
-          deviceLocalDataSource: ref.watch(deviceLocalDataSourceProvider),
+          apLocalDataSource: ref.watch(apLocalDataSourceProvider),
+          ontLocalDataSource: ref.watch(ontLocalDataSourceProvider),
+          switchLocalDataSource: ref.watch(switchLocalDataSourceProvider),
+          wlanLocalDataSource: ref.watch(wlanLocalDataSourceProvider),
           roomRepository: ref.watch(roomRepositoryProvider),
           notificationGenerationService:
               ref.watch(notificationGenerationServiceProvider),
