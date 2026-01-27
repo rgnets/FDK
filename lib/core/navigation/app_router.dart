@@ -10,7 +10,7 @@ import 'package:rgnets_fdk/features/home/presentation/screens/home_screen.dart';
 import 'package:rgnets_fdk/features/issues/presentation/screens/health_notices_screen.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/room_detail_screen.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/screens/rooms_screen.dart';
-import 'package:rgnets_fdk/features/scanner/presentation/screens/scanner_screen.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/screens/scanner_screen_v2.dart';
 import 'package:rgnets_fdk/features/settings/presentation/screens/settings_screen.dart';
 import 'package:rgnets_fdk/features/splash/presentation/screens/splash_screen.dart';
 
@@ -50,7 +50,7 @@ class AppRouter {
         path: '/auth-scanner',
         builder: (context, state) {
           final mode = state.uri.queryParameters['mode'];
-          return ScannerScreen(mode: mode);
+          return ScannerScreenV2(mode: mode);
         },
       ),
 
@@ -83,7 +83,7 @@ class AppRouter {
             pageBuilder: (context, state) {
               final mode = state.uri.queryParameters['mode'];
               return NoTransitionPage(
-                child: ScannerScreen(mode: mode),
+                child: ScannerScreenV2(mode: mode),
               );
             },
           ),
