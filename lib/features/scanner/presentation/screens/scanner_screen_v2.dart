@@ -777,8 +777,14 @@ class _ModeSelectorSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final modes = ScanMode.values.where((m) => m != ScanMode.rxg).toList();
+
     return Container(
       padding: const EdgeInsets.all(20),
+      // Constrain height to avoid overflow, allow scrolling
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.6,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -797,16 +803,26 @@ class _ModeSelectorSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          ...ScanMode.values.where((m) => m != ScanMode.rxg).map((mode) => ListTile(
-            leading: Icon(_getModeIcon(mode)),
-            title: Text(mode.displayName),
-            subtitle: Text(_getModeDescription(mode)),
-            selected: mode == currentMode,
-            onTap: () => onModeSelected(mode),
-            trailing: mode == currentMode
-                ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
-                : null,
-          )),
+          // Scrollable list of modes
+          Flexible(
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: modes.length,
+              itemBuilder: (context, index) {
+                final mode = modes[index];
+                return ListTile(
+                  leading: Icon(_getModeIcon(mode)),
+                  title: Text(mode.displayName),
+                  subtitle: Text(_getModeDescription(mode)),
+                  selected: mode == currentMode,
+                  onTap: () => onModeSelected(mode),
+                  trailing: mode == currentMode
+                      ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                      : null,
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
