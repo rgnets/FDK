@@ -494,15 +494,45 @@ This document provides a comprehensive checklist for testing all functions of th
 
 ## Known Technical Debt - Skipped Automated Tests
 
-The following automated tests are currently skipped and need migration before final release:
+**Status: 806 tests passing, 6 tests skipped**
 
-| Test File | Status | Reason | Priority |
-|-----------|--------|--------|----------|
-| rest_image_upload_service_test.dart | Skipped | Needs Dio mocking migration | **HIGH** |
-| optimization_verification_test.dart | Partially skipped | Deprecated APIs removed | Medium |
-| (Others in ~8 skipped) | Skipped | Architecture migration | Medium |
+### Completed Migrations
+- ✅ `rest_image_upload_service_test.dart` - Fully migrated from http.Client to Dio mocking (18 tests)
+- ✅ Timer management resolved with `NoopWebSocketService` and `NoopBackgroundRefreshService` in test harness
+- ✅ Full-app integration tests moved to `integration_test/` directory (7 tests)
 
-**Action Required:** Create tickets for each skipped test and prioritize `rest_image_upload_service_test.dart` as it covers critical image upload functionality.
+### Integration Tests Setup
+
+Full-app tests that require the complete `FDKApp` widget have been moved to Flutter integration tests:
+
+**Run integration tests with:**
+```bash
+# Headless (no device required)
+flutter test integration_test/app_test.dart
+
+# With device/emulator
+flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart
+```
+
+**Integration test coverage:**
+- Development environment navigation with mock data
+- Development environment device list loading
+- Staging environment auto-authentication
+- Production environment authentication requirement
+- Production auth screen input fields
+- Splash screen display
+- Bottom navigation functionality
+
+### Skipped Widget Tests (Architectural Constraint)
+
+| Test File | Tests | Reason |
+|-----------|-------|--------|
+| staging_auth_test.dart | 1 | FDKApp uses `ref.listen` in initState |
+| app_integration_test.dart | 5 | FDKApp uses `ref.listen` in initState |
+
+**Root Cause:** The `FDKApp` widget uses `ref.listen` inside `initState` via `WidgetsBinding.instance.addPostFrameCallback`. This is incompatible with `UncontrolledProviderScope` used in widget tests. This is a known Riverpod constraint.
+
+**Resolution:** These tests have been duplicated as integration tests in `integration_test/app_test.dart`. The widget test versions are kept (skipped) for reference and can be removed once the integration test workflow is validated.
 
 ---
 
