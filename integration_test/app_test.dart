@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
@@ -15,8 +14,10 @@ void main() {
   setUp(() async {
     // Reset router to splash screen
     AppRouter.router.go('/splash');
-    // Clear shared preferences
+    // Clear shared preferences - use both methods for headless and device runs
     SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
   });
 
   group('Development Environment Tests', () {
@@ -51,22 +52,29 @@ void main() {
       await tester.pumpWidget(const dev.FDKApp());
       await tester.pump();
       await tester.pump(const Duration(seconds: 3));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
       // Navigate to devices tab if not already there
       final devicesTab = find.byIcon(Icons.devices);
       if (devicesTab.evaluate().isNotEmpty) {
         await tester.tap(devicesTab);
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 1));
       }
 
-      // Should have loaded mock devices
-      // Look for device list indicators (device cards, list items, etc.)
+      // Should have loaded mock devices - wait for async data
       await tester.pump(const Duration(seconds: 2));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
 
-      // The home screen should have content (not empty)
+      // Verify we're on a screen with navigation (home or devices)
       expect(find.byType(BottomNavigationBar), findsOneWidget);
+
+      // Check for device list UI elements (ListView, Card, or ListTile)
+      // Mock data should provide devices to display
+      final hasListContent = find.byType(ListView).evaluate().isNotEmpty ||
+          find.byType(Card).evaluate().isNotEmpty ||
+          find.byType(ListTile).evaluate().isNotEmpty;
+      expect(hasListContent, isTrue,
+          reason: 'Device list should contain scrollable content');
     });
   });
 
@@ -88,8 +96,10 @@ void main() {
       expect(find.text('RG Nets Field Deployment Kit'), findsOneWidget);
 
       // Wait for auto-auth attempt (may succeed or fail depending on network)
+      // Use bounded pumps to avoid infinite waits from ongoing timers
       await tester.pump(const Duration(seconds: 5));
-      await tester.pumpAndSettle(const Duration(seconds: 10));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pump(const Duration(seconds: 2));
 
       // Should navigate somewhere (home on success, auth on failure)
       // Either BottomNavigationBar (home) or 'Connect to rXg System' (auth)
