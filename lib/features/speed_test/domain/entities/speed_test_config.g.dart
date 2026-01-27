@@ -9,15 +9,15 @@ part of 'speed_test_config.dart';
 _$SpeedTestConfigImpl _$$SpeedTestConfigImplFromJson(
         Map<String, dynamic> json) =>
     _$SpeedTestConfigImpl(
-      id: (json['id'] as num?)?.toInt(),
+      id: _toInt(json['id']),
       name: json['name'] as String?,
       testType: json['test_type'] as String?,
       target: json['target'] as String?,
-      port: (json['port'] as num?)?.toInt(),
+      port: _toInt(json['port']),
       iperfProtocol: json['iperf_protocol'] as String?,
-      minDownloadMbps: (json['min_download_mbps'] as num?)?.toDouble(),
-      minUploadMbps: (json['min_upload_mbps'] as num?)?.toDouble(),
-      period: (json['period'] as num?)?.toInt(),
+      minDownloadMbps: _toDouble(json['min_download_mbps']),
+      minUploadMbps: _toDouble(json['min_upload_mbps']),
+      period: _toInt(json['period']),
       periodUnit: json['period_unit'] as String?,
       startsAt: json['starts_at'] == null
           ? null
@@ -30,12 +30,12 @@ _$SpeedTestConfigImpl _$$SpeedTestConfigImplFromJson(
           : DateTime.parse(json['last_checked_at'] as String),
       passing: json['passing'] as bool? ?? false,
       lastResult: json['last_result'] as String?,
-      maxFailures: (json['max_failures'] as num?)?.toInt(),
+      maxFailures: _toInt(json['max_failures']),
       disableUplinkOnFailure:
           json['disable_uplink_on_failure'] as bool? ?? false,
-      sampleSizePct: (json['sample_size_pct'] as num?)?.toInt(),
+      sampleSizePct: _toInt(json['sample_size_pct']),
       pskOverride: json['psk_override'] as String?,
-      wlanId: (json['wlan_id'] as num?)?.toInt(),
+      wlanId: _toInt(json['wlan_id']),
       note: json['note'] as String?,
       scratch: json['scratch'] as String?,
       createdBy: json['created_by'] as String?,

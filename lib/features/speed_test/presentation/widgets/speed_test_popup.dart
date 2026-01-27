@@ -1,57 +1,58 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:rgnets_fdk/core/theme/app_colors.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
-import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
-import 'package:rgnets_fdk/features/speed_test/data/services/network_gateway_service.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 
-class SpeedTestPopup extends StatefulWidget {
+class SpeedTestPopup extends ConsumerStatefulWidget {
+  /// The speed test configuration
   final SpeedTestConfig? cachedTest;
+
   final VoidCallback? onCompleted;
+
+  /// Callback when result should be submitted (auto-called when test passes)
+  final void Function(SpeedTestResult result)? onResultSubmitted;
+
+  /// Existing result to update (instead of creating a new one)
+  final SpeedTestResult? existingResult;
+
+  /// Optional AP ID to display uplink speed (for AP speed tests)
+  final int? apId;
 
   const SpeedTestPopup({
     super.key,
     this.cachedTest,
     this.onCompleted,
+    this.onResultSubmitted,
+    this.existingResult,
+    this.apId,
   });
 
   @override
-  State<SpeedTestPopup> createState() => _SpeedTestPopupState();
+  ConsumerState<SpeedTestPopup> createState() => _SpeedTestPopupState();
 }
 
-class _SpeedTestPopupState extends State<SpeedTestPopup>
+class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
     with SingleTickerProviderStateMixin {
-  final SpeedTestService _speedTestService = SpeedTestService();
-
-  SpeedTestStatus _status = SpeedTestStatus.idle;
-  double _downloadSpeed = 0.0;
-  double _uploadSpeed = 0.0;
-  double _latency = 0.0;
-  double _progress = 0.0;
-  String _currentPhase = 'Ready to start';
-  String? _localIp;
-  String? _gatewayIp;
-  String? _serverHost;
-  String _serverLabel = 'Gateway';
-  String? _errorMessage;
-  bool _testPassed = false;
-
-  StreamSubscription<SpeedTestStatus>? _statusSubscription;
-  StreamSubscription<SpeedTestResult>? _resultSubscription;
-  StreamSubscription<double>? _progressSubscription;
-  StreamSubscription<String>? _statusMessageSubscription;
-
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  bool _resultSubmitted = false;
+  bool _isSubmitting = false;
+  bool? _submissionSuccess;
+  String? _submissionError;
 
   @override
   void initState() {
     super.initState();
     _initializePulseAnimation();
-    _initializeService();
+    // Initialize notifier (idempotent)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(speedTestRunNotifierProvider.notifier).initialize();
+    });
   }
 
   void _initializePulseAnimation() {
@@ -65,195 +66,184 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
     );
   }
 
-  Future<void> _initializeService() async {
-    await _speedTestService.initialize();
-
-    _status = SpeedTestStatus.idle;
-
-    final gatewayService = NetworkGatewayService();
-    _localIp = await gatewayService.getWifiIP();
-
-    _gatewayIp = await gatewayService.getWifiGateway();
-    _serverHost = _gatewayIp;
-    _serverLabel = 'Gateway';
-
-    if (_localIp == null) {
-      LoggerService.warning(
-          'Could not get device IP - location permission may be required on iOS',
-          tag: 'SpeedTestPopup');
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-
-    _statusSubscription = _speedTestService.statusStream.listen((status) {
-      if (!mounted) return;
-      setState(() {
-        _status = status;
-        _updatePhase();
-      });
-    });
-
-    _resultSubscription = _speedTestService.resultStream.listen((result) {
-      if (!mounted) return;
-      setState(() {
-        final serviceStatus = _speedTestService.status;
-
-        if (result.hasError) {
-          _errorMessage = result.errorMessage;
-          _currentPhase = 'Test failed';
-        } else {
-          // Update speeds (either live or final)
-          if (result.downloadSpeed > 0) _downloadSpeed = result.downloadSpeed;
-          if (result.uploadSpeed > 0) _uploadSpeed = result.uploadSpeed;
-          if (result.latency > 0) _latency = result.latency;
-
-          // Only update connection info if it's a final result
-          if (result.localIpAddress != null) _localIp = result.localIpAddress;
-          if (result.serverHost != null) _serverHost = result.serverHost;
-
-          // If the service finished but our local status hasn't updated yet, sync it
-          if (serviceStatus == SpeedTestStatus.completed &&
-              _status != SpeedTestStatus.completed) {
-            _status = SpeedTestStatus.completed;
-          }
-
-          // Check if this is a complete result
-          if (result.localIpAddress != null ||
-              _status == SpeedTestStatus.completed ||
-              serviceStatus == SpeedTestStatus.completed) {
-            _validateTestResults();
-            _currentPhase =
-                _testPassed ? 'Test completed - PASSED!' : 'Test completed';
-          }
-        }
-      });
-    });
-
-    _progressSubscription = _speedTestService.progressStream.listen((progress) {
-      if (!mounted) return;
-      setState(() {
-        _progress = progress;
-        _updatePhase();
-      });
-    });
-
-    _statusMessageSubscription =
-        _speedTestService.statusMessageStream.listen((message) {
-      if (!mounted) return;
-      setState(() {
-        _currentPhase = message;
-
-        // Extract server info from fallback attempt messages
-        if (message.contains('Default gateway')) {
-          _serverLabel = 'Gateway';
-          final match = RegExp(r'\(([^)]+)\)').firstMatch(message);
-          if (match != null) {
-            _serverHost = match.group(1);
-          }
-        } else if (message.contains('test configuration') ||
-            message.contains('Test configuration')) {
-          _serverLabel = 'Target';
-          final match = RegExp(r'\(([^)]+)\)').firstMatch(message);
-          if (match != null) {
-            _serverHost = match.group(1);
-          }
-        } else if (message.contains('external server') ||
-            message.contains('External server')) {
-          _serverLabel = 'External';
-          final match = RegExp(r'\(([^)]+)\)').firstMatch(message);
-          if (match != null) {
-            _serverHost = match.group(1);
-          }
-        } else if (message.contains('Testing download speed to') ||
-            message.contains('Testing upload speed to')) {
-          final match = RegExp(r'to ([\w\.\-]+)').firstMatch(message);
-          if (match != null) {
-            _serverHost = match.group(1);
-            _serverLabel = (_serverHost == _gatewayIp) ? 'Gateway' : 'Target';
-          }
-        }
-      });
-    });
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
   }
 
-  void _updatePhase() {
-    if (_status == SpeedTestStatus.running &&
-        _currentPhase == 'Ready to start') {
-      if (_progress < 50) {
-        _currentPhase = 'Testing download speed...';
-      } else {
-        _currentPhase = 'Testing upload speed...';
-      }
-    } else if (_status == SpeedTestStatus.completed &&
-        _currentPhase != 'Test completed!') {
-      _currentPhase = 'Test completed!';
-    } else if (_status == SpeedTestStatus.error &&
-        _currentPhase != 'Test failed') {
-      _currentPhase = 'Test failed';
-    }
-  }
+  /// Get the effective config
+  SpeedTestConfig? get _effectiveConfig => widget.cachedTest;
+
+  double? _getMinDownload() => _effectiveConfig?.minDownloadMbps;
+  double? _getMinUpload() => _effectiveConfig?.minUploadMbps;
+  String? _getConfigTarget() => _effectiveConfig?.target;
+  String? _getConfigName() => _effectiveConfig?.name;
 
   Future<void> _startTest() async {
-    final gatewayService = NetworkGatewayService();
-    final gatewayIp = await gatewayService.getWifiGateway();
+    final notifier = ref.read(speedTestRunNotifierProvider.notifier);
+    final configTarget = _getConfigTarget();
 
-    setState(() {
-      _currentPhase = 'Starting test...';
-      _serverLabel = 'Gateway';
-      _serverHost = gatewayIp ?? 'Detecting...';
-    });
-
-    String? configTarget;
-    final cachedTest = widget.cachedTest;
-    if (cachedTest != null) {
-      configTarget = cachedTest.target;
-    }
-
-    await _speedTestService.runSpeedTestWithFallback(configTarget: configTarget);
+    await notifier.startTest(
+      config: _effectiveConfig,
+      configTarget: configTarget,
+    );
   }
 
-  void _cancelTest() async {
-    await _speedTestService.cancelTest();
+  Future<void> _cancelTest() async {
+    await ref.read(speedTestRunNotifierProvider.notifier).cancelTest();
     if (mounted) {
       Navigator.of(context).pop();
     }
   }
 
-  double? _getMinDownload() {
-    return widget.cachedTest?.minDownloadMbps;
-  }
+  Future<void> _handleTestCompleted() async {
+    if (_resultSubmitted) return;
 
-  double? _getMinUpload() {
-    return widget.cachedTest?.minUploadMbps;
-  }
+    final testState = ref.read(speedTestRunNotifierProvider);
+    final result = testState.completedResult;
 
-  void _validateTestResults() {
-    final cachedTest = widget.cachedTest;
+    if (result == null) return;
 
-    if (cachedTest == null) {
-      _testPassed = true;
-      return;
+    // Submit result via callback if provided
+    if (widget.onResultSubmitted != null) {
+      final submitResult = SpeedTestResult(
+        downloadMbps: testState.downloadSpeed,
+        uploadMbps: testState.uploadSpeed,
+        rtt: testState.latency,
+        localIpAddress: testState.localIpAddress,
+        serverHost: testState.serverHost,
+        speedTestId: _effectiveConfig?.id,
+        passed: testState.testPassed ?? false,
+        initiatedAt: result.initiatedAt,
+        completedAt: DateTime.now(),
+        testType: 'iperf3',
+        source: testState.localIpAddress,
+        destination: testState.serverHost,
+        port: testState.serverPort,
+        iperfProtocol: testState.useUdp ? 'udp' : 'tcp',
+      );
+
+      LoggerService.info(
+        'SpeedTestPopup: Auto-submitting result via callback - passed=${testState.testPassed}, '
+        'download=${testState.downloadSpeed}, upload=${testState.uploadSpeed}',
+        tag: 'SpeedTestPopup',
+      );
+
+      widget.onResultSubmitted?.call(submitResult);
+      _resultSubmitted = true;
+    } else if (_effectiveConfig != null) {
+      // No callback provided, submit internally via provider
+      await _submitResultInternally();
     }
-
-    final minDownload = _getMinDownload();
-    final minUpload = _getMinUpload();
-
-    final downloadPassed = minDownload == null || _downloadSpeed >= minDownload;
-    final uploadPassed = minUpload == null || _uploadSpeed >= minUpload;
-
-    _testPassed = downloadPassed && uploadPassed;
   }
 
-  @override
-  void dispose() {
-    _statusSubscription?.cancel();
-    _resultSubscription?.cancel();
-    _progressSubscription?.cancel();
-    _statusMessageSubscription?.cancel();
-    _pulseController.dispose();
-    super.dispose();
+  Future<void> _submitResultInternally() async {
+    if (_isSubmitting || _resultSubmitted) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _submissionSuccess = null;
+      _submissionError = null;
+    });
+
+    try {
+      final existingId = widget.existingResult?.id;
+      final isUpdate = existingId != null;
+
+      LoggerService.info(
+        'SpeedTestPopup: existingResult=${widget.existingResult != null}, '
+        'existingId=$existingId, isUpdate=$isUpdate, '
+        'configId=${_effectiveConfig?.id}',
+        tag: 'SpeedTestPopup',
+      );
+
+      SpeedTestResult? resultFromServer;
+
+      if (isUpdate) {
+        // Update existing result with new test data
+        final testState = ref.read(speedTestRunNotifierProvider);
+        final completedResult = testState.completedResult;
+
+        final updatedResult = widget.existingResult!.copyWith(
+          downloadMbps: testState.downloadSpeed,
+          uploadMbps: testState.uploadSpeed,
+          rtt: testState.latency,
+          passed: testState.testPassed ?? false,
+          initiatedAt: completedResult?.initiatedAt ?? DateTime.now(),
+          completedAt: DateTime.now(),
+          testType: 'iperf3',
+          source: testState.localIpAddress,
+          destination: testState.serverHost,
+          port: testState.serverPort,
+          iperfProtocol: testState.useUdp ? 'udp' : 'tcp',
+        );
+
+        LoggerService.info(
+          'SpeedTestPopup: Updating result id=$existingId with '
+          'download=${testState.downloadSpeed}, upload=${testState.uploadSpeed}, '
+          'source=${testState.localIpAddress}, destination=${testState.serverHost}',
+          tag: 'SpeedTestPopup',
+        );
+
+        final notifier = ref.read(
+          speedTestResultsNotifierProvider(
+            speedTestId: updatedResult.speedTestId,
+          ).notifier,
+        );
+        resultFromServer = await notifier.updateResult(updatedResult);
+      } else {
+        // Create new result
+        LoggerService.info(
+          'SpeedTestPopup: Creating new result (no existing result to update)',
+          tag: 'SpeedTestPopup',
+        );
+        resultFromServer = await ref
+            .read(speedTestRunNotifierProvider.notifier)
+            .submitResult();
+      }
+
+      final success = resultFromServer != null;
+
+      // Update the WebSocket cache so it appears in the list
+      if (resultFromServer != null) {
+        ref
+            .read(webSocketCacheIntegrationProvider)
+            .updateSpeedTestResultInCache(resultFromServer);
+        LoggerService.info(
+          'SpeedTestPopup: ${isUpdate ? "Updated" : "Added"} result ${resultFromServer.id} in cache',
+          tag: 'SpeedTestPopup',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submissionSuccess = success;
+          _resultSubmitted = true;
+          if (!success) {
+            _submissionError = 'Failed to ${isUpdate ? "update" : "submit"} result';
+          }
+        });
+      }
+
+      LoggerService.info(
+        'SpeedTestPopup: ${isUpdate ? "Update" : "Submission"} ${success ? "succeeded" : "failed"}',
+        tag: 'SpeedTestPopup',
+      );
+    } catch (e) {
+      LoggerService.error(
+        'SpeedTestPopup: Error submitting result: $e',
+        tag: 'SpeedTestPopup',
+      );
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _submissionSuccess = false;
+          _submissionError = e.toString();
+        });
+      }
+    }
   }
 
   String _formatSpeed(double speed) {
@@ -264,8 +254,8 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
     }
   }
 
-  Color _getStatusColor() {
-    switch (_status) {
+  Color _getStatusColor(SpeedTestStatus status) {
+    switch (status) {
       case SpeedTestStatus.running:
         return AppColors.primary;
       case SpeedTestStatus.completed:
@@ -277,8 +267,8 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
     }
   }
 
-  IconData _getStatusIcon() {
-    switch (_status) {
+  IconData _getStatusIcon(SpeedTestStatus status) {
+    switch (status) {
       case SpeedTestStatus.running:
         return Icons.speed;
       case SpeedTestStatus.completed:
@@ -336,28 +326,28 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
               color: AppColors.gray500,
             ),
           ),
-          if (minRequired != null) ...[
-            const SizedBox(height: 2),
-            SizedBox(
-              width: 110,
-              child: Text(
-                'Min: ${_formatSpeed(minRequired)}',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 8,
-                  color: AppColors.gray400,
-                  fontStyle: FontStyle.italic,
-                  fontFamily: 'monospace',
-                ),
+          const SizedBox(height: 2),
+          SizedBox(
+            width: 110,
+            child: Text(
+              minRequired != null
+                  ? 'Min: ${_formatSpeed(minRequired)}'
+                  : 'Min: Not set',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 8,
+                color: AppColors.gray400,
+                fontStyle: FontStyle.italic,
+                fontFamily: 'monospace',
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLatencyIndicator() {
+  Widget _buildLatencyIndicator(double latency) {
     return Container(
       padding: const EdgeInsets.all(12),
       constraints: const BoxConstraints(
@@ -377,7 +367,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
           SizedBox(
             width: 110,
             child: Text(
-              '${_latency.toStringAsFixed(0)} ms',
+              '${latency.toStringAsFixed(0)} ms',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -402,8 +392,19 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
 
   @override
   Widget build(BuildContext context) {
+    final testState = ref.watch(speedTestRunNotifierProvider);
+    final status = testState.executionStatus;
+    final testPassed = testState.testPassed;
+
+    // Auto-submit when test completes
+    if (status == SpeedTestStatus.completed && !_resultSubmitted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleTestCompleted();
+      });
+    }
+
     return PopScope(
-      canPop: _status != SpeedTestStatus.running,
+      canPop: status != SpeedTestStatus.running,
       child: Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
@@ -420,18 +421,18 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                       animation: _pulseAnimation,
                       builder: (context, child) {
                         return Transform.scale(
-                          scale: _status == SpeedTestStatus.running
+                          scale: status == SpeedTestStatus.running
                               ? _pulseAnimation.value
                               : 1.0,
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: _getStatusColor().withOpacity(0.2),
+                              color: _getStatusColor(status).withOpacity(0.2),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              _getStatusIcon(),
-                              color: _getStatusColor(),
+                              _getStatusIcon(status),
+                              color: _getStatusColor(status),
                               size: 32,
                             ),
                           ),
@@ -451,7 +452,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                             ),
                           ),
                           Text(
-                            _currentPhase,
+                            testState.statusMessage ?? 'Ready to start',
                             style: TextStyle(
                               fontSize: 14,
                               color: AppColors.gray500,
@@ -460,7 +461,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                         ],
                       ),
                     ),
-                    if (_status != SpeedTestStatus.running)
+                    if (status != SpeedTestStatus.running)
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () {
@@ -487,11 +488,11 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                       Row(
                         children: [
                           Icon(
-                            _localIp != null
+                            testState.localIpAddress != null
                                 ? Icons.computer
                                 : Icons.location_off,
                             size: 16,
-                            color: _localIp != null
+                            color: testState.localIpAddress != null
                                 ? AppColors.gray500
                                 : Colors.orange,
                           ),
@@ -503,9 +504,9 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                               color: AppColors.gray500,
                             ),
                           ),
-                          if (_localIp != null)
+                          if (testState.localIpAddress != null)
                             Text(
-                              _localIp!,
+                              testState.localIpAddress!,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.gray300,
@@ -538,18 +539,18 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                             ),
                           ),
                           Text(
-                            _serverLabel,
+                            'Target',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (_serverHost != null) ...[
+                          if (testState.serverHost.isNotEmpty) ...[
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
-                                '($_serverHost)',
+                                '(${testState.serverHost})',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppColors.gray500,
@@ -561,11 +562,218 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                           ],
                         ],
                       ),
+                      // Uplink speed row (for AP speed tests)
+                      if (widget.apId != null) ...[
+                        const SizedBox(height: 6),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final uplinkAsync =
+                                ref.watch(apUplinkInfoProvider(widget.apId!));
+                            return Row(
+                              children: [
+                                const Icon(
+                                  Icons.cable,
+                                  size: 16,
+                                  color: AppColors.gray500,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Uplink: ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.gray500,
+                                  ),
+                                ),
+                                uplinkAsync.when(
+                                  data: (uplink) {
+                                    if (uplink == null) {
+                                      return const Text(
+                                        'Not available',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.warning,
+                                        ),
+                                      );
+                                    }
+                                    final speedBps = uplink.speedInBps;
+                                    final speedGbps = speedBps != null
+                                        ? speedBps / 1000000000
+                                        : null;
+                                    final isSlowUplink = speedBps != null &&
+                                        speedBps < 2500000000;
+                                    return Text(
+                                      speedGbps != null
+                                          ? '${speedGbps.toStringAsFixed(1)} Gbps'
+                                          : 'Unknown',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isSlowUplink
+                                            ? AppColors.error
+                                            : AppColors.gray300,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    );
+                                  },
+                                  loading: () => const Text(
+                                    'Loading...',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.gray500,
+                                    ),
+                                  ),
+                                  error: (_, __) => const Text(
+                                    'Error',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
+
+                // Requirements section (shown when config has thresholds)
+                if (_effectiveConfig != null &&
+                    (_getMinDownload() != null || _getMinUpload() != null)) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.assignment,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _getConfigName() ?? 'Speed Test Requirements',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            // Download requirement
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.download,
+                                    size: 14,
+                                    color: AppColors.success,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Min: ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.gray400,
+                                    ),
+                                  ),
+                                  Text(
+                                    _getMinDownload() != null
+                                        ? _formatSpeed(_getMinDownload()!)
+                                        : 'None',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.gray300,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Upload requirement
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.upload,
+                                    size: 14,
+                                    color: AppColors.info,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Min: ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.gray400,
+                                    ),
+                                  ),
+                                  Text(
+                                    _getMinUpload() != null
+                                        ? _formatSpeed(_getMinUpload()!)
+                                        : 'None',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.gray300,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Server fallback info
+                        if (_getConfigTarget() != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.swap_horiz,
+                                size: 14,
+                                color: AppColors.gray500,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Gateway first, then ${_getConfigTarget()}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.gray500,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 // Speed indicators
                 SizedBox(
@@ -575,7 +783,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                       Expanded(
                         child: _buildSpeedIndicator(
                           'Download',
-                          _downloadSpeed,
+                          testState.downloadSpeed,
                           Icons.download,
                           AppColors.success,
                           minRequired: _getMinDownload(),
@@ -585,7 +793,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                       Expanded(
                         child: _buildSpeedIndicator(
                           'Upload',
-                          _uploadSpeed,
+                          testState.uploadSpeed,
                           Icons.upload,
                           AppColors.info,
                           minRequired: _getMinUpload(),
@@ -600,13 +808,13 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                 // Latency indicator
                 SizedBox(
                   height: 110,
-                  child: _buildLatencyIndicator(),
+                  child: _buildLatencyIndicator(testState.latency),
                 ),
 
                 const SizedBox(height: 20),
 
                 // Progress indicator
-                if (_status == SpeedTestStatus.running) ...[
+                if (status == SpeedTestStatus.running) ...[
                   Center(
                     child: Column(
                       children: [
@@ -614,18 +822,18 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                           width: 48,
                           height: 48,
                           child: CircularProgressIndicator(
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(_getStatusColor()),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                _getStatusColor(status)),
                             strokeWidth: 4,
                           ),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          _currentPhase,
+                          testState.statusMessage ?? 'Testing...',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: _getStatusColor(),
+                            color: _getStatusColor(status),
                           ),
                         ),
                       ],
@@ -634,14 +842,15 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                 ],
 
                 // Error message
-                if (_errorMessage != null) ...[
+                if (testState.errorMessage != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.error.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.error.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
@@ -650,7 +859,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _errorMessage!,
+                            testState.errorMessage!,
                             style: const TextStyle(
                               color: AppColors.error,
                               fontSize: 12,
@@ -663,15 +872,16 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                 ],
 
                 // Threshold failure alert
-                if (_status == SpeedTestStatus.completed && !_testPassed) ...[
+                if (status == SpeedTestStatus.completed &&
+                    testPassed == false) ...[
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.warning.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: AppColors.warning.withOpacity(0.3)),
+                      border: Border.all(
+                          color: AppColors.warning.withOpacity(0.3)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -707,10 +917,115 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                   ),
                 ],
 
+                // Submission status feedback
+                if (status == SpeedTestStatus.completed && _effectiveConfig != null) ...[
+                  const SizedBox(height: 16),
+                  if (_isSubmitting)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Submitting result...',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_submissionSuccess == true)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.success,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Result submitted successfully',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_submissionSuccess == false)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: AppColors.error,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _submissionError ?? 'Failed to submit result',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _submitResultInternally,
+                            child: Text(
+                              'Retry',
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+
                 // Action buttons
                 const SizedBox(height: 16),
 
-                if (_status == SpeedTestStatus.idle) ...[
+                if (status == SpeedTestStatus.idle) ...[
                   Row(
                     children: [
                       Expanded(
@@ -744,7 +1059,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                   ),
                 ],
 
-                if (_status == SpeedTestStatus.running) ...[
+                if (status == SpeedTestStatus.running) ...[
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -759,7 +1074,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                   ),
                 ],
 
-                if (_status == SpeedTestStatus.completed) ...[
+                if (status == SpeedTestStatus.completed) ...[
                   Row(
                     children: [
                       Expanded(
@@ -783,13 +1098,14 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                         child: ElevatedButton.icon(
                           onPressed: () {
                             setState(() {
-                              _downloadSpeed = 0.0;
-                              _uploadSpeed = 0.0;
-                              _latency = 0.0;
-                              _progress = 0.0;
-                              _errorMessage = null;
-                              _testPassed = false;
+                              _resultSubmitted = false;
+                              _isSubmitting = false;
+                              _submissionSuccess = null;
+                              _submissionError = null;
                             });
+                            ref
+                                .read(speedTestRunNotifierProvider.notifier)
+                                .reset();
                             _startTest();
                           },
                           icon: const Icon(Icons.refresh, size: 16),
@@ -806,7 +1122,7 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                   ),
                 ],
 
-                if (_status == SpeedTestStatus.error) ...[
+                if (status == SpeedTestStatus.error) ...[
                   Row(
                     children: [
                       Expanded(
@@ -829,12 +1145,14 @@ class _SpeedTestPopupState extends State<SpeedTestPopup>
                         child: ElevatedButton.icon(
                           onPressed: () {
                             setState(() {
-                              _errorMessage = null;
-                              _downloadSpeed = 0.0;
-                              _uploadSpeed = 0.0;
-                              _latency = 0.0;
-                              _progress = 0.0;
+                              _resultSubmitted = false;
+                              _isSubmitting = false;
+                              _submissionSuccess = null;
+                              _submissionError = null;
                             });
+                            ref
+                                .read(speedTestRunNotifierProvider.notifier)
+                                .reset();
                             _startTest();
                           },
                           icon: const Icon(Icons.refresh, size: 16),

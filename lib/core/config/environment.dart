@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Environment configuration for different build flavors
 enum Environment { development, staging, production }
 
@@ -11,15 +9,6 @@ class EnvironmentConfig {
 
   static void setEnvironment(Environment env) {
     _environment = env;
-    // Only log in debug mode to avoid memory issues
-    if (kDebugMode) {
-      debugPrint(
-        'EnvironmentConfig: Environment set, isDevelopment=$isDevelopment, '
-        'isStaging=$isStaging, isProduction=$isProduction',
-      );
-      debugPrint('EnvironmentConfig: WebSocket URL will be: $websocketBaseUrl');
-      debugPrint('EnvironmentConfig: useSyntheticData=$useSyntheticData');
-    }
   }
 
   static Environment get environment => _environment;

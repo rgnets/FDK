@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/ap_uplink_service.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
@@ -160,6 +161,15 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
   ref.onDispose(integration.dispose);
 
   return integration;
+});
+
+/// Provides AP uplink info via cached lookups (fetching as needed).
+final apUplinkInfoProvider = FutureProvider.family<APUplinkInfo?, int>((
+  ref,
+  apId,
+) {
+  final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
+  return cacheIntegration.getAPUplinkInfo(apId);
 });
 
 /// Emits the last device-cache update time for WebSocket snapshots/updates.

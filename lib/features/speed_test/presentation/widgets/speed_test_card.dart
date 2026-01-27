@@ -1,20 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:rgnets_fdk/core/theme/app_colors.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
-class SpeedTestCard extends StatefulWidget {
+class SpeedTestCard extends ConsumerStatefulWidget {
   const SpeedTestCard({super.key});
 
   @override
-  State<SpeedTestCard> createState() => _SpeedTestCardState();
+  ConsumerState<SpeedTestCard> createState() => _SpeedTestCardState();
 }
 
-class _SpeedTestCardState extends State<SpeedTestCard> {
+class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   final SpeedTestService _speedTestService = SpeedTestService();
   SpeedTestStatus _status = SpeedTestStatus.idle;
   SpeedTestResult? _lastResult;
@@ -115,19 +117,43 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
   Future<void> _showSpeedTestPopup() async {
     if (!mounted) return;
 
-    showDialog(
+    // Get adhoc config from cache (pre-loaded at WebSocket connect)
+    final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+    final adhocConfig = cacheIntegration.getAdhocSpeedTestConfig();
+
+    if (adhocConfig != null) {
+      LoggerService.info(
+        'Using adhoc config from cache: ${adhocConfig.name} (id: ${adhocConfig.id})',
+        tag: 'SpeedTestCard',
+      );
+    } else {
+      LoggerService.info(
+        'No configs in cache - running adhoc test without config',
+        tag: 'SpeedTestCard',
+      );
+    }
+
+    showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext context) {
         return SpeedTestPopup(
-          onCompleted: () async {
+          cachedTest: adhocConfig,
+          onCompleted: () {
             if (mounted) {
               LoggerService.info(
-                  'Speed test completed - reloading result for dashboard',
-                  tag: 'SpeedTestCard');
+                'Speed test completed - reloading result for dashboard',
+                tag: 'SpeedTestCard',
+              );
+              final result = _speedTestService.lastResult;
               setState(() {
-                _lastResult = _speedTestService.lastResult;
+                _lastResult = result;
               });
+            }
+          },
+          onResultSubmitted: (result) async {
+            if (!result.hasError) {
+              await _submitAdhocResult(result);
             }
           },
         );
@@ -135,8 +161,53 @@ class _SpeedTestCardState extends State<SpeedTestCard> {
     );
   }
 
+  /// Submit adhoc speed test result to the server via WebSocket cache integration
+  Future<void> _submitAdhocResult(SpeedTestResult result) async {
+    try {
+      LoggerService.info(
+        'Submitting adhoc speed test result: '
+        'source=${result.source}, '
+        'destination=${result.destination}, '
+        'download=${result.downloadMbps}, '
+        'upload=${result.uploadMbps}, '
+        'ping=${result.rtt}',
+        tag: 'SpeedTestCard',
+      );
+
+      final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+      final success = await cacheIntegration.createAdhocSpeedTestResult(
+        downloadSpeed: result.downloadMbps ?? 0,
+        uploadSpeed: result.uploadMbps ?? 0,
+        latency: result.rtt ?? 0,
+        source: result.source,
+        destination: result.destination,
+        port: result.port,
+        protocol: result.iperfProtocol,
+        passed: result.passed,
+      );
+
+      if (success) {
+        LoggerService.info(
+          'Adhoc speed test result submitted successfully',
+          tag: 'SpeedTestCard',
+        );
+      } else {
+        LoggerService.warning(
+          'Failed to submit adhoc speed test result',
+          tag: 'SpeedTestCard',
+        );
+      }
+    } catch (e) {
+      LoggerService.error(
+        'Error submitting adhoc speed test result',
+        error: e,
+        tag: 'SpeedTestCard',
+      );
+    }
+  }
+
   void _showConfigDialog() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(

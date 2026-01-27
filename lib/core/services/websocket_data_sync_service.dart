@@ -505,6 +505,9 @@ class WebSocketDataSyncService {
       note: data['note']?.toString(),
       images: _extractImages(data),
       metadata: data,
+      infrastructureLinkId: _parseOptionalInt(
+        data['infrastructure_link_id'],
+      ),
       connectionState: data['connection_state']?.toString(),
       signalStrength: data['signal_strength'] as int?,
       connectedClients: data['connected_clients'] as int?,
@@ -680,6 +683,19 @@ class WebSocketDataSyncService {
     return null;
   }
 
+  int? _parseOptionalInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    if (value is double) {
+      return value.toInt();
+    }
+    return int.tryParse(value.toString());
+  }
+
   List<String>? _extractImages(Map<String, dynamic> deviceMap) {
     final imageKeys = [
       'images',
@@ -770,6 +786,40 @@ class WebSocketDataSyncService {
         final id = entry['id'];
         if (id != null) {
           deviceIds.add('$prefix$id');
+<<<<<<< HEAD
+=======
+        }
+
+        final nested = entry['devices'];
+        if (nested is List<dynamic>) {
+          for (final device in nested) {
+            if (device is Map<String, dynamic>) {
+              final nestedId = device['id'];
+              if (nestedId != null) {
+                deviceIds.add('$prefix$nestedId');
+              }
+            }
+          }
+        }
+      }
+    }
+
+    void addSwitchPortDevices(List<dynamic>? list) {
+      if (list == null) {
+        return;
+      }
+      for (final entry in list) {
+        if (entry is! Map<String, dynamic>) {
+          continue;
+        }
+        final switchDevice = entry['switch_device'];
+        final switchDeviceId = switchDevice is Map<String, dynamic>
+            ? switchDevice['id']
+            : entry['switch_device_id'];
+        final id = switchDeviceId ?? entry['id'];
+        if (id != null) {
+          deviceIds.add('sw_$id');
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
         }
 
         final nested = entry['devices'];
@@ -786,6 +836,7 @@ class WebSocketDataSyncService {
       }
     }
 
+<<<<<<< HEAD
     void addSwitchPortDevices(List<dynamic>? list) {
       if (list == null) {
         return;
@@ -817,6 +868,8 @@ class WebSocketDataSyncService {
       }
     }
 
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
     addDevices(roomData['access_points'] as List<dynamic>?, prefix: 'ap_');
     addDevices(roomData['media_converters'] as List<dynamic>?, prefix: 'ont_');
     final switchPorts = roomData['switch_ports'];

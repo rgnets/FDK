@@ -6,7 +6,14 @@ import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
 import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
+<<<<<<< HEAD
+<<<<<<< HEAD
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 

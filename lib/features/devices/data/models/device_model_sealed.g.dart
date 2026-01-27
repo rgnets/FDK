@@ -28,9 +28,6 @@ _$APModelImpl _$$APModelImplFromJson(Map<String, dynamic> json) =>
       note: json['note'] as String?,
       images:
           (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      imageSignedIds: (json['image_signed_ids'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList(),
       healthNotices: (json['health_notices'] as List<dynamic>?)
           ?.map((e) => HealthNoticeModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -38,6 +35,7 @@ _$APModelImpl _$$APModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : HealthCountsModel.fromJson(
               json['hn_counts'] as Map<String, dynamic>),
+      infrastructureLinkId: (json['infrastructure_link_id'] as num?)?.toInt(),
       connectionState: json['connection_state'] as String?,
       signalStrength: (json['signal_strength'] as num?)?.toInt(),
       connectedClients: (json['connected_clients'] as num?)?.toInt(),
@@ -78,10 +76,10 @@ Map<String, dynamic> _$$APModelImplToJson(_$APModelImpl instance) {
   writeNotNull('firmware', instance.firmware);
   writeNotNull('note', instance.note);
   writeNotNull('images', instance.images);
-  writeNotNull('image_signed_ids', instance.imageSignedIds);
   writeNotNull('health_notices',
       instance.healthNotices?.map((e) => e.toJson()).toList());
   writeNotNull('hn_counts', instance.hnCounts?.toJson());
+  writeNotNull('infrastructure_link_id', instance.infrastructureLinkId);
   writeNotNull('connection_state', instance.connectionState);
   writeNotNull('signal_strength', instance.signalStrength);
   writeNotNull('connected_clients', instance.connectedClients);
@@ -117,9 +115,6 @@ _$ONTModelImpl _$$ONTModelImplFromJson(Map<String, dynamic> json) =>
       note: json['note'] as String?,
       images:
           (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      imageSignedIds: (json['image_signed_ids'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList(),
       healthNotices: (json['health_notices'] as List<dynamic>?)
           ?.map((e) => HealthNoticeModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -166,7 +161,6 @@ Map<String, dynamic> _$$ONTModelImplToJson(_$ONTModelImpl instance) {
   writeNotNull('firmware', instance.firmware);
   writeNotNull('note', instance.note);
   writeNotNull('images', instance.images);
-  writeNotNull('image_signed_ids', instance.imageSignedIds);
   writeNotNull('health_notices',
       instance.healthNotices?.map((e) => e.toJson()).toList());
   writeNotNull('hn_counts', instance.hnCounts?.toJson());
@@ -202,9 +196,6 @@ _$SwitchModelImpl _$$SwitchModelImplFromJson(Map<String, dynamic> json) =>
       note: json['note'] as String?,
       images:
           (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      imageSignedIds: (json['image_signed_ids'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList(),
       healthNotices: (json['health_notices'] as List<dynamic>?)
           ?.map((e) => HealthNoticeModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -253,7 +244,6 @@ Map<String, dynamic> _$$SwitchModelImplToJson(_$SwitchModelImpl instance) {
   writeNotNull('firmware', instance.firmware);
   writeNotNull('note', instance.note);
   writeNotNull('images', instance.images);
-  writeNotNull('image_signed_ids', instance.imageSignedIds);
   writeNotNull('health_notices',
       instance.healthNotices?.map((e) => e.toJson()).toList());
   writeNotNull('hn_counts', instance.hnCounts?.toJson());
@@ -292,9 +282,6 @@ _$WLANModelImpl _$$WLANModelImplFromJson(Map<String, dynamic> json) =>
       note: json['note'] as String?,
       images:
           (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
-      imageSignedIds: (json['image_signed_ids'] as List<dynamic>?)
-          ?.map((e) => e as String)
-          .toList(),
       healthNotices: (json['health_notices'] as List<dynamic>?)
           ?.map((e) => HealthNoticeModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -338,7 +325,6 @@ Map<String, dynamic> _$$WLANModelImplToJson(_$WLANModelImpl instance) {
   writeNotNull('firmware', instance.firmware);
   writeNotNull('note', instance.note);
   writeNotNull('images', instance.images);
-  writeNotNull('image_signed_ids', instance.imageSignedIds);
   writeNotNull('health_notices',
       instance.healthNotices?.map((e) => e.toJson()).toList());
   writeNotNull('hn_counts', instance.hnCounts?.toJson());

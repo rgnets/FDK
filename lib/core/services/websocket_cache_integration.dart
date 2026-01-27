@@ -4,8 +4,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+<<<<<<< HEAD
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
+=======
+import 'package:rgnets_fdk/core/services/ap_uplink_service.dart';
+>>>>>>> 3bdf0aa (Uplink added)
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
@@ -30,13 +34,29 @@ class WebSocketCacheIntegration {
     DeviceUpdateEventBus? deviceUpdateEventBus,
   })  : _webSocketService = webSocketService,
         _imageBaseUrl = imageBaseUrl,
+<<<<<<< HEAD
         _logger = logger ?? Logger(),
         _deviceUpdateEventBus = deviceUpdateEventBus;
+=======
+        _logger = logger ?? Logger() {
+    _apUplinkCache = <int, APUplinkInfo>{};
+    _apUplinkService = APUplinkService(
+      webSocketService: _webSocketService,
+      logger: _logger,
+      cache: _apUplinkCache,
+    );
+  }
+>>>>>>> 3bdf0aa (Uplink added)
 
   final WebSocketService _webSocketService;
   final String? _imageBaseUrl;
   final Logger _logger;
+<<<<<<< HEAD
   final DeviceUpdateEventBus? _deviceUpdateEventBus;
+=======
+  late final Map<int, APUplinkInfo> _apUplinkCache;
+  late final APUplinkService _apUplinkService;
+>>>>>>> 3bdf0aa (Uplink added)
 
   /// Device resource types to subscribe to.
   static const List<String> _deviceResourceTypes = [
@@ -109,6 +129,470 @@ class WebSocketCacheIntegration {
   /// Check if we have cached device data.
   bool get hasDeviceCache => _deviceCache.values.any((list) => list.isNotEmpty);
 
+<<<<<<< HEAD
+=======
+  /// Check if we have cached speed test config data.
+  bool get hasSpeedTestConfigCache => _speedTestConfigCache.isNotEmpty;
+
+  /// Check if we have cached speed test result data.
+  bool get hasSpeedTestResultCache => _speedTestResultCache.isNotEmpty;
+
+  /// Get cached AP uplink info for a specific access point.
+  APUplinkInfo? getCachedAPUplink(int apId) {
+    return _apUplinkCache[apId];
+  }
+
+  /// Get AP uplink info, fetching and caching if needed.
+  Future<APUplinkInfo?> getAPUplinkInfo(int apId) {
+    return _apUplinkService.getAPUplinkPortDetail(apId);
+  }
+
+  /// Fetch AP uplink detail (3-step lookup) and update cache.
+  Future<APUplinkInfo?> fetchAPUplinkDetail(int apId) {
+    return _apUplinkService.fetchAPUplinkDetail(apId);
+  }
+
+  /// Register a callback for speed test config data updates.
+  void onSpeedTestConfigData(void Function(List<SpeedTestConfig>) callback) {
+    _speedTestConfigCallbacks.add(callback);
+  }
+
+  /// Register a callback for speed test result data updates.
+  void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
+    _speedTestResultCallbacks.add(callback);
+  }
+
+  /// Get cached speed test configs as domain entities.
+  List<SpeedTestConfig> getCachedSpeedTestConfigs() {
+    return _speedTestConfigCache.map((json) {
+      try {
+        return SpeedTestConfig.fromJson(json);
+      } catch (e) {
+        _logger.w('Failed to parse speed test config: $e');
+        return null;
+      }
+    }).whereType<SpeedTestConfig>().toList();
+  }
+
+  /// Get cached speed test results as domain entities.
+  List<SpeedTestResult> getCachedSpeedTestResults() {
+    var parseFailures = 0;
+    final results = _speedTestResultCache.map((json) {
+      try {
+        return SpeedTestResult.fromJsonWithValidation(json);
+      } catch (e) {
+        parseFailures++;
+        LoggerService.warning(
+          'Failed to parse speed test result id=${json['id']}: $e',
+          tag: 'SpeedTestCache',
+        );
+        return null;
+      }
+    }).whereType<SpeedTestResult>().toList();
+
+    if (parseFailures > 0) {
+      LoggerService.warning(
+        'Parse failures: $parseFailures out of ${_speedTestResultCache.length} raw results',
+        tag: 'SpeedTestCache',
+      );
+    }
+
+    return results;
+  }
+
+  /// Get cached speed test results for a specific access point.
+  List<SpeedTestResult> getSpeedTestResultsForAccessPointId(int accessPointId) {
+    // Debug: Log raw cache size
+    LoggerService.info(
+      'Raw cache has ${_speedTestResultCache.length} items, looking for accessPointId=$accessPointId',
+      tag: 'SpeedTestCache',
+    );
+
+    // Log first few raw items to see tested_via_access_point_id values
+    for (var i = 0; i < _speedTestResultCache.length && i < 5; i++) {
+      final raw = _speedTestResultCache[i];
+      // Check both the direct ID field and the nested association object
+      final directId = raw['tested_via_access_point_id'];
+      final nestedObj = raw['tested_via_access_point'];
+      final nestedId = nestedObj is Map ? nestedObj['id'] : null;
+      LoggerService.info(
+        'RawCache[$i]: id=${raw['id']}, direct_id=$directId, nested_id=$nestedId',
+        tag: 'SpeedTestCache',
+      );
+    }
+
+    final results = getCachedSpeedTestResults();
+    if (results.isEmpty) {
+      LoggerService.info(
+        'Parsed results is empty',
+        tag: 'SpeedTestCache',
+      );
+      return [];
+    }
+
+    LoggerService.info(
+      'Parsed ${results.length} results from cache',
+      tag: 'SpeedTestCache',
+    );
+
+    // Log parsed results with their testedViaAccessPointId values
+    final apIdSet = results
+        .map((r) => r.testedViaAccessPointId)
+        .where((id) => id != null)
+        .toSet();
+    LoggerService.info(
+      'Unique testedViaAccessPointId values after parsing: $apIdSet',
+      tag: 'SpeedTestCache',
+    );
+
+    final filtered = results
+        .where((result) => result.testedViaAccessPointId == accessPointId)
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    LoggerService.info(
+      'Found ${filtered.length} results for accessPointId=$accessPointId',
+      tag: 'SpeedTestCache',
+    );
+
+    return filtered;
+  }
+
+  /// Get the adhoc speed test config (first config with "adhoc" in name, or first config if none match).
+  SpeedTestConfig? getAdhocSpeedTestConfig() {
+    final configs = getCachedSpeedTestConfigs();
+    if (configs.isEmpty) return null;
+
+    // Try to find a config with "adhoc" in the name
+    final adhocConfig = configs.where(
+      (c) => c.name?.toLowerCase().contains('adhoc') ?? false,
+    ).firstOrNull;
+
+    // Return adhoc config if found, otherwise return first config
+    return adhocConfig ?? configs.first;
+  }
+
+  /// Get a speed test config by its ID.
+  SpeedTestConfig? getSpeedTestConfigById(int? configId) {
+    if (configId == null) {
+      return null;
+    }
+
+    final configs = getCachedSpeedTestConfigs();
+    return configs.where((c) => c.id == configId).firstOrNull;
+  }
+
+  /// Get cached speed test results for a specific device.
+  /// Filters results by tested_via_access_point_id (AP) or
+  /// tested_via_media_converter_id (ONT).
+  ///
+  /// [deviceId] can be prefixed ("ap_123") or unprefixed ("123").
+  /// [deviceType] optional - if provided, used to determine which field to match.
+  ///   Should be "access_point" or "ont" (matches DeviceTypes constants).
+  List<SpeedTestResult> getSpeedTestResultsForDevice(
+    String deviceId, {
+    String? deviceType,
+  }) {
+    final results = getCachedSpeedTestResults();
+    if (results.isEmpty) return [];
+
+    // Try to extract device type and numeric ID from prefixed deviceId (e.g., "ap_123")
+    String? extractedType;
+    int? numericId;
+
+    final parts = deviceId.split('_');
+    if (parts.length >= 2) {
+      // Prefixed format: "ap_123" or "ont_456"
+      extractedType = parts[0].toLowerCase();
+      numericId = int.tryParse(parts.sublist(1).join('_'));
+    } else {
+      // Unprefixed format: just "123"
+      numericId = int.tryParse(deviceId);
+    }
+
+    if (numericId == null) return [];
+
+    // Determine the effective device type
+    // Priority: extracted from ID > passed deviceType parameter
+    String? effectiveType = extractedType;
+    if (effectiveType == null && deviceType != null) {
+      // Map DeviceTypes constants to our internal types
+      if (deviceType == 'access_point') {
+        effectiveType = 'ap';
+      } else if (deviceType == 'ont') {
+        effectiveType = 'ont';
+      }
+    }
+
+    if (effectiveType == null) {
+      _logger.w(
+        'getSpeedTestResultsForDevice: Cannot determine device type for $deviceId',
+      );
+      return [];
+    }
+
+    _logger.i(
+      'getSpeedTestResultsForDevice: Searching for $effectiveType device with numericId=$numericId '
+      'in ${results.length} cached results (raw cache: ${_speedTestResultCache.length})',
+    );
+
+    // Log first few raw results to see what's actually in the cache
+    for (var i = 0; i < _speedTestResultCache.length && i < 3; i++) {
+      final raw = _speedTestResultCache[i];
+      _logger.i(
+        'RawResult[$i]: id=${raw['id']}, access_point_id=${raw['access_point_id']}, '
+        'tested_via_access_point_id=${raw['tested_via_access_point_id']}, '
+        'tested_via_media_converter_id=${raw['tested_via_media_converter_id']}',
+      );
+    }
+
+    // Log first few parsed results for debugging
+    for (var i = 0; i < results.length && i < 3; i++) {
+      final r = results[i];
+      _logger.i(
+        'ParsedResult[$i]: id=${r.id}, accessPointId=${r.accessPointId}, '
+        'testedViaAccessPointId=${r.testedViaAccessPointId}, '
+        'testedViaMediaConverterId=${r.testedViaMediaConverterId}',
+      );
+    }
+
+    // Filter results based on device type
+    return results.where((result) {
+      if (effectiveType == 'ap') {
+        // For access points, check tested_via_access_point_id only
+        return result.testedViaAccessPointId == numericId;
+      } else if (effectiveType == 'ont') {
+        // For ONTs (media converters), check tested_via_media_converter_id
+        return result.testedViaMediaConverterId == numericId;
+      }
+      return false;
+    }).toList()
+      // Sort by timestamp descending (most recent first)
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  /// Get the most recent speed test result for a specific device.
+  SpeedTestResult? getLatestSpeedTestResultForDevice(
+    String deviceId, {
+    String? deviceType,
+  }) {
+    final results = getSpeedTestResultsForDevice(deviceId, deviceType: deviceType);
+    return results.isNotEmpty ? results.first : null;
+  }
+
+  /// Create an adhoc speed test result and send via WebSocket.
+  /// Returns true if successful, false otherwise.
+  ///
+  /// If [deviceId] is provided (format: "ap_123" or "ont_456"), the appropriate
+  /// device field (access_point_id or tested_via_media_converter_id) will be set.
+  Future<bool> createAdhocSpeedTestResult({
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+    String? destination,
+    int? port,
+    String? protocol,
+    bool? passed,
+    String? deviceId,
+  }) async {
+    // Find the adhoc config to get its ID
+    final adhocConfig = getAdhocSpeedTestConfig();
+    if (adhocConfig?.id == null) {
+      _logger.w('WebSocketCacheIntegration: No adhoc config found for result submission');
+      return false;
+    }
+
+    if (!_webSocketService.isConnected) {
+      _logger.w('WebSocketCacheIntegration: Cannot submit result - WebSocket not connected');
+      return false;
+    }
+
+    try {
+      _logger.i(
+        'WebSocketCacheIntegration: Submitting adhoc speed test result - '
+        'configId=${adhocConfig!.id}, download=$downloadSpeed, upload=$uploadSpeed, deviceId=$deviceId',
+      );
+
+      // Parse deviceId to extract type and numeric ID for device association
+      int? accessPointId;
+      int? testedViaMediaConverterId;
+      if (deviceId != null) {
+        final parts = deviceId.split('_');
+        if (parts.length >= 2) {
+          final deviceType = parts[0].toLowerCase();
+          final numericId = int.tryParse(parts.sublist(1).join('_'));
+          if (numericId != null) {
+            if (deviceType == 'ap') {
+              accessPointId = numericId;
+            } else if (deviceType == 'ont') {
+              testedViaMediaConverterId = numericId;
+            }
+          }
+        }
+      }
+
+      // Send CREATE request via ActionCable WebSocket
+      final response = await _webSocketService.requestActionCable(
+        action: 'create_resource',
+        resourceType: _speedTestResultResourceType,
+        additionalData: {
+          'params': {
+            'speed_test_id': adhocConfig.id,
+            'download_mbps': downloadSpeed,
+            'upload_mbps': uploadSpeed,
+            'rtt': latency,
+            'completed_at': DateTime.now().toIso8601String(),
+            'test_type': 'iperf3',
+            if (source != null) 'source': source,
+            if (destination != null) 'destination': destination,
+            if (port != null) 'port': port,
+            if (protocol != null) 'iperf_protocol': protocol,
+            if (passed != null) 'passed': passed,
+            if (accessPointId != null) 'access_point_id': accessPointId,
+            if (testedViaMediaConverterId != null) 'tested_via_media_converter_id': testedViaMediaConverterId,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final hasError = response.payload['error'] != null;
+      if (hasError) {
+        _logger.e(
+          'WebSocketCacheIntegration: Failed to submit result - ${response.payload['error']}',
+        );
+        return false;
+      }
+
+      _logger.i('WebSocketCacheIntegration: Adhoc speed test result submitted successfully');
+      return true;
+    } catch (e) {
+      _logger.e('WebSocketCacheIntegration: Error submitting adhoc result: $e');
+      return false;
+    }
+  }
+
+  /// Update an existing speed test result for a specific device.
+  /// Finds the existing result by device ID (AP or ONT) and updates it.
+  /// Returns true if successful, false otherwise.
+  ///
+  /// [deviceId] format: "ap_123" or "ont_456"
+  Future<bool> updateDeviceSpeedTestResult({
+    required String deviceId,
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+    String? destination,
+    int? port,
+    String? protocol,
+    bool? passed,
+  }) async {
+    if (!_webSocketService.isConnected) {
+      _logger.w('WebSocketCacheIntegration: Cannot update result - WebSocket not connected');
+      return false;
+    }
+
+    // Find existing result for this device
+    final existingResult = getLatestSpeedTestResultForDevice(deviceId);
+    if (existingResult == null || existingResult.id == null) {
+      _logger.w(
+        'WebSocketCacheIntegration: No existing speed test result found for device $deviceId',
+      );
+      return false;
+    }
+
+    try {
+      _logger.i(
+        'WebSocketCacheIntegration: Updating speed test result ${existingResult.id} for device $deviceId - '
+        'download=$downloadSpeed, upload=$uploadSpeed',
+      );
+
+      // Send UPDATE request via ActionCable WebSocket
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: _speedTestResultResourceType,
+        additionalData: {
+          'id': existingResult.id,
+          'params': {
+            'download_mbps': downloadSpeed,
+            'upload_mbps': uploadSpeed,
+            'rtt': latency,
+            'completed_at': DateTime.now().toIso8601String(),
+            if (source != null) 'source': source,
+            if (destination != null) 'destination': destination,
+            if (port != null) 'port': port,
+            if (protocol != null) 'iperf_protocol': protocol,
+            if (passed != null) 'passed': passed,
+          },
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final hasError = response.payload['error'] != null;
+      if (hasError) {
+        _logger.e(
+          'WebSocketCacheIntegration: Failed to update result - ${response.payload['error']}',
+        );
+        return false;
+      }
+
+      _logger.i(
+        'WebSocketCacheIntegration: Speed test result ${existingResult.id} updated successfully',
+      );
+      return true;
+    } catch (e) {
+      _logger.e('WebSocketCacheIntegration: Error updating device result: $e');
+      return false;
+    }
+  }
+
+  /// Get cached speed test configs as raw JSON maps.
+  List<Map<String, dynamic>> getCachedSpeedTestConfigsRaw() {
+    return List.unmodifiable(_speedTestConfigCache);
+  }
+
+  /// Get cached speed test results as raw JSON maps.
+  List<Map<String, dynamic>> getCachedSpeedTestResultsRaw() {
+    return List.unmodifiable(_speedTestResultCache);
+  }
+
+  /// Update a single speed test result in the cache.
+  /// This is useful after updating a result via the API to keep the cache in sync.
+  /// Merges new data with existing cache entry to preserve fields the server may not return.
+  void updateSpeedTestResultInCache(SpeedTestResult result) {
+    if (result.id == null) {
+      LoggerService.warning(
+        'Cannot update speed test result in cache without id',
+        tag: 'SpeedTestCache',
+      );
+      return;
+    }
+
+    final newJson = result.toJson();
+    final index = _speedTestResultCache.indexWhere((item) => item['id'] == result.id);
+
+    if (index >= 0) {
+      // Merge new data with existing cache entry to preserve fields like pms_room_id
+      // that the server may not return in the update response
+      final existingJson = Map<String, dynamic>.from(_speedTestResultCache[index])
+        ..addAll(newJson);
+      _speedTestResultCache[index] = existingJson;
+      LoggerService.info(
+        'Updated speed test result ${result.id} in cache (merged with existing)',
+        tag: 'SpeedTestCache',
+      );
+    } else {
+      _speedTestResultCache.add(newJson);
+      LoggerService.info(
+        'Added speed test result ${result.id} to cache',
+        tag: 'SpeedTestCache',
+      );
+    }
+    _bumpLastUpdate();
+  }
+
+>>>>>>> 3bdf0aa (Uplink added)
   /// Get cached devices by resource type.
   List<Map<String, dynamic>>? getCachedDevices(String resourceType) {
     return _deviceCache[resourceType];
@@ -193,12 +677,22 @@ class WebSocketCacheIntegration {
             imageSignedIds: apImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
+<<<<<<< HEAD
             metadata: deviceMap,
             onboardingStatus: deviceMap['ap_onboarding_status'] != null
                 ? OnboardingStatusPayload.fromJson(
                     deviceMap['ap_onboarding_status'] as Map<String, dynamic>,
                   )
                 : null,
+=======
+            infrastructureLinkId: _parseOptionalInt(
+              deviceMap['infrastructure_link_id'],
+            ),
+<<<<<<< HEAD
+>>>>>>> 3bdf0aa (Uplink added)
+=======
+            metadata: deviceMap,
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
           );
 
         case 'media_converters':
@@ -218,11 +712,14 @@ class WebSocketCacheIntegration {
             hnCounts: hnCounts,
             healthNotices: healthNotices,
             metadata: deviceMap,
+<<<<<<< HEAD
             onboardingStatus: deviceMap['ont_onboarding_status'] != null
                 ? OnboardingStatusPayload.fromJson(
                     deviceMap['ont_onboarding_status'] as Map<String, dynamic>,
                   )
                 : null,
+=======
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
           );
 
         case 'switch_devices':
@@ -305,8 +802,25 @@ class WebSocketCacheIntegration {
     return null;
   }
 
+<<<<<<< HEAD
   /// Extract images with both URLs and signed IDs.
   ImageExtraction? _extractImagesData(Map<String, dynamic> deviceMap) {
+=======
+  int? _parseOptionalInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    if (value is double) {
+      return value.toInt();
+    }
+    return int.tryParse(value.toString());
+  }
+
+  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
+>>>>>>> 3bdf0aa (Uplink added)
     final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
     return extractImagesWithSignedIds(imagesValue, baseUrl: _imageBaseUrl);
   }
@@ -1082,6 +1596,14 @@ class WebSocketCacheIntegration {
     _deviceCache.clear();
     _roomCache.clear();
 
+<<<<<<< HEAD
+=======
+    // Clear speed test caches
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
+    _apUplinkService.clearCache();
+
+>>>>>>> 3bdf0aa (Uplink added)
     // Clear snapshot state
     for (final timer in _snapshotFlushTimers.values) {
       timer.cancel();
@@ -1118,6 +1640,12 @@ class WebSocketCacheIntegration {
     _roomDataCallbacks.clear();
     _deviceCache.clear();
     _roomCache.clear();
+<<<<<<< HEAD
+=======
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
+    _apUplinkService.clearCache();
+>>>>>>> 3bdf0aa (Uplink added)
   }
 
   /// Request a specific resource type snapshot manually.

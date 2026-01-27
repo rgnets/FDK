@@ -7,7 +7,11 @@ part of 'device_ui_state_provider.dart';
 // **************************************************************************
 
 String _$filteredDevicesListHash() =>
+<<<<<<< HEAD
     r'dba3450757fbf31ea5312471972cef46c17bdb11';
+=======
+    r'eb08d75fe18e5b6dddaf44ecb541ccd0d035b2c6';
+>>>>>>> 81c4e9a (Add deployment phase filtering (#13))
 
 /// Provider for filtered devices based on UI state
 ///

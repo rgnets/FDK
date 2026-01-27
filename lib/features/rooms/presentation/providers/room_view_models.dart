@@ -3,7 +3,14 @@ import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/presentation/providers/room_readiness_provider.dart';
+<<<<<<< HEAD
+<<<<<<< HEAD
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+import 'package:rgnets_fdk/features/rooms/presentation/providers/room_ui_state_provider.dart';
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -161,6 +168,10 @@ List<RoomViewModel> filteredRoomViewModels(
       filtered = List.from(viewModels);
   }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
   // Apply search filter
   if (searchQuery.isNotEmpty) {
     filtered = filtered.where((vm) {
@@ -169,6 +180,11 @@ List<RoomViewModel> filteredRoomViewModels(
     }).toList();
   }
 
+<<<<<<< HEAD
+=======
+>>>>>>> da0b3f7 (Integrate room readiness status labels into Locations UI (#12))
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
   // Sort by room name alphabetically
   filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 

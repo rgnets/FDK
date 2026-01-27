@@ -46,7 +46,14 @@ class OnboardingStatusCardContent extends StatelessWidget {
     required this.title,
     required this.resolution,
     this.onTap,
+<<<<<<< HEAD
+<<<<<<< HEAD
     this.showDivider = true,
+=======
+>>>>>>> 6a559fa (Draft for device onboarding)
+=======
+    this.showDivider = true,
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
     super.key,
   });
 
@@ -54,6 +61,8 @@ class OnboardingStatusCardContent extends StatelessWidget {
   final String title;
   final String resolution;
   final VoidCallback? onTap;
+<<<<<<< HEAD
+<<<<<<< HEAD
   final bool showDivider;
 
   @override
@@ -157,6 +166,105 @@ class OnboardingStatusCardContent extends StatelessWidget {
           ),
         ),
       ],
+=======
+=======
+  final bool showDivider;
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
+
+  @override
+  Widget build(BuildContext context) {
+    final isComplete = state.isComplete;
+
+    // Use orange/warning styling when not complete
+    final titleColor = isComplete ? Colors.black87 : Colors.white;
+    final stageColor = isComplete ? Colors.green : Colors.orange;
+    final titleBgColor = isComplete ? null : Colors.orange;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Divider line at top (matches design) - only for complete state
+        if (showDivider && isComplete)
+          Divider(
+            color: Colors.grey[300],
+            thickness: 1,
+            height: 1,
+          ),
+
+        // Title header with background when not complete
+        if (!isComplete)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: titleBgColor,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: titleColor,
+              ),
+            ),
+          ),
+
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Error box (if error exists) - show at top
+              if (state.errorText != null && state.errorText!.isNotEmpty) ...[
+                _buildErrorBox(context),
+                const SizedBox(height: 12),
+              ],
+
+              // Title header (black text, bold) - only for complete state
+              if (isComplete)
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+
+              if (isComplete) const SizedBox(height: 4),
+
+              // Stage indicator
+              Text(
+                'Stage ${state.currentStage}/${state.maxStages}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: stageColor,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Stage progress circles
+              _buildStageCircles(context),
+
+              const SizedBox(height: 16),
+
+              // Resolution text
+              Text(
+                resolution,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+          ),
+        ),
+<<<<<<< HEAD
+      ),
+>>>>>>> 6a559fa (Draft for device onboarding)
+=======
+      ],
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
     );
   }
 
@@ -191,23 +299,82 @@ class OnboardingStatusCardContent extends StatelessWidget {
     );
   }
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+  Widget _buildStageRow(BuildContext context) {
+    final elapsedText = state.elapsedTimeFormatted;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Stage indicator
+        Text(
+          'Stage ${state.currentStage}/${state.maxStages}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.orange,
+          ),
+        ),
+
+        // Elapsed time
+        if (elapsedText != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              elapsedText,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+>>>>>>> 6a559fa (Draft for device onboarding)
+=======
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
   Widget _buildStageCircles(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: List.generate(state.maxStages, (index) {
         final stageNumber = index + 1;
+<<<<<<< HEAD
         final isCompleted = stageNumber <= state.currentStage;
         final isCurrent = stageNumber == state.currentStage;
         final isComplete = state.isComplete;
 
+=======
+        final isCompleted = stageNumber < state.currentStage;
+        final isCurrent = stageNumber == state.currentStage;
+        final isComplete = state.isComplete;
+
+        // If onboarding is complete, all stages show as completed
+>>>>>>> 6a559fa (Draft for device onboarding)
         if (isComplete) {
           return _buildCompletedCircle();
         }
 
+<<<<<<< HEAD
+=======
+        // Current stage or completed stages
+>>>>>>> 6a559fa (Draft for device onboarding)
         if (isCompleted || (isCurrent && state.isComplete)) {
           return _buildCompletedCircle();
         }
 
+<<<<<<< HEAD
+=======
+        // Pending stages (including current if not complete)
+>>>>>>> 6a559fa (Draft for device onboarding)
         return _buildPendingCircle();
       }),
     );

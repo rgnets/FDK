@@ -7,6 +7,7 @@ import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provi
 import 'package:rgnets_fdk/features/devices/presentation/screens/note_edit_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/device_speed_test_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/unified_summary_card.dart';
 import 'package:rgnets_fdk/features/onboarding/presentation/widgets/onboarding_status_card.dart';
@@ -387,11 +388,14 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     }
   }
 
+<<<<<<< HEAD
   void _handleUploadComplete() {
     // Refresh device data to show newly uploaded images
     ref.read(deviceNotifierProvider(widget.device.id).notifier).refresh();
   }
 
+=======
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
   Future<void> _handleSaveNote(String note) async {
     final success = await ref
         .read(deviceNotifierProvider(widget.device.id).notifier)
@@ -467,6 +471,16 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
             children: [
               // Unified Summary section at the top
               UnifiedSummaryCardContent(device: widget.device),
+<<<<<<< HEAD
+
+              // Onboarding Status section (for AP/ONT devices)
+              OnboardingStatusCard(deviceId: widget.device.id),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+=======
+>>>>>>> 0a05c3e (Pass in onboarding state through websocket)
 
               // Onboarding Status section (for AP/ONT devices)
               OnboardingStatusCard(deviceId: widget.device.id),
@@ -599,6 +613,13 @@ class _StatisticsTabState extends State<_StatisticsTab>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Speed Test Section (for APs and ONTs)
+          if (device.type == DeviceTypes.accessPoint ||
+              device.type == DeviceTypes.ont) ...[
+            DeviceSpeedTestSection(device: device),
+            const SizedBox(height: 16),
+          ],
+
           // Traffic Statistics
           SectionCard(
             title: 'Traffic Statistics',
@@ -612,7 +633,7 @@ class _StatisticsTabState extends State<_StatisticsTab>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Performance Metrics
           SectionCard(
             title: 'Performance Metrics',
@@ -625,7 +646,7 @@ class _StatisticsTabState extends State<_StatisticsTab>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Client Statistics (for Access Points)
           if (device.type == DeviceTypes.accessPoint) ...[
             SectionCard(
@@ -640,18 +661,18 @@ class _StatisticsTabState extends State<_StatisticsTab>
             ),
             const SizedBox(height: 16),
           ],
-          
+
           const SizedBox(height: 80), // Space for bottom bar
         ],
       ),
     );
   }
-  
+
   String _formatUptime(int seconds) {
     final days = seconds ~/ 86400;
     final hours = (seconds % 86400) ~/ 3600;
     final minutes = (seconds % 3600) ~/ 60;
-    
+
     if (days > 0) {
       return '${days}d ${hours}h ${minutes}m';
     } else if (hours > 0) {

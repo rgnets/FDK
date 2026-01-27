@@ -39,9 +39,13 @@ class DeviceDetailSections extends ConsumerWidget {
         const SizedBox(height: 16),
         _buildTrafficSection(context),
         const SizedBox(height: 16),
+<<<<<<< HEAD
         _buildSystemSection(context),
         const SizedBox(height: 16),
         _buildImagesSection(context, ref),
+=======
+        _buildImagesSection(context),
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
       ],
     );
   }
@@ -186,6 +190,7 @@ class DeviceDetailSections extends ConsumerWidget {
     );
   }
 
+<<<<<<< HEAD
   Widget _buildSystemSection(BuildContext context) {
     if (device.model == null &&
         device.serialNumber == null &&
@@ -211,6 +216,9 @@ class DeviceDetailSections extends ConsumerWidget {
   }
 
   /// Filter to only valid HTTP/HTTPS image URLs (for display)
+=======
+  /// Filter to only valid HTTP/HTTPS image URLs
+>>>>>>> 7aa372b (Fix ui bug and set up websockets for updating notes)
   List<String> get _validImages {
     final images = device.images;
     if (images == null || images.isEmpty) {

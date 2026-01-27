@@ -11,6 +11,7 @@ class UnifiedListItem extends StatelessWidget {
     super.key,
     this.subtitleLines = const [],
     this.iconColorOverride,
+    this.titleColor,
     this.statusBadge,
     this.onTap,
     this.showChevron = false,
@@ -23,6 +24,7 @@ class UnifiedListItem extends StatelessWidget {
   final UnifiedItemStatus status;
   final List<UnifiedInfoLine> subtitleLines;
   final Color? iconColorOverride;
+  final Color? titleColor;
   final UnifiedStatusBadge? statusBadge;
   final VoidCallback? onTap;
   final bool showChevron;
@@ -66,7 +68,7 @@ class UnifiedListItem extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontWeight: isUnread ? FontWeight.bold : FontWeight.w600,
-                  color: Colors.white,
+                  color: titleColor ?? AppColors.textPrimary,
                 ),
               ),
             ),
