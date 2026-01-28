@@ -695,12 +695,19 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
 
     await result.match(
       (failure) async {
+        if (!mounted) return;
+        // Clear any existing SnackBars before showing new error
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failure.message),
             backgroundColor: Colors.orange,
           ),
         );
+        // Reset so the same QR can be rescanned
+        setState(() {
+          _lastScannedCode = null;
+        });
       },
       (credentials) async {
         await _stopScanning();
