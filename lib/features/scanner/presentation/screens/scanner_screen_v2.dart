@@ -39,6 +39,10 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
+  // Flash toggle state
+  bool _isFlashOn = false;
+  CameraFacing _currentCameraFacing = CameraFacing.back;
+
   @override
   void initState() {
     super.initState();
@@ -91,10 +95,109 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
   void dispose() {
     _barcodeSubscription?.cancel();
     _barcodeSubscription = null;
+    // Turn off flash if it's on before disposing
+    if (_isFlashOn && _controller != null) {
+      _controller!.toggleTorch();
+    }
     _controller?.dispose();
     _controller = null;
     _pulseController.dispose();
     super.dispose();
+  }
+
+  /// Toggle the flashlight/torch
+  void _toggleFlash() {
+    if (!mounted || _controller == null) return;
+    if (_currentCameraFacing != CameraFacing.back) return;
+
+    setState(() {
+      _isFlashOn = !_isFlashOn;
+    });
+    _controller!.toggleTorch();
+    LoggerService.debug('Flash toggled: $_isFlashOn', tag: _tag);
+  }
+
+  /// Switch between front and back camera
+  Future<void> _switchCamera() async {
+    if (!mounted || _controller == null) return;
+
+    try {
+      await _controller!.switchCamera();
+      setState(() {
+        _currentCameraFacing = _currentCameraFacing == CameraFacing.back
+            ? CameraFacing.front
+            : CameraFacing.back;
+
+        // Turn off flash if switching to front camera (no flash available)
+        if (_currentCameraFacing == CameraFacing.front && _isFlashOn) {
+          _isFlashOn = false;
+          _controller!.toggleTorch();
+        }
+      });
+      LoggerService.debug('Camera switched to: $_currentCameraFacing', tag: _tag);
+    } on Exception catch (e) {
+      LoggerService.error('Failed to switch camera', error: e, tag: _tag);
+    }
+  }
+
+  /// Build the flash toggle button widget
+  Widget _buildFlashButton() {
+    final isBackCamera = _currentCameraFacing == CameraFacing.back;
+
+    // ignore: use_decorated_box
+    return Container(
+      decoration: BoxDecoration(
+        color: _isFlashOn ? Colors.white24 : Colors.black54,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: _isFlashOn
+              ? Colors.white.withAlpha(128)
+              : Colors.white.withAlpha(51),
+          width: 1,
+        ),
+      ),
+      child: IconButton(
+        onPressed: isBackCamera ? _toggleFlash : null,
+        icon: Icon(
+          _isFlashOn ? Icons.flashlight_on : Icons.flashlight_off,
+          color: isBackCamera
+              ? (_isFlashOn ? Colors.yellow : Colors.white)
+              : Colors.grey,
+          size: 22,
+        ),
+        style: IconButton.styleFrom(
+          padding: const EdgeInsets.all(10),
+        ),
+      ),
+    );
+  }
+
+  /// Build the camera switch button widget
+  Widget _buildCameraSwitchButton() {
+    // ignore: use_decorated_box
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black54,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: Colors.white.withAlpha(51),
+          width: 1,
+        ),
+      ),
+      child: IconButton(
+        onPressed: _switchCamera,
+        icon: Icon(
+          _currentCameraFacing == CameraFacing.back
+              ? Icons.camera_front
+              : Icons.camera_rear,
+          color: Colors.white,
+          size: 22,
+        ),
+        style: IconButton.styleFrom(
+          padding: const EdgeInsets.all(10),
+        ),
+      ),
+    );
   }
 
   void _handleBarcode(BarcodeCapture capture) {
@@ -232,6 +335,19 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
 
         // Compact top bar with device type and collected items
         _buildTopBar(state),
+
+        // Camera controls (flash and switch) - top right
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 16,
+          right: 16,
+          child: Row(
+            children: [
+              _buildFlashButton(),
+              const SizedBox(width: 8),
+              _buildCameraSwitchButton(),
+            ],
+          ),
+        ),
 
         // Scanning overlay (frame only, no dimming)
         if (state.isScanning) _buildScanningOverlay(state),
@@ -551,6 +667,18 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
                       color: Colors.white,
                     ),
                     textAlign: TextAlign.center,
+                  ),
+                ),
+                // Camera controls for auth scanner
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 16,
+                  right: 16,
+                  child: Row(
+                    children: [
+                      _buildFlashButton(),
+                      const SizedBox(width: 8),
+                      _buildCameraSwitchButton(),
+                    ],
                   ),
                 ),
               ],
