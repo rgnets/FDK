@@ -104,9 +104,17 @@ class InitializationNotifier extends _$InitializationNotifier {
         timeout: const Duration(seconds: 45),
       );
 
+      // Clean up event subscription - no longer needed after initial sync
+      _eventSubscription?.cancel();
+      _eventSubscription = null;
+
       // Step 4: Ready
       state = const InitializationState.ready();
     } on Exception catch (e) {
+      // Clean up event subscription on error
+      _eventSubscription?.cancel();
+      _eventSubscription = null;
+
       state = InitializationState.error(
         message: e.toString(),
         retryCount: _retryCount,
@@ -124,6 +132,12 @@ class InitializationNotifier extends _$InitializationNotifier {
 
   /// Update progress state based on sync events.
   void _updateProgress(WebSocketDataSyncEvent event) {
+    // Only update state if we're actively initializing
+    // This prevents "Sync Now" from triggering the overlay
+    if (!_isInitializing) {
+      return;
+    }
+
     // Throttle updates to 100ms to prevent UI jank
     final now = DateTime.now();
     if (now.difference(_lastProgressUpdate).inMilliseconds < 100) {

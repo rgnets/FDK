@@ -168,6 +168,12 @@ class Auth extends _$Auth {
               siteName: siteName,
               issuedAt: issuedAt,
               signature: signature,
+            ).timeout(
+              const Duration(seconds: 20),
+              onTimeout: () {
+                _logger.e('AUTH_NOTIFIER: ⏱️ Handshake TIMED OUT after 20 seconds');
+                throw TimeoutException('Authentication timed out - server may be unreachable');
+              },
             );
 
             _logger
@@ -411,6 +417,12 @@ class Auth extends _$Auth {
       _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
       await service.connect(
         WebSocketConnectionParams(uri: uri, headers: headers),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after 10 seconds');
+          throw TimeoutException('Connection to server timed out');
+        },
       );
       _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
       service.send(subscriptionPayload);

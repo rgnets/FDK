@@ -23,46 +23,47 @@ class DevicesScreen extends ConsumerStatefulWidget {
 class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   String _formatNetworkInfo(Device device) {
     // Safely handle null and empty values using null-aware operators
-    final ip = (device.ipAddress?.trim().isEmpty ?? true) 
-        ? 'No IP' 
+    final ip = (device.ipAddress?.trim().isEmpty ?? true)
+        ? 'No IP'
         : device.ipAddress!.trim();
-    final mac = (device.macAddress?.trim().isEmpty ?? true) 
-        ? 'No MAC' 
+    final mac = (device.macAddress?.trim().isEmpty ?? true)
+        ? 'No MAC'
         : device.macAddress!.trim();
-    
+
     // Special case: IPv6 addresses are too long to show with MAC
     // Use local variable to avoid multiple null checks
     final ipAddr = device.ipAddress;
-    if (ipAddr != null && 
+    if (ipAddr != null &&
         ipAddr.trim().isNotEmpty &&
-        ipAddr.contains(':') && 
+        ipAddr.contains(':') &&
         ipAddr.length > 20) {
       return ipAddr.trim();
     }
-    
+
     return '$ip • $mac';
   }
-  
+
   @override
   void initState() {
     super.initState();
     // Ensure the UI state matches the selected tab
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(deviceUIStateNotifierProvider.notifier).setFilterType('access_point');
+      ref
+          .read(deviceUIStateNotifierProvider.notifier)
+          .setFilterType('access_point');
     });
   }
-  
-  
+
   @override
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   int _getTabIndex(String filterType) {
     switch (filterType) {
       case 'access_point':
@@ -75,7 +76,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         return 0; // Default to APs
     }
   }
-  
+
   String _getFilterFromIndex(int index) {
     switch (index) {
       case 0:
@@ -114,7 +115,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
             border: Border.all(
               color: isFiltering
                   ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.3),
             ),
           ),
           child: Row(
@@ -165,15 +168,18 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     size: 18,
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       phase,
                       style: TextStyle(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                         color: isSelected
                             ? Theme.of(context).colorScheme.primary
                             : null,
@@ -192,7 +198,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
           }).toList();
         },
         onSelected: (String newPhase) {
-          ref.read(deviceUIStateNotifierProvider.notifier).setPhaseFilter(newPhase);
+          ref
+              .read(deviceUIStateNotifierProvider.notifier)
+              .setPhaseFilter(newPhase);
         },
       ),
     );
@@ -201,7 +209,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   @override
   Widget build(BuildContext context) {
     // AppBar removed from DevicesScreen - search and menu functionality needs to be relocated
-    LoggerService.debug('DevicesScreen: AppBar removed, search functionality preserved in state');
+    LoggerService.debug(
+      'DevicesScreen: AppBar removed, search functionality preserved in state',
+    );
     return Scaffold(
       body: Consumer(
         builder: (context, ref, child) {
@@ -209,11 +219,13 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
           final devicesAsync = ref.watch(devicesNotifierProvider);
           // Device state information available in logger
           if (devicesAsync.hasValue) {
-            LoggerService.debug('Device count: ${devicesAsync.value?.length ?? 0}');
+            LoggerService.debug(
+              'Device count: ${devicesAsync.value?.length ?? 0}',
+            );
           }
           final filteredDevices = ref.watch(filteredDevicesListProvider);
           final mockDataState = ref.watch(mockDataStateProvider);
-          
+
           return devicesAsync.when(
             loading: () => const Center(child: LoadingIndicator()),
             error: (error, stack) => Center(
@@ -222,14 +234,14 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                 title: 'Error loading devices',
                 subtitle: error.toString(),
                 actionLabel: 'Retry',
-                onAction: () => ref.read(devicesNotifierProvider.notifier).userRefresh(),
+                onAction: () =>
+                    ref.read(devicesNotifierProvider.notifier).userRefresh(),
               ),
             ),
             data: (devices) {
-              return RefreshIndicator(
-                onRefresh: () => ref.read(devicesNotifierProvider.notifier).userRefresh(),
-                child: Column(
-              children: [
+              // No RefreshIndicator - WebSocket provides real-time updates
+              return Column(
+                children: [
                   // Data source indicator
                   if (mockDataState.isUsingMockData)
                     Container(
@@ -276,10 +288,14 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     controller: _searchController,
                     hintText: 'Search devices...',
                     onChanged: (query) {
-                      ref.read(deviceUIStateNotifierProvider.notifier).setSearchQuery(query);
+                      ref
+                          .read(deviceUIStateNotifierProvider.notifier)
+                          .setSearchQuery(query);
                     },
                     onClear: () {
-                      ref.read(deviceUIStateNotifierProvider.notifier).clearSearch();
+                      ref
+                          .read(deviceUIStateNotifierProvider.notifier)
+                          .clearSearch();
                     },
                   ),
 
@@ -291,10 +307,15 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     builder: (context) {
                       final uiState = ref.watch(deviceUIStateNotifierProvider);
 
-                      final apCount = devices.where((d) => d.type == 'access_point').length;
-                      final switchCount = devices.where((d) => d.type == 'switch').length;
-                      final ontCount = devices.where((d) => d.type == 'ont').length;
-
+                      final apCount = devices
+                          .where((d) => d.type == 'access_point')
+                          .length;
+                      final switchCount = devices
+                          .where((d) => d.type == 'switch')
+                          .length;
+                      final ontCount = devices
+                          .where((d) => d.type == 'ont')
+                          .length;
 
                       return HUDTabBar(
                         height: 80,
@@ -325,7 +346,9 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                         selectedIndex: _getTabIndex(uiState.filterType),
                         onTabSelected: (index) {
                           final filterValue = _getFilterFromIndex(index);
-                          ref.read(deviceUIStateNotifierProvider.notifier).setFilterType(filterValue);
+                          ref
+                              .read(deviceUIStateNotifierProvider.notifier)
+                              .setFilterType(filterValue);
                         },
                         onActiveTabTapped: () {
                           _scrollController.animateTo(
@@ -337,49 +360,57 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                       );
                     },
                   ),
-                
+
                   // Device list
                   Expanded(
                     child: Consumer(
                       builder: (context, ref, child) {
-                        final uiState = ref.watch(deviceUIStateNotifierProvider);
+                        final uiState = ref.watch(
+                          deviceUIStateNotifierProvider,
+                        );
                         return filteredDevices.isEmpty
-                          ? EmptyState(
-                              icon: Icons.devices_other,
-                              title: 'No devices found',
-                              subtitle: uiState.searchQuery.isNotEmpty
-                                ? 'Try adjusting your search'
-                                : 'No devices match the current filter',
-                            )
-                          : ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.only(bottom: 80),
-                              itemCount: filteredDevices.length,
-                              itemBuilder: (context, index) {
-                                final device = filteredDevices[index];
-                                return UnifiedListItem(
-                                  title: device.name,
-                                  icon: ListItemHelpers.getDeviceIcon(device.type),
-                                  status: ListItemHelpers.mapDeviceStatus(device.status),
-                                  subtitleLines: [
-                                    UnifiedInfoLine(
-                                      text: _formatNetworkInfo(device),
+                            ? EmptyState(
+                                icon: Icons.devices_other,
+                                title: 'No devices found',
+                                subtitle: uiState.searchQuery.isNotEmpty
+                                    ? 'Try adjusting your search'
+                                    : 'No devices match the current filter',
+                              )
+                            : ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.only(bottom: 80),
+                                itemCount: filteredDevices.length,
+                                itemBuilder: (context, index) {
+                                  final device = filteredDevices[index];
+                                  return UnifiedListItem(
+                                    title: device.name,
+                                    icon: ListItemHelpers.getDeviceIcon(
+                                      device.type,
                                     ),
-                                  ],
-                                  statusBadge: UnifiedStatusBadge(
-                                    text: device.status.toUpperCase(),
-                                    color: ListItemHelpers.getStatusColor(device.status),
-                                  ),
-                                  showChevron: true,
-                                  onTap: () => context.push('/devices/${device.id}'),
-                                );
-                              },
-                            );
+                                    status: ListItemHelpers.mapDeviceStatus(
+                                      device.status,
+                                    ),
+                                    subtitleLines: [
+                                      UnifiedInfoLine(
+                                        text: _formatNetworkInfo(device),
+                                      ),
+                                    ],
+                                    statusBadge: UnifiedStatusBadge(
+                                      text: device.status.toUpperCase(),
+                                      color: ListItemHelpers.getStatusColor(
+                                        device.status,
+                                      ),
+                                    ),
+                                    showChevron: true,
+                                    onTap: () =>
+                                        context.push('/devices/${device.id}'),
+                                  );
+                                },
+                              );
                       },
                     ),
                   ),
                 ],
-                ),
               );
             },
           );

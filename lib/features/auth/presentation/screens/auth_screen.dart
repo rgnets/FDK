@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
+import 'package:rgnets_fdk/core/utils/loading_dialog_controller.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
@@ -18,6 +19,17 @@ class AuthScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
+  /// Controller for managing loading dialog state safely.
+  /// Using an instance variable ensures proper cleanup across retries.
+  final _loadingController = LoadingDialogController();
+
+  @override
+  void dispose() {
+    // Ensure loading dialog is dismissed when screen is disposed
+    _loadingController.ensureDismissed(context);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -170,12 +182,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return;
     }
 
-    final navigator = Navigator.of(context);
-    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    // Capture context-dependent objects early while context is valid
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final goRouter = GoRouter.of(context);
-
-    var loadingShown = false;
 
     try {
       final fqdn = credentials['fqdn'] as String?;
@@ -232,17 +241,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return;
       }
 
-      loadingShown = true;
-      unawaited(
-        showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(child: LoadingIndicator()),
-        ),
-      );
-      loadingShown = true;
+      // Show loading dialog using the controller (ensures consistent show/dismiss)
+      _loadingController.show(context);
+      logger.d('AUTH_SCREEN: Loading dialog shown');
 
       if (!mounted) {
+        _loadingController.ensureDismissed(context);
         return;
       }
 
@@ -255,20 +259,24 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             siteName: siteName,
             issuedAt: issuedAt,
             signature: signature,
+          )
+          .timeout(
+            const Duration(seconds: 25),
+            onTimeout: () {
+              throw TimeoutException('Authentication timed out');
+            },
           );
 
       if (!mounted) {
+        _loadingController.ensureDismissed(null);
         return;
       }
 
-      if (!mounted) {
-        return;
+      // Dismiss loading dialog using the controller
+      if (context.mounted) {
+        _loadingController.dismiss(context);
       }
-
-      if (loadingShown && rootNavigator.canPop()) {
-        rootNavigator.pop();
-        loadingShown = false;
-      }
+      logger.d('AUTH_SCREEN: Loading dialog dismissed');
 
       ref
           .read(authProvider)
@@ -302,11 +310,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             orElse: () {},
           );
     } on Exception catch (e) {
+      // Always ensure loading dialog is dismissed on error
       if (mounted) {
-        if (loadingShown && rootNavigator.canPop()) {
-          rootNavigator.pop();
-          loadingShown = false;
-        }
+        _loadingController.dismiss(context);
+      } else {
+        _loadingController.ensureDismissed(null);
+      }
+
+      if (mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
