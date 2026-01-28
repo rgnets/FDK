@@ -24,9 +24,13 @@ class StorageService {
   static const String _keyAutoSync = 'auto_sync';
   static const String _keySyncInterval = 'sync_interval';
   static const String _keyPhaseFilter = 'device_phase_filter';
+  static const String _keyStatusFilter = 'device_status_filter';
 
   /// Public key for phase filter (for tests and direct access)
   static const String keyPhaseFilter = _keyPhaseFilter;
+
+  /// Public key for status filter (for tests and direct access)
+  static const String keyStatusFilter = _keyStatusFilter;
 
   // Legacy keys for migration
   static const String _legacyKeyApiUrl = 'api_url';
@@ -99,7 +103,8 @@ class StorageService {
     const legacyLoginKey = 'att_fe_tool.login';
     const legacyApiKey = 'att_fe_tool.api_key';
 
-    final hasAttLegacy = _prefs.containsKey(legacyFqdnKey) &&
+    final hasAttLegacy =
+        _prefs.containsKey(legacyFqdnKey) &&
         _prefs.containsKey(legacyLoginKey) &&
         _prefs.containsKey(legacyApiKey);
 
@@ -125,7 +130,8 @@ class StorageService {
     }
 
     // Migration 2: api_url/api_token keys to site_url/token
-    final hasApiLegacy = _prefs.containsKey(_legacyKeyApiUrl) ||
+    final hasApiLegacy =
+        _prefs.containsKey(_legacyKeyApiUrl) ||
         _prefs.containsKey(_legacyKeyApiToken);
 
     if (hasApiLegacy && !_prefs.containsKey(_keySiteUrl)) {
@@ -167,9 +173,7 @@ class StorageService {
               return AuthAttempt.fromJson(entry);
             }
             if (entry is Map) {
-              return AuthAttempt.fromJson(
-                Map<String, dynamic>.from(entry),
-              );
+              return AuthAttempt.fromJson(Map<String, dynamic>.from(entry));
             }
             return null;
           })
@@ -221,6 +225,12 @@ class StorageService {
   Future<void> setPhaseFilter(String phase) =>
       _prefs.setString(_keyPhaseFilter, phase);
   Future<void> clearPhaseFilter() => _prefs.remove(_keyPhaseFilter);
+
+  // Status filter
+  String? get statusFilter => _prefs.getString(_keyStatusFilter);
+  Future<void> setStatusFilter(String status) =>
+      _prefs.setString(_keyStatusFilter, status);
+  Future<void> clearStatusFilter() => _prefs.remove(_keyStatusFilter);
 
   // Generic methods
   Future<bool> setBool(String key, {required bool value}) =>
