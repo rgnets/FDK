@@ -48,6 +48,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     await Future<void>.delayed(const Duration(seconds: 2));
     logger.d('SPLASH_SCREEN: Initialization delay complete');
 
+    // Check if widget is still mounted after async delay
+    if (!mounted) {
+      logger.w('SPLASH_SCREEN: ⚠️ Widget disposed during delay, aborting navigation');
+      return;
+    }
+
     // Check if deeplink is being processed - if so, let deeplink service handle navigation
     final deeplinkService = ref.read(deeplinkServiceProvider);
     if (deeplinkService.isProcessing || deeplinkService.hasPendingInitialLink) {

@@ -27,10 +27,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  /// Helper to wait real time and then pump frames
+  /// Helper to wait real time and then pump frames to render UI
   Future<void> waitAndPump(WidgetTester tester, Duration duration) async {
     await binding.delayed(duration);
-    await tester.pump();
+    // Pump multiple frames to ensure UI is fully rendered
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
   /// Initialize test state and return SharedPreferences instance
@@ -58,7 +61,8 @@ void main() {
       await waitAndPump(tester, const Duration(milliseconds: 500));
       expect(find.text('RG Nets Field Deployment Kit'), findsOneWidget);
 
-      await waitAndPump(tester, const Duration(seconds: 4));
+      // Wait for app initialization - loading 1920 devices takes time
+      await waitAndPump(tester, const Duration(seconds: 8));
 
       expect(EnvironmentConfig.isDevelopment, isTrue);
       expect(EnvironmentConfig.useSyntheticData, isTrue);
@@ -76,7 +80,7 @@ void main() {
           child: const dev.FDKApp(),
         ),
       );
-      await waitAndPump(tester, const Duration(seconds: 5));
+      await waitAndPump(tester, const Duration(seconds: 10));
 
       final devicesTab = find.byIcon(Icons.devices);
       if (devicesTab.evaluate().isNotEmpty) {
@@ -144,12 +148,12 @@ void main() {
       await waitAndPump(tester, const Duration(milliseconds: 500));
       expect(find.text('RG Nets Field Deployment Kit'), findsOneWidget);
 
-      await waitAndPump(tester, const Duration(seconds: 4));
+      await waitAndPump(tester, const Duration(seconds: 8));
 
       expect(find.text('Connect to rXg System'), findsOneWidget);
     });
 
-    testWidgets('Production auth screen has required input fields',
+    testWidgets('Production auth screen has required elements',
         (WidgetTester tester) async {
       final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.production);
@@ -160,10 +164,12 @@ void main() {
           child: const prod.FDKApp(),
         ),
       );
-      await waitAndPump(tester, const Duration(seconds: 5));
+      await waitAndPump(tester, const Duration(seconds: 8));
 
+      // Auth screen should show title and action buttons
       expect(find.text('Connect to rXg System'), findsOneWidget);
-      expect(find.byType(TextFormField), findsWidgets);
+      expect(find.text('Scan QR Code'), findsOneWidget);
+      expect(find.text('Enter credentials manually'), findsOneWidget);
     });
   });
 
@@ -198,7 +204,7 @@ void main() {
           child: const dev.FDKApp(),
         ),
       );
-      await waitAndPump(tester, const Duration(seconds: 5));
+      await waitAndPump(tester, const Duration(seconds: 10));
 
       expect(find.byType(BottomNavigationBar), findsOneWidget);
 
