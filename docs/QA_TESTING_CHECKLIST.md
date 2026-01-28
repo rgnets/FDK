@@ -506,13 +506,18 @@ This document provides a comprehensive checklist for testing all functions of th
 
 Full-app tests that require the complete `FDKApp` widget use Flutter integration tests:
 
+**IMPORTANT:** Integration tests require iOS or Android devices/emulators. They will NOT work on macOS desktop due to SharedPreferences plugin limitations.
+
 **Run integration tests with:**
 ```bash
-# Headless (no device required)
-flutter test integration_test/app_test.dart
+# With iOS simulator
+flutter test integration_test/app_test.dart -d <iphone_simulator_id>
 
-# With device/emulator
-flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart
+# With Android emulator
+flutter test integration_test/app_test.dart -d <android_emulator_id>
+
+# Using flutter drive (recommended for CI)
+flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart -d <device_id>
 ```
 
 **Integration test coverage:**
