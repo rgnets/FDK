@@ -78,6 +78,7 @@ dev_dependencies:
   mocktail: ^1.0.4
   retrofit_generator: ^8.2.1
   riverpod_generator: 2.3.10
+  flutter_launcher_icons: ^0.14.2
   # custom_lint: ^0.7.0  # Temporarily disabled due to analyzer conflicts
   # riverpod_lint: ^2.6.3  # Temporarily disabled due to analyzer conflicts
 
@@ -88,6 +89,22 @@ dev_dependencies:
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+# App icon configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/app_icon.png"
+  # Add a dark background since the logo is light-colored
+  background_color: "#1a1a2e"
+  # For Android adaptive icons
+  adaptive_icon_background: "#1a1a2e"
+  adaptive_icon_foreground: "assets/app_icon.png"
+  # macOS requires a map format
+  macos:
+    generate: true
+    image_path: "assets/app_icon.png"
 
 # The following section is specific to Flutter packages.
 flutter:
