@@ -95,16 +95,16 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true
-  image_path: "assets/app_icon.png"
+  image_path: "assets/app_icon_solid.png"
   # Add a dark background since the logo is light-colored
   background_color: "#1a1a2e"
   # For Android adaptive icons
   adaptive_icon_background: "#1a1a2e"
-  adaptive_icon_foreground: "assets/app_icon.png"
+  adaptive_icon_foreground: "assets/app_icon_solid.png"
   # macOS requires a map format
   macos:
     generate: true
-    image_path: "assets/app_icon.png"
+    image_path: "assets/app_icon_solid.png"
 
 # The following section is specific to Flutter packages.
 flutter:
