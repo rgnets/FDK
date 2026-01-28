@@ -140,6 +140,8 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
         port: result.port,
         protocol: result.iperfProtocol,
         passed: result.passed,
+        initiatedAt: result.initiatedAt,
+        completedAt: result.completedAt,
       );
 
       if (success) {

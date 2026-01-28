@@ -61,11 +61,11 @@ class SpeedTestResult with _$SpeedTestResult {
     @JsonKey(name: 'updated_by') String? updatedBy,
     @JsonKey(name: 'created_at') DateTime? createdAt,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
-    // Legacy fields for backwards compatibility
-    @Default(false) bool hasError,
-    String? errorMessage,
-    @JsonKey(name: 'local_ip_address') String? localIpAddress,
-    @JsonKey(name: 'server_host') String? serverHost,
+    // Legacy/local-only fields - not sent to backend
+    @JsonKey(includeToJson: false) @Default(false) bool hasError,
+    @JsonKey(includeToJson: false) String? errorMessage,
+    @JsonKey(name: 'local_ip_address', includeToJson: false) String? localIpAddress,
+    @JsonKey(name: 'server_host', includeToJson: false) String? serverHost,
   }) = _SpeedTestResult;
 
   const SpeedTestResult._();

@@ -1,5 +1,6 @@
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
@@ -9,11 +10,14 @@ import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result
 class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
   SpeedTestWebSocketDataSource({
     required WebSocketService webSocketService,
+    required WebSocketCacheIntegration cacheIntegration,
     Logger? logger,
   })  : _webSocketService = webSocketService,
+        _cacheIntegration = cacheIntegration,
         _logger = logger ?? Logger();
 
   final WebSocketService _webSocketService;
+  final WebSocketCacheIntegration _cacheIntegration;
   final Logger _logger;
 
   static const String _speedTestConfigResourceType = 'speed_tests';
@@ -27,6 +31,16 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
   Future<List<SpeedTestConfig>> getSpeedTestConfigs() async {
     _logger.i('SpeedTestWebSocketDataSource: getSpeedTestConfigs() called');
 
+    // Try cache first
+    final cachedConfigs = _cacheIntegration.getCachedSpeedTestConfigs();
+    if (cachedConfigs.isNotEmpty) {
+      _logger.i(
+        'SpeedTestWebSocketDataSource: Returning ${cachedConfigs.length} configs from cache',
+      );
+      return cachedConfigs;
+    }
+
+    // Fall back to WebSocket request if cache empty
     if (!_webSocketService.isConnected) {
       _logger.w('SpeedTestWebSocketDataSource: WebSocket not connected');
       return [];
@@ -76,6 +90,14 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
   Future<SpeedTestConfig> getSpeedTestConfig(int id) async {
     _logger.i('SpeedTestWebSocketDataSource: getSpeedTestConfig($id) called');
 
+    // Try cache first
+    final cachedConfig = _cacheIntegration.getSpeedTestConfigById(id);
+    if (cachedConfig != null) {
+      _logger.i('SpeedTestWebSocketDataSource: Returning config $id from cache');
+      return cachedConfig;
+    }
+
+    // Fall back to WebSocket request
     if (!_webSocketService.isConnected) {
       throw StateError('WebSocket not connected');
     }
@@ -115,6 +137,48 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       'limit: $limit, offset: $offset) called',
     );
 
+    // Try cache first with filtering
+    var cachedResults = _cacheIntegration.getCachedSpeedTestResults();
+    if (cachedResults.isNotEmpty) {
+      // Apply filters
+      if (speedTestId != null) {
+        cachedResults = cachedResults
+            .where((r) => r.speedTestId == speedTestId)
+            .toList();
+      }
+      if (accessPointId != null) {
+        cachedResults = cachedResults
+            .where((r) => r.testedViaAccessPointId == accessPointId)
+            .toList();
+      }
+
+      // Sort by timestamp (newest first)
+      cachedResults.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Apply pagination
+      if (offset != null && offset > 0) {
+        cachedResults = cachedResults.skip(offset).toList();
+      }
+      if (limit != null && limit > 0) {
+        cachedResults = cachedResults.take(limit).toList();
+      }
+
+      // Only return from cache if we have results after filtering
+      if (cachedResults.isNotEmpty) {
+        _logger.i(
+          'SpeedTestWebSocketDataSource: Returning ${cachedResults.length} results from cache',
+        );
+        return cachedResults;
+      }
+
+      // Log cache miss and fall through to WebSocket
+      _logger.d(
+        'SpeedTestWebSocketDataSource: Filters resulted in empty cache, '
+        'falling back to WebSocket',
+      );
+    }
+
+    // Fall back to WebSocket request if cache empty
     if (!_webSocketService.isConnected) {
       _logger.w('SpeedTestWebSocketDataSource: WebSocket not connected');
       return [];

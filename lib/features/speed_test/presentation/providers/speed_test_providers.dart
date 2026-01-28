@@ -25,8 +25,10 @@ part 'speed_test_providers.g.dart';
 @Riverpod(keepAlive: true)
 SpeedTestDataSource speedTestDataSource(SpeedTestDataSourceRef ref) {
   final webSocketService = ref.watch(webSocketServiceProvider);
+  final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
   return SpeedTestWebSocketDataSource(
     webSocketService: webSocketService,
+    cacheIntegration: cacheIntegration,
     logger: Logger(),
   );
 }
@@ -38,8 +40,10 @@ SpeedTestDataSource speedTestDataSource(SpeedTestDataSourceRef ref) {
 @Riverpod(keepAlive: true)
 SpeedTestRepository speedTestRepository(SpeedTestRepositoryRef ref) {
   final dataSource = ref.watch(speedTestDataSourceProvider);
+  final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
   return SpeedTestRepositoryImpl(
     dataSource: dataSource,
+    cacheIntegration: cacheIntegration,
     logger: Logger(),
   );
 }
@@ -361,6 +365,8 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
             latency: result.rtt ?? 0,
             source: result.source,
             destination: result.destination,
+            initiatedAt: result.initiatedAt,
+            completedAt: result.completedAt,
           );
       return true;
     } catch (e) {

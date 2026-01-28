@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
+import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
@@ -10,11 +11,14 @@ import 'package:rgnets_fdk/features/speed_test/domain/repositories/speed_test_re
 class SpeedTestRepositoryImpl implements SpeedTestRepository {
   SpeedTestRepositoryImpl({
     required SpeedTestDataSource dataSource,
+    required WebSocketCacheIntegration cacheIntegration,
     Logger? logger,
   })  : _dataSource = dataSource,
+        _cacheIntegration = cacheIntegration,
         _logger = logger ?? Logger();
 
   final SpeedTestDataSource _dataSource;
+  final WebSocketCacheIntegration _cacheIntegration;
   final Logger _logger;
 
   // ============================================================================
@@ -116,6 +120,10 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
         'SpeedTestRepositoryImpl: updateSpeedTestResult(${result.id}) called',
       );
       final updated = await _dataSource.updateSpeedTestResult(result);
+
+      // Update cache immediately (same pattern as device updates)
+      _cacheIntegration.updateSpeedTestResultInCache(updated.toJson());
+
       return Right(updated);
     } on Exception catch (e) {
       _logger.e('SpeedTestRepositoryImpl: Failed to update result: $e');

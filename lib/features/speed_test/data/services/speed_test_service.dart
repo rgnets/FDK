@@ -427,6 +427,9 @@ class SpeedTestService {
         rtt: (latency as num).toDouble(),
         initiatedAt: initiatedAt,
         completedAt: DateTime.now(),
+        source: localIp,
+        destination: serverHost,
+        // Keep legacy fields for local UI display
         localIpAddress: localIp,
         serverHost: serverHost,
       );

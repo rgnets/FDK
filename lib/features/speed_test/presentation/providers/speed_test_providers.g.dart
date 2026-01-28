@@ -7,7 +7,7 @@ part of 'speed_test_providers.dart';
 // **************************************************************************
 
 String _$speedTestDataSourceHash() =>
-    r'04b217e04a9b8ef1dfca0744f8a1e97e12964d82';
+    r'457c875a89d71de8210eb4bb9bba3bee39b1a74f';
 
 /// See also [speedTestDataSource].
 @ProviderFor(speedTestDataSource)
@@ -23,7 +23,7 @@ final speedTestDataSourceProvider = Provider<SpeedTestDataSource>.internal(
 
 typedef SpeedTestDataSourceRef = ProviderRef<SpeedTestDataSource>;
 String _$speedTestRepositoryHash() =>
-    r'7460c9da6a8c0b1775d45e3b79a76a62b11d4c05';
+    r'cde0557446726a402f54bb9844ea9ed62cd9b74f';
 
 /// See also [speedTestRepository].
 @ProviderFor(speedTestRepository)
@@ -249,7 +249,7 @@ class _SpeedTestResultsNotifierProviderElement
 }
 
 String _$speedTestRunNotifierHash() =>
-    r'76bfa7b486be1d8d9b2e3ed1c36b42f6ed9676b7';
+    r'9b0eea3189731390396dd7c4fbd573e6f34596ad';
 
 /// See also [SpeedTestRunNotifier].
 @ProviderFor(SpeedTestRunNotifier)

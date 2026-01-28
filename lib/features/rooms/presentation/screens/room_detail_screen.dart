@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readines
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/widgets/room_speed_test_selector.dart';
 
 /// Room detail screen with device management
 class RoomDetailScreen extends ConsumerStatefulWidget {
@@ -398,7 +399,19 @@ class _OverviewTab extends ConsumerWidget {
               ),
             ],
           ),
-          
+          const SizedBox(height: 16),
+
+          // Speed Test Results Section
+          RoomSpeedTestSelector(
+            pmsRoomId: int.tryParse(roomVm.id) ?? 0,
+            roomName: roomVm.name,
+            apIds: roomVm.deviceIds
+                ?.where((id) => id.startsWith('ap_'))
+                .map((id) => int.tryParse(id.replaceFirst('ap_', '')) ?? 0)
+                .where((id) => id > 0)
+                .toList() ?? [],
+          ),
+
           const SizedBox(height: 80), // Space for bottom bar
         ],
       ),

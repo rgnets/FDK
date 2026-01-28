@@ -102,9 +102,5 @@ Map<String, dynamic> _$$SpeedTestResultImplToJson(
   writeNotNull('updated_by', instance.updatedBy);
   writeNotNull('created_at', instance.createdAt?.toIso8601String());
   writeNotNull('updated_at', instance.updatedAt?.toIso8601String());
-  val['has_error'] = instance.hasError;
-  writeNotNull('error_message', instance.errorMessage);
-  writeNotNull('local_ip_address', instance.localIpAddress);
-  writeNotNull('server_host', instance.serverHost);
   return val;
 }

@@ -80,12 +80,14 @@ mixin _$SpeedTestResult {
   DateTime? get createdAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt =>
-      throw _privateConstructorUsedError; // Legacy fields for backwards compatibility
+      throw _privateConstructorUsedError; // Legacy/local-only fields - not sent to backend
+  @JsonKey(includeToJson: false)
   bool get hasError => throw _privateConstructorUsedError;
+  @JsonKey(includeToJson: false)
   String? get errorMessage => throw _privateConstructorUsedError;
-  @JsonKey(name: 'local_ip_address')
+  @JsonKey(name: 'local_ip_address', includeToJson: false)
   String? get localIpAddress => throw _privateConstructorUsedError;
-  @JsonKey(name: 'server_host')
+  @JsonKey(name: 'server_host', includeToJson: false)
   String? get serverHost => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
@@ -130,10 +132,12 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -180,10 +184,12 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)?
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -230,10 +236,12 @@ mixin _$SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)?
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -303,10 +311,11 @@ abstract class $SpeedTestResultCopyWith<$Res> {
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      bool hasError,
-      String? errorMessage,
-      @JsonKey(name: 'local_ip_address') String? localIpAddress,
-      @JsonKey(name: 'server_host') String? serverHost});
+      @JsonKey(includeToJson: false) bool hasError,
+      @JsonKey(includeToJson: false) String? errorMessage,
+      @JsonKey(name: 'local_ip_address', includeToJson: false)
+      String? localIpAddress,
+      @JsonKey(name: 'server_host', includeToJson: false) String? serverHost});
 }
 
 /// @nodoc
@@ -558,10 +567,11 @@ abstract class _$$SpeedTestResultImplCopyWith<$Res>
       @JsonKey(name: 'updated_by') String? updatedBy,
       @JsonKey(name: 'created_at') DateTime? createdAt,
       @JsonKey(name: 'updated_at') DateTime? updatedAt,
-      bool hasError,
-      String? errorMessage,
-      @JsonKey(name: 'local_ip_address') String? localIpAddress,
-      @JsonKey(name: 'server_host') String? serverHost});
+      @JsonKey(includeToJson: false) bool hasError,
+      @JsonKey(includeToJson: false) String? errorMessage,
+      @JsonKey(name: 'local_ip_address', includeToJson: false)
+      String? localIpAddress,
+      @JsonKey(name: 'server_host', includeToJson: false) String? serverHost});
 }
 
 /// @nodoc
@@ -806,10 +816,11 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
       @JsonKey(name: 'updated_by') this.updatedBy,
       @JsonKey(name: 'created_at') this.createdAt,
       @JsonKey(name: 'updated_at') this.updatedAt,
-      this.hasError = false,
-      this.errorMessage,
-      @JsonKey(name: 'local_ip_address') this.localIpAddress,
-      @JsonKey(name: 'server_host') this.serverHost})
+      @JsonKey(includeToJson: false) this.hasError = false,
+      @JsonKey(includeToJson: false) this.errorMessage,
+      @JsonKey(name: 'local_ip_address', includeToJson: false)
+      this.localIpAddress,
+      @JsonKey(name: 'server_host', includeToJson: false) this.serverHost})
       : super._();
 
   factory _$SpeedTestResultImpl.fromJson(Map<String, dynamic> json) =>
@@ -909,17 +920,18 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   final DateTime? updatedAt;
-// Legacy fields for backwards compatibility
+// Legacy/local-only fields - not sent to backend
   @override
-  @JsonKey()
+  @JsonKey(includeToJson: false)
   final bool hasError;
   @override
+  @JsonKey(includeToJson: false)
   final String? errorMessage;
   @override
-  @JsonKey(name: 'local_ip_address')
+  @JsonKey(name: 'local_ip_address', includeToJson: false)
   final String? localIpAddress;
   @override
-  @JsonKey(name: 'server_host')
+  @JsonKey(name: 'server_host', includeToJson: false)
   final String? serverHost;
 
   @override
@@ -1094,10 +1106,12 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)
         $default,
   ) {
     return $default(
@@ -1184,10 +1198,12 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)?
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)?
         $default,
   ) {
     return $default?.call(
@@ -1274,10 +1290,12 @@ class _$SpeedTestResultImpl extends _SpeedTestResult {
             @JsonKey(name: 'updated_by') String? updatedBy,
             @JsonKey(name: 'created_at') DateTime? createdAt,
             @JsonKey(name: 'updated_at') DateTime? updatedAt,
-            bool hasError,
-            String? errorMessage,
-            @JsonKey(name: 'local_ip_address') String? localIpAddress,
-            @JsonKey(name: 'server_host') String? serverHost)?
+            @JsonKey(includeToJson: false) bool hasError,
+            @JsonKey(includeToJson: false) String? errorMessage,
+            @JsonKey(name: 'local_ip_address', includeToJson: false)
+            String? localIpAddress,
+            @JsonKey(name: 'server_host', includeToJson: false)
+            String? serverHost)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1402,10 +1420,11 @@ abstract class _SpeedTestResult extends SpeedTestResult {
       @JsonKey(name: 'updated_by') final String? updatedBy,
       @JsonKey(name: 'created_at') final DateTime? createdAt,
       @JsonKey(name: 'updated_at') final DateTime? updatedAt,
-      final bool hasError,
-      final String? errorMessage,
-      @JsonKey(name: 'local_ip_address') final String? localIpAddress,
-      @JsonKey(name: 'server_host')
+      @JsonKey(includeToJson: false) final bool hasError,
+      @JsonKey(includeToJson: false) final String? errorMessage,
+      @JsonKey(name: 'local_ip_address', includeToJson: false)
+      final String? localIpAddress,
+      @JsonKey(name: 'server_host', includeToJson: false)
       final String? serverHost}) = _$SpeedTestResultImpl;
   const _SpeedTestResult._() : super._();
 
@@ -1505,15 +1524,17 @@ abstract class _SpeedTestResult extends SpeedTestResult {
   @override
   @JsonKey(name: 'updated_at')
   DateTime? get updatedAt;
-  @override // Legacy fields for backwards compatibility
+  @override // Legacy/local-only fields - not sent to backend
+  @JsonKey(includeToJson: false)
   bool get hasError;
   @override
+  @JsonKey(includeToJson: false)
   String? get errorMessage;
   @override
-  @JsonKey(name: 'local_ip_address')
+  @JsonKey(name: 'local_ip_address', includeToJson: false)
   String? get localIpAddress;
   @override
-  @JsonKey(name: 'server_host')
+  @JsonKey(name: 'server_host', includeToJson: false)
   String? get serverHost;
   @override
   @JsonKey(ignore: true)

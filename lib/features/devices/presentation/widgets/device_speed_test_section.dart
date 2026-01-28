@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
+import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
 
 /// A section that displays speed test results for a specific device
@@ -27,15 +28,6 @@ class DeviceSpeedTestSection extends ConsumerStatefulWidget {
 
 class _DeviceSpeedTestSectionState
     extends ConsumerState<DeviceSpeedTestSection> {
-  List<SpeedTestResult> _deviceResults = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadDeviceResults();
-  }
-
   /// Get prefixed device ID for speed test lookups.
   /// If already prefixed (e.g., "ap_1307"), return as-is.
   /// If raw (e.g., "1307"), add prefix based on device type.
@@ -46,7 +38,8 @@ class _DeviceSpeedTestSectionState
       return id;
     }
     // Add prefix based on device type
-    final prefix = widget.device.type == DeviceTypes.accessPoint ? 'ap' : 'ont';
+    final prefix =
+        widget.device.type == DeviceTypes.accessPoint ? 'ap' : 'ont';
     return '${prefix}_$id';
   }
 
@@ -55,34 +48,6 @@ class _DeviceSpeedTestSectionState
     final parts = id.split('_');
     final rawId = parts.length >= 2 ? parts.sublist(1).join('_') : id;
     return int.tryParse(rawId);
-  }
-
-  void _loadDeviceResults() {
-    final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-    final List<SpeedTestResult> results;
-    if (widget.device.type == DeviceTypes.accessPoint) {
-      final apId = _getNumericDeviceId();
-      results = apId == null
-          ? <SpeedTestResult>[]
-          : cacheIntegration.getSpeedTestResultsForAccessPointId(apId);
-    } else {
-      results = cacheIntegration.getSpeedTestResultsForDevice(
-        _getPrefixedDeviceId(),
-        deviceType: widget.device.type,
-      );
-    }
-
-    LoggerService.info(
-      'Loaded ${results.length} speed test result(s) for device ${_getPrefixedDeviceId()}',
-      tag: 'DeviceSpeedTestSection',
-    );
-
-    if (mounted) {
-      setState(() {
-        _deviceResults = results;
-        _isLoading = false;
-      });
-    }
   }
 
   String _formatSpeed(double speed) {
@@ -110,15 +75,15 @@ class _DeviceSpeedTestSectionState
     }
   }
 
-  Future<void> _runSpeedTest() async {
+  Future<void> _runSpeedTest(List<SpeedTestResult> deviceResults) async {
     if (!mounted) return;
 
     final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
 
     // Try to get config from the device's existing results (uses the same test config)
     SpeedTestConfig? config;
-    if (_deviceResults.isNotEmpty) {
-      final speedTestId = _deviceResults.first.speedTestId;
+    if (deviceResults.isNotEmpty) {
+      final speedTestId = deviceResults.first.speedTestId;
       config = cacheIntegration.getSpeedTestConfigById(speedTestId);
       if (config != null) {
         LoggerService.info(
@@ -138,6 +103,11 @@ class _DeviceSpeedTestSectionState
       );
     }
 
+    final apId = _getNumericDeviceId();
+
+    // Get the existing result to update (if any)
+    final existingResult = deviceResults.isNotEmpty ? deviceResults.first : null;
+
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -146,13 +116,15 @@ class _DeviceSpeedTestSectionState
           cachedTest: config,
           onCompleted: () {
             if (mounted) {
-              // Reload results after test completion
-              _loadDeviceResults();
+              // Invalidate provider to refresh results
+              ref.invalidate(
+                speedTestResultsNotifierProvider(accessPointId: apId),
+              );
             }
           },
           onResultSubmitted: (result) async {
             if (!result.hasError) {
-              await _submitDeviceResult(result);
+              await _submitDeviceResult(result, existingResult);
             }
           },
         );
@@ -160,71 +132,221 @@ class _DeviceSpeedTestSectionState
     );
   }
 
-  Future<void> _submitDeviceResult(SpeedTestResult result) async {
+  /// Update existing speed test result with new test data.
+  Future<void> _submitDeviceResult(
+    SpeedTestResult newTestResult,
+    SpeedTestResult? existingResult,
+  ) async {
+    if (existingResult == null || existingResult.id == null) {
+      LoggerService.warning(
+        'DeviceSpeedTestSection: Cannot update - no existing result',
+        tag: 'DeviceSpeedTestSection',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No existing result to update'),
+            backgroundColor: AppColors.warning,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     try {
-      final prefixedId = _getPrefixedDeviceId();
       LoggerService.info(
-        'Updating speed test result for device $prefixedId: '
-        'download=${result.downloadMbps}, upload=${result.uploadMbps}',
+        'DeviceSpeedTestSection: Updating result id=${existingResult.id}',
         tag: 'DeviceSpeedTestSection',
       );
 
-      final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-      final success = await cacheIntegration.updateDeviceSpeedTestResult(
-        deviceId: prefixedId,
-        downloadSpeed: result.downloadMbps ?? 0,
-        uploadSpeed: result.uploadMbps ?? 0,
-        latency: result.rtt ?? 0,
-        source: result.source,
-        destination: result.destination,
-        port: result.port,
-        protocol: result.iperfProtocol,
-        passed: result.passed,
+      final updatedResult = existingResult.copyWith(
+        downloadMbps: newTestResult.downloadMbps,
+        uploadMbps: newTestResult.uploadMbps,
+        rtt: newTestResult.rtt,
+        jitter: newTestResult.jitter,
+        passed: newTestResult.passed,
+        source: newTestResult.source,
+        destination: newTestResult.destination,
+        port: newTestResult.port,
+        iperfProtocol: newTestResult.iperfProtocol,
+        initiatedAt: newTestResult.initiatedAt,
+        completedAt: newTestResult.completedAt,
       );
 
-      if (success) {
-        LoggerService.info(
-          'Speed test result updated successfully for device $prefixedId',
-          tag: 'DeviceSpeedTestSection',
-        );
-        if (mounted) {
-          // Refresh the displayed results
-          _loadDeviceResults();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Speed test result submitted successfully'),
-              backgroundColor: AppColors.success,
-              duration: const Duration(seconds: 3),
-            ),
+      final apId = _getNumericDeviceId();
+      final response = await ref
+          .read(speedTestRepositoryProvider)
+          .updateSpeedTestResult(updatedResult);
+
+      response.fold(
+        (failure) {
+          LoggerService.warning(
+            'DeviceSpeedTestSection: Update failed: ${failure.message}',
+            tag: 'DeviceSpeedTestSection',
           );
-        }
-      } else {
-        LoggerService.warning(
-          'Speed test submission failed for device $prefixedId - no existing result found',
-          tag: 'DeviceSpeedTestSection',
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Speed test submission failed - no existing result found'),
-              backgroundColor: AppColors.error,
-              duration: const Duration(seconds: 4),
-            ),
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Update failed: ${failure.message}'),
+                backgroundColor: AppColors.error,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        },
+        (updated) {
+          LoggerService.info(
+            'DeviceSpeedTestSection: Result updated successfully',
+            tag: 'DeviceSpeedTestSection',
           );
-        }
-      }
+          if (mounted) {
+            ref.invalidate(
+              speedTestResultsNotifierProvider(accessPointId: apId),
+            );
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Speed test result updated successfully'),
+                backgroundColor: AppColors.success,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        },
+      );
     } catch (e) {
       LoggerService.error(
-        'Error updating speed test result for device ${_getPrefixedDeviceId()}',
+        'DeviceSpeedTestSection: Error updating result',
         error: e,
         tag: 'DeviceSpeedTestSection',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Error submitting speed test result'),
+          const SnackBar(
+            content: Text('Error updating speed test result'),
             backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 4),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMarkNotApplicableConfirmation(SpeedTestResult result) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Mark as Not Applicable?'),
+        content: const Text(
+          'This speed test will be marked as not applicable. '
+          'The result will be excluded from readiness calculations.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _markResultNotApplicable(result);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markResultNotApplicable(SpeedTestResult result) async {
+    if (result.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot update result without ID')),
+      );
+      return;
+    }
+
+    try {
+      final updated = result.copyWith(isApplicable: false);
+      final apId = _getNumericDeviceId();
+
+      // Use notifier's updateResult which auto-refreshes
+      final updatedResult = await ref
+          .read(speedTestResultsNotifierProvider(accessPointId: apId).notifier)
+          .updateResult(updated);
+
+      if (updatedResult != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Speed test marked as not applicable'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update speed test'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _markResultApplicable(SpeedTestResult result) async {
+    if (result.id == null) return;
+
+    try {
+      final updated = result.copyWith(isApplicable: true);
+      final apId = _getNumericDeviceId();
+
+      // Use notifier's updateResult which auto-refreshes
+      final updatedResult = await ref
+          .read(speedTestResultsNotifierProvider(accessPointId: apId).notifier)
+          .updateResult(updated);
+
+      if (updatedResult != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Speed test marked as applicable'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to update speed test'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -318,6 +440,65 @@ class _DeviceSpeedTestSectionState
               ],
             ),
           ],
+
+          // Not Applicable indicator and toggle
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (!result.isApplicable)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.gray600.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'NOT APPLICABLE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                )
+              else
+                const SizedBox.shrink(),
+              TextButton.icon(
+                onPressed: () => result.isApplicable
+                    ? _showMarkNotApplicableConfirmation(result)
+                    : _markResultApplicable(result),
+                icon: Icon(
+                  result.isApplicable
+                      ? Icons.remove_circle_outline
+                      : Icons.check_circle_outline,
+                  size: 14,
+                  color:
+                      result.isApplicable ? AppColors.warning : AppColors.success,
+                ),
+                label: Text(
+                  result.isApplicable ? 'Mark N/A' : 'Mark Applicable',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: result.isApplicable
+                        ? AppColors.warning
+                        : AppColors.success,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -355,82 +536,102 @@ class _DeviceSpeedTestSectionState
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const SectionCard(
+    final apId = _getNumericDeviceId();
+
+    // Watch the provider for reactive updates
+    final resultsAsync = ref.watch(
+      speedTestResultsNotifierProvider(accessPointId: apId),
+    );
+
+    return resultsAsync.when(
+      loading: () => const SectionCard(
         title: 'Speed Test',
         children: [
           Center(child: LoadingIndicator()),
         ],
-      );
-    }
-
-    final latestResult =
-        _deviceResults.isNotEmpty ? _deviceResults.first : null;
-
-    return SectionCard(
-      title: 'Speed Test',
-      children: [
-        // Show latest result if available
-        if (latestResult != null) ...[
-          _buildResultCard(latestResult),
-
-          // Show count of previous results
-          if (_deviceResults.length > 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                '${_deviceResults.length - 1} previous test(s) available',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.gray500,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-        ] else ...[
-          // No results placeholder
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.speed,
-                  size: 40,
-                  color: AppColors.gray500,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'No speed tests run for this device',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.gray500,
-                  ),
-                ),
-              ],
+      ),
+      error: (error, stack) => SectionCard(
+        title: 'Speed Test',
+        children: [
+          Center(
+            child: Text(
+              'Error loading results',
+              style: TextStyle(color: AppColors.error),
             ),
           ),
         ],
+      ),
+      data: (deviceResults) {
+        final latestResult =
+            deviceResults.isNotEmpty ? deviceResults.first : null;
 
-        // Run test button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _runSpeedTest,
-            icon: Icon(
-              latestResult != null ? Icons.refresh : Icons.play_arrow,
-              size: 18,
-            ),
-            label: Text(
-              latestResult != null ? 'Run New Test' : 'Run Speed Test',
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ),
-      ],
+        return SectionCard(
+          title: 'Speed Test',
+          children: [
+            // Show latest result if available
+            if (latestResult != null) ...[
+              _buildResultCard(latestResult),
+
+              // Show count of previous results
+              if (deviceResults.length > 1)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '${deviceResults.length - 1} previous test(s) available',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.gray500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+            ] else ...[
+              // No results placeholder
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.speed,
+                      size: 40,
+                      color: AppColors.gray500,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No speed tests run for this device',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Run test button - hide if result is not applicable
+            if (latestResult == null || latestResult.isApplicable)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _runSpeedTest(deviceResults),
+                  icon: Icon(
+                    latestResult != null ? Icons.refresh : Icons.play_arrow,
+                    size: 18,
+                  ),
+                  label: Text(
+                    latestResult != null ? 'Run New Test' : 'Run Speed Test',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
