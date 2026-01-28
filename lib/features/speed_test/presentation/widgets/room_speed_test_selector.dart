@@ -62,34 +62,8 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         _errorMessage = null;
       });
 
-      LoggerService.info(
-        'RoomSpeedTestSelector: Loading for pmsRoomId=${widget.pmsRoomId}, '
-        'roomName="${widget.roomName}", apIds=${widget.apIds}',
-        tag: 'RoomSpeedTestSelector',
-      );
-
       final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-
-      // Get all speed test results from cache
       final allResults = cacheIntegration.getCachedSpeedTestResults();
-
-      LoggerService.info(
-        'RoomSpeedTestSelector: Found ${allResults.length} total cached results',
-        tag: 'RoomSpeedTestSelector',
-      );
-
-      // Log first few results for debugging
-      if (allResults.isNotEmpty) {
-        for (var i = 0; i < allResults.length && i < 5; i++) {
-          final r = allResults[i];
-          LoggerService.info(
-            'RoomSpeedTestSelector: Result[$i]: id=${r.id}, speedTestId=${r.speedTestId}, '
-            'pmsRoomId=${r.pmsRoomId}, accessPointId=${r.accessPointId}, '
-            'testedViaAccessPointId=${r.testedViaAccessPointId}',
-            tag: 'RoomSpeedTestSelector',
-          );
-        }
-      }
 
       if (allResults.isEmpty) {
         LoggerService.warning(
@@ -104,31 +78,14 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         return;
       }
 
-      // Filter results by pms_room_id OR by AP IDs in this room, then group by speed_test_id
       final Map<int, List<SpeedTestResult>> resultsByTestId = {};
-
-      // Convert apIds to a Set for faster lookup
       final apIdSet = widget.apIds.toSet();
-
-      LoggerService.info(
-        'RoomSpeedTestSelector: Filtering with pmsRoomId=${widget.pmsRoomId}, apIdSet=$apIdSet',
-        tag: 'RoomSpeedTestSelector',
-      );
-
-      var matchedCount = 0;
-      var skippedNoSpeedTestId = 0;
-      var skippedNoMatch = 0;
 
       for (final result in allResults) {
         if (result.speedTestId == null) {
-          skippedNoSpeedTestId++;
           continue;
         }
 
-        // Check if this result belongs to this room:
-        // 1. Direct pms_room_id match
-        // 2. accessPointId matches one of the APs in this room
-        // 3. testedViaAccessPointId matches one of the APs in this room
         final matchesPmsRoom = result.pmsRoomId == widget.pmsRoomId;
         final matchesAccessPoint = result.accessPointId != null &&
             apIdSet.contains(result.accessPointId);
@@ -136,29 +93,12 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
             apIdSet.contains(result.testedViaAccessPointId);
 
         if (!matchesPmsRoom && !matchesAccessPoint && !matchesTestedViaAp) {
-          skippedNoMatch++;
           continue;
         }
 
-        matchedCount++;
-        LoggerService.info(
-          'RoomSpeedTestSelector: MATCHED result id=${result.id}, '
-          'matchesPmsRoom=$matchesPmsRoom, matchesAccessPoint=$matchesAccessPoint, '
-          'matchesTestedViaAp=$matchesTestedViaAp',
-          tag: 'RoomSpeedTestSelector',
-        );
-
-        // Add to map - group ALL results by speed_test_id for this room
         resultsByTestId.putIfAbsent(result.speedTestId!, () => []);
         resultsByTestId[result.speedTestId!]!.add(result);
       }
-
-      LoggerService.info(
-        'RoomSpeedTestSelector: Filter summary - matched=$matchedCount, '
-        'skippedNoSpeedTestId=$skippedNoSpeedTestId, skippedNoMatch=$skippedNoMatch, '
-        'uniqueTests=${resultsByTestId.length}',
-        tag: 'RoomSpeedTestSelector',
-      );
 
       if (resultsByTestId.isEmpty) {
         setState(() {
@@ -286,14 +226,6 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     }
 
     try {
-      LoggerService.info(
-        'RoomSpeedTestSelector: Updating existing result id=${_selectedResult!.id} '
-        'for pmsRoomId=${widget.pmsRoomId}, '
-        'download=${newTestResult.downloadMbps}, upload=${newTestResult.uploadMbps}',
-        tag: 'RoomSpeedTestSelector',
-      );
-
-      // Create updated result combining existing ID with new test data
       final updatedResult = _selectedResult!.copyWith(
         downloadMbps: newTestResult.downloadMbps,
         uploadMbps: newTestResult.uploadMbps,
@@ -332,11 +264,6 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
           }
         },
         (updated) {
-          LoggerService.info(
-            'RoomSpeedTestSelector: Coverage result updated successfully',
-            tag: 'RoomSpeedTestSelector',
-          );
-          // Update local state with the updated result
           setState(() {
             _selectedResult = updated;
           });

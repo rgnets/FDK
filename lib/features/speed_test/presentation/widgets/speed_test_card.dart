@@ -81,32 +81,13 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
     final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
     final adhocConfig = cacheIntegration.getAdhocSpeedTestConfig();
 
-    if (adhocConfig != null) {
-      LoggerService.info(
-        'Using adhoc config from cache: ${adhocConfig.name} (id: ${adhocConfig.id})',
-        tag: 'SpeedTestCard',
-      );
-    } else {
-      LoggerService.info(
-        'No configs in cache - running adhoc test without config',
-        tag: 'SpeedTestCard',
-      );
-    }
-
     showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (BuildContext context) {
         return SpeedTestPopup(
           cachedTest: adhocConfig,
-          onCompleted: () {
-            if (mounted) {
-              LoggerService.info(
-                'Speed test completed - UI will update via Riverpod',
-                tag: 'SpeedTestCard',
-              );
-            }
-          },
+          onCompleted: () {},
           onResultSubmitted: (result) async {
             if (!result.hasError) {
               await _submitAdhocResult(result);
@@ -117,21 +98,10 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
     );
   }
 
-  /// Submit adhoc speed test result to the server via WebSocket cache integration
   Future<void> _submitAdhocResult(SpeedTestResult result) async {
     try {
-      LoggerService.info(
-        'Submitting adhoc speed test result: '
-        'source=${result.source}, '
-        'destination=${result.destination}, '
-        'download=${result.downloadMbps}, '
-        'upload=${result.uploadMbps}, '
-        'ping=${result.rtt}',
-        tag: 'SpeedTestCard',
-      );
-
       final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
-      final success = await cacheIntegration.createAdhocSpeedTestResult(
+      await cacheIntegration.createAdhocSpeedTestResult(
         downloadSpeed: result.downloadMbps ?? 0,
         uploadSpeed: result.uploadMbps ?? 0,
         latency: result.rtt ?? 0,
@@ -143,18 +113,6 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
         initiatedAt: result.initiatedAt,
         completedAt: result.completedAt,
       );
-
-      if (success) {
-        LoggerService.info(
-          'Adhoc speed test result submitted successfully',
-          tag: 'SpeedTestCard',
-        );
-      } else {
-        LoggerService.warning(
-          'Failed to submit adhoc speed test result',
-          tag: 'SpeedTestCard',
-        );
-      }
     } catch (e) {
       LoggerService.error(
         'Error submitting adhoc speed test result',

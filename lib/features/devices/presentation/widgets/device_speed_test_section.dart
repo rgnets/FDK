@@ -4,7 +4,6 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
-import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
@@ -28,21 +27,6 @@ class DeviceSpeedTestSection extends ConsumerStatefulWidget {
 
 class _DeviceSpeedTestSectionState
     extends ConsumerState<DeviceSpeedTestSection> {
-  /// Get prefixed device ID for speed test lookups.
-  /// If already prefixed (e.g., "ap_1307"), return as-is.
-  /// If raw (e.g., "1307"), add prefix based on device type.
-  String _getPrefixedDeviceId() {
-    final id = widget.device.id;
-    // Check if already prefixed
-    if (id.startsWith('ap_') || id.startsWith('ont_')) {
-      return id;
-    }
-    // Add prefix based on device type
-    final prefix =
-        widget.device.type == DeviceTypes.accessPoint ? 'ap' : 'ont';
-    return '${prefix}_$id';
-  }
-
   int? _getNumericDeviceId() {
     final id = widget.device.id;
     final parts = id.split('_');
@@ -85,23 +69,9 @@ class _DeviceSpeedTestSectionState
     if (deviceResults.isNotEmpty) {
       final speedTestId = deviceResults.first.speedTestId;
       config = cacheIntegration.getSpeedTestConfigById(speedTestId);
-      if (config != null) {
-        LoggerService.info(
-          'Running speed test for device ${_getPrefixedDeviceId()} with config from result: ${config.name} (id: $speedTestId)',
-          tag: 'DeviceSpeedTestSection',
-        );
-      }
     }
 
-    // Fall back to adhoc config if no matching config found
     config ??= cacheIntegration.getAdhocSpeedTestConfig();
-
-    if (config != null) {
-      LoggerService.info(
-        'Running speed test for device ${_getPrefixedDeviceId()} with config: ${config.name}',
-        tag: 'DeviceSpeedTestSection',
-      );
-    }
 
     final apId = _getNumericDeviceId();
 
@@ -155,11 +125,6 @@ class _DeviceSpeedTestSectionState
     }
 
     try {
-      LoggerService.info(
-        'DeviceSpeedTestSection: Updating result id=${existingResult.id}',
-        tag: 'DeviceSpeedTestSection',
-      );
-
       final updatedResult = existingResult.copyWith(
         downloadMbps: newTestResult.downloadMbps,
         uploadMbps: newTestResult.uploadMbps,
@@ -196,10 +161,6 @@ class _DeviceSpeedTestSectionState
           }
         },
         (updated) {
-          LoggerService.info(
-            'DeviceSpeedTestSection: Result updated successfully',
-            tag: 'DeviceSpeedTestSection',
-          );
           if (mounted) {
             ref.invalidate(
               speedTestResultsNotifierProvider(accessPointId: apId),
