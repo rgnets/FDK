@@ -13,6 +13,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
@@ -72,14 +73,14 @@ RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
 ///
 /// Uses REST API (HTTP PUT) for uploading images instead of WebSocket.
 /// This provides better reliability for large base64 payloads.
-/// After upload, requests updated device data via WebSocket to ensure
-/// the UI automatically updates with the new images.
+/// After upload, fetches fresh device data via REST and updates the
+/// WebSocket cache to ensure the UI immediately reflects the new images.
 @riverpod
 ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
   final restService = ref.watch(restImageUploadServiceProvider);
   final verifier = ref.watch(imageUploadVerifierProvider);
   final eventBus = ref.watch(imageUploadEventBusProvider);
-  final repository = ref.watch(deviceRepositoryProvider);
+  final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
 
   return ImageUploadService(
     uploadCallback: (resourceType, deviceId, params) async {
@@ -106,14 +107,42 @@ ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
     eventBus: eventBus,
     restUploadService: restService,
     refreshCallback: (deviceType, deviceId) async {
-      // Request updated device data via WebSocket
-      // The repository.getDevice() triggers a WebSocket request which updates the cache
-      // The full device ID includes the prefix (e.g., ap_123)
+      // After successful upload, fetch fresh device data via REST
+      // and update the WebSocket cache directly. This ensures the
+      // device list UI (which watches WebSocket cache) shows new images.
       LoggerService.info(
-        'Requesting device refresh via repository for $deviceType-$deviceId',
+        'Fetching fresh device data via REST for $deviceType-$deviceId',
         tag: 'ImageUploadProvider',
       );
-      await repository.getDevice(deviceId);
+
+      // Get the resource type from device type
+      final resourceType = ImageUploadService.getResourceType(deviceType);
+      // Extract raw ID from prefixed device ID (e.g., ap_123 -> 123)
+      final rawId = ImageUploadService.extractRawId(deviceId);
+
+      // Fetch fresh device data from REST API
+      final freshDeviceData = await restService.fetchDeviceData(
+        resourceType: resourceType,
+        deviceId: rawId,
+      );
+
+      if (freshDeviceData != null) {
+        // Update the WebSocket cache with fresh data
+        // This triggers UI updates for the device list view
+        LoggerService.info(
+          'Updating WebSocket cache with fresh device data for $resourceType/$rawId',
+          tag: 'ImageUploadProvider',
+        );
+        webSocketCacheIntegration.updateDeviceFromRest(resourceType, freshDeviceData);
+      } else {
+        // Fallback: Request a snapshot for the resource type to get fresh data
+        // This ensures the device list eventually gets updated even if REST fetch fails
+        LoggerService.warning(
+          'REST fetch failed, requesting WebSocket snapshot for $resourceType',
+          tag: 'ImageUploadProvider',
+        );
+        webSocketCacheIntegration.requestResourceSnapshot(resourceType);
+      }
     },
   );
 }

@@ -95,6 +95,45 @@ class RestImageUploadService {
     }
   }
 
+  /// Fetches the full device data from REST API.
+  ///
+  /// This is used after image upload to get the latest device state
+  /// including new image URLs, which can then be used to update
+  /// the WebSocket cache for immediate UI refresh.
+  ///
+  /// Returns the raw device data map, or null if the fetch fails.
+  Future<Map<String, dynamic>?> fetchDeviceData({
+    required String resourceType,
+    required String deviceId,
+  }) async {
+    final url =
+        'https://$_siteUrl/api/$resourceType/$deviceId.json?api_key=$_apiKey';
+
+    LoggerService.debug(
+      'Fetching device data for $resourceType/$deviceId',
+      tag: 'RestImageUploadService',
+    );
+
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(url);
+
+      if (response.statusCode == 200 && response.data != null) {
+        LoggerService.debug(
+          'Fetched device data successfully for $resourceType/$deviceId',
+          tag: 'RestImageUploadService',
+        );
+        return response.data;
+      }
+      return null;
+    } catch (e) {
+      LoggerService.warning(
+        'Failed to fetch device data: $e',
+        tag: 'RestImageUploadService',
+      );
+      return null;
+    }
+  }
+
   /// Creates a REST image upload service.
   ///
   /// [siteUrl] - Base URL for the API (e.g., 'https://example.rgnetworks.com')

@@ -1,6 +1,7 @@
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/status_filter_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'device_ui_state_provider.g.dart';
@@ -9,30 +10,37 @@ part 'device_ui_state_provider.g.dart';
 class DeviceUIState {
   const DeviceUIState({
     this.searchQuery = '',
-    this.filterType = 'access_point',  // Default to first tab (APs)
+    this.filterType = 'access_point', // Default to first tab (APs)
     this.isSearching = false,
     this.selectedPhase = PhaseFilterState.allPhases,
+    this.selectedStatus = StatusFilterState.allStatuses,
   });
 
   final String searchQuery;
   final String filterType;
   final bool isSearching;
   final String selectedPhase;
+  final String selectedStatus;
 
   /// Returns true if phase filtering is active
   bool get isPhaseFiltering => selectedPhase != PhaseFilterState.allPhases;
+
+  /// Returns true if status filtering is active
+  bool get isStatusFiltering => selectedStatus != StatusFilterState.allStatuses;
 
   DeviceUIState copyWith({
     String? searchQuery,
     String? filterType,
     bool? isSearching,
     String? selectedPhase,
+    String? selectedStatus,
   }) {
     return DeviceUIState(
       searchQuery: searchQuery ?? this.searchQuery,
       filterType: filterType ?? this.filterType,
       isSearching: isSearching ?? this.isSearching,
       selectedPhase: selectedPhase ?? this.selectedPhase,
+      selectedStatus: selectedStatus ?? this.selectedStatus,
     );
   }
 }
@@ -49,9 +57,23 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
       }
     });
 
-    // Initialize with current phase filter state
+    // Listen to status filter changes and update only selectedStatus
+    ref.listen<StatusFilterState>(statusFilterNotifierProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.selectedStatus != next.selectedStatus) {
+        state = state.copyWith(selectedStatus: next.selectedStatus);
+      }
+    });
+
+    // Initialize with current filter states
     final phaseState = ref.read(phaseFilterNotifierProvider);
-    return DeviceUIState(selectedPhase: phaseState.selectedPhase);
+    final statusState = ref.read(statusFilterNotifierProvider);
+    return DeviceUIState(
+      selectedPhase: phaseState.selectedPhase,
+      selectedStatus: statusState.selectedStatus,
+    );
   }
 
   void setSearchQuery(String query) {
@@ -67,10 +89,7 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
   }
 
   void clearSearch() {
-    state = state.copyWith(
-      searchQuery: '',
-      isSearching: false,
-    );
+    state = state.copyWith(searchQuery: '', isSearching: false);
   }
 
   void setPhaseFilter(String phase) {
@@ -82,6 +101,16 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
   void clearPhaseFilter() {
     setPhaseFilter(PhaseFilterState.allPhases);
   }
+
+  void setStatusFilter(String status) {
+    // Update both local state and the status filter provider (for persistence)
+    state = state.copyWith(selectedStatus: status);
+    ref.read(statusFilterNotifierProvider.notifier).setStatus(status);
+  }
+
+  void clearStatusFilter() {
+    setStatusFilter(StatusFilterState.allStatuses);
+  }
 }
 
 /// Provider for filtered devices based on UI state
@@ -90,28 +119,44 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
   final uiState = ref.watch(deviceUIStateNotifierProvider);
   final phaseFilter = ref.watch(phaseFilterNotifierProvider);
+  final statusFilter = ref.watch(statusFilterNotifierProvider);
 
   return devices.when(
     data: (deviceList) {
-      final filtered = deviceList.where((device) {
-        // Filter by type
-        final matchesType = uiState.filterType == 'all' ||
-                           device.type == uiState.filterType;
+      // Precompute search query once (trimmed and lowercased)
+      final query = uiState.searchQuery.trim().toLowerCase();
 
-        // Filter by search query
-        final matchesSearch = uiState.searchQuery.isEmpty ||
-                             device.name.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
-                             device.type.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ||
-                             (device.location?.toLowerCase().contains(uiState.searchQuery.toLowerCase()) ?? false);
+      final filtered =
+          deviceList.where((device) {
+            // Filter by type
+            final matchesType =
+                uiState.filterType == 'all' ||
+                device.type == uiState.filterType;
 
-        // Filter by phase (using metadata) - handle both String and int types
-        final rawPhase = device.metadata?['phase'];
-        final devicePhase = rawPhase?.toString();
-        final matchesPhase = phaseFilter.matchesFilter(devicePhase);
+            // Filter by search query (name, type, location, IP, MAC)
+            final matchesSearch =
+                query.isEmpty ||
+                device.name.toLowerCase().contains(query) ||
+                device.type.toLowerCase().contains(query) ||
+                (device.location?.toLowerCase().contains(query) ?? false) ||
+                (device.ipAddress?.toLowerCase().contains(query) ?? false) ||
+                (device.macAddress?.toLowerCase().contains(query) ?? false);
 
-        return matchesType && matchesSearch && matchesPhase;
-      }).toList()
-        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+            // Filter by phase (using metadata) - handle both String and int types
+            final rawPhase = device.metadata?['phase'];
+            final devicePhase = rawPhase?.toString();
+            final matchesPhase = phaseFilter.matchesFilter(devicePhase);
+
+            // Filter by status
+            final matchesStatus = statusFilter.matchesFilter(device.status);
+
+            return matchesType &&
+                matchesSearch &&
+                matchesPhase &&
+                matchesStatus;
+          }).toList()..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
 
       return filtered;
     },
@@ -124,14 +169,16 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
 @riverpod
 DeviceStatistics deviceStatistics(DeviceStatisticsRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
-  
+
   return devices.when(
     data: (deviceList) {
       final total = deviceList.length;
       final online = deviceList.where((d) => d.status == 'online').length;
       final offline = deviceList.where((d) => d.status == 'offline').length;
-      final issues = deviceList.where((d) => d.status == 'warning' || d.status == 'error').length;
-      
+      final issues = deviceList
+          .where((d) => d.status == 'warning' || d.status == 'error')
+          .length;
+
       return DeviceStatistics(
         total: total,
         online: online,
@@ -163,23 +210,18 @@ class DeviceStatistics {
 @riverpod
 MockDataState mockDataState(MockDataStateRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
-  
+
   return devices.when(
     data: (_) => const MockDataState(isUsingMockData: false),
     loading: () => const MockDataState(isUsingMockData: false),
-    error: (error, _) => MockDataState(
-      isUsingMockData: true,
-      apiErrorMessage: error.toString(),
-    ),
+    error: (error, _) =>
+        MockDataState(isUsingMockData: true, apiErrorMessage: error.toString()),
   );
 }
 
 /// State for mock data information
 class MockDataState {
-  const MockDataState({
-    this.isUsingMockData = false,
-    this.apiErrorMessage,
-  });
+  const MockDataState({this.isUsingMockData = false, this.apiErrorMessage});
 
   final bool isUsingMockData;
   final String? apiErrorMessage;
@@ -191,7 +233,7 @@ List<String> devicePhases(DevicePhasesRef ref) {
   final devices = ref.watch(devicesNotifierProvider);
 
   return devices.when(
-    data: (deviceList) => PhaseFilterState.getUniquePhasesFromDevices(deviceList),
+    data: PhaseFilterState.getUniquePhasesFromDevices,
     loading: () => [PhaseFilterState.allPhases],
     error: (_, __) => [PhaseFilterState.allPhases],
   );

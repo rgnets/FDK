@@ -6,21 +6,6 @@ part of 'devices_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$filteredDevicesHash() => r'62d57a55d5bd884c5d2fbca5166b2bf52d255e2f';
-
-/// See also [filteredDevices].
-@ProviderFor(filteredDevices)
-final filteredDevicesProvider = Provider<List<Device>>.internal(
-  filteredDevices,
-  name: r'filteredDevicesProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$filteredDevicesHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef FilteredDevicesRef = ProviderRef<List<Device>>;
 String _$devicesNotifierHash() => r'b04f3d264b41ab17dfd141c9b1b21d9e9f294a64';
 
 /// See also [DevicesNotifier].
@@ -344,22 +329,5 @@ class _DeviceSearchNotifierProviderElement
   @override
   String get query => (origin as DeviceSearchNotifierProvider).query;
 }
-
-String _$deviceFilterStateHash() => r'82ae11f3a618bf89741881672d83c3c5b570490c';
-
-/// See also [DeviceFilterState].
-@ProviderFor(DeviceFilterState)
-final deviceFilterStateProvider =
-    NotifierProvider<DeviceFilterState, DeviceFilters>.internal(
-  DeviceFilterState.new,
-  name: r'deviceFilterStateProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$deviceFilterStateHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$DeviceFilterState = Notifier<DeviceFilters>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member

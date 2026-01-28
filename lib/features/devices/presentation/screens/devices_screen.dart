@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/device_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/status_filter_provider.dart';
 
 /// Screen for managing devices
 class DevicesScreen extends ConsumerStatefulWidget {
@@ -90,14 +91,15 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     }
   }
 
-  Widget _buildPhaseFilterBar(WidgetRef ref, List<Device> devices) {
+  Widget _buildPhaseFilterBar(WidgetRef ref) {
     final phases = ref.watch(devicePhasesProvider);
     final phaseState = ref.watch(phaseFilterNotifierProvider);
     final isFiltering = phaseState.isFiltering;
     final selectedPhase = phaseState.selectedPhase;
 
     // Don't show if there are no phases to filter (only "All Phases")
-    if (phases.length <= 1) {
+    // BUT always show if user has an active filter (so they can clear it)
+    if (phases.length <= 1 && !isFiltering) {
       return const SizedBox.shrink();
     }
 
@@ -206,6 +208,414 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
     );
   }
 
+  Widget _buildStatusFilterBar(WidgetRef ref) {
+    final statuses = ref.watch(deviceStatusesProvider);
+    final statusState = ref.watch(statusFilterNotifierProvider);
+    final isFiltering = statusState.isFiltering;
+    final selectedStatus = statusState.selectedStatus;
+
+    // Don't show if there are no statuses to filter (only "All Statuses")
+    // BUT always show if user has an active filter (so they can clear it)
+    if (statuses.length <= 1 && !isFiltering) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: PopupMenuButton<String>(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isFiltering
+                ? _getStatusColor(selectedStatus)
+                : Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isFiltering
+                  ? _getStatusColor(selectedStatus)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isFiltering
+                    ? _getStatusIcon(selectedStatus)
+                    : Icons.filter_list,
+                size: 18,
+                color: isFiltering
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isFiltering ? _capitalizeStatus(selectedStatus) : 'Status',
+                  style: TextStyle(
+                    color: isFiltering
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(
+                Icons.arrow_drop_down,
+                size: 20,
+                color: isFiltering
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+            ],
+          ),
+        ),
+        itemBuilder: (BuildContext context) {
+          return statuses.map((String status) {
+            final isSelected = status == selectedStatus;
+            final isAllStatuses = status == StatusFilterState.allStatuses;
+            return PopupMenuItem<String>(
+              value: status,
+              child: Row(
+                children: [
+                  Icon(
+                    isAllStatuses
+                        ? Icons.filter_list_off
+                        : _getStatusIcon(status),
+                    size: 18,
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : isAllStatuses
+                        ? Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7)
+                        : _getStatusColor(status),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isAllStatuses ? status : _capitalizeStatus(status),
+                      style: TextStyle(
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(
+                      Icons.check,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                ],
+              ),
+            );
+          }).toList();
+        },
+        onSelected: (String newStatus) {
+          ref
+              .read(deviceUIStateNotifierProvider.notifier)
+              .setStatusFilter(newStatus);
+        },
+      ),
+    );
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'online':
+        return Icons.check_circle;
+      case 'offline':
+        return Icons.cancel;
+      case 'warning':
+        return Icons.warning;
+      case 'error':
+        return Icons.error;
+      default:
+        return Icons.help;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'online':
+        return Colors.green;
+      case 'offline':
+        return Colors.grey;
+      case 'warning':
+        return Colors.orange;
+      case 'error':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _capitalizeStatus(String status) {
+    if (status.isEmpty) {
+      return status;
+    }
+    return status[0].toUpperCase() + status.substring(1).toLowerCase();
+  }
+
+  Widget _buildFilterRow(WidgetRef ref) {
+    final phases = ref.watch(devicePhasesProvider);
+    final statuses = ref.watch(deviceStatusesProvider);
+    final phaseState = ref.watch(phaseFilterNotifierProvider);
+    final statusState = ref.watch(statusFilterNotifierProvider);
+
+    // Always show filter if user has an active filter (so they can clear it)
+    final hasPhases = phases.length > 1 || phaseState.isFiltering;
+    final hasStatuses = statuses.length > 1 || statusState.isFiltering;
+
+    // If neither filter has options or active filters, show nothing
+    if (!hasPhases && !hasStatuses) {
+      return const SizedBox.shrink();
+    }
+
+    // If only one filter has options, show it full width
+    if (hasPhases && !hasStatuses) {
+      return _buildPhaseFilterBar(ref);
+    }
+    if (!hasPhases && hasStatuses) {
+      return _buildStatusFilterBar(ref);
+    }
+
+    // Both filters have options, show them side by side
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: _buildPhaseFilterContent(ref)),
+          const SizedBox(width: 8),
+          Expanded(child: _buildStatusFilterContent(ref)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhaseFilterContent(WidgetRef ref) {
+    final phases = ref.watch(devicePhasesProvider);
+    final phaseState = ref.watch(phaseFilterNotifierProvider);
+    final isFiltering = phaseState.isFiltering;
+    final selectedPhase = phaseState.selectedPhase;
+
+    return PopupMenuButton<String>(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isFiltering
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isFiltering
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isFiltering ? Icons.label : Icons.filter_list,
+              size: 18,
+              color: isFiltering
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isFiltering ? selectedPhase : 'Phase',
+                style: TextStyle(
+                  color: isFiltering
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: isFiltering
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (BuildContext context) {
+        return phases.map((String phase) {
+          final isSelected = phase == selectedPhase;
+          return PopupMenuItem<String>(
+            value: phase,
+            child: Row(
+              children: [
+                Icon(
+                  phase == PhaseFilterState.allPhases
+                      ? Icons.filter_list_off
+                      : Icons.label,
+                  size: 18,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    phase,
+                    style: TextStyle(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+      onSelected: (String newPhase) {
+        ref
+            .read(deviceUIStateNotifierProvider.notifier)
+            .setPhaseFilter(newPhase);
+      },
+    );
+  }
+
+  Widget _buildStatusFilterContent(WidgetRef ref) {
+    final statuses = ref.watch(deviceStatusesProvider);
+    final statusState = ref.watch(statusFilterNotifierProvider);
+    final isFiltering = statusState.isFiltering;
+    final selectedStatus = statusState.selectedStatus;
+
+    return PopupMenuButton<String>(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isFiltering
+              ? _getStatusColor(selectedStatus)
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isFiltering
+                ? _getStatusColor(selectedStatus)
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isFiltering ? _getStatusIcon(selectedStatus) : Icons.filter_list,
+              size: 18,
+              color: isFiltering
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isFiltering ? _capitalizeStatus(selectedStatus) : 'Status',
+                style: TextStyle(
+                  color: isFiltering
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: isFiltering
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (BuildContext context) {
+        return statuses.map((String status) {
+          final isSelected = status == selectedStatus;
+          final isAllStatuses = status == StatusFilterState.allStatuses;
+          return PopupMenuItem<String>(
+            value: status,
+            child: Row(
+              children: [
+                Icon(
+                  isAllStatuses
+                      ? Icons.filter_list_off
+                      : _getStatusIcon(status),
+                  size: 18,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : isAllStatuses
+                      ? Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7)
+                      : _getStatusColor(status),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    isAllStatuses ? status : _capitalizeStatus(status),
+                    style: TextStyle(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+      onSelected: (String newStatus) {
+        ref
+            .read(deviceUIStateNotifierProvider.notifier)
+            .setStatusFilter(newStatus);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // AppBar removed from DevicesScreen - search and menu functionality needs to be relocated
@@ -299,8 +709,8 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
                     },
                   ),
 
-                  // Phase filter bar
-                  _buildPhaseFilterBar(ref, devices),
+                  // Filter bars (phase and status)
+                  _buildFilterRow(ref),
 
                   // HUD Tab Bar - taller with full data
                   Builder(

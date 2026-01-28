@@ -67,14 +67,14 @@ final restImageUploadServiceProvider =
 typedef RestImageUploadServiceRef
     = AutoDisposeProviderRef<RestImageUploadService>;
 String _$imageUploadServiceHash() =>
-    r'3db2c9c2681ec8ca771a30d09805f6c8f3576250';
+    r'aaa61109542998de8c8f6dbf99e6690d876a4ccd';
 
 /// Provider for ImageUploadService
 ///
 /// Uses REST API (HTTP PUT) for uploading images instead of WebSocket.
 /// This provides better reliability for large base64 payloads.
-/// After upload, requests updated device data via WebSocket to ensure
-/// the UI automatically updates with the new images.
+/// After upload, fetches fresh device data via REST and updates the
+/// WebSocket cache to ensure the UI immediately reflects the new images.
 ///
 /// Copied from [imageUploadService].
 @ProviderFor(imageUploadService)

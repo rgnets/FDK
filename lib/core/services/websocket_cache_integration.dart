@@ -1053,6 +1053,43 @@ class WebSocketCacheIntegration {
     lastDeviceUpdate.value = DateTime.now();
   }
 
+  /// Updates a single device in the cache with data from a REST response.
+  ///
+  /// Use this after a REST-based operation (like image upload) to ensure
+  /// the WebSocket cache reflects the latest server state. This enables
+  /// immediate UI updates without waiting for a WebSocket broadcast.
+  ///
+  /// Note: This uses `action: 'show'` to avoid emitting DeviceUpdateEvent,
+  /// since the ImageUploadService already emits CacheInvalidationEvent
+  /// which triggers DeviceNotifier refresh. Using 'update' would cause
+  /// redundant refresh calls.
+  ///
+  /// [resourceType] - The resource type (e.g., 'access_points', 'media_converters')
+  /// [deviceData] - The raw device data map from the REST response
+  void updateDeviceFromRest(String resourceType, Map<String, dynamic> deviceData) {
+    if (!_deviceResourceTypes.contains(resourceType)) {
+      _logger.w(
+        'WebSocketCacheIntegration: updateDeviceFromRest called with non-device resource: $resourceType',
+      );
+      return;
+    }
+
+    final id = deviceData['id'];
+    if (id == null) {
+      _logger.w('WebSocketCacheIntegration: updateDeviceFromRest called with no id');
+      return;
+    }
+
+    _logger.i(
+      'WebSocketCacheIntegration: Updating device from REST - '
+      'resource=$resourceType, id=$id',
+    );
+
+    // Use existing upsert logic to update cache and notify listeners
+    // Pass action: 'show' to avoid emitting DeviceUpdateEvent (prevents redundant refresh)
+    _applyUpsert(resourceType, deviceData, action: 'show');
+  }
+
   /// Clears device/room data caches and requests fresh data from server.
   /// Use this for "Clear Cache" in settings - keeps WebSocket connection alive.
   void clearDataAndRefresh() {
