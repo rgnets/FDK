@@ -146,7 +146,7 @@ void main() {
         // assert
         expect(params1, equals(params2));
         expect(params1, isNot(equals(params3)));
-        expect(params1.props, [tDeviceId, null]);
+        expect(params1.props, [tDeviceId, null, false]); // id, fields, forceRefresh
       });
     });
   });

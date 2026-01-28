@@ -1,38 +1,43 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgnets_fdk/core/mock/mock_data_generator.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 
 void main() {
   group('MockDataGenerator Tests', () {
     test('generates realistic devices with enterprise characteristics', () {
       final devices = MockDataGenerator.generateDevices(count: 10);
-      
+
       expect(devices.length, equals(10));
-      
+
       // Check that devices have proper enterprise naming
       for (final device in devices) {
-        expect(device.id, isNotEmpty);
-        expect(device.name, isNotEmpty);
-        expect(device.type, isNotEmpty);
-        expect(device.status, isIn(['online', 'offline', 'warning', 'error']));
-        
+        // Use the extension getter for deviceId, deviceName, deviceStatus, and deviceType
+        expect(device.deviceId, isNotEmpty);
+        expect(device.deviceName, isNotEmpty);
+        expect(device.deviceType, isNotEmpty);
+        expect(device.deviceStatus, isIn(['online', 'offline', 'warning', 'error']));
+
         // Check enterprise naming conventions (allowing for core devices)
-        expect(device.name, matches(RegExp(r'^[A-Z-]+.*$')));
-        
+        expect(device.deviceName, matches(RegExp(r'^[A-Z-]+.*$')));
+
+        // Convert to entity to access ipAddress and macAddress easily
+        final entity = device.toEntity();
+
         // Check IP addresses are realistic
-        if (device.ipAddress != null) {
-          expect(device.ipAddress, matches(RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')));
+        if (entity.ipAddress != null) {
+          expect(entity.ipAddress, matches(RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')));
         }
-        
+
         // Check MAC addresses are properly formatted
-        if (device.macAddress != null) {
-          expect(device.macAddress, matches(RegExp(r'^[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}$')));
+        if (entity.macAddress != null) {
+          expect(entity.macAddress, matches(RegExp(r'^[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}$')));
         }
-        
+
         // Check metadata exists and has realistic values
-        expect(device.metadata, isNotNull);
-        expect(device.metadata!['firmware'], isNotNull);
-        expect(device.metadata!['model'], isNotNull);
-        expect(device.metadata!['vlan'], isNotNull);
+        expect(entity.metadata, isNotNull);
+        expect(entity.metadata!['firmware'], isNotNull);
+        expect(entity.metadata!['model'], isNotNull);
+        expect(entity.metadata!['vlan'], isNotNull);
       }
     });
     
@@ -98,27 +103,28 @@ void main() {
     
     test('device types ONLY include RG Nets field deployment types', () {
       final devices = MockDataGenerator.generateDevices(count: 100);
-      
+
       final typeCounts = <String, int>{};
       for (final device in devices) {
-        typeCounts[device.type] = (typeCounts[device.type] ?? 0) + 1;
+        // Use the extension getter for deviceType
+        typeCounts[device.deviceType] = (typeCounts[device.deviceType] ?? 0) + 1;
       }
-      
-      // Should contain EXACTLY the three RG Nets device types
-      expect(typeCounts.keys.toSet(), equals({'Access Point', 'Switch', 'ONT'}));
+
+      // Should contain EXACTLY the three RG Nets device types (using internal type constants)
+      expect(typeCounts.keys.toSet(), equals({'access_point', 'switch', 'ont'}));
       
       // Access Points should be most common (around 45%)
-      final apCount = typeCounts['Access Point'] ?? 0;
+      final apCount = typeCounts['access_point'] ?? 0;
       expect(apCount, greaterThan(30)); // At least 30% (allowing some variance)
-      
+
       // Switches should be second most common (around 35%)
-      final switchCount = typeCounts['Switch'] ?? 0;
+      final switchCount = typeCounts['switch'] ?? 0;
       expect(switchCount, greaterThan(20)); // At least 20% (allowing more variance)
-      
+
       // ONTs should be present (around 20%)
-      final ontCount = typeCounts['ONT'] ?? 0;
+      final ontCount = typeCounts['ont'] ?? 0;
       expect(ontCount, greaterThan(10)); // At least 10%
-      
+
       // Should have EXACTLY 3 device types
       expect(typeCounts.keys.length, equals(3));
     });

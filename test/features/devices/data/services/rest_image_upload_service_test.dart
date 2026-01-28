@@ -1,37 +1,45 @@
-import 'dart:convert';
-
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
 
-class MockHttpClient extends Mock implements http.Client {}
+class MockDio extends Mock implements Dio {}
+
+Response<Map<String, dynamic>> buildResponse({
+  required String url,
+  required int statusCode,
+  Map<String, dynamic>? data,
+}) {
+  return Response<Map<String, dynamic>>(
+    data: data,
+    statusCode: statusCode,
+    requestOptions: RequestOptions(path: url),
+  );
+}
 
 void main() {
+  late MockDio mockDio;
+  late RestImageUploadService service;
+
+  const testSiteUrl = 'https://example.rgnetworks.com';
+  const testApiKey = 'test-api-key-12345';
+
+  setUpAll(() {
+    registerFallbackValue(Options());
+    registerFallbackValue(<String, dynamic>{});
+    registerFallbackValue((int sent, int total) {});
+  });
+
+  setUp(() {
+    mockDio = MockDio();
+    service = RestImageUploadService(
+      siteUrl: testSiteUrl,
+      apiKey: testApiKey,
+      dio: mockDio,
+    );
+  });
+
   group('RestImageUploadService', () {
-    late MockHttpClient mockHttpClient;
-    late RestImageUploadService service;
-
-    const testSiteUrl = 'https://example.rgnetworks.com';
-    const testApiKey = 'test-api-key-12345';
-
-    setUp(() {
-      mockHttpClient = MockHttpClient();
-      service = RestImageUploadService(
-        httpClient: mockHttpClient,
-        siteUrl: testSiteUrl,
-        apiKey: testApiKey,
-      );
-    });
-
-    tearDown(() {
-      mockHttpClient.close();
-    });
-
-    setUpAll(() {
-      registerFallbackValue(Uri.parse('https://example.com'));
-    });
-
     group('constructor', () {
       test('should create instance with required parameters', () {
         expect(service, isNotNull);
@@ -40,9 +48,9 @@ void main() {
       test('should throw if siteUrl is empty', () {
         expect(
           () => RestImageUploadService(
-            httpClient: mockHttpClient,
             siteUrl: '',
             apiKey: testApiKey,
+            dio: mockDio,
           ),
           throwsA(isA<ArgumentError>()),
         );
@@ -51,212 +59,99 @@ void main() {
       test('should throw if apiKey is empty', () {
         expect(
           () => RestImageUploadService(
-            httpClient: mockHttpClient,
             siteUrl: testSiteUrl,
             apiKey: '',
+            dio: mockDio,
           ),
           throwsA(isA<ArgumentError>()),
         );
       });
     });
 
+    group('fetchCurrentSignedIds', () {
+      test('should return signed IDs from response', () async {
+        const deviceId = '123';
+        const resourceType = 'access_points';
+        final url =
+            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json?api_key=$testApiKey';
+
+        final responseData = {
+          'images': [
+            {'signed_id': 'signed_1', 'url': 'https://example.com/a.jpg'},
+            {'signed_id': '', 'url': 'https://example.com/b.jpg'},
+            {'url': 'https://example.com/c.jpg'},
+            {'signed_id': 'signed_2'},
+          ],
+        };
+
+        when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+          (_) async => buildResponse(
+            url: url,
+            statusCode: 200,
+            data: responseData,
+          ),
+        );
+
+        final result = await service.fetchCurrentSignedIds(
+          resourceType: resourceType,
+          deviceId: deviceId,
+        );
+
+        expect(result, ['signed_1', 'signed_2']);
+
+        final captured = verify(
+          () => mockDio.get<Map<String, dynamic>>(captureAny()),
+        ).captured;
+
+        final capturedUrl = captured.first as String;
+        expect(capturedUrl, url);
+      });
+
+      test('should return empty list on DioException', () async {
+        const deviceId = '123';
+        const resourceType = 'access_points';
+        final url =
+            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json?api_key=$testApiKey';
+
+        final exception = DioException(
+          type: DioExceptionType.connectionError,
+          requestOptions: RequestOptions(path: url),
+          message: 'Connection failed',
+        );
+
+        when(() => mockDio.get<Map<String, dynamic>>(any())).thenThrow(exception);
+
+        final result = await service.fetchCurrentSignedIds(
+          resourceType: resourceType,
+          deviceId: deviceId,
+        );
+
+        expect(result, isEmpty);
+      });
+    });
+
     group('uploadImages', () {
-      test('should send PUT request to correct endpoint for access_points', () async {
-        const deviceId = '123';
-        const resourceType = 'access_points';
-        final images = ['data:image/jpeg;base64,abc123'];
-
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': images}),
-            200,
-          ),
-        );
-
-        await service.uploadImages(
-          deviceId: deviceId,
-          resourceType: resourceType,
-          images: images,
-        );
-
-        final captured = verify(
-          () => mockHttpClient.put(
-            captureAny(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).captured;
-
-        final uri = captured.first as Uri;
-        expect(uri.toString(), contains('/api/access_points/123.json'));
-        expect(uri.toString(), contains('api_key=$testApiKey'));
-      });
-
-      test('should send PUT request to correct endpoint for media_converters', () async {
-        const deviceId = '456';
-        const resourceType = 'media_converters';
-        final images = ['signed_id_1', 'data:image/png;base64,xyz789'];
-
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 456, 'images': images}),
-            200,
-          ),
-        );
-
-        await service.uploadImages(
-          deviceId: deviceId,
-          resourceType: resourceType,
-          images: images,
-        );
-
-        final captured = verify(
-          () => mockHttpClient.put(
-            captureAny(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).captured;
-
-        final uri = captured.first as Uri;
-        expect(uri.toString(), contains('/api/media_converters/456.json'));
-      });
-
-      test('should send PUT request to correct endpoint for switch_devices', () async {
-        const deviceId = '789';
-        const resourceType = 'switch_devices';
-        final images = <String>[];
-
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 789, 'images': images}),
-            200,
-          ),
-        );
-
-        await service.uploadImages(
-          deviceId: deviceId,
-          resourceType: resourceType,
-          images: images,
-        );
-
-        final captured = verify(
-          () => mockHttpClient.put(
-            captureAny(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).captured;
-
-        final uri = captured.first as Uri;
-        expect(uri.toString(), contains('/api/switch_devices/789.json'));
-      });
-
-      test('should send correct headers', () async {
-        const deviceId = '123';
-        const resourceType = 'access_points';
-        final images = ['data:image/jpeg;base64,abc123'];
-
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': images}),
-            200,
-          ),
-        );
-
-        await service.uploadImages(
-          deviceId: deviceId,
-          resourceType: resourceType,
-          images: images,
-        );
-
-        verify(
-          () => mockHttpClient.put(
-            any(),
-            headers: {'Content-Type': 'application/json'},
-            body: any(named: 'body'),
-          ),
-        ).called(1);
-      });
-
-      test('should send correct body with images', () async {
+      test('should send PUT request to correct endpoint with body and options',
+          () async {
         const deviceId = '123';
         const resourceType = 'access_points';
         final images = ['signed_id_1', 'data:image/jpeg;base64,abc123'];
-
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': images}),
-            200,
-          ),
-        );
-
-        await service.uploadImages(
-          deviceId: deviceId,
-          resourceType: resourceType,
-          images: images,
-        );
-
-        final captured = verify(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: captureAny(named: 'body'),
-          ),
-        ).captured;
-
-        final body = jsonDecode(captured.first as String) as Map<String, dynamic>;
-        expect(body['images'], equals(images));
-      });
-
-      test('should return RestImageUploadResult on success', () async {
-        const deviceId = '123';
-        const resourceType = 'access_points';
-        final images = ['data:image/jpeg;base64,abc123'];
         final serverImages = [
           {'signed_id': 'new_signed_id', 'url': 'https://example.com/image.jpg'},
         ];
 
         when(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
         ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': serverImages}),
-            200,
+          (invocation) async => buildResponse(
+            url: invocation.positionalArguments.first as String,
+            statusCode: 200,
+            data: {'id': 123, 'images': serverImages},
           ),
         );
 
@@ -268,7 +163,106 @@ void main() {
 
         expect(result.success, isTrue);
         expect(result.statusCode, equals(200));
-        expect(result.serverImages, isNotNull);
+        expect(result.serverImages, equals(serverImages));
+
+        final captured = verify(
+          () => mockDio.put<Map<String, dynamic>>(
+            captureAny(),
+            data: captureAny(named: 'data'),
+            options: captureAny(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).captured;
+
+        final capturedUrl = captured[0] as String;
+        final capturedBody = captured[1] as Map<String, dynamic>;
+        final capturedOptions = captured[2] as Options;
+
+        expect(capturedUrl, contains('/api/access_points/123.json'));
+        expect(capturedUrl, contains('api_key=$testApiKey'));
+        expect(capturedBody['images'], equals(images));
+        expect(capturedOptions.contentType, equals('application/json'));
+        expect(capturedOptions.responseType, equals(ResponseType.json));
+      });
+
+      test('should send PUT request to correct endpoint for media_converters',
+          () async {
+        const deviceId = '456';
+        const resourceType = 'media_converters';
+        final images = ['signed_id_1'];
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenAnswer(
+          (invocation) async => buildResponse(
+            url: invocation.positionalArguments.first as String,
+            statusCode: 200,
+            data: {'id': 456, 'images': images},
+          ),
+        );
+
+        await service.uploadImages(
+          deviceId: deviceId,
+          resourceType: resourceType,
+          images: images,
+        );
+
+        final captured = verify(
+          () => mockDio.put<Map<String, dynamic>>(
+            captureAny(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).captured;
+
+        final capturedUrl = captured.first as String;
+        expect(capturedUrl, contains('/api/media_converters/456.json'));
+      });
+
+      test('should send PUT request to correct endpoint for switch_devices',
+          () async {
+        const deviceId = '789';
+        const resourceType = 'switch_devices';
+        final images = <String>[];
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenAnswer(
+          (invocation) async => buildResponse(
+            url: invocation.positionalArguments.first as String,
+            statusCode: 200,
+            data: {'id': 789, 'images': images},
+          ),
+        );
+
+        await service.uploadImages(
+          deviceId: deviceId,
+          resourceType: resourceType,
+          images: images,
+        );
+
+        final captured = verify(
+          () => mockDio.put<Map<String, dynamic>>(
+            captureAny(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).captured;
+
+        final capturedUrl = captured.first as String;
+        expect(capturedUrl, contains('/api/switch_devices/789.json'));
       });
 
       test('should return failure result on non-200 status code', () async {
@@ -277,13 +271,18 @@ void main() {
         final images = ['data:image/jpeg;base64,abc123'];
 
         when(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
         ).thenAnswer(
-          (_) async => http.Response('Internal Server Error', 500),
+          (invocation) async => buildResponse(
+            url: invocation.positionalArguments.first as String,
+            statusCode: 500,
+            data: {'error': 'Internal Server Error'},
+          ),
         );
 
         final result = await service.uploadImages(
@@ -294,23 +293,28 @@ void main() {
 
         expect(result.success, isFalse);
         expect(result.statusCode, equals(500));
-        expect(result.errorMessage, isNotNull);
+        expect(result.errorMessage, contains('status 500'));
       });
 
-      test('should return failure result on 401 unauthorized', () async {
+      test('should handle DioException connectionTimeout', () async {
         const deviceId = '123';
         const resourceType = 'access_points';
         final images = ['data:image/jpeg;base64,abc123'];
 
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response('Unauthorized', 401),
+        final exception = DioException(
+          type: DioExceptionType.connectionTimeout,
+          requestOptions: RequestOptions(path: '/test'),
+          message: 'Timeout',
         );
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenThrow(exception);
 
         final result = await service.uploadImages(
           deviceId: deviceId,
@@ -319,23 +323,29 @@ void main() {
         );
 
         expect(result.success, isFalse);
-        expect(result.statusCode, equals(401));
+        expect(result.statusCode, equals(0));
+        expect(result.errorMessage, equals('Connection timeout'));
       });
 
-      test('should return failure result on 404 not found', () async {
-        const deviceId = '999';
+      test('should handle DioException sendTimeout', () async {
+        const deviceId = '123';
         const resourceType = 'access_points';
         final images = ['data:image/jpeg;base64,abc123'];
 
-        when(
-          () => mockHttpClient.put(
-            any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).thenAnswer(
-          (_) async => http.Response('Not Found', 404),
+        final exception = DioException(
+          type: DioExceptionType.sendTimeout,
+          requestOptions: RequestOptions(path: '/test'),
+          message: 'Send timeout',
         );
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenThrow(exception);
 
         final result = await service.uploadImages(
           deviceId: deviceId,
@@ -344,21 +354,88 @@ void main() {
         );
 
         expect(result.success, isFalse);
-        expect(result.statusCode, equals(404));
+        expect(result.errorMessage, contains('Send timeout'));
       });
 
-      test('should handle network exception', () async {
+      test('should handle DioException receiveTimeout', () async {
         const deviceId = '123';
         const resourceType = 'access_points';
         final images = ['data:image/jpeg;base64,abc123'];
 
+        final exception = DioException(
+          type: DioExceptionType.receiveTimeout,
+          requestOptions: RequestOptions(path: '/test'),
+          message: 'Receive timeout',
+        );
+
         when(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
-        ).thenThrow(Exception('Network error'));
+        ).thenThrow(exception);
+
+        final result = await service.uploadImages(
+          deviceId: deviceId,
+          resourceType: resourceType,
+          images: images,
+        );
+
+        expect(result.success, isFalse);
+        expect(result.errorMessage, contains('Receive timeout'));
+      });
+
+      test('should handle DioException connectionError', () async {
+        const deviceId = '123';
+        const resourceType = 'access_points';
+        final images = ['data:image/jpeg;base64,abc123'];
+
+        final exception = DioException(
+          type: DioExceptionType.connectionError,
+          requestOptions: RequestOptions(path: '/test'),
+          message: 'No internet',
+        );
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenThrow(exception);
+
+        final result = await service.uploadImages(
+          deviceId: deviceId,
+          resourceType: resourceType,
+          images: images,
+        );
+
+        expect(result.success, isFalse);
+        expect(result.errorMessage, contains('Connection error'));
+      });
+
+      test('should handle DioException unknown/default type', () async {
+        const deviceId = '123';
+        const resourceType = 'access_points';
+        final images = ['data:image/jpeg;base64,abc123'];
+
+        final exception = DioException(
+          type: DioExceptionType.unknown,
+          requestOptions: RequestOptions(path: '/test'),
+          message: 'Unknown error',
+        );
+
+        when(
+          () => mockDio.put<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
+          ),
+        ).thenThrow(exception);
 
         final result = await service.uploadImages(
           deviceId: deviceId,
@@ -370,54 +447,36 @@ void main() {
         expect(result.errorMessage, contains('Network error'));
       });
 
-      test('should strip https:// prefix from siteUrl if present', () async {
-        final serviceWithHttps = RestImageUploadService(
-          httpClient: mockHttpClient,
-          siteUrl: 'https://example.rgnetworks.com',
-          apiKey: testApiKey,
-        );
-
+      test('should handle generic Exception', () async {
         const deviceId = '123';
         const resourceType = 'access_points';
         final images = ['data:image/jpeg;base64,abc123'];
 
         when(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
-        ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': images}),
-            200,
-          ),
-        );
+        ).thenThrow(Exception('Unexpected error'));
 
-        await serviceWithHttps.uploadImages(
+        final result = await service.uploadImages(
           deviceId: deviceId,
           resourceType: resourceType,
           images: images,
         );
 
-        final captured = verify(
-          () => mockHttpClient.put(
-            captureAny(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          ),
-        ).captured;
-
-        final uri = captured.first as Uri;
-        expect(uri.scheme, equals('https'));
-        expect(uri.host, equals('example.rgnetworks.com'));
+        expect(result.success, isFalse);
+        expect(result.errorMessage, contains('Network error'));
       });
 
-      test('should handle siteUrl without protocol prefix', () async {
-        final serviceWithoutHttps = RestImageUploadService(
-          httpClient: mockHttpClient,
-          siteUrl: 'example.rgnetworks.com',
+      test('should normalize siteUrl with https prefix and trailing slash',
+          () async {
+        final normalizedService = RestImageUploadService(
+          siteUrl: 'https://example.rgnetworks.com/',
           apiKey: testApiKey,
+          dio: mockDio,
         );
 
         const deviceId = '123';
@@ -425,35 +484,37 @@ void main() {
         final images = ['data:image/jpeg;base64,abc123'];
 
         when(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             any(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
         ).thenAnswer(
-          (_) async => http.Response(
-            jsonEncode({'id': 123, 'images': images}),
-            200,
+          (invocation) async => buildResponse(
+            url: invocation.positionalArguments.first as String,
+            statusCode: 200,
+            data: {'id': 123, 'images': images},
           ),
         );
 
-        await serviceWithoutHttps.uploadImages(
+        await normalizedService.uploadImages(
           deviceId: deviceId,
           resourceType: resourceType,
           images: images,
         );
 
         final captured = verify(
-          () => mockHttpClient.put(
+          () => mockDio.put<Map<String, dynamic>>(
             captureAny(),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+            onSendProgress: any(named: 'onSendProgress'),
           ),
         ).captured;
 
-        final uri = captured.first as Uri;
-        expect(uri.scheme, equals('https'));
-        expect(uri.host, equals('example.rgnetworks.com'));
+        final capturedUrl = captured.first as String;
+        expect(capturedUrl.startsWith('https://example.rgnetworks.com/'), isTrue);
       });
     });
 

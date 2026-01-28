@@ -117,43 +117,31 @@ class FDKApp extends ConsumerStatefulWidget {
 }
 
 class _FDKAppState extends ConsumerState<FDKApp> {
+  bool _servicesInitialized = false;
+
   @override
   void initState() {
     super.initState();
     // Start background refresh service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(backgroundRefreshServiceProvider).startBackgroundRefresh();
-      // Initialize WebSocket data sync listener to refresh providers when data arrives
-      ref.read(webSocketDataSyncListenerProvider);
-      // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
-      ref.read(authSignOutCleanupProvider);
-      // Initialize deeplink service for handling fdk:// URLs
-      _initializeDeeplinkService();
-      // Set up initialization listener to trigger data load when authenticated
-      _setupInitializationListener();
+      _initializeServices();
     });
   }
 
-  /// Set up a listener that triggers initialization when user becomes authenticated.
-  void _setupInitializationListener() {
-    ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
-      final wasAuthenticated = previous ?? false;
-      if (isAuthenticated && !wasAuthenticated) {
-        LoggerService.info(
-          'User authenticated, starting initialization',
-          tag: 'Init',
-        );
-        ref.read(initializationNotifierProvider.notifier).initialize();
-      } else if (!isAuthenticated && wasAuthenticated) {
-        LoggerService.info(
-          'User signed out, resetting initialization state',
-          tag: 'Init',
-        );
-        ref.read(initializationNotifierProvider.notifier).reset();
-      }
-    });
+  /// Initialize background services (called once from initState callback)
+  void _initializeServices() {
+    if (_servicesInitialized) return;
+    _servicesInitialized = true;
 
-    // Also check if already authenticated on startup
+    ref.read(backgroundRefreshServiceProvider).startBackgroundRefresh();
+    // Initialize WebSocket data sync listener to refresh providers when data arrives
+    ref.read(webSocketDataSyncListenerProvider);
+    // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
+    ref.read(authSignOutCleanupProvider);
+    // Initialize deeplink service for handling fdk:// URLs
+    _initializeDeeplinkService();
+
+    // Check if already authenticated on startup
     final isAuthenticated = ref.read(isAuthenticatedProvider);
     if (isAuthenticated) {
       LoggerService.info(
@@ -209,6 +197,24 @@ class _FDKAppState extends ConsumerState<FDKApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for auth state changes in build (required by Riverpod)
+    ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
+      final wasAuthenticated = previous ?? false;
+      if (isAuthenticated && !wasAuthenticated) {
+        LoggerService.info(
+          'User authenticated, starting initialization',
+          tag: 'Init',
+        );
+        ref.read(initializationNotifierProvider.notifier).initialize();
+      } else if (!isAuthenticated && wasAuthenticated) {
+        LoggerService.info(
+          'User signed out, resetting initialization state',
+          tag: 'Init',
+        );
+        ref.read(initializationNotifierProvider.notifier).reset();
+      }
+    });
+
     return MaterialApp.router(
       title: 'RG Nets FDK',
       debugShowCheckedModeBanner: false,

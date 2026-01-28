@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_mock_data_source.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 
 void main() {
   late DeviceMockDataSourceImpl dataSource;
@@ -14,11 +14,10 @@ void main() {
 
   group('deleteDeviceImage', () {
     test('should remove image by signedId and update both images and signedIds lists', () async {
-      // Create a device with images and signedIds
-      final deviceWithImages = DeviceModel(
+      // Create a device with images and signedIds using the sealed class
+      final deviceWithImages = DeviceModelSealed.ap(
         id: 'ap_1',
         name: 'Test AP',
-        type: 'access_point',
         status: 'online',
         macAddress: '',
         ipAddress: '',
@@ -37,9 +36,10 @@ void main() {
       // Since mock data source gets device from JSON, we need to test the logic
       // Let's just verify the filtering logic is correct by testing a simple case
 
-      // Test the filtering logic that should be applied
-      final currentSignedIds = deviceWithImages.imageSignedIds ?? [];
-      final signedIdToDelete = 'signed_id_2';
+      // Test the filtering logic that should be applied (access via entity conversion)
+      final entity = deviceWithImages.toEntity();
+      final currentSignedIds = entity.imageSignedIds ?? [];
+      const signedIdToDelete = 'signed_id_2';
 
       final updatedSignedIds = currentSignedIds
           .where((id) => id != signedIdToDelete)
