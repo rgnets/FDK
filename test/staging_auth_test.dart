@@ -70,42 +70,11 @@ void main() {
       // Should navigate to auth screen on failure
       expect(find.text('Connect to rXg System'), findsOneWidget);
     });
-    
-    // Skip: FDKApp uses ref.listen in initState - not compatible with widget tests
-    testWidgets('Staging splash screen navigates to home on successful auth',
-      (WidgetTester tester) async {
-      final container = createTestContainer(
-        sharedPreferences: sharedPreferences,
-        autoAuthInDev: false, // Staging is not dev mode
-        overrides: [
-          // Override auth to simulate success
-          overrideAuthProvider(
-            initialStatus: const AuthStatus.unauthenticated(),
-            authenticateStatus: const AuthStatus.authenticated(testUser),
-          ),
-        ],
-      );
 
-      await tester.pumpWidget(
-        wrapWithContainer(
-          container: container,
-          child: const staging.FDKApp(),
-        ),
-      );
-
-      // Should show splash initially
-      await tester.pump();
-      expect(find.text('RG Nets Field Deployment Kit'), findsOneWidget);
-
-      // Wait for auto-auth
-      await tester.pump(const Duration(seconds: 3));
-      await tester.pumpAndSettle();
-
-      // Should navigate to home on success
-      expect(find.byType(BottomNavigationBar), findsOneWidget);
-    }, skip: true); // FDKApp uses ref.listen in initState
+    // Note: Full FDKApp navigation tests moved to integration_test/app_test.dart
+    // due to ref.listen incompatibility with UncontrolledProviderScope
   });
-  
+
   group('Regression Prevention Tests', () {
     test('Auth provider should properly report authentication status', () async {
       SharedPreferences.setMockInitialValues({});

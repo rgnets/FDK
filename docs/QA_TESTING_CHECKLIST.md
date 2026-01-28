@@ -492,18 +492,19 @@ This document provides a comprehensive checklist for testing all functions of th
 
 ---
 
-## Known Technical Debt - Skipped Automated Tests
+## Automated Test Status
 
-**Status: 806 tests passing, 6 tests skipped**
+**Status: 806 tests passing, 0 tests skipped**
 
 ### Completed Migrations
 - ✅ `rest_image_upload_service_test.dart` - Fully migrated from http.Client to Dio mocking (18 tests)
 - ✅ Timer management resolved with `NoopWebSocketService` and `NoopBackgroundRefreshService` in test harness
 - ✅ Full-app integration tests moved to `integration_test/` directory (7 tests)
+- ✅ Redundant skipped widget tests removed after integration test validation
 
 ### Integration Tests Setup
 
-Full-app tests that require the complete `FDKApp` widget have been moved to Flutter integration tests:
+Full-app tests that require the complete `FDKApp` widget use Flutter integration tests:
 
 **Run integration tests with:**
 ```bash
@@ -523,16 +524,9 @@ flutter drive --driver=test_driver/integration_test.dart --target=integration_te
 - Splash screen display
 - Bottom navigation functionality
 
-### Skipped Widget Tests (Architectural Constraint)
+### Technical Note
 
-| Test File | Tests | Reason |
-|-----------|-------|--------|
-| staging_auth_test.dart | 1 | FDKApp uses `ref.listen` in initState |
-| app_integration_test.dart | 5 | FDKApp uses `ref.listen` in initState |
-
-**Root Cause:** The `FDKApp` widget uses `ref.listen` inside `initState` via `WidgetsBinding.instance.addPostFrameCallback`. This is incompatible with `UncontrolledProviderScope` used in widget tests. This is a known Riverpod constraint.
-
-**Resolution:** These tests have been duplicated as integration tests in `integration_test/app_test.dart`. The widget test versions are kept (skipped) for reference and can be removed once the integration test workflow is validated.
+The `FDKApp` widget uses `ref.listen` inside `initState` via `WidgetsBinding.instance.addPostFrameCallback`. This is incompatible with `UncontrolledProviderScope` used in widget tests, which is why full-app tests are run as integration tests instead.
 
 ---
 
