@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/main.dart' as dev;
 import 'package:rgnets_fdk/main_production.dart' as prod;
 import 'package:rgnets_fdk/main_staging.dart' as staging;
@@ -32,22 +33,26 @@ void main() {
     await tester.pump();
   }
 
-  /// Initialize test state
-  Future<void> initTestState() async {
+  /// Initialize test state and return SharedPreferences instance
+  Future<SharedPreferences> initTestState() async {
     AppRouter.router.go('/splash');
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    return prefs;
   }
 
   group('Development Environment Tests', () {
     testWidgets('Development environment navigates to home with mock data',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.development);
 
       await tester.pumpWidget(
-        const ProviderScope(child: dev.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const dev.FDKApp(),
+        ),
       );
 
       await waitAndPump(tester, const Duration(milliseconds: 500));
@@ -62,11 +67,14 @@ void main() {
 
     testWidgets('Development environment shows device list',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.development);
 
       await tester.pumpWidget(
-        const ProviderScope(child: dev.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const dev.FDKApp(),
+        ),
       );
       await waitAndPump(tester, const Duration(seconds: 5));
 
@@ -91,14 +99,17 @@ void main() {
   group('Staging Environment Tests', () {
     testWidgets('Staging environment attempts auto-authentication',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.staging);
 
       expect(EnvironmentConfig.isStaging, isTrue);
       expect(EnvironmentConfig.websocketBaseUrl, startsWith('wss://'));
 
       await tester.pumpWidget(
-        const ProviderScope(child: staging.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const staging.FDKApp(),
+        ),
       );
 
       await waitAndPump(tester, const Duration(milliseconds: 500));
@@ -117,14 +128,17 @@ void main() {
   group('Production Environment Tests', () {
     testWidgets('Production environment requires authentication',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.production);
 
       expect(EnvironmentConfig.isProduction, isTrue);
       expect(EnvironmentConfig.useSyntheticData, isFalse);
 
       await tester.pumpWidget(
-        const ProviderScope(child: prod.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const prod.FDKApp(),
+        ),
       );
 
       await waitAndPump(tester, const Duration(milliseconds: 500));
@@ -137,11 +151,14 @@ void main() {
 
     testWidgets('Production auth screen has required input fields',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.production);
 
       await tester.pumpWidget(
-        const ProviderScope(child: prod.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const prod.FDKApp(),
+        ),
       );
       await waitAndPump(tester, const Duration(seconds: 5));
 
@@ -153,11 +170,14 @@ void main() {
   group('Navigation Flow Tests', () {
     testWidgets('Splash screen displays correctly',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.development);
 
       await tester.pumpWidget(
-        const ProviderScope(child: dev.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const dev.FDKApp(),
+        ),
       );
       await waitAndPump(tester, const Duration(milliseconds: 500));
 
@@ -169,11 +189,14 @@ void main() {
 
     testWidgets('Bottom navigation works after reaching home',
         (WidgetTester tester) async {
-      await initTestState();
+      final prefs = await initTestState();
       EnvironmentConfig.setEnvironment(Environment.development);
 
       await tester.pumpWidget(
-        const ProviderScope(child: dev.FDKApp()),
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+          child: const dev.FDKApp(),
+        ),
       );
       await waitAndPump(tester, const Duration(seconds: 5));
 
