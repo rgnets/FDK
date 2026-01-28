@@ -44,6 +44,15 @@ final class ProcessAuthQr
         return _extractCredentialsFromKeyValue(code);
       }
 
+      // Try to parse as line-separated format (legacy format from old QR codes):
+      // Line 1: fqdn
+      // Line 2: login
+      // Line 3: api_key
+      final lines = code.split(RegExp(r'[\r\n]+'));
+      if (lines.length >= 3) {
+        return _extractCredentialsFromLines(lines);
+      }
+
       return const Left(ValidationFailure(message: 'Invalid QR code format'));
     } on FormatException catch (e) {
       return Left(ValidationFailure(message: 'Failed to parse QR code: $e'));
@@ -70,6 +79,27 @@ final class ProcessAuthQr
       siteName: siteName,
       timestamp: timestamp,
       signature: signature,
+    );
+  }
+
+  Either<Failure, AuthCredentials> _extractCredentialsFromLines(
+    List<String> lines,
+  ) {
+    // Legacy line-separated format:
+    // Line 1: fqdn
+    // Line 2: login
+    // Line 3: api_key
+    final fqdn = lines[0].trim();
+    final login = lines[1].trim();
+    final token = lines[2].trim();
+
+    return _buildCredentials(
+      fqdn: fqdn.isEmpty ? null : fqdn,
+      login: login.isEmpty ? null : login,
+      token: token.isEmpty ? null : token,
+      siteName: null,
+      timestamp: null,
+      signature: null,
     );
   }
 
