@@ -96,6 +96,7 @@ class WebSocketService {
 
   final _stateController = StreamController<SocketConnectionState>.broadcast();
   final _messageController = StreamController<SocketMessage>.broadcast();
+  final _authFailureController = StreamController<int>.broadcast();
   final Map<String, _PendingRequest> _pendingRequests = {};
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
@@ -107,13 +108,21 @@ class WebSocketService {
   Timer? _heartbeatWatchdog;
   DateTime? _lastHeartbeat;
   int _reconnectAttempts = 0;
+  int _consecutiveReconnectFailures = 0;
   bool _manuallyClosed = false;
+
+  /// Maximum consecutive reconnect failures before emitting auth failure signal.
+  static const int _maxReconnectBeforeAuthCheck = 3;
 
   /// Emits connection state updates.
   Stream<SocketConnectionState> get connectionState => _stateController.stream;
 
   /// Emits parsed socket messages.
   Stream<SocketMessage> get messages => _messageController.stream;
+
+  /// Stream that emits the count of consecutive reconnect failures
+  /// when multiple failures suggest a potential auth issue.
+  Stream<int> get potentialAuthFailures => _authFailureController.stream;
 
   /// Latest socket message, useful for debug tooling.
   SocketMessage? get lastMessage => _lastMessage;
@@ -129,6 +138,7 @@ class WebSocketService {
     _manuallyClosed = false;
     _currentParams = params;
     _reconnectAttempts = 0;
+    _consecutiveReconnectFailures = 0;
     await _open(params);
   }
 
@@ -386,7 +396,31 @@ class WebSocketService {
       _logger.d('WebSocketService: Reconnect aborted (manually closed)');
       return;
     }
+
+    // Store state before reconnect attempt
+    final wasConnected = _state == SocketConnectionState.connected;
+
     await _open(_currentParams!);
+
+    // Track reconnection success/failure
+    if (_state == SocketConnectionState.connected) {
+      // Reconnect succeeded - reset failure counter
+      _consecutiveReconnectFailures = 0;
+    } else if (!wasConnected) {
+      // Reconnect failed
+      _consecutiveReconnectFailures++;
+      _logger.w(
+        'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
+      );
+
+      if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
+        _logger.w(
+          'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
+          'may indicate auth issue',
+        );
+        _authFailureController.add(_consecutiveReconnectFailures);
+      }
+    }
   }
 
   Duration _computeBackoffDelay(int attempt) {
@@ -477,6 +511,7 @@ class WebSocketService {
     await disconnect();
     await _stateController.close();
     await _messageController.close();
+    await _authFailureController.close();
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
+import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
@@ -119,6 +120,15 @@ class WebSocketCacheIntegration {
   /// Callbacks for when speed test result data is received.
   final List<void Function(List<SpeedTestResult>)> _speedTestResultCallbacks =
       [];
+
+  /// Stream controller for API key revocation events.
+  final _apiKeyRevocationController =
+      StreamController<ApiKeyRevocationEvent>.broadcast();
+
+  /// Stream of API key revocation events.
+  /// Listen to this stream to be notified when the API key has been revoked.
+  Stream<ApiKeyRevocationEvent> get apiKeyRevocations =>
+      _apiKeyRevocationController.stream;
 
   /// Register a callback for device data updates.
   void onDeviceData(DeviceDataCallback callback) {
@@ -874,6 +884,12 @@ class WebSocketCacheIntegration {
       'payload keys: ${payload.keys.toList()}, raw keys: ${raw.keys.toList()}',
     );
 
+    // Check for API key revocation BEFORE other message processing
+    if (_isApiKeyRevocation(message)) {
+      _handleApiKeyRevocation(message);
+      return;
+    }
+
     if (_isChannelConfirmation(message)) {
       _logger.i('WebSocketCacheIntegration: Channel subscription confirmed');
       _channelConfirmed = true;
@@ -961,6 +977,60 @@ class WebSocketCacheIntegration {
       return false;
     }
     return _identifierMatches(message);
+  }
+
+  /// Checks if the message indicates an API key revocation.
+  ///
+  /// Revocation can be indicated by:
+  /// - A message with type 'api_key_revoked'
+  /// - A 'disconnect' message with reason 'api_key_revoked'
+  /// - ActionCable wrapped message with type in payload
+  bool _isApiKeyRevocation(SocketMessage message) {
+    // Direct revocation message type
+    if (message.type == 'api_key_revoked') {
+      return true;
+    }
+
+    // ActionCable wraps messages - check payload for type field
+    // When server broadcasts via ActionCable, the outer message.type may be 'message'
+    // and the actual type is in payload['type']
+    final payloadType = message.payload['type'] as String?;
+    if (payloadType == 'api_key_revoked') {
+      return true;
+    }
+
+    // Disconnect message with revocation reason
+    if (message.type == 'disconnect' || payloadType == 'disconnect') {
+      final reason = message.payload['reason'] as String?;
+      if (reason == 'api_key_revoked') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Handles an API key revocation message by emitting an event.
+  void _handleApiKeyRevocation(SocketMessage message) {
+    final reason = message.payload['reason'] as String? ?? 'unknown';
+    final userMessage = message.payload['message'] as String? ??
+        'Your session has been invalidated. Please sign in again.';
+    final timestampValue = message.payload['timestamp'];
+    DateTime? timestamp;
+    if (timestampValue is int) {
+      timestamp = DateTime.fromMillisecondsSinceEpoch(timestampValue * 1000);
+    }
+
+    _logger.w(
+      'WebSocketCacheIntegration: API key revoked - reason: $reason',
+    );
+
+    // Emit revocation event for auth layer to handle
+    _apiKeyRevocationController.add(ApiKeyRevocationEvent(
+      reason: reason,
+      message: userMessage,
+      timestamp: timestamp,
+    ));
   }
 
   bool _identifierMatches(SocketMessage message) {
@@ -1545,6 +1615,7 @@ class WebSocketCacheIntegration {
   void dispose() {
     _messageSub?.cancel();
     _connectionSub?.cancel();
+    _apiKeyRevocationController.close();
     for (final timer in _snapshotFlushTimers.values) {
       timer.cancel();
     }

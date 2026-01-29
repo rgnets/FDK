@@ -216,10 +216,12 @@ class _FDKAppState extends ConsumerState<FDKApp> {
         ref.read(initializationNotifierProvider.notifier).initialize();
       } else if (!isAuthenticated && wasAuthenticated) {
         LoggerService.info(
-          'User signed out, resetting initialization state',
+          'User signed out, navigating to auth screen',
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).reset();
+        // Navigate to auth screen so user can sign back in
+        AppRouter.router.go('/auth');
       }
     });
 
