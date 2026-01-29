@@ -7,7 +7,7 @@ part of 'device_ui_state_provider.dart';
 // **************************************************************************
 
 String _$filteredDevicesListHash() =>
-    r'2dca6d28ecb2baf5382d3fc34ebb6c5317700f7b';
+    r'a0ec282ba7d03e362d01b4b38a35e5bef5930b3f';
 
 /// Provider for filtered devices based on UI state
 ///
@@ -75,7 +75,7 @@ final devicePhasesProvider = AutoDisposeProvider<List<String>>.internal(
 
 typedef DevicePhasesRef = AutoDisposeProviderRef<List<String>>;
 String _$deviceUIStateNotifierHash() =>
-    r'a0cd0c8b76e6af29108a1f7dc89277de59f50758';
+    r'bea11b3117b1442305ef258a9df2f6dfd4b50a6d';
 
 /// Provider for device UI state (search, filters, etc.)
 ///

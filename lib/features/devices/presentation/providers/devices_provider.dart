@@ -433,6 +433,7 @@ class DeviceNotifier extends _$DeviceNotifier {
   }
 
   /// Updates the device note via WebSocket
+  /// Uses dedicated updateDeviceNote method that only sends the note field
   Future<bool> updateNote(String note) async {
     final currentDevice = state.valueOrNull;
     if (currentDevice == null) {
@@ -442,9 +443,12 @@ class DeviceNotifier extends _$DeviceNotifier {
 
     try {
       final repository = ref.read(deviceRepositoryProvider);
-      // Create updated device with new note
-      final updatedDevice = currentDevice.copyWith(note: note.isEmpty ? null : note);
-      final result = await repository.updateDevice(updatedDevice);
+      // Use dedicated note update method that only sends the note field
+      // Pass empty string directly to clear the note on the backend
+      final result = await repository.updateDeviceNote(
+        deviceId,
+        note,
+      );
 
       return result.fold(
         (failure) {

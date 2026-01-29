@@ -150,8 +150,8 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
       case 'locate':
         _locateDevice(device);
         break;
-      case 'support':
-        _openSupport(device);
+      case 'reboot':
+        _rebootDevice(device);
         break;
     }
   }
@@ -176,10 +176,69 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
     );
   }
   
-  void _openSupport(Device device) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening support for ${device.name}')),
-    );
+  void _rebootDevice(Device device) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reboot Device'),
+        content: Text('Are you sure you want to reboot ${device.name}?\n\nThe device will be temporarily unavailable.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('Reboot'),
+          ),
+        ],
+      ),
+    ).then((confirmed) async {
+      if ((confirmed ?? false) && mounted) {
+        // Show loading indicator
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 16),
+                Text('Rebooting ${device.name}...'),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        try {
+          await ref
+              .read(devicesNotifierProvider.notifier)
+              .rebootDevice(device.id);
+
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Reboot command sent to ${device.name}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } on Exception catch (e) {
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to reboot: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
   }
 }
 
@@ -799,9 +858,9 @@ class _QuickActionsBar extends StatelessWidget {
                 onTap: () => onAction('locate', device),
               ),
               _QuickActionButton(
-                icon: Icons.support,
-                label: 'Support',
-                onTap: () => onAction('support', device),
+                icon: Icons.restart_alt,
+                label: 'Reboot',
+                onTap: () => onAction('reboot', device),
               ),
             ],
           ),

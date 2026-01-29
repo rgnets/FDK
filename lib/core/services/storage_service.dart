@@ -25,12 +25,16 @@ class StorageService {
   static const String _keySyncInterval = 'sync_interval';
   static const String _keyPhaseFilter = 'device_phase_filter';
   static const String _keyStatusFilter = 'device_status_filter';
+  static const String _keyRoomFilter = 'device_room_filter';
 
   /// Public key for phase filter (for tests and direct access)
   static const String keyPhaseFilter = _keyPhaseFilter;
 
   /// Public key for status filter (for tests and direct access)
   static const String keyStatusFilter = _keyStatusFilter;
+
+  /// Public key for room filter (for tests and direct access)
+  static const String keyRoomFilter = _keyRoomFilter;
 
   // Legacy keys for migration
   static const String _legacyKeyApiUrl = 'api_url';
@@ -231,6 +235,12 @@ class StorageService {
   Future<void> setStatusFilter(String status) =>
       _prefs.setString(_keyStatusFilter, status);
   Future<void> clearStatusFilter() => _prefs.remove(_keyStatusFilter);
+
+  // Room filter
+  String? get roomFilter => _prefs.getString(_keyRoomFilter);
+  Future<void> setRoomFilter(String room) =>
+      _prefs.setString(_keyRoomFilter, room);
+  Future<void> clearRoomFilter() => _prefs.remove(_keyRoomFilter);
 
   // Generic methods
   Future<bool> setBool(String key, {required bool value}) =>

@@ -113,6 +113,18 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
   }
 
   @override
+  Future<DeviceModelSealed> updateDeviceNote(String deviceId, String? note) async {
+    // Get the device and return a copy with the updated note
+    final device = await getDevice(deviceId);
+    return device.map(
+      ap: (d) => d.copyWith(note: note),
+      ont: (d) => d.copyWith(note: note),
+      switchDevice: (d) => d.copyWith(note: note),
+      wlan: (d) => d.copyWith(note: note),
+    );
+  }
+
+  @override
   Future<void> rebootDevice(String deviceId) async {
     // Mock reboot - just verify device exists
     await getDevice(deviceId);
