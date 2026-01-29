@@ -61,7 +61,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
           final filteredRooms = ref.watch(filteredRoomViewModelsProvider(currentFilter));
           
           return roomsAsync.when(
-            loading: () => const Center(child: LoadingIndicator()),
+            loading: () => const RoomListSkeleton(),
             error: (error, stack) => Center(
               child: EmptyState(
                 icon: Icons.error_outline,

@@ -64,7 +64,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
       loading: () {
         // AppBar removed from loading state
         return const Scaffold(
-          body: Center(child: LoadingIndicator()),
+          body: DeviceDetailSkeleton(),
         );
       },
       error: (error, stack) {
