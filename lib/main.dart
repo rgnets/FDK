@@ -220,6 +220,48 @@ class _FDKAppState extends ConsumerState<FDKApp> {
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).reset();
+
+        // Check if there's a sign-out reason to display
+        final signOutReason = ref.read(signOutReasonProvider);
+        if (signOutReason != null) {
+          // Clear the reason so it doesn't show again
+          ref.read(signOutReasonProvider.notifier).state = null;
+
+          // Show dialog explaining why the user was signed out
+          final navigatorContext =
+              AppRouter.router.routerDelegate.navigatorKey.currentContext;
+          if (navigatorContext != null) {
+            LoggerService.info(
+              'Showing sign-out reason dialog',
+              tag: 'Auth',
+            );
+            showDialog<void>(
+              context: navigatorContext,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange),
+                    SizedBox(width: 12),
+                    Expanded(child: Text('Session Ended')),
+                  ],
+                ),
+                content: Text(signOutReason),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      AppRouter.router.go('/auth');
+                    },
+                    child: const Text('Sign In'),
+                  ),
+                ],
+              ),
+            );
+            return; // Don't navigate yet - dialog will handle it
+          }
+        }
+
         // Navigate to auth screen so user can sign back in
         AppRouter.router.go('/auth');
       }

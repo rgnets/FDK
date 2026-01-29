@@ -27,6 +27,7 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     as device_notifications;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
     as notifications_domain;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auth_notifier.g.dart';
@@ -399,6 +400,9 @@ class Auth extends _$Auth {
     }
 
     _logger.i('AUTH_NOTIFIER: Triggering sign out due to reconnect failures');
+    // Set the reason so the UI can show a message to the user
+    ref.read(signOutReasonProvider.notifier).state =
+        'Unable to reconnect to server. Your session may have expired.';
     unawaited(signOut());
   }
 
@@ -415,6 +419,9 @@ class Auth extends _$Auth {
     }
 
     _logger.i('AUTH_NOTIFIER: Triggering sign out due to API key revocation');
+    // Set the reason so the UI can show a message to the user
+    ref.read(signOutReasonProvider.notifier).state = event.message ??
+        'Your session has been invalidated. Please sign in again.';
     unawaited(signOut());
   }
 
@@ -636,6 +643,12 @@ AuthStatus? authStatus(AuthStatusRef ref) {
   final authAsync = ref.watch(authProvider);
   return authAsync.valueOrNull;
 }
+
+/// Provider that holds the reason for the last sign-out.
+/// Used to show a message to the user when they're redirected to the auth screen
+/// due to API key revocation or connection failures.
+/// The message is cleared after being read.
+final signOutReasonProvider = StateProvider<String?>((ref) => null);
 
 /// Listener provider that handles cleanup when auth state changes to unauthenticated.
 /// This is separated from Auth.signOut() to avoid CircularDependencyError when
