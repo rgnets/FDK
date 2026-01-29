@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
 import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
 import 'package:rgnets_fdk/features/issues/presentation/widgets/health_notice_card.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 
 /// Screen for viewing and filtering health notices
 class HealthNoticesScreen extends ConsumerStatefulWidget {
@@ -27,6 +30,8 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
     final notices = ref.watch(filteredHealthNoticesProvider);
     final allNotices = ref.watch(healthNoticesListProvider);
     final filter = ref.watch(healthNoticeFilterStateProvider);
+    final roomsAsync = ref.watch(roomsNotifierProvider);
+    final rooms = roomsAsync.valueOrNull ?? [];
 
     // Calculate severity counts from actual notices (not hn_counts which may be stale)
     final fatalCount = allNotices.countBySeverity(HealthNoticeSeverity.fatal);
@@ -175,9 +180,16 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: notices.length,
                     itemBuilder: (context, index) {
+                      final notice = notices[index];
+                      final hasNavigationTarget = _hasNavigationTarget(notice, rooms, roomsAsync.isLoading);
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: HealthNoticeCard(notice: notices[index]),
+                        child: HealthNoticeCard(
+                          notice: notice,
+                          onTap: hasNavigationTarget
+                              ? () => _handleNoticeTap(context, notice, rooms, roomsAsync.isLoading)
+                              : null,
+                        ),
                       );
                     },
                   ),
@@ -354,5 +366,106 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
         ),
       ),
     );
+  }
+
+  /// Checks if a health notice has a valid navigation target
+  bool _hasNavigationTarget(HealthNotice notice, List<Room> rooms, bool roomsLoading) {
+    // Has device ID - can navigate
+    final deviceId = notice.deviceId?.trim();
+    if (deviceId != null && deviceId.isNotEmpty) {
+      return true;
+    }
+
+    // Has room name and rooms are loaded - check if resolvable
+    if (notice.roomName != null && notice.roomName!.trim().isNotEmpty) {
+      // If rooms are still loading, assume we might have a target
+      if (roomsLoading) {
+        return true;
+      }
+      // Check if room can be resolved
+      return _resolveRoomId(notice.roomName, rooms) != null;
+    }
+
+    return false;
+  }
+
+  /// Handles tap on a health notice card - navigates to device or room detail
+  void _handleNoticeTap(BuildContext context, HealthNotice notice, List<Room> rooms, bool roomsLoading) {
+    // Priority 1: Navigate to device if deviceId is available
+    final deviceId = notice.deviceId?.trim();
+    if (deviceId != null && deviceId.isNotEmpty) {
+      context.push('/devices/${Uri.encodeComponent(deviceId)}');
+      return;
+    }
+
+    // Priority 2: Fallback to room navigation if roomName can be resolved
+    if (roomsLoading) {
+      // Rooms still loading - show appropriate message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Loading room data...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final roomId = _resolveRoomId(notice.roomName, rooms);
+    if (roomId != null) {
+      context.push('/rooms/$roomId');
+      return;
+    }
+
+    // No navigation target available (shouldn't reach here if _hasNavigationTarget is accurate)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Unable to find device or room'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Resolves a room name from health notice to a room ID
+  /// Uses normalized string matching to handle format differences
+  int? _resolveRoomId(String? roomName, List<Room> rooms) {
+    if (roomName == null || roomName.trim().isEmpty) {
+      return null;
+    }
+
+    final normalizedName = roomName.trim().toLowerCase();
+    final digitPattern = RegExp('[^0-9]');
+
+    for (final room in rooms) {
+      // Try exact match on room name
+      if (room.name.toLowerCase() == normalizedName) {
+        return room.id;
+      }
+
+      // Try match on room number field
+      if (room.number != null && room.number!.toLowerCase() == normalizedName) {
+        return room.id;
+      }
+
+      // Try match on extracted number (handles "(Building) 101" format)
+      final extractedNum = room.extractedNumber;
+      if (extractedNum != null && extractedNum.toLowerCase() == normalizedName) {
+        return room.id;
+      }
+
+      // Try extracting digits and matching
+      final nameDigits = normalizedName.replaceAll(digitPattern, '');
+      if (nameDigits.isNotEmpty) {
+        if (room.number == nameDigits) {
+          return room.id;
+        }
+        // Match against room name containing the same digits
+        final roomDigits = room.name.replaceAll(digitPattern, '');
+        if (roomDigits == nameDigits) {
+          return room.id;
+        }
+      }
+    }
+
+    return null; // No match found
   }
 }

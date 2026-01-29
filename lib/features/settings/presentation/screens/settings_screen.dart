@@ -144,17 +144,6 @@ class SettingsScreen extends ConsumerWidget {
       _SettingsSection(
         title: 'Application',
         children: [
-          ListTile(
-            leading: const Icon(Icons.dark_mode),
-            title: const Text('Theme'),
-            subtitle: Text('Current: ${settings.themeMode}'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: isLoading
-                ? null
-                : () {
-                    _showThemeDialog(context, ref);
-                  },
-          ),
           SwitchListTile(
             secondary: const Icon(Icons.notifications),
             title: const Text('Enable Notifications'),
@@ -332,84 +321,6 @@ class SettingsScreen extends ConsumerWidget {
     ]);
 
     return ListView(children: children);
-  }
-
-  void _showThemeDialog(BuildContext context, WidgetRef ref) {
-    final settings = ref.read(settingsNotifierProvider).valueOrNull;
-    if (settings == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings are still loading...')),
-      );
-      return;
-    }
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Theme'),
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            var currentTheme = settings.themeMode;
-
-            Future<void> selectTheme(String theme, String displayName) async {
-              setState(() {
-                currentTheme = theme;
-              });
-              await ref
-                  .read(settingsNotifierProvider.notifier)
-                  .setThemeMode(theme);
-              if (context.mounted) {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Theme updated to $displayName')),
-                );
-              }
-            }
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: const Text('Dark'),
-                  leading: Icon(
-                    currentTheme == 'dark'
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: currentTheme == 'dark'
-                        ? Theme.of(context).primaryColor
-                        : null,
-                  ),
-                  onTap: () => selectTheme('dark', 'Dark'),
-                ),
-                ListTile(
-                  title: const Text('Light'),
-                  leading: Icon(
-                    currentTheme == 'light'
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: currentTheme == 'light'
-                        ? Theme.of(context).primaryColor
-                        : null,
-                  ),
-                  onTap: () => selectTheme('light', 'Light'),
-                ),
-                ListTile(
-                  title: const Text('System'),
-                  leading: Icon(
-                    currentTheme == 'system'
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: currentTheme == 'system'
-                        ? Theme.of(context).primaryColor
-                        : null,
-                  ),
-                  onTap: () => selectTheme('system', 'System'),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
   }
 
   void _showSyncIntervalDialog(BuildContext context, WidgetRef ref) {

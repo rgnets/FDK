@@ -23,102 +23,117 @@ class HealthNoticeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Header row with severity and time
-              Row(
-                children: [
-                  _buildSeverityBadge(),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      notice.shortMessage,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Device info
-              if (notice.deviceName != null) ...[
-                Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.router,
-                      size: 16,
-                      color: Colors.white.withValues(alpha: 0.7),
+                    // Header row with severity and time
+                    Row(
+                      children: [
+                        _buildSeverityBadge(),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            notice.shortMessage,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      notice.deviceName!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    const SizedBox(height: 8),
+
+                    // Device info
+                    if (notice.deviceName != null) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.router,
+                            size: 16,
                             color: Colors.white.withValues(alpha: 0.7),
                           ),
-                    ),
-                    if (notice.roomName != null) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.room,
-                        size: 16,
-                        color: Colors.white.withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        notice.roomName!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          const SizedBox(width: 4),
+                          Text(
+                            notice.deviceName!,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                ),
+                          ),
+                          if (notice.roomName != null) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.room,
+                              size: 16,
                               color: Colors.white.withValues(alpha: 0.7),
                             ),
+                            const SizedBox(width: 4),
+                            Text(
+                              notice.roomName!,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                            ),
+                          ],
+                        ],
                       ),
+                      const SizedBox(height: 4),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-              ],
 
-              // Time info
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 14,
-                    color: Colors.white.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _formatTime(notice.createdAt),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    // Time info
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time,
+                          size: 14,
                           color: Colors.white.withValues(alpha: 0.5),
                         ),
-                  ),
-                  if (notice.isOverdue) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'OVERDUE',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatTime(notice.createdAt),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.5),
+                              ),
                         ),
-                      ),
+                        if (notice.isOverdue) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'OVERDUE',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
-                ],
+                ),
               ),
+              // Chevron indicator when tappable
+              if (onTap != null) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.5),
+                ),
+              ],
             ],
           ),
         ),

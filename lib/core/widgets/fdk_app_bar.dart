@@ -272,21 +272,31 @@ class _FDKAppBarState extends ConsumerState<FDKAppBar> with SingleTickerProvider
           borderRadius: BorderRadius.circular(12),
         ),
         child: Stack(
+          clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
             Icon(icon, color: iconColor ?? Colors.white, size: 22),
             if (badge != null)
               Positioned(
-                top: 8,
-                right: 8,
+                top: -4,
+                right: -4,
                 child: Container(
                   padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(color: badgeColor ?? Colors.red, borderRadius: BorderRadius.circular(8)),
-                  constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+                  decoration: BoxDecoration(
+                    color: badgeColor ?? Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+                  child: MediaQuery.withNoTextScaling(
+                    child: Text(
+                      badge,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
               ),
