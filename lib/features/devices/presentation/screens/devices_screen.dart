@@ -754,7 +754,7 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
           final mockDataState = ref.watch(mockDataStateProvider);
 
           return devicesAsync.when(
-            loading: () => const Center(child: LoadingIndicator()),
+            loading: () => const DeviceListSkeleton(),
             error: (error, stack) => Center(
               child: EmptyState(
                 icon: Icons.error_outline,

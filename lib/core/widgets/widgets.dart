@@ -10,3 +10,4 @@ export 'loading_indicator.dart';
 export 'main_scaffold.dart';
 export 'search_bar_widget.dart';
 export 'section_card.dart';
+export 'skeleton/skeleton.dart';
