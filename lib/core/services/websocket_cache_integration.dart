@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
@@ -10,9 +11,12 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
 /// Callback type for when device data is received via WebSocket.
 typedef DeviceDataCallback = void Function(
@@ -48,12 +52,18 @@ class WebSocketCacheIntegration {
   /// Room resource type.
   static const String _roomResourceType = 'pms_rooms';
 
-  /// All resource types (devices + rooms).
+  /// Speed test resource types.
+  static const String _speedTestConfigResourceType = 'speed_tests';
+  static const String _speedTestResultResourceType = 'speed_test_results';
+
+  /// All resource types (devices + rooms + speed tests).
   static const List<String> _resourceTypes = [
     'access_points',
     'switch_devices',
     'media_converters',
     'pms_rooms',
+    'speed_tests',
+    'speed_test_results',
   ];
 
   final ValueNotifier<DateTime?> lastUpdate = ValueNotifier<DateTime?>(null);
@@ -88,6 +98,28 @@ class WebSocketCacheIntegration {
   /// Callbacks for when room data is received.
   final List<void Function(List<Map<String, dynamic>>)> _roomDataCallbacks = [];
 
+  /// Cached speed test config data.
+  final List<Map<String, dynamic>> _speedTestConfigCache = [];
+
+  /// Cached speed test result data.
+  final List<Map<String, dynamic>> _speedTestResultCache = [];
+
+  /// Update notifier for speed test configs.
+  final ValueNotifier<DateTime?> lastSpeedTestConfigUpdate =
+      ValueNotifier<DateTime?>(null);
+
+  /// Update notifier for speed test results.
+  final ValueNotifier<DateTime?> lastSpeedTestResultUpdate =
+      ValueNotifier<DateTime?>(null);
+
+  /// Callbacks for when speed test config data is received.
+  final List<void Function(List<SpeedTestConfig>)> _speedTestConfigCallbacks =
+      [];
+
+  /// Callbacks for when speed test result data is received.
+  final List<void Function(List<SpeedTestResult>)> _speedTestResultCallbacks =
+      [];
+
   /// Register a callback for device data updates.
   void onDeviceData(DeviceDataCallback callback) {
     _deviceDataCallbacks.add(callback);
@@ -96,6 +128,16 @@ class WebSocketCacheIntegration {
   /// Register a callback for room data updates.
   void onRoomData(void Function(List<Map<String, dynamic>>) callback) {
     _roomDataCallbacks.add(callback);
+  }
+
+  /// Register a callback for speed test config data updates.
+  void onSpeedTestConfigData(void Function(List<SpeedTestConfig>) callback) {
+    _speedTestConfigCallbacks.add(callback);
+  }
+
+  /// Register a callback for speed test result data updates.
+  void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
+    _speedTestResultCallbacks.add(callback);
   }
 
   /// Get cached rooms.
@@ -108,6 +150,269 @@ class WebSocketCacheIntegration {
 
   /// Check if we have cached device data.
   bool get hasDeviceCache => _deviceCache.values.any((list) => list.isNotEmpty);
+
+  /// Check if we have cached speed test config data.
+  bool get hasSpeedTestConfigCache => _speedTestConfigCache.isNotEmpty;
+
+  /// Check if we have cached speed test result data.
+  bool get hasSpeedTestResultCache => _speedTestResultCache.isNotEmpty;
+
+  /// Get all cached speed test configs.
+  List<SpeedTestConfig> getCachedSpeedTestConfigs() {
+    return _speedTestConfigCache
+        .map((json) {
+          try {
+            return SpeedTestConfig.fromJson(json);
+          } catch (e) {
+            _logger.w('Failed to parse speed test config: $e');
+            return null;
+          }
+        })
+        .whereType<SpeedTestConfig>()
+        .toList();
+  }
+
+  /// Get adhoc speed test config (name contains 'adhoc' or first available).
+  SpeedTestConfig? getAdhocSpeedTestConfig() {
+    final configs = getCachedSpeedTestConfigs();
+    if (configs.isEmpty) return null;
+
+    // Try to find one with 'adhoc' in the name
+    final adhocConfig = configs.firstWhereOrNull(
+      (SpeedTestConfig c) => c.name?.toLowerCase().contains('adhoc') ?? false,
+    );
+    if (adhocConfig != null) return adhocConfig;
+
+    // Fall back to first config
+    return configs.first;
+  }
+
+  /// Get speed test config by ID.
+  SpeedTestConfig? getSpeedTestConfigById(int? id) {
+    if (id == null) return null;
+    final match = _speedTestConfigCache.firstWhereOrNull(
+      (Map<String, dynamic> json) => json['id'] == id,
+    );
+    return match != null ? SpeedTestConfig.fromJson(match) : null;
+  }
+
+  /// Get all cached speed test results.
+  List<SpeedTestResult> getCachedSpeedTestResults() {
+    return _speedTestResultCache
+        .map((json) {
+          try {
+            return SpeedTestResult.fromJsonWithValidation(json);
+          } catch (e) {
+            _logger.w('Failed to parse speed test result: $e');
+            return null;
+          }
+        })
+        .whereType<SpeedTestResult>()
+        .toList();
+  }
+
+  /// Get speed test results filtered by device ID.
+  List<SpeedTestResult> getSpeedTestResultsForDevice(
+    String deviceId, {
+    String? deviceType,
+  }) {
+    final results = getCachedSpeedTestResults();
+    // Parse numeric ID from prefixed ID (e.g., "ap_123" -> 123)
+    final numericId = int.tryParse(deviceId.split('_').last);
+    if (numericId == null) return [];
+
+    if (deviceType == DeviceTypes.accessPoint || deviceId.startsWith('ap_')) {
+      return results
+          .where((r) => r.testedViaAccessPointId == numericId)
+          .toList();
+    } else if (deviceType == DeviceTypes.ont || deviceId.startsWith('ont_')) {
+      return results
+          .where((r) => r.testedViaMediaConverterId == numericId)
+          .toList();
+    }
+    return [];
+  }
+
+  /// Get speed test results filtered by access point ID.
+  List<SpeedTestResult> getSpeedTestResultsForAccessPointId(int accessPointId) {
+    return getCachedSpeedTestResults()
+        .where((r) => r.testedViaAccessPointId == accessPointId)
+        .toList();
+  }
+
+  /// Get speed test results filtered by speed test config ID.
+  List<SpeedTestResult> getSpeedTestResultsForConfigId(int speedTestId) {
+    return getCachedSpeedTestResults()
+        .where((r) => r.speedTestId == speedTestId)
+        .toList();
+  }
+
+  /// Update a single speed test result in the cache.
+  /// Used when we receive a direct response from an update request
+  /// to ensure cache consistency without waiting for broadcast.
+  /// Follows the same pattern as device cache updates.
+  void updateSpeedTestResultInCache(Map<String, dynamic> data) {
+    final id = data['id'];
+    if (id == null) {
+      _logger.w('updateSpeedTestResultInCache: Missing id in data');
+      return;
+    }
+
+    final index = _speedTestResultCache.indexWhere((item) => item['id'] == id);
+    if (index >= 0) {
+      _speedTestResultCache[index] = data;
+    } else {
+      _speedTestResultCache.add(data);
+    }
+    _bumpLastUpdate();
+    _bumpSpeedTestResultUpdate();
+    _notifySpeedTestResultCallbacks();
+
+    _logger.i('updateSpeedTestResultInCache: Updated result $id in cache');
+  }
+
+  /// Create an adhoc speed test result via WebSocket.
+  /// Returns true if the creation was successful.
+  Future<bool> createAdhocSpeedTestResult({
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+    String? destination,
+    int? port,
+    String? protocol,
+    bool passed = false,
+    DateTime? initiatedAt,
+    DateTime? completedAt,
+    int? pmsRoomId,
+    String? roomType,
+  }) async {
+    if (!_webSocketService.isConnected) {
+      _logger.w('Cannot create speed test result: WebSocket not connected');
+      return false;
+    }
+
+    try {
+      // Get adhoc config to associate the result with
+      final adhocConfig = getAdhocSpeedTestConfig();
+
+      final params = <String, dynamic>{
+        'download_mbps': downloadSpeed,
+        'upload_mbps': uploadSpeed,
+        'rtt': latency,
+        'passed': passed,
+        'test_type': 'iperf3',
+        'initiated_at': (initiatedAt ?? DateTime.now()).toIso8601String(),
+        'completed_at': (completedAt ?? DateTime.now()).toIso8601String(),
+        if (adhocConfig?.id != null) 'speed_test_id': adhocConfig!.id,
+        if (source != null) 'source': source,
+        if (destination != null) 'destination': destination,
+        if (port != null) 'port': port,
+        if (protocol != null) 'iperf_protocol': protocol,
+        if (pmsRoomId != null) 'pms_room_id': pmsRoomId,
+        if (roomType != null) 'room_type': roomType,
+      };
+
+      final response = await _webSocketService.requestActionCable(
+        action: 'create_resource',
+        resourceType: _speedTestResultResourceType,
+        additionalData: {'params': params},
+        timeout: const Duration(seconds: 15),
+      );
+
+      // Add to local cache on success
+      final data = response.payload['data'];
+      if (data is Map<String, dynamic>) {
+        _applyUpsert(_speedTestResultResourceType, data);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('Failed to create adhoc speed test result: $e');
+      return false;
+    }
+  }
+
+  /// Update an existing device speed test result via WebSocket.
+  /// Returns true if the update was successful.
+  Future<bool> updateDeviceSpeedTestResult({
+    required String deviceId,
+    required double downloadSpeed,
+    required double uploadSpeed,
+    required double latency,
+    String? source,
+    String? destination,
+    int? port,
+    String? protocol,
+    bool passed = false,
+    DateTime? initiatedAt,
+    DateTime? completedAt,
+    int? pmsRoomId,
+    String? roomType,
+  }) async {
+    if (!_webSocketService.isConnected) {
+      _logger.w('Cannot update speed test result: WebSocket not connected');
+      return false;
+    }
+
+    try {
+      // Parse numeric ID from prefixed device ID (e.g., "ap_123" -> 123)
+      final numericId = int.tryParse(deviceId.split('_').last);
+      if (numericId == null) {
+        _logger.w('Cannot update speed test result: Invalid device ID format');
+        return false;
+      }
+
+      // Look up existing results for this device to get the speed_test_id
+      final existingResults = getSpeedTestResultsForDevice(deviceId);
+      final speedTestId = existingResults.isNotEmpty
+          ? existingResults.first.speedTestId // Results are sorted newest first
+          : getAdhocSpeedTestConfig()?.id; // Fall back to adhoc config
+
+      // Determine which ID field to use based on device type prefix
+      final params = <String, dynamic>{
+        'download_mbps': downloadSpeed,
+        'upload_mbps': uploadSpeed,
+        'rtt': latency,
+        'passed': passed,
+        'test_type': 'iperf3',
+        'initiated_at': (initiatedAt ?? DateTime.now()).toIso8601String(),
+        'completed_at': (completedAt ?? DateTime.now()).toIso8601String(),
+        if (speedTestId != null) 'speed_test_id': speedTestId,
+        if (source != null) 'source': source,
+        if (destination != null) 'destination': destination,
+        if (port != null) 'port': port,
+        if (protocol != null) 'iperf_protocol': protocol,
+        if (pmsRoomId != null) 'pms_room_id': pmsRoomId,
+        if (roomType != null) 'room_type': roomType,
+      };
+
+      // Set the appropriate device association field based on prefix
+      if (deviceId.startsWith('ap_')) {
+        params['tested_via_access_point_id'] = numericId;
+      } else if (deviceId.startsWith('ont_')) {
+        params['tested_via_media_converter_id'] = numericId;
+      }
+
+      final response = await _webSocketService.requestActionCable(
+        action: 'create_resource',
+        resourceType: _speedTestResultResourceType,
+        additionalData: {'params': params},
+        timeout: const Duration(seconds: 15),
+      );
+
+      // Add to local cache on success
+      final data = response.payload['data'];
+      if (data is Map<String, dynamic>) {
+        _applyUpsert(_speedTestResultResourceType, data);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('Failed to update device speed test result: $e');
+      return false;
+    }
+  }
 
   /// Get cached devices by resource type.
   List<Map<String, dynamic>>? getCachedDevices(String resourceType) {
@@ -842,6 +1147,34 @@ class WebSocketCacheIntegration {
       for (final callback in _roomDataCallbacks) {
         callback(items);
       }
+    } else if (resourceType == _speedTestConfigResourceType) {
+      // Handle speed test config data
+      _speedTestConfigCache
+        ..clear()
+        ..addAll(items);
+      _bumpLastUpdate();
+      _bumpSpeedTestConfigUpdate();
+
+      _logger.i(
+        'WebSocketCacheIntegration: speed_tests snapshot - ${items.length} items',
+      );
+
+      // Notify speed test config callbacks
+      _notifySpeedTestConfigCallbacks();
+    } else if (resourceType == _speedTestResultResourceType) {
+      // Handle speed test result data
+      _speedTestResultCache
+        ..clear()
+        ..addAll(items);
+      _bumpLastUpdate();
+      _bumpSpeedTestResultUpdate();
+
+      _logger.i(
+        'WebSocketCacheIntegration: speed_test_results snapshot - ${items.length} items',
+      );
+
+      // Notify speed test result callbacks
+      _notifySpeedTestResultCallbacks();
     } else if (_deviceResourceTypes.contains(resourceType)) {
       // Handle device data
       _deviceCache[resourceType] = items;
@@ -886,9 +1219,17 @@ class WebSocketCacheIntegration {
 
     if (items.isEmpty) {
       accumulator.touch();
-      final hasCached =
-          (_deviceCache[resourceType]?.isNotEmpty ?? false) ||
-          _roomCache.isNotEmpty;
+      // Check appropriate cache based on resource type
+      bool hasCached;
+      if (resourceType == _speedTestConfigResourceType) {
+        hasCached = _speedTestConfigCache.isNotEmpty;
+      } else if (resourceType == _speedTestResultResourceType) {
+        hasCached = _speedTestResultCache.isNotEmpty;
+      } else if (resourceType == _roomResourceType) {
+        hasCached = _roomCache.isNotEmpty;
+      } else {
+        hasCached = _deviceCache[resourceType]?.isNotEmpty ?? false;
+      }
       final hasAccumulated = accumulator.items.isNotEmpty;
       if (hasAccumulated || hasCached) {
         return;
@@ -969,6 +1310,28 @@ class WebSocketCacheIntegration {
       for (final callback in _roomDataCallbacks) {
         callback(_roomCache);
       }
+    } else if (resourceType == _speedTestConfigResourceType) {
+      // Handle speed test config upsert
+      final index = _speedTestConfigCache.indexWhere((item) => item['id'] == id);
+      if (index >= 0) {
+        _speedTestConfigCache[index] = data;
+      } else {
+        _speedTestConfigCache.add(data);
+      }
+      _bumpLastUpdate();
+      _bumpSpeedTestConfigUpdate();
+      _notifySpeedTestConfigCallbacks();
+    } else if (resourceType == _speedTestResultResourceType) {
+      // Handle speed test result upsert
+      final index = _speedTestResultCache.indexWhere((item) => item['id'] == id);
+      if (index >= 0) {
+        _speedTestResultCache[index] = data;
+      } else {
+        _speedTestResultCache.add(data);
+      }
+      _bumpLastUpdate();
+      _bumpSpeedTestResultUpdate();
+      _notifySpeedTestResultCallbacks();
     } else if (_deviceResourceTypes.contains(resourceType)) {
       // Handle device upsert
       final cache = _deviceCache[resourceType] ?? [];
@@ -1013,6 +1376,18 @@ class WebSocketCacheIntegration {
       for (final callback in _roomDataCallbacks) {
         callback(_roomCache);
       }
+    } else if (resourceType == _speedTestConfigResourceType) {
+      // Handle speed test config delete
+      _speedTestConfigCache.removeWhere((item) => item['id'] == id);
+      _bumpLastUpdate();
+      _bumpSpeedTestConfigUpdate();
+      _notifySpeedTestConfigCallbacks();
+    } else if (resourceType == _speedTestResultResourceType) {
+      // Handle speed test result delete
+      _speedTestResultCache.removeWhere((item) => item['id'] == id);
+      _bumpLastUpdate();
+      _bumpSpeedTestResultUpdate();
+      _notifySpeedTestResultCallbacks();
     } else if (_deviceResourceTypes.contains(resourceType)) {
       // Handle device delete
       final cache = _deviceCache[resourceType] ?? [];
@@ -1053,6 +1428,28 @@ class WebSocketCacheIntegration {
     lastDeviceUpdate.value = DateTime.now();
   }
 
+  void _bumpSpeedTestConfigUpdate() {
+    lastSpeedTestConfigUpdate.value = DateTime.now();
+  }
+
+  void _bumpSpeedTestResultUpdate() {
+    lastSpeedTestResultUpdate.value = DateTime.now();
+  }
+
+  void _notifySpeedTestConfigCallbacks() {
+    final configs = getCachedSpeedTestConfigs();
+    for (final callback in _speedTestConfigCallbacks) {
+      callback(configs);
+    }
+  }
+
+  void _notifySpeedTestResultCallbacks() {
+    final results = getCachedSpeedTestResults();
+    for (final callback in _speedTestResultCallbacks) {
+      callback(results);
+    }
+  }
+
   /// Updates a single device in the cache with data from a REST response.
   ///
   /// Use this after a REST-based operation (like image upload) to ensure
@@ -1090,14 +1487,16 @@ class WebSocketCacheIntegration {
     _applyUpsert(resourceType, deviceData, action: 'show');
   }
 
-  /// Clears device/room data caches and requests fresh data from server.
+  /// Clears device/room/speed test data caches and requests fresh data from server.
   /// Use this for "Clear Cache" in settings - keeps WebSocket connection alive.
   void clearDataAndRefresh() {
     _logger.i('WebSocketCacheIntegration: Clearing data caches and requesting refresh');
 
-    // Clear only device and room caches
+    // Clear device, room, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
 
     // Request fresh snapshots if connected
     if (_webSocketService.isConnected && _channelConfirmed) {
@@ -1115,9 +1514,11 @@ class WebSocketCacheIntegration {
   void clearCaches() {
     _logger.i('WebSocketCacheIntegration: Clearing all caches');
 
-    // Clear device and room caches
+    // Clear device, room, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
 
     // Clear snapshot state
     for (final timer in _snapshotFlushTimers.values) {
@@ -1151,10 +1552,16 @@ class WebSocketCacheIntegration {
     _snapshotAccumulators.clear();
     lastUpdate.dispose();
     lastDeviceUpdate.dispose();
+    lastSpeedTestConfigUpdate.dispose();
+    lastSpeedTestResultUpdate.dispose();
     _deviceDataCallbacks.clear();
     _roomDataCallbacks.clear();
+    _speedTestConfigCallbacks.clear();
+    _speedTestResultCallbacks.clear();
     _deviceCache.clear();
     _roomCache.clear();
+    _speedTestConfigCache.clear();
+    _speedTestResultCache.clear();
   }
 
   /// Request a specific resource type snapshot manually.
