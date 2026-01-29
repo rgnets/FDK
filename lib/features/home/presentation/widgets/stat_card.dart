@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
 
 /// Statistics card widget for displaying metric information
 class StatCard extends StatelessWidget {
@@ -24,8 +25,9 @@ class StatCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: 160,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 140),
+        child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           image: const DecorationImage(
@@ -61,12 +63,13 @@ class StatCard extends StatelessWidget {
                   children: [
                     Icon(icon, color: color, size: 36),
                     const SizedBox(height: 8),
-                    Text(
+                    ScalableText(
                       value,
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                      ),
+                      ) ?? const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      alignment: Alignment.center,
                     ),
                     Text(
                       label,
@@ -84,7 +87,6 @@ class StatCard extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey[400],
-                          fontSize: 11,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -95,6 +97,7 @@ class StatCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

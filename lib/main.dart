@@ -14,6 +14,7 @@ import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/services/error_reporter.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
+import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
@@ -229,6 +230,15 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       routerConfig: AppRouter.router,
+      // Limit text scaling to prevent overflow with large system fonts
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: clampedTextScaler(context),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
