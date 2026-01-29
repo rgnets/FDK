@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/device_ui_state_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/room_filter_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/status_filter_provider.dart';
 
 /// Screen for managing devices
@@ -370,36 +371,48 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
   Widget _buildFilterRow(WidgetRef ref) {
     final phases = ref.watch(devicePhasesProvider);
     final statuses = ref.watch(deviceStatusesProvider);
+    final rooms = ref.watch(deviceRoomsProvider);
     final phaseState = ref.watch(phaseFilterNotifierProvider);
     final statusState = ref.watch(statusFilterNotifierProvider);
+    final roomState = ref.watch(roomFilterNotifierProvider);
 
     // Always show filter if user has an active filter (so they can clear it)
     final hasPhases = phases.length > 1 || phaseState.isFiltering;
     final hasStatuses = statuses.length > 1 || statusState.isFiltering;
+    final hasRooms = rooms.length > 1 || roomState.isFiltering;
 
-    // If neither filter has options or active filters, show nothing
-    if (!hasPhases && !hasStatuses) {
+    // Count how many filters are available
+    final activeFilters = [hasPhases, hasStatuses, hasRooms].where((b) => b).length;
+
+    // If no filters have options or active filters, show nothing
+    if (activeFilters == 0) {
       return const SizedBox.shrink();
     }
 
-    // If only one filter has options, show it full width
-    if (hasPhases && !hasStatuses) {
-      return _buildPhaseFilterBar(ref);
+    // Build list of available filter widgets
+    final filterWidgets = <Widget>[];
+    if (hasRooms) {
+      filterWidgets.add(Expanded(child: _buildRoomFilterContent(ref)));
     }
-    if (!hasPhases && hasStatuses) {
-      return _buildStatusFilterBar(ref);
+    if (hasPhases) {
+      filterWidgets.add(Expanded(child: _buildPhaseFilterContent(ref)));
+    }
+    if (hasStatuses) {
+      filterWidgets.add(Expanded(child: _buildStatusFilterContent(ref)));
     }
 
-    // Both filters have options, show them side by side
+    // Add spacing between filters
+    final spacedWidgets = <Widget>[];
+    for (var i = 0; i < filterWidgets.length; i++) {
+      spacedWidgets.add(filterWidgets[i]);
+      if (i < filterWidgets.length - 1) {
+        spacedWidgets.add(const SizedBox(width: 8));
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(child: _buildPhaseFilterContent(ref)),
-          const SizedBox(width: 8),
-          Expanded(child: _buildStatusFilterContent(ref)),
-        ],
-      ),
+      child: Row(children: spacedWidgets),
     );
   }
 
@@ -612,6 +625,110 @@ class _DevicesScreenState extends ConsumerState<DevicesScreen> {
         ref
             .read(deviceUIStateNotifierProvider.notifier)
             .setStatusFilter(newStatus);
+      },
+    );
+  }
+
+  Widget _buildRoomFilterContent(WidgetRef ref) {
+    final rooms = ref.watch(deviceRoomsProvider);
+    final roomState = ref.watch(roomFilterNotifierProvider);
+    final isFiltering = roomState.isFiltering;
+    final selectedRoom = roomState.selectedRoom;
+
+    return PopupMenuButton<String>(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isFiltering
+              ? Theme.of(context).colorScheme.tertiary
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isFiltering
+                ? Theme.of(context).colorScheme.tertiary
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isFiltering ? Icons.meeting_room : Icons.filter_list,
+              size: 18,
+              color: isFiltering
+                  ? Theme.of(context).colorScheme.onTertiary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                isFiltering ? selectedRoom : 'Room',
+                style: TextStyle(
+                  color: isFiltering
+                      ? Theme.of(context).colorScheme.onTertiary
+                      : Theme.of(context).colorScheme.onSurface,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: isFiltering
+                  ? Theme.of(context).colorScheme.onTertiary
+                  : Theme.of(context).colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+      itemBuilder: (BuildContext context) {
+        return rooms.map((String room) {
+          final isSelected = room == selectedRoom;
+          final isAllRooms = room == RoomFilterState.allRooms;
+          return PopupMenuItem<String>(
+            value: room,
+            child: Row(
+              children: [
+                Icon(
+                  isAllRooms ? Icons.filter_list_off : Icons.meeting_room,
+                  size: 18,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    room,
+                    style: TextStyle(
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+      onSelected: (String newRoom) {
+        ref
+            .read(deviceUIStateNotifierProvider.notifier)
+            .setRoomFilter(newRoom);
       },
     );
   }

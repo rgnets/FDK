@@ -72,10 +72,7 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
               ),
             ),
             data: (_) {
-          
-              return RefreshIndicator(
-                onRefresh: () => ref.read(roomsNotifierProvider.notifier).refresh(),
-            child: Column(
+              return Column(
               children: [
                 // Search bar
                 SearchBarWidget(
@@ -209,9 +206,8 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                         );
                   }(),
                 ),
-                ],
-                ),
-              );
+              ],
+            );
             },
           );
         },

@@ -232,6 +232,41 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
   }
 
   @override
+  Future<DeviceModelSealed> updateDeviceNote(String deviceId, String? note) async {
+    _logger.i('DeviceWebSocketDataSource: updateDeviceNote($deviceId) called');
+
+    final resourceType = _getResourceTypeFromId(deviceId);
+    final rawId = _extractRawId(deviceId);
+
+    if (resourceType == null) {
+      throw Exception('Unknown device type for ID: $deviceId');
+    }
+
+    try {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: resourceType,
+        additionalData: {
+          'id': rawId,
+          'params': {'note': note}, // Only send the note field!
+        },
+        timeout: const Duration(seconds: 15),
+      );
+
+      final deviceData = _extractDeviceData(response.payload, response.raw);
+      if (deviceData != null) {
+        return _mapToDeviceModel(resourceType, deviceData);
+      }
+
+      // Fetch fresh device data if response didn't include it
+      return getDevice(deviceId, forceRefresh: true);
+    } on Exception catch (e) {
+      _logger.e('DeviceWebSocketDataSource: Failed to update note: $e');
+      throw Exception('Failed to update note: $e');
+    }
+  }
+
+  @override
   Future<void> rebootDevice(String deviceId) async {
     _logger.i('DeviceWebSocketDataSource: rebootDevice($deviceId) called');
 

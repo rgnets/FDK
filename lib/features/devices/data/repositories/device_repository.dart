@@ -455,6 +455,20 @@ class DeviceRepositoryImpl implements DeviceRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, Device>> updateDeviceNote(String deviceId, String? note) async {
+    try {
+      if (!_isAuthenticated()) {
+        return const Left(DeviceFailure(message: 'Not authenticated'));
+      }
+      final updatedModel = await dataSource.updateDeviceNote(deviceId, note);
+      await _cacheDeviceToTypedCache(updatedModel);
+      return Right(updatedModel.toEntity());
+    } on Exception catch (e) {
+      return Left(DeviceFailure(message: 'Failed to update note: $e'));
+    }
+  }
+
   /// Convert a Device entity to the appropriate DeviceModelSealed variant
   DeviceModelSealed _deviceToSealedModel(Device device) {
     switch (device.type) {

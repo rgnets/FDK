@@ -26,6 +26,10 @@ abstract class DeviceDataSource {
   /// Updates a device
   Future<DeviceModelSealed> updateDevice(DeviceModelSealed device);
 
+  /// Updates only the device note field
+  /// This sends only the note to the backend, avoiding issues with full device serialization
+  Future<DeviceModelSealed> updateDeviceNote(String deviceId, String? note);
+
   /// Reboots a device
   Future<void> rebootDevice(String deviceId);
 

@@ -1,7 +1,9 @@
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/room_filter_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/status_filter_provider.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'device_ui_state_provider.g.dart';
@@ -14,6 +16,7 @@ class DeviceUIState {
     this.isSearching = false,
     this.selectedPhase = PhaseFilterState.allPhases,
     this.selectedStatus = StatusFilterState.allStatuses,
+    this.selectedRoom = RoomFilterState.allRooms,
   });
 
   final String searchQuery;
@@ -21,6 +24,7 @@ class DeviceUIState {
   final bool isSearching;
   final String selectedPhase;
   final String selectedStatus;
+  final String selectedRoom;
 
   /// Returns true if phase filtering is active
   bool get isPhaseFiltering => selectedPhase != PhaseFilterState.allPhases;
@@ -28,12 +32,16 @@ class DeviceUIState {
   /// Returns true if status filtering is active
   bool get isStatusFiltering => selectedStatus != StatusFilterState.allStatuses;
 
+  /// Returns true if room filtering is active
+  bool get isRoomFiltering => selectedRoom != RoomFilterState.allRooms;
+
   DeviceUIState copyWith({
     String? searchQuery,
     String? filterType,
     bool? isSearching,
     String? selectedPhase,
     String? selectedStatus,
+    String? selectedRoom,
   }) {
     return DeviceUIState(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -41,6 +49,7 @@ class DeviceUIState {
       isSearching: isSearching ?? this.isSearching,
       selectedPhase: selectedPhase ?? this.selectedPhase,
       selectedStatus: selectedStatus ?? this.selectedStatus,
+      selectedRoom: selectedRoom ?? this.selectedRoom,
     );
   }
 }
@@ -67,12 +76,21 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
       }
     });
 
+    // Listen to room filter changes and update only selectedRoom
+    ref.listen<RoomFilterState>(roomFilterNotifierProvider, (previous, next) {
+      if (previous?.selectedRoom != next.selectedRoom) {
+        state = state.copyWith(selectedRoom: next.selectedRoom);
+      }
+    });
+
     // Initialize with current filter states
     final phaseState = ref.read(phaseFilterNotifierProvider);
     final statusState = ref.read(statusFilterNotifierProvider);
+    final roomState = ref.read(roomFilterNotifierProvider);
     return DeviceUIState(
       selectedPhase: phaseState.selectedPhase,
       selectedStatus: statusState.selectedStatus,
+      selectedRoom: roomState.selectedRoom,
     );
   }
 
@@ -111,6 +129,16 @@ class DeviceUIStateNotifier extends _$DeviceUIStateNotifier {
   void clearStatusFilter() {
     setStatusFilter(StatusFilterState.allStatuses);
   }
+
+  void setRoomFilter(String room) {
+    // Update both local state and the room filter provider (for persistence)
+    state = state.copyWith(selectedRoom: room);
+    ref.read(roomFilterNotifierProvider.notifier).setRoom(room);
+  }
+
+  void clearRoomFilter() {
+    setRoomFilter(RoomFilterState.allRooms);
+  }
 }
 
 /// Provider for filtered devices based on UI state
@@ -120,11 +148,27 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
   final uiState = ref.watch(deviceUIStateNotifierProvider);
   final phaseFilter = ref.watch(phaseFilterNotifierProvider);
   final statusFilter = ref.watch(statusFilterNotifierProvider);
+  final roomFilter = ref.watch(roomFilterNotifierProvider);
+  final roomsAsync = ref.watch(roomsNotifierProvider);
 
   return devices.when(
     data: (deviceList) {
       // Precompute search query once (trimmed and lowercased)
       final query = uiState.searchQuery.trim().toLowerCase();
+
+      // Get the selected room's ID for matching by ID (more reliable than name)
+      int? selectedRoomId;
+      if (roomFilter.isFiltering) {
+        final selectedRoomName = roomFilter.selectedRoom.trim().toLowerCase();
+        roomsAsync.whenData((roomList) {
+          for (final room in roomList) {
+            if (room.name.trim().toLowerCase() == selectedRoomName) {
+              selectedRoomId = room.id;
+              break;
+            }
+          }
+        });
+      }
 
       final filtered =
           deviceList.where((device) {
@@ -150,10 +194,24 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
             // Filter by status
             final matchesStatus = statusFilter.matchesFilter(device.status);
 
+            // Filter by room - match by ID (pmsRoomId) for reliability
+            bool matchesRoom;
+            if (!roomFilter.isFiltering) {
+              matchesRoom = true; // Show all when not filtering
+            } else if (selectedRoomId != null) {
+              // Match by room ID
+              matchesRoom = device.pmsRoomId == selectedRoomId;
+            } else {
+              // Fallback to name matching if room ID lookup failed
+              final deviceRoom = device.pmsRoom?.name ?? device.location;
+              matchesRoom = roomFilter.matchesFilter(deviceRoom);
+            }
+
             return matchesType &&
                 matchesSearch &&
                 matchesPhase &&
-                matchesStatus;
+                matchesStatus &&
+                matchesRoom;
           }).toList()..sort(
             (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
           );
