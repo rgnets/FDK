@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:rgnets_fdk/core/providers/app_bar_provider.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/widgets/fdk_app_bar.dart';
+import 'package:rgnets_fdk/core/widgets/offline_banner.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
 
@@ -76,7 +77,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
       children: [
         Scaffold(
           appBar: const FDKAppBar(),
-          body: widget.child,
+          body: Column(
+            children: [
+              Expanded(child: widget.child),
+              const OfflineBanner(),
+            ],
+          ),
           bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           boxShadow: [
