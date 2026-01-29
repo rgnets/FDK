@@ -7,6 +7,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
@@ -36,6 +37,8 @@ part 'auth_notifier.g.dart';
 class Auth extends _$Auth {
   late final Logger _logger;
   int _authGeneration = 0;
+  StreamSubscription<ApiKeyRevocationEvent>? _revocationSubscription;
+  StreamSubscription<int>? _authFailureSubscription;
 
   AuthenticateUser get _authenticateUser =>
       AuthenticateUser(ref.read(authRepositoryProvider));
@@ -52,6 +55,20 @@ class Auth extends _$Auth {
     _logger
       ..i('🔐 AUTH_NOTIFIER: build() called - initializing auth state')
       ..d('AUTH_NOTIFIER: Provider hash: $hashCode');
+
+    // Listen for API key revocation events from WebSocket
+    _setupRevocationListener();
+
+    // Listen for repeated reconnect failures (fallback for missed revocation messages)
+    _setupAuthFailureListener();
+
+    // Cancel subscriptions when provider is disposed
+    ref.onDispose(() {
+      _revocationSubscription?.cancel();
+      _revocationSubscription = null;
+      _authFailureSubscription?.cancel();
+      _authFailureSubscription = null;
+    });
 
     try {
       // Check if user is already authenticated (stored session)
@@ -325,6 +342,80 @@ class Auth extends _$Auth {
     final currentSiteValue = (currentSiteUrl ?? '').trim();
     return expectedTokenValue == currentTokenValue &&
         expectedSiteValue == currentSiteValue;
+  }
+
+  /// Sets up a listener for API key revocation events from the WebSocket.
+  void _setupRevocationListener() {
+    // Cancel any existing subscription first
+    _revocationSubscription?.cancel();
+
+    try {
+      final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+      _revocationSubscription = cacheIntegration.apiKeyRevocations.listen(
+        _handleApiKeyRevocation,
+        onError: (Object error) {
+          _logger.e('AUTH_NOTIFIER: Error in revocation stream: $error');
+        },
+      );
+      _logger.d('AUTH_NOTIFIER: Revocation listener set up');
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: Failed to set up revocation listener: $e');
+    }
+  }
+
+  /// Sets up a listener for repeated WebSocket reconnect failures.
+  /// This serves as a fallback detection mechanism when the revocation
+  /// message is missed (e.g., network issues during revocation).
+  void _setupAuthFailureListener() {
+    // Cancel any existing subscription first
+    _authFailureSubscription?.cancel();
+
+    try {
+      final webSocketService = ref.read(webSocketServiceProvider);
+      _authFailureSubscription = webSocketService.potentialAuthFailures.listen(
+        _handlePotentialAuthFailure,
+        onError: (Object error) {
+          _logger.e('AUTH_NOTIFIER: Error in auth failure stream: $error');
+        },
+      );
+      _logger.d('AUTH_NOTIFIER: Auth failure listener set up');
+    } on Exception catch (e) {
+      _logger.w('AUTH_NOTIFIER: Failed to set up auth failure listener: $e');
+    }
+  }
+
+  /// Handles repeated reconnect failures which may indicate a revoked API key.
+  /// Triggers sign out - same as clicking the sign out button.
+  void _handlePotentialAuthFailure(int failureCount) {
+    _logger.w(
+      'AUTH_NOTIFIER: 🔑⚠️ Potential auth failure detected ($failureCount consecutive reconnect failures)',
+    );
+
+    // Only handle if we're currently authenticated
+    final currentState = state.valueOrNull;
+    if (currentState == null || !currentState.isAuthenticated) {
+      _logger.d('AUTH_NOTIFIER: Ignoring auth failure - not authenticated');
+      return;
+    }
+
+    _logger.i('AUTH_NOTIFIER: Triggering sign out due to reconnect failures');
+    unawaited(signOut());
+  }
+
+  /// Handles an API key revocation event by signing out the user.
+  /// Triggers sign out - same as clicking the sign out button.
+  void _handleApiKeyRevocation(ApiKeyRevocationEvent event) {
+    _logger.w('AUTH_NOTIFIER: 🔑❌ API key revoked - reason: ${event.reason}');
+
+    // Only handle if we're currently authenticated
+    final currentState = state.valueOrNull;
+    if (currentState == null || !currentState.isAuthenticated) {
+      _logger.d('AUTH_NOTIFIER: Ignoring revocation - not authenticated');
+      return;
+    }
+
+    _logger.i('AUTH_NOTIFIER: Triggering sign out due to API key revocation');
+    unawaited(signOut());
   }
 
   Future<User> _performWebSocketHandshake({
