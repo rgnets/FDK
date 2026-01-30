@@ -64,7 +64,7 @@ class InitializationNotifier extends _$InitializationNotifier {
   /// 4. ready - Initialization complete
   ///
   /// On error, transitions to [InitializationState.error].
-  Future<void> initialize() async {
+  Future<void> initialize({bool waitForSync = true}) async {
     LoggerService.debug(
       'initialize() called, _isInitializing=$_isInitializing, state=$state',
       tag: 'InitProvider',
@@ -142,33 +142,53 @@ class InitializationNotifier extends _$InitializationNotifier {
       );
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
-      // Step 3: Load data via WebSocket
-      state = const InitializationState.loadingData(
-        currentOperation: 'Loading devices and rooms...',
-      );
-      LoggerService.debug('State -> loadingData', tag: 'InitProvider');
+      if (waitForSync) {
+        // Step 3: Load data via WebSocket (blocking)
+        state = const InitializationState.loadingData(
+          currentOperation: 'Loading devices and rooms...',
+        );
+        LoggerService.debug('State -> loadingData', tag: 'InitProvider');
 
-      _setupProgressListener();
+        _setupProgressListener();
 
-      LoggerService.debug(
-        'Calling syncInitialData with 45s timeout...',
-        tag: 'InitProvider',
-      );
-      await _dataSyncService.syncInitialData(
-        timeout: const Duration(seconds: 45),
-      );
-      LoggerService.debug('syncInitialData completed', tag: 'InitProvider');
+        LoggerService.debug(
+          'Calling syncInitialData with 45s timeout...',
+          tag: 'InitProvider',
+        );
+        await _dataSyncService.syncInitialData(
+          timeout: const Duration(seconds: 45),
+        );
+        LoggerService.debug('syncInitialData completed', tag: 'InitProvider');
 
-      // Clean up event subscription - no longer needed after initial sync
-      _eventSubscription?.cancel();
-      _eventSubscription = null;
+        // Clean up event subscription - no longer needed after initial sync
+        _eventSubscription?.cancel();
+        _eventSubscription = null;
 
-      // Step 4: Ready
-      state = const InitializationState.ready();
-      LoggerService.info(
-        'Initialization complete! State -> ready',
-        tag: 'InitProvider',
-      );
+        // Step 4: Ready
+        state = const InitializationState.ready();
+        LoggerService.info(
+          'Initialization complete! State -> ready',
+          tag: 'InitProvider',
+        );
+      } else {
+        // Start sync in background to avoid blocking initial UI.
+        unawaited(
+          _dataSyncService
+              .syncInitialData(timeout: const Duration(seconds: 45))
+              .catchError((_) {})
+              .whenComplete(() {
+            _eventSubscription?.cancel();
+            _eventSubscription = null;
+          }),
+        );
+
+        // Step 4: Ready immediately
+        state = const InitializationState.ready();
+        LoggerService.info(
+          'Initialization complete (background sync)! State -> ready',
+          tag: 'InitProvider',
+        );
+      }
     } on Exception catch (e, stack) {
       // Clean up event subscription on error
       _eventSubscription?.cancel();

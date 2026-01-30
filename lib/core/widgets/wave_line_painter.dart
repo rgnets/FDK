@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 class PulseInfo {
   PulseInfo({required this.position, required this.intensity});
   
-  final double position;
-  final double intensity; // 0.0 to 1.0
+  double position;
+  double intensity; // 0.0 to 1.0
 }
 
 /// Custom painter for a horizontal line that dips under the FDK logo
@@ -17,25 +17,45 @@ class WaveLinePainter extends CustomPainter {
     this.pulseInfos = const [],
     this.animationValue = 0.0,
   });
-  
+
   final Color lineColor;
   final double baseThickness;
   final List<PulseInfo> pulseInfos; // Pulse positions with intensity
   final double animationValue;
 
+  // Cached Paint objects to avoid allocations during paint()
+  static final Paint _basePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _pulsePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+
+  static final Paint _glowPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round;
+
+  // Cache for the wave path - only recreate when size changes
+  static Size? _cachedSize;
+  static Path? _cachedPath;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = lineColor
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    // Reuse cached path if size hasn't changed
+    if (_cachedSize != size || _cachedPath == null) {
+      _cachedPath = _createWavePath(size);
+      _cachedSize = size;
+    }
+    final path = _cachedPath!;
 
-    // Create the path for the line
-    final path = _createWavePath(size);
+    // Configure and reuse the base paint
+    _basePaint
+      ..color = lineColor
+      ..strokeWidth = baseThickness;
 
     // Draw the main line
-    paint.strokeWidth = baseThickness;
-    canvas.drawPath(path, paint);
+    canvas.drawPath(path, _basePaint);
 
     // Draw multiple traveling pulse effects for morse code with varying intensity
     for (final pulse in pulseInfos) {
@@ -97,53 +117,51 @@ class WaveLinePainter extends CustomPainter {
     return path;
   }
 
+  // Cached gradient stops to avoid recreating
+  static const _gradientStops = [0.0, 0.5, 1.0];
+  static const _pulseMaskFilter = MaskFilter.blur(BlurStyle.normal, 0.3);
+  static const _glowMaskFilter = MaskFilter.blur(BlurStyle.outer, 1.5);
+
   void _drawPulse(Canvas canvas, Size size, Path path, double pulsePosition, double intensity) {
     // Calculate pulse width (about 10% of screen width)
     final pulseWidth = size.width * 0.1;
     final pulseCenter = size.width * pulsePosition;
+
+    // Create a clipping region for the pulse
+    final pulseRect = Rect.fromLTWH(pulseCenter - pulseWidth / 2, 0, pulseWidth, size.height);
 
     // Create gradient for pulse effect with intensity-based brightness
     final pulseGradient = LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
       colors: [
-        lineColor.withValues(alpha: 0), 
-        lineColor.withValues(alpha: intensity), // Use intensity for brightness
-        lineColor.withValues(alpha: 0)
+        lineColor.withValues(alpha: 0),
+        lineColor.withValues(alpha: intensity),
+        lineColor.withValues(alpha: 0),
       ],
-      stops: const [0.0, 0.5, 1.0],
+      stops: _gradientStops,
     );
 
-    // Create a clipping region for the pulse
-    final pulseRect = Rect.fromLTWH(pulseCenter - pulseWidth / 2, 0, pulseWidth, size.height);
-
-    // Draw thicker line in pulse area
-    final pulsePaint = Paint()
+    // Configure and reuse the pulse paint
+    _pulsePaint
       ..shader = pulseGradient.createShader(pulseRect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth =
-          baseThickness *
-          2.0 // Double thickness for pulse visibility with ultra-thin line
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 0.3);
+      ..strokeWidth = baseThickness * 2.0
+      ..maskFilter = _pulseMaskFilter;
 
     // Save canvas state, clip to pulse area and draw the pulse
     canvas
       ..save()
       ..clipRect(pulseRect)
-      ..drawPath(path, pulsePaint);
+      ..drawPath(path, _pulsePaint);
 
-    // Add glow effect proportional to intensity
-    final glowPaint = Paint()
-      ..color = lineColor.withValues(alpha: intensity * 0.3) // Glow intensity varies with pulse
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = baseThickness * 3  // Slightly wider glow for visibility
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.outer, 1.5);
+    // Configure and reuse the glow paint
+    _glowPaint
+      ..color = lineColor.withValues(alpha: intensity * 0.3)
+      ..strokeWidth = baseThickness * 3
+      ..maskFilter = _glowMaskFilter;
 
     canvas
-      ..drawPath(path, glowPaint)
-      // Restore canvas state
+      ..drawPath(path, _glowPaint)
       ..restore();
   }
 
