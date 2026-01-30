@@ -77,30 +77,94 @@ class Auth extends _$Auth {
       final getCurrentUser = _getCurrentUser;
       final result = await getCurrentUser();
 
-      return result.fold(
-        (failure) {
+      return await result.fold(
+        (failure) async {
           _logger
             ..w(
               'AUTH_NOTIFIER: No existing session found or error: ${failure.message}',
             )
-            ..d('AUTH_NOTIFIER: Setting initial state to unauthenticated');
-          return const AuthStatus.unauthenticated();
+            ..d('AUTH_NOTIFIER: Checking for stored credentials...');
+          return _attemptCredentialRecovery();
         },
-        (user) {
+        (user) async {
           if (user != null) {
             _logger
               ..i('AUTH_NOTIFIER: ✅ Found existing user session!')
               ..d('AUTH_NOTIFIER: Username: ${user.username}')
-              ..d('AUTH_NOTIFIER: API URL: ${user.siteUrl}');
-            return AuthStatus.authenticated(user);
+              ..d('AUTH_NOTIFIER: API URL: ${user.siteUrl}')
+              ..d('AUTH_NOTIFIER: Connecting WebSocket for existing session...');
+            // Even when user model exists, we need to connect the WebSocket
+            // Call credential recovery which handles WebSocket connection
+            return _attemptCredentialRecovery();
           } else {
-            _logger.d('AUTH_NOTIFIER: No user found in storage');
-            return const AuthStatus.unauthenticated();
+            _logger.d('AUTH_NOTIFIER: No user found in storage, checking credentials...');
+            return _attemptCredentialRecovery();
           }
         },
       );
     } on Exception catch (e) {
       _logger.e('AUTH_NOTIFIER: Error checking for existing session: $e');
+      return _attemptCredentialRecovery();
+    }
+  }
+
+  /// Attempts to recover authentication from stored credentials when user model is missing.
+  /// Returns [AuthStatus.unauthenticated] if no valid credentials exist or recovery fails.
+  Future<AuthStatus> _attemptCredentialRecovery() async {
+    _logger.d('AUTH_NOTIFIER: Attempting credential recovery...');
+
+    final storage = ref.read(storageServiceProvider);
+
+    // Check if we have the required credentials
+    final token = storage.token;
+    final siteUrl = storage.siteUrl;
+    final username = storage.username;
+
+    final hasCredentials = token != null &&
+        token.isNotEmpty &&
+        siteUrl != null &&
+        siteUrl.isNotEmpty &&
+        username != null &&
+        username.isNotEmpty;
+
+    if (!hasCredentials) {
+      _logger.d('AUTH_NOTIFIER: No stored credentials for recovery');
+      return const AuthStatus.unauthenticated();
+    }
+
+    _logger.i('AUTH_NOTIFIER: Found stored credentials, attempting auto-reconnect');
+
+    // Parse FQDN from siteUrl
+    final parsed = Uri.tryParse(siteUrl);
+    final fqdn = parsed?.host ??
+        siteUrl.replaceFirst(RegExp(r'^https?://'), '').split('/').first;
+
+    if (fqdn.isEmpty) {
+      _logger.w('AUTH_NOTIFIER: Could not parse FQDN from siteUrl: $siteUrl');
+      return const AuthStatus.unauthenticated();
+    }
+
+    try {
+      final resolvedUser = await _performWebSocketHandshake(
+        fqdn: fqdn,
+        login: username,
+        token: token,
+        siteName: storage.siteName ?? fqdn,
+        issuedAt: storage.authIssuedAt,
+        signature: storage.authSignature,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          _logger.e('AUTH_NOTIFIER: Credential recovery timed out');
+          throw TimeoutException('Credential recovery timed out');
+        },
+      );
+
+      _logger.i('AUTH_NOTIFIER: ✅ Credential recovery successful');
+      return AuthStatus.authenticated(resolvedUser);
+    } on Exception catch (e, stack) {
+      _logger.e('AUTH_NOTIFIER: Credential recovery failed: $e\n$stack');
+      // Do NOT clear credentials - allow retry from login screen
       return const AuthStatus.unauthenticated();
     }
   }

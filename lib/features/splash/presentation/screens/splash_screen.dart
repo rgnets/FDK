@@ -9,6 +9,7 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/utils/qr_decoder.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 
 /// Splash screen shown on app launch
@@ -297,11 +298,63 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
     }
 
-    // Production mode: check if user has stored credentials
-    logger.i('SPLASH_SCREEN: 🏭 Production mode - checking stored credentials');
+    // Production mode: first wait for auth provider build() which attempts credential recovery
+    logger.i('SPLASH_SCREEN: 🏭 Production mode - checking auth state');
+
+    // Trigger build() and wait for credential recovery to complete
+    // This ensures _attemptCredentialRecovery() finishes before we proceed
+    logger.d('SPLASH_SCREEN: Waiting for auth provider build() to complete...');
+    try {
+      final authState = await ref.read(authProvider.future).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () {
+          logger.w('SPLASH_SCREEN: Auth build timed out after 20s');
+          return const AuthStatus.unauthenticated();
+        },
+      );
+
+      if (!mounted) {
+        logger.w('SPLASH_SCREEN: Widget disposed while waiting for auth');
+        return;
+      }
+
+      final alreadyAuthenticated = authState.maybeWhen(
+        authenticated: (user) {
+          logger
+            ..i('SPLASH_SCREEN: ✅ Already authenticated from credential recovery!')
+            ..d('SPLASH_SCREEN: User: ${user.username}');
+          return true;
+        },
+        orElse: () => false,
+      );
+
+      if (alreadyAuthenticated) {
+        logger.i('SPLASH_SCREEN: 🎉 Navigating directly to /home');
+        context.go('/home');
+        return;
+      }
+    } on Exception catch (e) {
+      logger.e('SPLASH_SCREEN: Error waiting for auth state: $e');
+    }
+
+    // Not authenticated yet - credential recovery either failed or no credentials exist
+    // Fall back to checking stored credentials for manual auth attempt
+    logger.d('SPLASH_SCREEN: Not authenticated, checking stored credentials for fallback');
     final storageService = ref.read(storageServiceProvider);
-    final hasCredentials = storageService.isAuthenticated;
-    logger.d('SPLASH_SCREEN: Has stored credentials: $hasCredentials');
+
+    // Check for actual stored credentials (not just the flag)
+    final hasStoredCredentials = storageService.token != null &&
+        storageService.token!.isNotEmpty &&
+        storageService.siteUrl != null &&
+        storageService.siteUrl!.isNotEmpty &&
+        storageService.username != null &&
+        storageService.username!.isNotEmpty;
+
+    final hasCredentials = storageService.isAuthenticated || hasStoredCredentials;
+    logger.d(
+      'SPLASH_SCREEN: Has stored credentials: $hasCredentials '
+      '(flag=${storageService.isAuthenticated}, hasData=$hasStoredCredentials)',
+    );
 
     if (mounted) {
       if (hasCredentials) {
@@ -321,7 +374,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           return;
         }
 
-        logger.i('SPLASH_SCREEN: ✅ Stored credentials found, re-authenticating');
+        logger.i('SPLASH_SCREEN: ✅ Stored credentials found, re-authenticating (fallback)');
         try {
           await ref
               .read(authProvider.notifier)
