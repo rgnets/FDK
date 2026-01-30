@@ -64,7 +64,7 @@ class InitializationNotifier extends _$InitializationNotifier {
   /// 4. ready - Initialization complete
   ///
   /// On error, transitions to [InitializationState.error].
-  Future<void> initialize({bool waitForSync = true}) async {
+  Future<void> initialize({bool waitForSync = false}) async {
     LoggerService.debug(
       'initialize() called, _isInitializing=$_isInitializing, state=$state',
       tag: 'InitProvider',
@@ -107,12 +107,12 @@ class InitializationNotifier extends _$InitializationNotifier {
       );
 
       if (!isConnected) {
-        // Wait up to 2 seconds for connection
+        // Wait up to 1 second for connection (reduced for faster startup)
         LoggerService.debug(
-          'WebSocket not connected, waiting up to 2s...',
+          'WebSocket not connected, waiting up to 1s...',
           tag: 'InitProvider',
         );
-        for (var i = 0; i < 20 && !isConnected; i++) {
+        for (var i = 0; i < 10 && !isConnected; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 100));
           isConnected = _webSocketService.isConnected;
         }
@@ -124,7 +124,7 @@ class InitializationNotifier extends _$InitializationNotifier {
 
       if (!isConnected) {
         LoggerService.error(
-          'WebSocket not connected after 2s wait, setting error state',
+          'WebSocket not connected after 1s wait, setting error state',
           tag: 'InitProvider',
         );
         state = InitializationState.error(
@@ -140,7 +140,7 @@ class InitializationNotifier extends _$InitializationNotifier {
         'State -> validatingCredentials',
         tag: 'InitProvider',
       );
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
       if (waitForSync) {
         // Step 3: Load data via WebSocket (blocking)

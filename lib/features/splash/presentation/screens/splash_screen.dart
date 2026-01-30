@@ -44,9 +44,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // Navigation starting - environment info available in logger
     }
 
-    // Simulate initialization
-    logger.d('SPLASH_SCREEN: Starting 2-second initialization delay');
-    await Future<void>.delayed(const Duration(seconds: 2));
+    // Brief splash display (reduced for faster startup)
+    logger.d('SPLASH_SCREEN: Starting 1-second initialization delay');
+    await Future<void>.delayed(const Duration(seconds: 1));
     logger.d('SPLASH_SCREEN: Initialization delay complete');
 
     // Check if widget is still mounted after async delay
