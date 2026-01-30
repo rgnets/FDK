@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/initialization/domain/entities/initialization_state.dart';
@@ -64,24 +65,68 @@ class InitializationNotifier extends _$InitializationNotifier {
   ///
   /// On error, transitions to [InitializationState.error].
   Future<void> initialize() async {
+    LoggerService.debug(
+      'initialize() called, _isInitializing=$_isInitializing, state=$state',
+      tag: 'InitProvider',
+    );
+
     // Prevent multiple simultaneous initializations
     if (_isInitializing) {
+      LoggerService.debug(
+        'Returning early: already initializing',
+        tag: 'InitProvider',
+      );
       return;
     }
 
     // Allow re-initialization from uninitialized or error states
     if (state != const InitializationState.uninitialized() &&
         !state.maybeWhen(error: (_, __) => true, orElse: () => false)) {
+      LoggerService.debug(
+        'Returning early: state is not uninitialized or error (state=$state)',
+        tag: 'InitProvider',
+      );
       return;
     }
 
     _isInitializing = true;
+    LoggerService.info('Starting initialization sequence', tag: 'InitProvider');
 
     try {
-      // Step 1: Check WebSocket connection
+      // Step 1: Check WebSocket connection (with brief wait for connection to stabilize)
       state = const InitializationState.checkingConnection();
+      LoggerService.debug('State -> checkingConnection', tag: 'InitProvider');
 
-      if (!_webSocketService.isConnected) {
+      // Wait briefly for WebSocket to stabilize after credential recovery
+      // This handles the race condition where auth completes but WebSocket state
+      // hasn't propagated yet
+      var isConnected = _webSocketService.isConnected;
+      LoggerService.debug(
+        'Initial WebSocket isConnected=$isConnected',
+        tag: 'InitProvider',
+      );
+
+      if (!isConnected) {
+        // Wait up to 2 seconds for connection
+        LoggerService.debug(
+          'WebSocket not connected, waiting up to 2s...',
+          tag: 'InitProvider',
+        );
+        for (var i = 0; i < 20 && !isConnected; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          isConnected = _webSocketService.isConnected;
+        }
+        LoggerService.debug(
+          'After waiting: isConnected=$isConnected',
+          tag: 'InitProvider',
+        );
+      }
+
+      if (!isConnected) {
+        LoggerService.error(
+          'WebSocket not connected after 2s wait, setting error state',
+          tag: 'InitProvider',
+        );
         state = InitializationState.error(
           message: 'Unable to connect to server',
           retryCount: _retryCount,
@@ -91,18 +136,28 @@ class InitializationNotifier extends _$InitializationNotifier {
 
       // Step 2: Validate credentials (auth is handled separately)
       state = const InitializationState.validatingCredentials();
+      LoggerService.debug(
+        'State -> validatingCredentials',
+        tag: 'InitProvider',
+      );
       await Future<void>.delayed(const Duration(milliseconds: 200));
 
       // Step 3: Load data via WebSocket
       state = const InitializationState.loadingData(
         currentOperation: 'Loading devices and rooms...',
       );
+      LoggerService.debug('State -> loadingData', tag: 'InitProvider');
 
       _setupProgressListener();
 
+      LoggerService.debug(
+        'Calling syncInitialData with 45s timeout...',
+        tag: 'InitProvider',
+      );
       await _dataSyncService.syncInitialData(
         timeout: const Duration(seconds: 45),
       );
+      LoggerService.debug('syncInitialData completed', tag: 'InitProvider');
 
       // Clean up event subscription - no longer needed after initial sync
       _eventSubscription?.cancel();
@@ -110,17 +165,29 @@ class InitializationNotifier extends _$InitializationNotifier {
 
       // Step 4: Ready
       state = const InitializationState.ready();
-    } on Exception catch (e) {
+      LoggerService.info(
+        'Initialization complete! State -> ready',
+        tag: 'InitProvider',
+      );
+    } on Exception catch (e, stack) {
       // Clean up event subscription on error
       _eventSubscription?.cancel();
       _eventSubscription = null;
 
+      LoggerService.error(
+        'Initialization failed with exception: $e\n$stack',
+        tag: 'InitProvider',
+      );
       state = InitializationState.error(
         message: e.toString(),
         retryCount: _retryCount,
       );
     } finally {
       _isInitializing = false;
+      LoggerService.debug(
+        'initialize() completed, _isInitializing=false',
+        tag: 'InitProvider',
+      );
     }
   }
 
