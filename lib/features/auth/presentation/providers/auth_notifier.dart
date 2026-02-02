@@ -148,13 +148,15 @@ class Auth extends _$Auth {
     }
 
     try {
+      // Get auth signature from secure storage
+      final signature = await storage.getAuthSignature();
       final resolvedUser = await _performWebSocketHandshake(
         fqdn: fqdn,
         login: username,
         token: token,
         siteName: storage.siteName ?? fqdn,
         issuedAt: storage.authIssuedAt,
-        signature: storage.authSignature,
+        signature: signature,
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {

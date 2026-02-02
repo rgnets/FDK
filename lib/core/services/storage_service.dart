@@ -114,9 +114,8 @@ class StorageService {
         }
       }
 
-      // Clean up legacy API keys
-      await _prefs.remove(_legacyKeyApiUrl);
-      await _prefs.remove(_legacyKeyApiToken);
+      // Migrate legacy api_url/api_token if present
+      await _migrateLegacyApiKeys();
 
       // Also migrate ATT FE Tool legacy keys
       await _migrateLegacyAttKeys();
@@ -136,6 +135,39 @@ class StorageService {
       );
       // Don't set flag - allow retry. User may need to re-authenticate.
     }
+  }
+
+  /// Migrates legacy api_url/api_token keys to secure storage.
+  Future<void> _migrateLegacyApiKeys() async {
+    final hasLegacy =
+        _prefs.containsKey(_legacyKeyApiUrl) ||
+        _prefs.containsKey(_legacyKeyApiToken);
+
+    if (!hasLegacy) return;
+
+    final apiUrl = _prefs.getString(_legacyKeyApiUrl);
+    final apiToken = _prefs.getString(_legacyKeyApiToken);
+
+    // If we have a token, migrate it to secure storage
+    if (apiToken != null && apiToken.isNotEmpty) {
+      await _secureStorage.saveToken(apiToken);
+      // Verify write succeeded
+      final verifyToken = await _secureStorage.getToken();
+      if (verifyToken != apiToken) {
+        throw Exception('Legacy api_token migration verification failed');
+      }
+    }
+
+    // If we have a URL and no siteUrl already set, migrate it
+    if (apiUrl != null &&
+        apiUrl.isNotEmpty &&
+        !_prefs.containsKey(_keySiteUrl)) {
+      await _prefs.setString(_keySiteUrl, apiUrl);
+    }
+
+    // Remove legacy keys only after successful migration
+    await _prefs.remove(_legacyKeyApiUrl);
+    await _prefs.remove(_legacyKeyApiToken);
   }
 
   Future<void> _migrateLegacyAttKeys() async {
@@ -159,9 +191,15 @@ class StorageService {
         await _prefs.setString(_keyUsername, login);
         // Save sensitive token to secure storage
         await _secureStorage.saveToken(apiKey);
+
+        // Verify write succeeded before deleting legacy keys
+        final verifyToken = await _secureStorage.getToken();
+        if (verifyToken != apiKey) {
+          throw Exception('ATT legacy token migration verification failed');
+        }
       }
 
-      // Remove legacy keys
+      // Remove legacy keys only after successful migration
       await Future.wait<bool>([
         _prefs.remove(legacyFqdnKey),
         _prefs.remove(legacyLoginKey),
