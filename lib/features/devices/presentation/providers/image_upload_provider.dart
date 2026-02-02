@@ -54,11 +54,11 @@ ImageUploadVerifier imageUploadVerifier(ImageUploadVerifierRef ref) {
 /// Uses Dio internally with certificate validation for handling
 /// self-signed certificates. No external client needed.
 @riverpod
-RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
+Future<RestImageUploadService> restImageUploadService(RestImageUploadServiceRef ref) async {
   final storage = ref.watch(storageServiceProvider);
 
   final siteUrl = storage.siteUrl ?? '';
-  final apiKey = storage.token ?? '';
+  final apiKey = await storage.getToken() ?? '';
 
   if (siteUrl.isEmpty || apiKey.isEmpty) {
     throw StateError('Not authenticated: missing siteUrl or apiKey');
@@ -77,8 +77,8 @@ RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
 /// After upload, fetches fresh device data via REST and updates the
 /// WebSocket cache to ensure the UI immediately reflects the new images.
 @riverpod
-ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
-  final restService = ref.watch(restImageUploadServiceProvider);
+Future<ImageUploadService> imageUploadService(ImageUploadServiceRef ref) async {
+  final restService = await ref.watch(restImageUploadServiceProvider.future);
   final verifier = ref.watch(imageUploadVerifierProvider);
   final eventBus = ref.watch(imageUploadEventBusProvider);
   final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
@@ -292,7 +292,7 @@ class ImageUploadNotifier extends _$ImageUploadNotifier {
       }
 
       // Upload images
-      final uploadService = ref.read(imageUploadServiceProvider);
+      final uploadService = await ref.read(imageUploadServiceProvider.future);
       final result = await uploadService.uploadImages(
         deviceType: deviceType,
         deviceId: deviceId,

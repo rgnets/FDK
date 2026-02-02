@@ -54,7 +54,7 @@ class Auth extends _$Auth {
   Future<AuthStatus> build() async {
     _logger = ref.watch(loggerProvider);
     final storage = ref.read(storageServiceProvider);
-    await storage.migrateLegacyCredentialsIfNeeded();
+    await storage.migrateToSecureStorageIfNeeded();
 
     _logger
       ..i('🔐 AUTH_NOTIFIER: build() called - initializing auth state')
@@ -119,7 +119,7 @@ class Auth extends _$Auth {
     final storage = ref.read(storageServiceProvider);
 
     // Check if we have the required credentials
-    final token = storage.token;
+    final token = await storage.getToken();
     final siteUrl = storage.siteUrl;
     final username = storage.username;
 
@@ -291,7 +291,7 @@ class Auth extends _$Auth {
 
     try {
       final storage = ref.read(storageServiceProvider);
-      final expectedToken = storage.token;
+      final expectedToken = await storage.getToken();
       final expectedSiteUrl = storage.siteUrl;
 
       // Set state to unauthenticated FIRST to unblock UI
@@ -367,7 +367,7 @@ class Auth extends _$Auth {
   }) async {
     try {
       final storage = ref.read(storageServiceProvider);
-      final currentToken = storage.token;
+      final currentToken = await storage.getToken();
       final currentSiteUrl = storage.siteUrl;
       if (!_credentialsMatch(
         expectedToken: expectedToken,

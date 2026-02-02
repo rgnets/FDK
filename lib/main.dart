@@ -167,9 +167,13 @@ class _FDKAppState extends ConsumerState<FDKApp> {
   }
 
   /// Initialize background services (called once from initState callback)
-  void _initializeServices() {
+  Future<void> _initializeServices() async {
     if (_servicesInitialized) return;
     _servicesInitialized = true;
+
+    // Migrate credentials to secure storage if needed (runs once)
+    final storageService = ref.read(storageServiceProvider);
+    await storageService.migrateToSecureStorageIfNeeded();
 
     ref.read(backgroundRefreshServiceProvider).startBackgroundRefresh();
     // Initialize WebSocket data sync listener to refresh providers when data arrives
@@ -177,7 +181,7 @@ class _FDKAppState extends ConsumerState<FDKApp> {
     // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
     ref.read(authSignOutCleanupProvider);
     // Initialize deeplink service for handling fdk:// URLs
-    _initializeDeeplinkService();
+    await _initializeDeeplinkService();
 
     // Check if already authenticated on startup
     final isAuthenticated = ref.read(isAuthenticatedProvider);

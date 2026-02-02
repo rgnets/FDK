@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/performance_monitor_service.dart';
+import 'package:rgnets_fdk/core/services/secure_storage_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,10 +36,16 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   );
 });
 
+/// Secure storage service provider for sensitive credentials
+final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
+  return SecureStorageService();
+});
+
 /// Storage service provider
 final storageServiceProvider = Provider<StorageService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
-  return StorageService(prefs);
+  final secureStorage = ref.watch(secureStorageServiceProvider);
+  return StorageService(prefs, secureStorage);
 });
 
 /// Performance monitor service provider (singleton)
@@ -73,21 +80,24 @@ final deviceUpdateEventBusProvider = Provider<DeviceUpdateEventBus>((ref) {
 /// Provider for the current API key used for authenticated HTTP requests.
 /// This is the token stored during authentication, used to authenticate
 /// image requests to the RXG backend's ActiveStorage.
-final apiKeyProvider = Provider<String?>((ref) {
+/// Returns a Future since credentials are now stored in secure storage.
+final apiKeyProvider = FutureProvider<String?>((ref) async {
   final storage = ref.watch(storageServiceProvider);
-  return storage.token;
+  return storage.getToken();
 });
 
 /// Provider for authenticating image URLs with the current API key.
 /// Returns a function that takes an image URL and returns an authenticated URL.
 final authenticatedImageUrlProvider = Provider<String? Function(String?)>((ref) {
-  final apiKey = ref.watch(apiKeyProvider);
+  final apiKeyAsync = ref.watch(apiKeyProvider);
+  final apiKey = apiKeyAsync.valueOrNull;
   return (String? imageUrl) => authenticateImageUrl(imageUrl, apiKey);
 });
 
 /// Provider for authenticating a list of image URLs with the current API key.
 final authenticatedImageUrlsProvider = Provider<List<String> Function(List<String>)>((ref) {
-  final apiKey = ref.watch(apiKeyProvider);
+  final apiKeyAsync = ref.watch(apiKeyProvider);
+  final apiKey = apiKeyAsync.valueOrNull;
   return (List<String> imageUrls) => authenticateImageUrls(imageUrls, apiKey);
 });
 

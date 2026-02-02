@@ -343,8 +343,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final storageService = ref.read(storageServiceProvider);
 
     // Check for actual stored credentials (not just the flag)
-    final hasStoredCredentials = storageService.token != null &&
-        storageService.token!.isNotEmpty &&
+    final storedToken = await storageService.getToken();
+    final hasStoredCredentials = storedToken != null &&
+        storedToken.isNotEmpty &&
         storageService.siteUrl != null &&
         storageService.siteUrl!.isNotEmpty &&
         storageService.username != null &&
@@ -359,7 +360,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (mounted) {
       if (hasCredentials) {
         final siteUrl = storageService.siteUrl ?? '';
-        final authToken = storageService.token ?? '';
+        final authToken = storedToken ?? '';
         final login = storageService.username ?? '';
         final siteName = storageService.siteName;
 
