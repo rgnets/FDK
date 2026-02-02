@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notices_summary_model.dart';
 
@@ -12,25 +12,16 @@ class HealthNoticesRemoteDataSource {
   }) : _socketService = socketService;
 
   final WebSocketService _socketService;
+  static const _tag = 'HealthNoticesDataSource';
 
   /// Fetches health notices summary (notices list + counts) from backend
   Future<HealthNoticesSummaryModel> fetchSummary() async {
-    if (kDebugMode) {
-      print('HealthNoticesDataSource: fetchSummary called, isConnected=${_socketService.isConnected}');
-    }
-
     if (!_socketService.isConnected) {
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: WebSocket not connected, returning empty');
-      }
+      LoggerService.debug('WebSocket not connected, returning empty', tag: _tag);
       return const HealthNoticesSummaryModel();
     }
 
     try {
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Sending request via requestActionCable...');
-      }
-
       // Use the WebSocket service's built-in request/response correlation
       final response = await _socketService.requestActionCable(
         action: 'resource_action',
@@ -39,46 +30,32 @@ class HealthNoticesRemoteDataSource {
         timeout: const Duration(seconds: 10),
       );
 
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Got response type=${response.type}');
-      }
-
       // Check for error response
       if (response.type == 'error') {
-        if (kDebugMode) {
-          print('HealthNoticesDataSource: Error response received');
-        }
+        LoggerService.warning('Error response received', tag: _tag);
         return const HealthNoticesSummaryModel();
       }
 
       // For resource_response, the data is in payload['data']
       // which contains { notices: [...], counts: {...} }
       final responseData = response.payload['data'];
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: responseData type=${responseData.runtimeType}');
-      }
 
       if (responseData is! Map<String, dynamic>) {
-        if (kDebugMode) {
-          print('HealthNoticesDataSource: responseData is not a Map, returning empty');
-        }
+        LoggerService.warning('Invalid response data type: ${responseData.runtimeType}', tag: _tag);
         return const HealthNoticesSummaryModel();
       }
 
       final summary = HealthNoticesSummaryModel.fromJson(responseData);
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Parsed ${summary.notices.length} notices, counts=${summary.counts.total}');
-      }
+      LoggerService.debug(
+        'Parsed ${summary.notices.length} notices, counts=${summary.counts.total}',
+        tag: _tag,
+      );
       return summary;
     } on TimeoutException {
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Request timed out');
-      }
+      LoggerService.warning('Request timed out', tag: _tag);
       return const HealthNoticesSummaryModel();
     } on Exception catch (e) {
-      if (kDebugMode) {
-        print('HealthNoticesDataSource: Request failed: $e');
-      }
+      LoggerService.error('Request failed: $e', tag: _tag, error: e);
       return const HealthNoticesSummaryModel();
     }
   }

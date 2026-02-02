@@ -595,8 +595,6 @@ class DeviceRepositoryImpl implements DeviceRepository {
     String deviceId,
     String signedIdToDelete,
   ) async {
-    print('=== REPOSITORY DELETE IMAGE ===');
-    print('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
     _logger.i('DeviceRepositoryImpl: deleteDeviceImage called for $deviceId, signedId: $signedIdToDelete');
     try {
       if (!_isAuthenticated()) {

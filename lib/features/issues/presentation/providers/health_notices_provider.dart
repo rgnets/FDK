@@ -49,10 +49,6 @@ class AggregateHealthCountsNotifier extends _$AggregateHealthCountsNotifier {
     // Get cached devices with health notice data from in-memory WebSocket cache
     final devices = cacheIntegration.getAllCachedDeviceModels();
 
-    if (kDebugMode) {
-      print('AggregateHealthCountsNotifier: Found ${devices.length} cached devices');
-    }
-
     // Aggregate health counts from all devices
     var totalFatal = 0;
     var totalCritical = 0;
@@ -68,22 +64,15 @@ class AggregateHealthCountsNotifier extends _$AggregateHealthCountsNotifier {
         totalCritical += counts.critical;
         totalWarning += counts.warning;
         totalNotice += counts.notice;
-        // Log first few devices with hn_counts to debug
-        if (kDebugMode && devicesWithHnCounts <= 5) {
-          print('  DEBUG Device ${device.deviceName} (${device.deviceId}): total=${counts.total}, fatal=${counts.fatal}, critical=${counts.critical}, warning=${counts.warning}, notice=${counts.notice}');
-        }
       }
-    }
-
-    if (kDebugMode) {
-      print('AggregateHealthCountsNotifier: $devicesWithHnCounts/${devices.length} devices have hn_counts');
     }
 
     final total = totalFatal + totalCritical + totalWarning + totalNotice;
 
-    if (kDebugMode) {
-      print('AggregateHealthCountsNotifier: Aggregated counts - total=$total, fatal=$totalFatal, critical=$totalCritical, warning=$totalWarning, notice=$totalNotice');
-    }
+    LoggerService.debug(
+      'AggregateHealthCountsNotifier: $devicesWithHnCounts/${devices.length} devices, counts: total=$total, fatal=$totalFatal, critical=$totalCritical, warning=$totalWarning, notice=$totalNotice',
+      tag: 'HealthNotices',
+    );
 
     return HealthCounts(
       total: total,
@@ -118,11 +107,7 @@ HealthCounts aggregateHealthCounts(AggregateHealthCountsRef ref) {
 @Riverpod(keepAlive: true)
 int criticalIssueCount(CriticalIssueCountRef ref) {
   final notices = ref.watch(healthNoticesListProvider);
-  final count = notices.criticalCount;
-  if (kDebugMode) {
-    print('criticalIssueCountProvider: criticalCount=$count from ${notices.length} total notices');
-  }
-  return count;
+  return notices.criticalCount;
 }
 
 /// Provider that extracts health notices from cached device data
@@ -167,10 +152,6 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       'HEALTH: Extracted ${notices.length} total notices from $devicesWithNotices devices with notices',
       tag: 'HealthNotices',
     );
-
-    if (kDebugMode) {
-      print('HealthNoticesNotifier: Found ${notices.length} total notices from ${devices.length} devices');
-    }
 
     // Sort by severity (highest first), then by creation time (newest first)
     notices.sort((a, b) {
