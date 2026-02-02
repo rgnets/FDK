@@ -205,7 +205,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ? siteNameRaw.trim()
               : null;
 
-      logger.d('AUTH_SCREEN: Parsed - fqdn=$fqdn, login=$login, token=${token != null ? "${token.substring(0, 4)}..." : "null"}');
+      logger.d('AUTH_SCREEN: Parsed - fqdn=$fqdn, login=$login, token=${token != null ? "[REDACTED, length=${token.length}]" : "null"}');
 
       if (fqdn == null || login == null || token == null) {
         logger.e('AUTH_SCREEN: Invalid credential payload - missing required fields');

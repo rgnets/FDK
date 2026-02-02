@@ -183,12 +183,11 @@ class Auth extends _$Auth {
     String? signature,
   }) async {
     _authGeneration += 1;
-    final keyLength = math.min(4, token.length);
     _logger
       ..i('🔑 AUTH_NOTIFIER: authenticate() called')
       ..d('AUTH_NOTIFIER: FQDN: $fqdn')
       ..d('AUTH_NOTIFIER: Login: $login')
-      ..d('AUTH_NOTIFIER: API Key: ${token.substring(0, keyLength)}...')
+      ..d('AUTH_NOTIFIER: Token: [REDACTED, length=${token.length}]')
       ..d('AUTH_NOTIFIER: Auth generation: $_authGeneration')
       ..d('AUTH_NOTIFIER: Current state before auth: ${state.value}');
 

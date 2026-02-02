@@ -116,10 +116,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           ..d('SPLASH_SCREEN: Decoded credentials from QR:')
           ..d('SPLASH_SCREEN:   FQDN: $fqdn')
           ..d('SPLASH_SCREEN:   Login: $login')
-          ..d('SPLASH_SCREEN:   API Key: ${authToken.substring(0, 4)}...')
-          ..d('SPLASH_SCREEN:   Site Name: $siteName')
-          ..d('SPLASH_SCREEN:   Full FQDN type: ${fqdn.runtimeType}')
-          ..d('SPLASH_SCREEN:   Full Login type: ${login.runtimeType}');
+          ..d('SPLASH_SCREEN:   Token: [REDACTED, length=${authToken.length}]')
+          ..d('SPLASH_SCREEN:   Site Name: $siteName');
 
         try {
           logger
@@ -244,7 +242,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           ..d('Using fallback credentials:')
           ..d('FQDN: $fqdn')
           ..d('Login: $login')
-          ..d('API Key: ${authToken.substring(0, 4)}...');
+          ..d('Token: [REDACTED, length=${authToken.length}]');
 
         try {
           await ref
