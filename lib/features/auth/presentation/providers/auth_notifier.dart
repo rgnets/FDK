@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';

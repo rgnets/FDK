@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/navigation_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/home/domain/entities/home_statistics.dart';

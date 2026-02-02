@@ -5,6 +5,7 @@ import 'package:logger/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_websocket_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/data/repositories/speed_test_repository_impl.dart';

@@ -1,7 +1,7 @@
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart'
     show notificationGenerationServiceProvider;
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart'
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart'
     show webSocketCacheIntegrationProvider;
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';

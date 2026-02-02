@@ -9,6 +9,7 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/app_initializer.dart';
 import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/services/error_reporter.dart';

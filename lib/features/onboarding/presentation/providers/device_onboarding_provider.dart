@@ -1,6 +1,7 @@
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
