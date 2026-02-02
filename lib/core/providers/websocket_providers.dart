@@ -3,8 +3,10 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 
-// Re-export sync providers for backward compatibility
-export 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+// NOTE: Sync providers are in websocket_sync_providers.dart
+// Import that file directly if you need webSocketDataSyncServiceProvider,
+// webSocketCacheIntegrationProvider, etc. We don't re-export here to avoid
+// circular dependencies with repository_providers.dart.
 
 /// Provides the base WebSocket configuration derived from the environment.
 final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
