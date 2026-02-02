@@ -40,7 +40,7 @@ class RoomDeviceStats with _$RoomDeviceStats {
 ///
 /// Provides device filtering and statistics for a specific room.
 /// Follows Clean Architecture and MVVM patterns.
-@Riverpod(keepAlive: true)
+@riverpod
 class RoomDeviceNotifier extends _$RoomDeviceNotifier {
   @override
   RoomDeviceState build(String roomId) {

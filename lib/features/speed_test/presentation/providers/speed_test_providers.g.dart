@@ -56,7 +56,7 @@ final speedTestConfigsNotifierProvider = AsyncNotifierProvider<
 
 typedef _$SpeedTestConfigsNotifier = AsyncNotifier<List<SpeedTestConfig>>;
 String _$speedTestResultsNotifierHash() =>
-    r'1e035a7a5d6105cc2577309ba1a1469642de508d';
+    r'6950d1eff53c75eeb1ee3117ba2c30a98e0deee8';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -80,7 +80,7 @@ class _SystemHash {
 }
 
 abstract class _$SpeedTestResultsNotifier
-    extends BuildlessAsyncNotifier<List<SpeedTestResult>> {
+    extends BuildlessAutoDisposeAsyncNotifier<List<SpeedTestResult>> {
   late final int? speedTestId;
   late final int? accessPointId;
 
@@ -137,8 +137,9 @@ class SpeedTestResultsNotifierFamily
 }
 
 /// See also [SpeedTestResultsNotifier].
-class SpeedTestResultsNotifierProvider extends AsyncNotifierProviderImpl<
-    SpeedTestResultsNotifier, List<SpeedTestResult>> {
+class SpeedTestResultsNotifierProvider
+    extends AutoDisposeAsyncNotifierProviderImpl<SpeedTestResultsNotifier,
+        List<SpeedTestResult>> {
   /// See also [SpeedTestResultsNotifier].
   SpeedTestResultsNotifierProvider({
     int? speedTestId,
@@ -204,8 +205,8 @@ class SpeedTestResultsNotifierProvider extends AsyncNotifierProviderImpl<
   }
 
   @override
-  AsyncNotifierProviderElement<SpeedTestResultsNotifier, List<SpeedTestResult>>
-      createElement() {
+  AutoDisposeAsyncNotifierProviderElement<SpeedTestResultsNotifier,
+      List<SpeedTestResult>> createElement() {
     return _SpeedTestResultsNotifierProviderElement(this);
   }
 
@@ -227,7 +228,7 @@ class SpeedTestResultsNotifierProvider extends AsyncNotifierProviderImpl<
 }
 
 mixin SpeedTestResultsNotifierRef
-    on AsyncNotifierProviderRef<List<SpeedTestResult>> {
+    on AutoDisposeAsyncNotifierProviderRef<List<SpeedTestResult>> {
   /// The parameter `speedTestId` of this provider.
   int? get speedTestId;
 
@@ -236,7 +237,7 @@ mixin SpeedTestResultsNotifierRef
 }
 
 class _SpeedTestResultsNotifierProviderElement
-    extends AsyncNotifierProviderElement<SpeedTestResultsNotifier,
+    extends AutoDisposeAsyncNotifierProviderElement<SpeedTestResultsNotifier,
         List<SpeedTestResult>> with SpeedTestResultsNotifierRef {
   _SpeedTestResultsNotifierProviderElement(super.provider);
 

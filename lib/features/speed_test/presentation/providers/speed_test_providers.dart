@@ -95,7 +95,7 @@ class SpeedTestConfigsNotifier extends _$SpeedTestConfigsNotifier {
 // Speed Test Results Provider
 // ============================================================================
 
-@Riverpod(keepAlive: true)
+@riverpod
 class SpeedTestResultsNotifier extends _$SpeedTestResultsNotifier {
   Logger get _logger => ref.read(loggerProvider);
 
