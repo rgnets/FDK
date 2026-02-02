@@ -111,9 +111,14 @@ Changed `@Riverpod(keepAlive: true)` to `@riverpod` for auto-dispose behavior.
 
 ## Phase 9: Enable riverpod_lint ✅
 
-**File**: `pubspec.yaml`
+**Files**:
+- `pubspec.yaml`
+- `analysis_options.yaml`
 
-**Fix**: Enabled `custom_lint: ^0.6.3` and `riverpod_lint: ^2.3.10` (versions compatible with existing `riverpod_generator`).
+**Fix**:
+- Enabled `custom_lint: ^0.6.3` and `riverpod_lint: ^2.3.10` in pubspec.yaml
+- Added `analyzer.plugins: - custom_lint` to analysis_options.yaml
+- Sorted dev_dependencies alphabetically to satisfy lint rules
 
 ---
 
