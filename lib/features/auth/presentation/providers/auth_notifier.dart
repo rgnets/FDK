@@ -27,6 +27,8 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     as device_notifications;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
     as notifications_domain;
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart'
+    as rooms_providers;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -752,6 +754,7 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
         ref.invalidate(notifications_domain.notificationsDomainNotifierProvider);
         ref.invalidate(dashboard_providers.dashboardStatsProvider);
+        ref.invalidate(rooms_providers.roomsNotifierProvider);
         logger.d('AUTH_CLEANUP: Data providers invalidated');
       } on Exception catch (e) {
         logger.w('AUTH_CLEANUP: Failed to invalidate data providers: $e');

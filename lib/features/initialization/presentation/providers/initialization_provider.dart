@@ -175,8 +175,14 @@ class InitializationNotifier extends _$InitializationNotifier {
         unawaited(
           _dataSyncService
               .syncInitialData(timeout: const Duration(seconds: 45))
-              .catchError((_) {})
-              .whenComplete(() {
+              .catchError((Object e, StackTrace st) {
+            LoggerService.error(
+              'Background sync failed: $e',
+              tag: 'InitProvider',
+              error: e,
+              stackTrace: st,
+            );
+          }).whenComplete(() {
             _eventSubscription?.cancel();
             _eventSubscription = null;
           }),

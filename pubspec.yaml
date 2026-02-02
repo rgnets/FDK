@@ -79,13 +79,8 @@ dev_dependencies:
   retrofit_generator: ^8.2.1
   riverpod_generator: 2.3.10
   flutter_launcher_icons: ^0.14.2
-  # custom_lint: ^0.7.0  # Temporarily disabled due to analyzer conflicts
-  # riverpod_lint: ^2.6.3  # Temporarily disabled due to analyzer conflicts
-
-# Dependency overrides to resolve analyzer conflicts
-# dependency_overrides:
-#   analyzer: ^6.7.0
-#   analyzer_plugin: ^0.11.3
+  custom_lint: ^0.6.3
+  riverpod_lint: ^2.3.10
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

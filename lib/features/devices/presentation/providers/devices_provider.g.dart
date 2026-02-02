@@ -6,7 +6,7 @@ part of 'devices_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$devicesNotifierHash() => r'b04f3d264b41ab17dfd141c9b1b21d9e9f294a64';
+String _$devicesNotifierHash() => r'766bf18de3493cae7dc0846a98e088328641f561';
 
 /// See also [DevicesNotifier].
 @ProviderFor(DevicesNotifier)
@@ -22,7 +22,7 @@ final devicesNotifierProvider =
 );
 
 typedef _$DevicesNotifier = AsyncNotifier<List<Device>>;
-String _$deviceNotifierHash() => r'cf3ebe7c65173144858d1bc65dd476c168fe7a26';
+String _$deviceNotifierHash() => r'b9ac7feda3a075a2e1c6fafa009e9f81a662bd0b';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -45,7 +45,8 @@ class _SystemHash {
   }
 }
 
-abstract class _$DeviceNotifier extends BuildlessAsyncNotifier<Device?> {
+abstract class _$DeviceNotifier
+    extends BuildlessAutoDisposeAsyncNotifier<Device?> {
   late final String deviceId;
 
   FutureOr<Device?> build(
@@ -97,7 +98,7 @@ class DeviceNotifierFamily extends Family<AsyncValue<Device?>> {
 
 /// See also [DeviceNotifier].
 class DeviceNotifierProvider
-    extends AsyncNotifierProviderImpl<DeviceNotifier, Device?> {
+    extends AutoDisposeAsyncNotifierProviderImpl<DeviceNotifier, Device?> {
   /// See also [DeviceNotifier].
   DeviceNotifierProvider(
     String deviceId,
@@ -153,7 +154,8 @@ class DeviceNotifierProvider
   }
 
   @override
-  AsyncNotifierProviderElement<DeviceNotifier, Device?> createElement() {
+  AutoDisposeAsyncNotifierProviderElement<DeviceNotifier, Device?>
+      createElement() {
     return _DeviceNotifierProviderElement(this);
   }
 
@@ -171,13 +173,13 @@ class DeviceNotifierProvider
   }
 }
 
-mixin DeviceNotifierRef on AsyncNotifierProviderRef<Device?> {
+mixin DeviceNotifierRef on AutoDisposeAsyncNotifierProviderRef<Device?> {
   /// The parameter `deviceId` of this provider.
   String get deviceId;
 }
 
 class _DeviceNotifierProviderElement
-    extends AsyncNotifierProviderElement<DeviceNotifier, Device?>
+    extends AutoDisposeAsyncNotifierProviderElement<DeviceNotifier, Device?>
     with DeviceNotifierRef {
   _DeviceNotifierProviderElement(super.provider);
 
@@ -186,10 +188,10 @@ class _DeviceNotifierProviderElement
 }
 
 String _$deviceSearchNotifierHash() =>
-    r'c160a0e8a8ab0f1cb2282d84141ac5826b4ede3a';
+    r'87a21b5273aeec608f0df6bb10f76c4554fbdbe8';
 
 abstract class _$DeviceSearchNotifier
-    extends BuildlessAsyncNotifier<List<Device>> {
+    extends BuildlessAutoDisposeAsyncNotifier<List<Device>> {
   late final String query;
 
   FutureOr<List<Device>> build(
@@ -240,8 +242,8 @@ class DeviceSearchNotifierFamily extends Family<AsyncValue<List<Device>>> {
 }
 
 /// See also [DeviceSearchNotifier].
-class DeviceSearchNotifierProvider
-    extends AsyncNotifierProviderImpl<DeviceSearchNotifier, List<Device>> {
+class DeviceSearchNotifierProvider extends AutoDisposeAsyncNotifierProviderImpl<
+    DeviceSearchNotifier, List<Device>> {
   /// See also [DeviceSearchNotifier].
   DeviceSearchNotifierProvider(
     String query,
@@ -297,7 +299,7 @@ class DeviceSearchNotifierProvider
   }
 
   @override
-  AsyncNotifierProviderElement<DeviceSearchNotifier, List<Device>>
+  AutoDisposeAsyncNotifierProviderElement<DeviceSearchNotifier, List<Device>>
       createElement() {
     return _DeviceSearchNotifierProviderElement(this);
   }
@@ -316,14 +318,15 @@ class DeviceSearchNotifierProvider
   }
 }
 
-mixin DeviceSearchNotifierRef on AsyncNotifierProviderRef<List<Device>> {
+mixin DeviceSearchNotifierRef
+    on AutoDisposeAsyncNotifierProviderRef<List<Device>> {
   /// The parameter `query` of this provider.
   String get query;
 }
 
 class _DeviceSearchNotifierProviderElement
-    extends AsyncNotifierProviderElement<DeviceSearchNotifier, List<Device>>
-    with DeviceSearchNotifierRef {
+    extends AutoDisposeAsyncNotifierProviderElement<DeviceSearchNotifier,
+        List<Device>> with DeviceSearchNotifierRef {
   _DeviceSearchNotifierProviderElement(super.provider);
 
   @override

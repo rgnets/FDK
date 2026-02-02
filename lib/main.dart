@@ -91,8 +91,37 @@ void main() async {
     try {
       sharedPreferences = await SharedPreferences.getInstance();
     } on Exception catch (e) {
-      // If SharedPreferences fails, provide a fallback or exit gracefully
       debugPrint('Failed to initialize SharedPreferences: $e');
+      // Show error UI instead of silent exit
+      runApp(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Storage Initialization Failed',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Error: $e', textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => main(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
       return;
     }
 
