@@ -49,7 +49,7 @@ final authStatusProvider = AutoDisposeProvider<AuthStatus?>.internal(
 );
 
 typedef AuthStatusRef = AutoDisposeProviderRef<AuthStatus?>;
-String _$authHash() => r'c585e25eb9b441842f8818b30ee5c30b6ebc69e7';
+String _$authHash() => r'61aed628ca39a3ff07d46be6f3999490f47f6724';
 
 /// See also [Auth].
 @ProviderFor(Auth)

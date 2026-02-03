@@ -737,9 +737,10 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         unawaited(ref.read(ontLocalDataSourceProvider).clearCache());
         unawaited(ref.read(switchLocalDataSourceProvider).clearCache());
         unawaited(ref.read(wlanLocalDataSourceProvider).clearCache());
-        logger.d('AUTH_CLEANUP: Typed device caches cleared');
+        unawaited(ref.read(roomLocalDataSourceProvider).clearCache());
+        logger.d('AUTH_CLEANUP: Typed device and room caches cleared');
       } on Exception catch (e) {
-        logger.w('AUTH_CLEANUP: Failed to clear typed device caches: $e');
+        logger.w('AUTH_CLEANUP: Failed to clear typed caches: $e');
       }
 
       // Clear WebSocket cache integration
