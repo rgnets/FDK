@@ -135,9 +135,19 @@ class WebSocketCacheIntegration {
     _deviceDataCallbacks.add(callback);
   }
 
+  /// Remove a callback for device data updates.
+  void removeDeviceDataCallback(DeviceDataCallback callback) {
+    _deviceDataCallbacks.remove(callback);
+  }
+
   /// Register a callback for room data updates.
   void onRoomData(void Function(List<Map<String, dynamic>>) callback) {
     _roomDataCallbacks.add(callback);
+  }
+
+  /// Remove a callback for room data updates.
+  void removeRoomDataCallback(void Function(List<Map<String, dynamic>>) callback) {
+    _roomDataCallbacks.remove(callback);
   }
 
   /// Register a callback for speed test config data updates.
@@ -145,9 +155,19 @@ class WebSocketCacheIntegration {
     _speedTestConfigCallbacks.add(callback);
   }
 
+  /// Remove a callback for speed test config data updates.
+  void removeSpeedTestConfigCallback(void Function(List<SpeedTestConfig>) callback) {
+    _speedTestConfigCallbacks.remove(callback);
+  }
+
   /// Register a callback for speed test result data updates.
   void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
     _speedTestResultCallbacks.add(callback);
+  }
+
+  /// Remove a callback for speed test result data updates.
+  void removeSpeedTestResultCallback(void Function(List<SpeedTestResult>) callback) {
+    _speedTestResultCallbacks.remove(callback);
   }
 
   /// Get cached rooms.
