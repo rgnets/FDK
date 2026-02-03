@@ -7,7 +7,6 @@ import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_pay
 import 'package:rgnets_fdk/features/onboarding/data/resolvers/message_resolver.dart';
 import 'package:rgnets_fdk/features/onboarding/data/services/stage_timestamp_tracker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 part 'device_onboarding_provider.g.dart';
 
