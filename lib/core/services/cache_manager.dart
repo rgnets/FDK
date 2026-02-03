@@ -20,8 +20,44 @@ class CacheEntry<T> {
 
 /// Cache manager implementing stale-while-revalidate pattern
 class CacheManager {
+  CacheManager({this.maxEntries = 100}) {
+    // Run cleanup periodically to prevent unbounded growth
+    _cleanupTimer = Timer.periodic(const Duration(minutes: 5), (_) => _cleanup());
+  }
+
+  final int maxEntries;
   final Map<String, CacheEntry<dynamic>> _cache = {};
   final Map<String, Completer<dynamic>> _pendingRequests = {};
+  Timer? _cleanupTimer;
+
+  /// Remove expired entries and enforce max size
+  void _cleanup() {
+    // Remove expired entries
+    _cache.removeWhere((_, entry) => entry.isExpired);
+
+    // If still over limit, remove oldest entries
+    if (_cache.length > maxEntries) {
+      final sortedKeys = _cache.entries.toList()
+        ..sort((a, b) => a.value.timestamp.compareTo(b.value.timestamp));
+
+      final keysToRemove = sortedKeys
+          .take(_cache.length - maxEntries)
+          .map((e) => e.key)
+          .toList();
+
+      for (final key in keysToRemove) {
+        _cache.remove(key);
+      }
+    }
+  }
+
+  /// Dispose resources
+  void dispose() {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = null;
+    _cache.clear();
+    _pendingRequests.clear();
+  }
 
   /// Get cached data with stale-while-revalidate
   Future<T?> get<T>({
@@ -152,5 +188,7 @@ class CacheManager {
 
 /// Provider for cache manager
 final cacheManagerProvider = Provider<CacheManager>((ref) {
-  return CacheManager();
+  final manager = CacheManager();
+  ref.onDispose(manager.dispose);
+  return manager;
 });
