@@ -1,4 +1,3 @@
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
@@ -30,7 +29,6 @@ MessageResolver messageResolver(MessageResolverRef ref) {
 /// Transforms DeviceModelSealed into OnboardingState with timing information.
 @Riverpod(keepAlive: true)
 class DeviceOnboardingNotifier extends _$DeviceOnboardingNotifier {
-  Logger get _logger => ref.read(loggerProvider);
   StageTimestampTracker get _tracker => ref.read(stageTimestampTrackerProvider);
   MessageResolver get _resolver => ref.read(messageResolverProvider);
 

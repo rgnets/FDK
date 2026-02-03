@@ -147,22 +147,6 @@ Future<ImageUploadService> imageUploadService(ImageUploadServiceRef ref) async {
   );
 }
 
-/// Reconstruct full device ID from resource type and raw ID
-String _reconstructDeviceId(String resourceType, String rawId) {
-  switch (resourceType) {
-    case 'access_points':
-      return 'ap_$rawId';
-    case 'media_converters':
-      return 'ont_$rawId';
-    case 'switch_devices':
-      return 'sw_$rawId';
-    case 'wlan_devices':
-      return 'wlan_$rawId';
-    default:
-      return rawId;
-  }
-}
-
 /// State for image upload operations
 class ImageUploadViewState {
   final bool isUploading;
