@@ -288,7 +288,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       if (id is int) return id;
       if (id is String) return int.tryParse(id) ?? 0;
     }
-    // For DeviceModel objects
+    // For DeviceModel objects - try dynamic access
     try {
       final id = device.id;
       if (id is String) {
@@ -296,7 +296,9 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
         final match = RegExp(r'\d+').firstMatch(id);
         return int.tryParse(match?.group(0) ?? '') ?? 0;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Expected: device may not have .id property - fallback to 0
+    }
     return 0;
   }
 
@@ -479,7 +481,9 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       } else if (deviceType == 'ONT') {
         return device.ontOnboardingStatus;
       }
-    } catch (_) {}
+    } catch (_) {
+      // Expected: device may not have onboarding status property
+    }
     return null;
   }
 

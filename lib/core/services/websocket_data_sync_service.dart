@@ -629,7 +629,10 @@ class WebSocketDataSyncService {
         } else {
           return 'offline';
         }
-      } on Exception catch (_) {}
+      } on Exception catch (e) {
+        // Date parsing failed - fallback to unknown status
+        _logger.d('WebSocketDataSync: Failed to parse device status date: $e');
+      }
     }
 
     return 'unknown';
