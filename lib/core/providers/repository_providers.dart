@@ -81,8 +81,8 @@ final deviceMockDataSourceProvider = Provider<DeviceDataSource>((ref) {
 
 /// Device data source provider (interface)
 final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
-  if (EnvironmentConfig.isDevelopment) {
-    // Use mock data source in development
+  if (EnvironmentConfig.useSyntheticData) {
+    // Use mock data source only when synthetic data flag is enabled
     return ref.watch(deviceMockDataSourceProvider);
   }
 

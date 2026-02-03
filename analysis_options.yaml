@@ -18,8 +18,6 @@ analyzer:
     - "build/**"
     - "test_programs/**"
     - "test/**/fixtures/**"
-    - "lib/core/services/mock_data_service.dart"
-    - "lib/features/devices/data/datasources/device_mock_data_source.dart"
     - "scripts/**"
   errors:
     invalid_annotation_target: ignore
