@@ -330,7 +330,7 @@ class _ManualCredentialEntrySheetState
                   controller: _fqdnController,
                   decoration: const InputDecoration(
                     labelText: 'Server (fqdn)',
-                    hintText: 'zew.netlab.ninja',
+                    hintText: 'example.rxg.com',
                   ),
                   autofillHints: const [AutofillHints.url],
                   validator: (value) {
@@ -348,7 +348,7 @@ class _ManualCredentialEntrySheetState
                   controller: _loginController,
                   decoration: const InputDecoration(
                     labelText: 'Login',
-                    hintText: 'fieldtech',
+                    hintText: 'username',
                   ),
                   autofillHints: const [AutofillHints.username],
                   validator: (value) {
@@ -363,7 +363,7 @@ class _ManualCredentialEntrySheetState
                   controller: _tokenController,
                   decoration: const InputDecoration(
                     labelText: 'Token',
-                    hintText: 'Paste or scan key',
+                    hintText: 'api_key_here',
                   ),
                   autofillHints: const [AutofillHints.password],
                   obscureText: true,
