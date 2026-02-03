@@ -95,6 +95,7 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
     webSocketCacheIntegration: webSocketCacheIntegration,
     imageBaseUrl: storageService.siteUrl,
     logger: logger,
+    storageService: storageService,
   );
 });
 

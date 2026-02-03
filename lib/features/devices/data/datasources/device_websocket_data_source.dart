@@ -1,11 +1,11 @@
-import 'dart:convert';
-
 import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
+import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
 
 /// WebSocket-based data source for fetching devices.
 /// Replaces DeviceRemoteDataSource with a WebSocket-backed implementation.
@@ -14,12 +14,15 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     required WebSocketCacheIntegration webSocketCacheIntegration,
     String? imageBaseUrl,
     Logger? logger,
+    StorageService? storageService,
   })  : _cacheIntegration = webSocketCacheIntegration,
         _imageBaseUrl = imageBaseUrl,
+        _storageService = storageService,
         _logger = logger ?? Logger();
 
   final WebSocketCacheIntegration _cacheIntegration;
   final String? _imageBaseUrl;
+  final StorageService? _storageService;
   final Logger _logger;
 
   static const Map<String, String> _deviceEndpointByPrefix = {
@@ -338,16 +341,23 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
       throw Exception('Unknown device type for ID: $deviceId');
     }
 
-    // Get current device to access imageSignedIds
-    final device = await getDevice(deviceId);
-    final currentSignedIds = device.map(
-      ap: (d) => d.imageSignedIds ?? [],
-      ont: (d) => d.imageSignedIds ?? [],
-      switchDevice: (d) => d.imageSignedIds ?? [],
-      wlan: (d) => d.imageSignedIds ?? [],
+    // Use REST API (HTTP PUT) for image deletion.
+    // The WebSocket update_resource action does not process the images
+    // parameter - only the REST API endpoint handles image updates.
+    // This matches how ATT-FE-Tool deletes images.
+    final restService = await _getRestImageUploadService();
+
+    // Fetch current signed IDs from the server via REST
+    final currentSignedIds = await restService.fetchCurrentSignedIds(
+      resourceType: resourceType,
+      deviceId: rawId,
     );
 
-    // Filter out the signed ID to delete (like ATT-FE-Tool does)
+    _logger.i(
+      'DeviceWebSocketDataSource: Current image count: ${currentSignedIds.length}',
+    );
+
+    // Filter out the signed ID to delete
     final updatedSignedIds = currentSignedIds
         .where((id) => id != signedIdToDelete)
         .toList();
@@ -359,52 +369,54 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
       throw Exception('SignedId not found in device images.');
     }
 
-    try {
-      // Send update request without waiting for response (fire-and-forget)
-      // The backend broadcasts resource_updated without request_id, causing timeouts
-      // Instead, we send and verify by fetching the updated device
-      final requestId = 'req-$resourceType-${DateTime.now().millisecondsSinceEpoch}';
-      final data = {
-        'action': 'update_resource',
-        'resource_type': resourceType,
-        'request_id': requestId,
-        'id': rawId,
-        'params': {'images': updatedSignedIds},
-      };
+    // Send the remaining signed IDs via REST PUT
+    final result = await restService.uploadImages(
+      deviceId: rawId,
+      resourceType: resourceType,
+      images: updatedSignedIds,
+    );
 
-      _webSocketService.send({
-        'command': 'message',
-        'identifier': '{"channel":"RxgChannel"}',
-        'data': jsonEncode(data),
-      });
-
-      _logger.i('DeviceWebSocketDataSource: Image delete request sent');
-
-      // Wait briefly for the backend to process the update
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
-
-      // Verify the change by fetching the updated device
-      final updatedDevice = await getDevice(deviceId, forceRefresh: true);
-
-      final newImageCount = updatedDevice.map(
-        ap: (d) => d.images?.length ?? 0,
-        ont: (d) => d.images?.length ?? 0,
-        switchDevice: (d) => d.images?.length ?? 0,
-        wlan: (d) => d.images?.length ?? 0,
+    if (!result.success) {
+      _logger.e(
+        'DeviceWebSocketDataSource: REST delete failed: ${result.errorMessage}',
       );
-
-      if (newImageCount < currentSignedIds.length) {
-        _logger.i('DeviceWebSocketDataSource: Image deletion verified successfully');
-        return updatedDevice;
-      } else {
-        _logger.w('DeviceWebSocketDataSource: Image count unchanged after delete');
-        // Still return the device - the cache may update later via WebSocket broadcast
-        return updatedDevice;
-      }
-    } on Exception catch (e) {
-      _logger.e('DeviceWebSocketDataSource: Failed to delete device image: $e');
-      throw Exception('Failed to delete device image: $e');
+      throw Exception('Failed to delete device image: ${result.errorMessage}');
     }
+
+    _logger.i('DeviceWebSocketDataSource: Image deleted via REST API successfully');
+
+    // Fetch the updated device data via REST to get the new state
+    final deviceData = await restService.fetchDeviceData(
+      resourceType: resourceType,
+      deviceId: rawId,
+    );
+
+    if (deviceData != null) {
+      return _mapToDeviceModel(resourceType, deviceData);
+    }
+
+    // Fallback: return cached device if REST fetch fails
+    return getDevice(deviceId);
+  }
+
+  /// Creates a [RestImageUploadService] using stored credentials.
+  Future<RestImageUploadService> _getRestImageUploadService() async {
+    final storage = _storageService;
+    if (storage == null) {
+      throw Exception('StorageService not available for REST API');
+    }
+
+    final siteUrl = storage.siteUrl;
+    if (siteUrl == null || siteUrl.isEmpty) {
+      throw Exception('Site URL not available for REST API');
+    }
+
+    final apiKey = await storage.getToken();
+    if (apiKey == null || apiKey.isEmpty) {
+      throw Exception('API key not available for REST API');
+    }
+
+    return RestImageUploadService(siteUrl: siteUrl, apiKey: apiKey);
   }
 
   String? _getResourceTypeFromId(String deviceId) {
