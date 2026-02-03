@@ -8,7 +8,7 @@ import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/app_initializer.dart';
 import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/services/error_reporter.dart';
@@ -91,8 +91,37 @@ void main() async {
     try {
       sharedPreferences = await SharedPreferences.getInstance();
     } on Exception catch (e) {
-      // If SharedPreferences fails, provide a fallback or exit gracefully
       debugPrint('Failed to initialize SharedPreferences: $e');
+      // Show error UI instead of silent exit
+      runApp(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Storage Initialization Failed',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Error: $e', textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => main(),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
       return;
     }
 
@@ -137,9 +166,13 @@ class _FDKAppState extends ConsumerState<FDKApp> {
   }
 
   /// Initialize background services (called once from initState callback)
-  void _initializeServices() {
+  Future<void> _initializeServices() async {
     if (_servicesInitialized) return;
     _servicesInitialized = true;
+
+    // Migrate credentials to secure storage if needed (runs once)
+    final storageService = ref.read(storageServiceProvider);
+    await storageService.migrateToSecureStorageIfNeeded();
 
     ref.read(backgroundRefreshServiceProvider).startBackgroundRefresh();
     // Initialize WebSocket data sync listener to refresh providers when data arrives
@@ -147,7 +180,7 @@ class _FDKAppState extends ConsumerState<FDKApp> {
     // Initialize auth sign-out cleanup listener to handle cache clearing and provider invalidation
     ref.read(authSignOutCleanupProvider);
     // Initialize deeplink service for handling fdk:// URLs
-    _initializeDeeplinkService();
+    await _initializeDeeplinkService();
 
     // Check if already authenticated on startup
     final isAuthenticated = ref.read(isAuthenticatedProvider);

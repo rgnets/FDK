@@ -7,7 +7,7 @@ part of 'room_device_view_model.dart';
 // **************************************************************************
 
 String _$roomDeviceNotifierHash() =>
-    r'162f6ee280103a8736f496c2943e0921738d1e2c';
+    r'5ef3bc2a18b2721842fb1ef380e71261420254d4';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -30,7 +30,8 @@ class _SystemHash {
   }
 }
 
-abstract class _$RoomDeviceNotifier extends BuildlessNotifier<RoomDeviceState> {
+abstract class _$RoomDeviceNotifier
+    extends BuildlessAutoDisposeNotifier<RoomDeviceState> {
   late final String roomId;
 
   RoomDeviceState build(
@@ -106,8 +107,8 @@ class RoomDeviceNotifierFamily extends Family<RoomDeviceState> {
 /// Follows Clean Architecture and MVVM patterns.
 ///
 /// Copied from [RoomDeviceNotifier].
-class RoomDeviceNotifierProvider
-    extends NotifierProviderImpl<RoomDeviceNotifier, RoomDeviceState> {
+class RoomDeviceNotifierProvider extends AutoDisposeNotifierProviderImpl<
+    RoomDeviceNotifier, RoomDeviceState> {
   /// Room device view model provider
   ///
   /// Provides device filtering and statistics for a specific room.
@@ -168,7 +169,8 @@ class RoomDeviceNotifierProvider
   }
 
   @override
-  NotifierProviderElement<RoomDeviceNotifier, RoomDeviceState> createElement() {
+  AutoDisposeNotifierProviderElement<RoomDeviceNotifier, RoomDeviceState>
+      createElement() {
     return _RoomDeviceNotifierProviderElement(this);
   }
 
@@ -186,14 +188,14 @@ class RoomDeviceNotifierProvider
   }
 }
 
-mixin RoomDeviceNotifierRef on NotifierProviderRef<RoomDeviceState> {
+mixin RoomDeviceNotifierRef on AutoDisposeNotifierProviderRef<RoomDeviceState> {
   /// The parameter `roomId` of this provider.
   String get roomId;
 }
 
 class _RoomDeviceNotifierProviderElement
-    extends NotifierProviderElement<RoomDeviceNotifier, RoomDeviceState>
-    with RoomDeviceNotifierRef {
+    extends AutoDisposeNotifierProviderElement<RoomDeviceNotifier,
+        RoomDeviceState> with RoomDeviceNotifierRef {
   _RoomDeviceNotifierProviderElement(super.provider);
 
   @override

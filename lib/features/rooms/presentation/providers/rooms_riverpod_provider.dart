@@ -1,8 +1,11 @@
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/utils/logging_utils.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/rooms/domain/usecases/get_rooms.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -55,29 +58,36 @@ class RoomsNotifier extends _$RoomsNotifier {
 @riverpod
 RoomStatistics roomStatistics(RoomStatisticsRef ref) {
   final rooms = ref.watch(roomsNotifierProvider);
-  
+  final devices = ref.watch(devicesNotifierProvider);
+
   return rooms.when(
     data: (roomList) {
       final total = roomList.length;
-      // Assuming we can calculate device stats from room metadata or deviceIds
       var totalDevices = 0;
       var onlineDevices = 0;
       var roomsWithIssues = 0;
-      
+
+      // Get the list of devices once (may be null/empty if still loading)
+      final deviceList = devices.valueOrNull ?? [];
+
       for (final room in roomList) {
-        final deviceCount = room.deviceIds?.length ?? 0;
+        final roomDeviceIds = room.deviceIds ?? [];
+        final deviceCount = roomDeviceIds.length;
         totalDevices += deviceCount;
-        
-        // Mock calculation for demo - in real app this would come from device status
-        final mockOnlineDevices = (deviceCount * 0.8).round(); // Assume 80% online
-        onlineDevices += mockOnlineDevices;
-        
-        // Mock issues calculation
-        if (deviceCount > 0 && mockOnlineDevices < deviceCount) {
+
+        // Use real device status from devicesNotifierProvider
+        final roomDevices = deviceList
+            .where((d) => roomDeviceIds.contains(d.id))
+            .toList();
+        final realOnlineDevices = roomDevices.where((d) => d.isOnline).length;
+        onlineDevices += realOnlineDevices;
+
+        // A room has issues if it has devices but not all are online
+        if (deviceCount > 0 && realOnlineDevices < deviceCount) {
           roomsWithIssues++;
         }
       }
-      
+
       return RoomStatistics(
         total: total,
         totalDevices: totalDevices,
@@ -86,7 +96,15 @@ RoomStatistics roomStatistics(RoomStatisticsRef ref) {
       );
     },
     loading: () => const RoomStatistics(),
-    error: (_, __) => const RoomStatistics(),
+    error: (error, stack) {
+      LoggerService.error(
+        'Failed to load room statistics',
+        tag: 'RoomsProvider',
+        error: error,
+        stackTrace: stack,
+      );
+      return const RoomStatistics();
+    },
   );
 }
 
@@ -120,6 +138,14 @@ Room? roomById(RoomByIdRef ref, String roomId) {
       return matchingRooms.isNotEmpty ? matchingRooms.first : null;
     },
     loading: () => null,
-    error: (_, __) => null,
+    error: (error, stack) {
+      LoggerService.error(
+        'Failed to get room by ID: $roomId',
+        tag: 'RoomsProvider',
+        error: error,
+        stackTrace: stack,
+      );
+      return null;
+    },
   );
 }

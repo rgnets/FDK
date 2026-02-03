@@ -13,7 +13,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
-import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
@@ -53,11 +53,11 @@ ImageUploadVerifier imageUploadVerifier(ImageUploadVerifierRef ref) {
 /// Uses Dio internally with certificate validation for handling
 /// self-signed certificates. No external client needed.
 @riverpod
-RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
+Future<RestImageUploadService> restImageUploadService(RestImageUploadServiceRef ref) async {
   final storage = ref.watch(storageServiceProvider);
 
   final siteUrl = storage.siteUrl ?? '';
-  final apiKey = storage.token ?? '';
+  final apiKey = await storage.getToken() ?? '';
 
   if (siteUrl.isEmpty || apiKey.isEmpty) {
     throw StateError('Not authenticated: missing siteUrl or apiKey');
@@ -76,8 +76,8 @@ RestImageUploadService restImageUploadService(RestImageUploadServiceRef ref) {
 /// After upload, fetches fresh device data via REST and updates the
 /// WebSocket cache to ensure the UI immediately reflects the new images.
 @riverpod
-ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
-  final restService = ref.watch(restImageUploadServiceProvider);
+Future<ImageUploadService> imageUploadService(ImageUploadServiceRef ref) async {
+  final restService = await ref.watch(restImageUploadServiceProvider.future);
   final verifier = ref.watch(imageUploadVerifierProvider);
   final eventBus = ref.watch(imageUploadEventBusProvider);
   final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
@@ -145,22 +145,6 @@ ImageUploadService imageUploadService(ImageUploadServiceRef ref) {
       }
     },
   );
-}
-
-/// Reconstruct full device ID from resource type and raw ID
-String _reconstructDeviceId(String resourceType, String rawId) {
-  switch (resourceType) {
-    case 'access_points':
-      return 'ap_$rawId';
-    case 'media_converters':
-      return 'ont_$rawId';
-    case 'switch_devices':
-      return 'sw_$rawId';
-    case 'wlan_devices':
-      return 'wlan_$rawId';
-    default:
-      return rawId;
-  }
 }
 
 /// State for image upload operations
@@ -291,7 +275,7 @@ class ImageUploadNotifier extends _$ImageUploadNotifier {
       }
 
       // Upload images
-      final uploadService = ref.read(imageUploadServiceProvider);
+      final uploadService = await ref.read(imageUploadServiceProvider.future);
       final result = await uploadService.uploadImages(
         deviceType: deviceType,
         deviceId: deviceId,

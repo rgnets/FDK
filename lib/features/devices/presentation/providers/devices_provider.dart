@@ -39,7 +39,6 @@ class DevicesNotifier extends _$DevicesNotifier {
   Future<List<Device>> build() async {
     final authStatus = ref.watch(authStatusProvider);
     final isAuthenticated = authStatus?.isAuthenticated ?? false;
-    _attachDevicesStream();
 
     if (isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Loading devices');
@@ -52,6 +51,9 @@ class DevicesNotifier extends _$DevicesNotifier {
       _latestDevices = null;
       return [];
     }
+
+    // Only attach stream subscription after confirming authentication
+    _attachDevicesStream();
 
     try {
       // Try to get from cache first with stale-while-revalidate
@@ -273,7 +275,7 @@ class DevicesNotifier extends _$DevicesNotifier {
   }
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 class DeviceNotifier extends _$DeviceNotifier {
   Logger get _logger => ref.read(loggerProvider);
   StreamSubscription<CacheInvalidationEvent>? _cacheInvalidationSub;
@@ -469,8 +471,8 @@ class DeviceNotifier extends _$DeviceNotifier {
   }
 }
 
-// Search provider
-@Riverpod(keepAlive: true)
+// Search provider - auto-dispose to prevent memory leaks with many searches
+@riverpod
 class DeviceSearchNotifier extends _$DeviceSearchNotifier {
   SearchDevices get _searchDevices =>
       SearchDevices(ref.read(deviceRepositoryProvider));

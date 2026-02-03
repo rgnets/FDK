@@ -190,10 +190,7 @@ class RestImageUploadService {
       'REST Upload: PUT $resourceType/$deviceId with ${images.length} images',
       tag: 'RestImageUploadService',
     );
-    LoggerService.debug(
-      'REST Upload URL: $url',
-      tag: 'RestImageUploadService',
-    );
+    // Note: Not logging URL as it contains api_key
 
     try {
       final dio = _dio;

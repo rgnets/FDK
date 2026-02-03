@@ -1,22 +1,26 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/services/secure_storage_service.dart';
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service for managing local storage
+/// Service for managing local storage.
+///
+/// Sensitive credentials are stored in secure storage (Keychain/Keystore).
+/// Non-sensitive settings are stored in SharedPreferences.
 class StorageService {
-  StorageService(this._prefs);
+  StorageService(this._prefs, this._secureStorage);
   final SharedPreferences _prefs;
+  final SecureStorageService _secureStorage;
 
-  // Keys (WS-only semantics)
+  // Keys for SharedPreferences (non-sensitive data only)
   static const String _keySiteUrl = 'site_url';
-  static const String _keyToken = 'token';
   static const String _keyUsername = 'username';
   static const String _keySiteName = 'site_name';
   static const String _keyAuthIssuedAt = 'auth_issued_at';
-  static const String _keyAuthSignature = 'auth_signature';
   static const String _keyIsAuthenticated = 'is_authenticated';
-  static const String _keySessionToken = 'ws_session_token';
   static const String _keySessionExpiresAt = 'ws_session_expires_at';
   static const String _keyAuthAttempts = 'auth_attempts';
   static const String _keyThemeMode = 'theme_mode';
@@ -26,6 +30,14 @@ class StorageService {
   static const String _keyPhaseFilter = 'device_phase_filter';
   static const String _keyStatusFilter = 'device_status_filter';
   static const String _keyRoomFilter = 'device_room_filter';
+  static const String _keySecureMigrationComplete = 'secure_migration_v1';
+
+  // Legacy keys (for migration cleanup)
+  static const String _legacyKeyToken = 'token';
+  static const String _legacyKeySessionToken = 'ws_session_token';
+  static const String _legacyKeyAuthSignature = 'auth_signature';
+  static const String _legacyKeyApiUrl = 'api_url';
+  static const String _legacyKeyApiToken = 'api_token';
 
   /// Public key for phase filter (for tests and direct access)
   static const String keyPhaseFilter = _keyPhaseFilter;
@@ -36,73 +48,129 @@ class StorageService {
   /// Public key for room filter (for tests and direct access)
   static const String keyRoomFilter = _keyRoomFilter;
 
-  // Legacy keys for migration
-  static const String _legacyKeyApiUrl = 'api_url';
-  static const String _legacyKeyApiToken = 'api_token';
+  /// Migrates credentials from plaintext SharedPreferences to secure storage.
+  ///
+  /// Uses atomic migration: read → write secure → verify → delete plaintext.
+  /// Only runs once; sets a flag on completion.
+  Future<void> migrateToSecureStorageIfNeeded() async {
+    // Check if migration already completed
+    if (_prefs.getBool(_keySecureMigrationComplete) ?? false) {
+      return;
+    }
 
-  // Auth
-  Future<void> saveCredentials({
-    required String siteUrl,
-    required String token,
-    required String username,
-    String? siteName,
-    String? issuedAtIso,
-    String? signature,
-    bool markAuthenticated = false,
-  }) async {
-    await _prefs.setString(_keySiteUrl, siteUrl);
-    await _prefs.setString(_keyToken, token);
-    await _prefs.setString(_keyUsername, username);
-    if (siteName != null) {
-      await _prefs.setString(_keySiteName, siteName);
-    }
-    if (issuedAtIso != null) {
-      await _prefs.setString(_keyAuthIssuedAt, issuedAtIso);
-    }
-    if (signature != null) {
-      await _prefs.setString(_keyAuthSignature, signature);
-    }
-    await _prefs.setBool(_keyIsAuthenticated, markAuthenticated);
-  }
-
-  Future<void> saveSession({
-    required String token,
-    required DateTime expiresAt,
-  }) async {
-    await _prefs.setString(_keySessionToken, token);
-    await _prefs.setString(
-      _keySessionExpiresAt,
-      expiresAt.toUtc().toIso8601String(),
+    LoggerService.info(
+      'Starting secure storage migration',
+      tag: 'StorageService',
     );
+
+    try {
+      // Check if secure storage is available
+      final isAvailable = await _secureStorage.isAvailable();
+      if (!isAvailable) {
+        LoggerService.warning(
+          'Secure storage unavailable - migration skipped',
+          tag: 'StorageService',
+        );
+        // Don't set flag - retry on next launch
+        return;
+      }
+
+      // Migrate token
+      final plaintextToken = _prefs.getString(_legacyKeyToken);
+      if (plaintextToken != null && plaintextToken.isNotEmpty) {
+        await _secureStorage.saveToken(plaintextToken);
+        // Verify write succeeded
+        final verifyToken = await _secureStorage.getToken();
+        if (verifyToken == plaintextToken) {
+          await _prefs.remove(_legacyKeyToken);
+        } else {
+          throw Exception('Token migration verification failed');
+        }
+      }
+
+      // Migrate session token
+      final plaintextSessionToken = _prefs.getString(_legacyKeySessionToken);
+      if (plaintextSessionToken != null && plaintextSessionToken.isNotEmpty) {
+        await _secureStorage.saveSessionToken(plaintextSessionToken);
+        // Verify write succeeded
+        final verifySession = await _secureStorage.getSessionToken();
+        if (verifySession == plaintextSessionToken) {
+          await _prefs.remove(_legacyKeySessionToken);
+        } else {
+          throw Exception('Session token migration verification failed');
+        }
+      }
+
+      // Migrate auth signature
+      final plaintextSignature = _prefs.getString(_legacyKeyAuthSignature);
+      if (plaintextSignature != null && plaintextSignature.isNotEmpty) {
+        await _secureStorage.saveAuthSignature(plaintextSignature);
+        // Verify write succeeded
+        final verifySignature = await _secureStorage.getAuthSignature();
+        if (verifySignature == plaintextSignature) {
+          await _prefs.remove(_legacyKeyAuthSignature);
+        } else {
+          throw Exception('Auth signature migration verification failed');
+        }
+      }
+
+      // Migrate legacy api_url/api_token if present
+      await _migrateLegacyApiKeys();
+
+      // Also migrate ATT FE Tool legacy keys
+      await _migrateLegacyAttKeys();
+
+      // Mark migration complete
+      await _prefs.setBool(_keySecureMigrationComplete, true);
+
+      LoggerService.info(
+        'Secure storage migration completed successfully',
+        tag: 'StorageService',
+      );
+    } on Exception catch (e) {
+      LoggerService.error(
+        'Secure storage migration failed: $e',
+        tag: 'StorageService',
+        error: e,
+      );
+      // Don't set flag - allow retry. User may need to re-authenticate.
+    }
   }
 
-  Future<void> clearCredentials() async {
-    await _prefs.remove(_keySiteUrl);
-    await _prefs.remove(_keyToken);
-    await _prefs.remove(_keyUsername);
-    await _prefs.remove(_keySiteName);
-    await _prefs.remove(_keyAuthIssuedAt);
-    await _prefs.remove(_keyAuthSignature);
-    // Also clear any legacy keys
+  /// Migrates legacy api_url/api_token keys to secure storage.
+  Future<void> _migrateLegacyApiKeys() async {
+    final hasLegacy =
+        _prefs.containsKey(_legacyKeyApiUrl) ||
+        _prefs.containsKey(_legacyKeyApiToken);
+
+    if (!hasLegacy) return;
+
+    final apiUrl = _prefs.getString(_legacyKeyApiUrl);
+    final apiToken = _prefs.getString(_legacyKeyApiToken);
+
+    // If we have a token, migrate it to secure storage
+    if (apiToken != null && apiToken.isNotEmpty) {
+      await _secureStorage.saveToken(apiToken);
+      // Verify write succeeded
+      final verifyToken = await _secureStorage.getToken();
+      if (verifyToken != apiToken) {
+        throw Exception('Legacy api_token migration verification failed');
+      }
+    }
+
+    // If we have a URL and no siteUrl already set, migrate it
+    if (apiUrl != null &&
+        apiUrl.isNotEmpty &&
+        !_prefs.containsKey(_keySiteUrl)) {
+      await _prefs.setString(_keySiteUrl, apiUrl);
+    }
+
+    // Remove legacy keys only after successful migration
     await _prefs.remove(_legacyKeyApiUrl);
     await _prefs.remove(_legacyKeyApiToken);
-    await clearSession();
-    await _prefs.setBool(_keyIsAuthenticated, false);
   }
 
-  Future<void> setAuthenticated({required bool value}) async {
-    await _prefs.setBool(_keyIsAuthenticated, value);
-  }
-
-  Future<void> clearSession() async {
-    await _prefs.remove(_keySessionToken);
-    await _prefs.remove(_keySessionExpiresAt);
-  }
-
-  /// Migrates legacy credential storage formats to WS-only semantics.
-  /// Handles both att_fe_tool.* keys and api_url/api_token keys.
-  Future<void> migrateLegacyCredentialsIfNeeded() async {
-    // Migration 1: ATT FE Tool legacy keys
+  Future<void> _migrateLegacyAttKeys() async {
     const legacyFqdnKey = 'att_fe_tool.fqdn';
     const legacyLoginKey = 'att_fe_tool.login';
     const legacyApiKey = 'att_fe_tool.api_key';
@@ -118,41 +186,98 @@ class StorageService {
       final apiKey = _prefs.getString(legacyApiKey) ?? '';
 
       if (fqdn.isNotEmpty && login.isNotEmpty && apiKey.isNotEmpty) {
-        await saveCredentials(
-          siteUrl: 'https://$fqdn',
-          token: apiKey,
-          username: login,
-          markAuthenticated: false,
-        );
+        // Save non-sensitive data to SharedPreferences
+        await _prefs.setString(_keySiteUrl, 'https://$fqdn');
+        await _prefs.setString(_keyUsername, login);
+        // Save sensitive token to secure storage
+        await _secureStorage.saveToken(apiKey);
+
+        // Verify write succeeded before deleting legacy keys
+        final verifyToken = await _secureStorage.getToken();
+        if (verifyToken != apiKey) {
+          throw Exception('ATT legacy token migration verification failed');
+        }
       }
 
+      // Remove legacy keys only after successful migration
       await Future.wait<bool>([
         _prefs.remove(legacyFqdnKey),
         _prefs.remove(legacyLoginKey),
         _prefs.remove(legacyApiKey),
       ]);
     }
+  }
 
-    // Migration 2: api_url/api_token keys to site_url/token
-    final hasApiLegacy =
-        _prefs.containsKey(_legacyKeyApiUrl) ||
-        _prefs.containsKey(_legacyKeyApiToken);
-
-    if (hasApiLegacy && !_prefs.containsKey(_keySiteUrl)) {
-      final apiUrl = _prefs.getString(_legacyKeyApiUrl);
-      final apiToken = _prefs.getString(_legacyKeyApiToken);
-
-      if (apiUrl != null && apiUrl.isNotEmpty) {
-        await _prefs.setString(_keySiteUrl, apiUrl);
-      }
-      if (apiToken != null && apiToken.isNotEmpty) {
-        await _prefs.setString(_keyToken, apiToken);
-      }
-
-      // Remove legacy keys after migration
-      await _prefs.remove(_legacyKeyApiUrl);
-      await _prefs.remove(_legacyKeyApiToken);
+  // Auth - credentials now use secure storage
+  Future<void> saveCredentials({
+    required String siteUrl,
+    required String token,
+    required String username,
+    String? siteName,
+    String? issuedAtIso,
+    String? signature,
+    bool markAuthenticated = false,
+  }) async {
+    // Non-sensitive data to SharedPreferences
+    await _prefs.setString(_keySiteUrl, siteUrl);
+    await _prefs.setString(_keyUsername, username);
+    if (siteName != null) {
+      await _prefs.setString(_keySiteName, siteName);
     }
+    if (issuedAtIso != null) {
+      await _prefs.setString(_keyAuthIssuedAt, issuedAtIso);
+    }
+    await _prefs.setBool(_keyIsAuthenticated, markAuthenticated);
+
+    // Sensitive data to secure storage
+    await _secureStorage.saveToken(token);
+    if (signature != null) {
+      await _secureStorage.saveAuthSignature(signature);
+    }
+  }
+
+  Future<void> saveSession({
+    required String token,
+    required DateTime expiresAt,
+  }) async {
+    // Session token to secure storage
+    await _secureStorage.saveSessionToken(token);
+    // Expiry time to SharedPreferences (not sensitive)
+    await _prefs.setString(
+      _keySessionExpiresAt,
+      expiresAt.toUtc().toIso8601String(),
+    );
+  }
+
+  Future<void> clearCredentials() async {
+    // Clear non-sensitive data from SharedPreferences
+    await _prefs.remove(_keySiteUrl);
+    await _prefs.remove(_keyUsername);
+    await _prefs.remove(_keySiteName);
+    await _prefs.remove(_keyAuthIssuedAt);
+    // Also clear any legacy keys that might exist
+    await _prefs.remove(_legacyKeyToken);
+    await _prefs.remove(_legacyKeyApiUrl);
+    await _prefs.remove(_legacyKeyApiToken);
+    await _prefs.remove(_legacyKeySessionToken);
+    await _prefs.remove(_legacyKeyAuthSignature);
+
+    // Clear sensitive data from secure storage
+    await _secureStorage.clearAll();
+
+    await clearSession();
+    await _prefs.setBool(_keyIsAuthenticated, false);
+  }
+
+  Future<void> setAuthenticated({required bool value}) async {
+    await _prefs.setBool(_keyIsAuthenticated, value);
+  }
+
+  Future<void> clearSession() async {
+    await _secureStorage.deleteSessionToken();
+    await _prefs.remove(_keySessionExpiresAt);
+    // Also clear legacy key if present
+    await _prefs.remove(_legacyKeySessionToken);
   }
 
   Future<void> logAuthAttempt(AuthAttempt attempt) async {
@@ -188,16 +313,14 @@ class StorageService {
     }
   }
 
+  // Getters - synchronous for non-sensitive, async for sensitive
   String? get siteUrl => _prefs.getString(_keySiteUrl);
-  String? get token => _prefs.getString(_keyToken);
   String? get username => _prefs.getString(_keyUsername);
   String? get siteName => _prefs.getString(_keySiteName);
   String? get authIssuedAtIso => _prefs.getString(_keyAuthIssuedAt);
   DateTime? get authIssuedAt =>
       authIssuedAtIso != null ? DateTime.tryParse(authIssuedAtIso!) : null;
-  String? get authSignature => _prefs.getString(_keyAuthSignature);
   bool get isAuthenticated => _prefs.getBool(_keyIsAuthenticated) ?? false;
-  String? get sessionToken => _prefs.getString(_keySessionToken);
   DateTime? get sessionExpiresAt {
     final iso = _prefs.getString(_keySessionExpiresAt);
     if (iso == null) {
@@ -206,7 +329,51 @@ class StorageService {
     return DateTime.tryParse(iso);
   }
 
-  // Settings
+  // Async getters for sensitive data from secure storage
+  Future<String?> getToken() => _secureStorage.getToken();
+  Future<String?> getSessionToken() => _secureStorage.getSessionToken();
+  Future<String?> getAuthSignature() => _secureStorage.getAuthSignature();
+
+  // Synchronous token getter for backward compatibility during transition
+  // DEPRECATED: Use getToken() instead
+  @Deprecated('Use getToken() instead for secure access')
+  String? get token {
+    // This is only for backward compatibility during migration
+    // Returns null - callers must use async getToken()
+    if (kDebugMode) {
+      LoggerService.warning(
+        'Deprecated synchronous token access - use getToken() instead',
+        tag: 'StorageService',
+      );
+    }
+    return null;
+  }
+
+  // DEPRECATED: Use getSessionToken() instead
+  @Deprecated('Use getSessionToken() instead for secure access')
+  String? get sessionToken {
+    if (kDebugMode) {
+      LoggerService.warning(
+        'Deprecated synchronous sessionToken access - use getSessionToken()',
+        tag: 'StorageService',
+      );
+    }
+    return null;
+  }
+
+  // DEPRECATED: Use getAuthSignature() instead
+  @Deprecated('Use getAuthSignature() instead for secure access')
+  String? get authSignature {
+    if (kDebugMode) {
+      LoggerService.warning(
+        'Deprecated synchronous authSignature access - use getAuthSignature()',
+        tag: 'StorageService',
+      );
+    }
+    return null;
+  }
+
+  // Settings (non-sensitive - remain in SharedPreferences)
   String get themeMode => _prefs.getString(_keyThemeMode) ?? 'dark';
   Future<void> setThemeMode(String mode) =>
       _prefs.setString(_keyThemeMode, mode);
@@ -242,7 +409,7 @@ class StorageService {
       _prefs.setString(_keyRoomFilter, room);
   Future<void> clearRoomFilter() => _prefs.remove(_keyRoomFilter);
 
-  // Generic methods
+  // Generic methods (for non-sensitive data only)
   Future<bool> setBool(String key, {required bool value}) =>
       _prefs.setBool(key, value);
   bool? getBool(String key) => _prefs.getBool(key);

@@ -187,11 +187,15 @@ class WebSocketDataSyncService {
       'action': 'subscribe_to_resource',
       'resource_type': resourceType,
     });
-    _socketService.send({
-      'command': 'message',
-      'identifier': _channelIdentifier(),
-      'data': payload,
-    });
+    try {
+      _socketService.send({
+        'command': 'message',
+        'identifier': _channelIdentifier(),
+        'data': payload,
+      });
+    } on StateError catch (e) {
+      _logger.w('WebSocketDataSync: Subscribe send failed (connection closed): $e');
+    }
   }
 
   void _sendSnapshotRequest(String resourceType) {
@@ -204,11 +208,15 @@ class WebSocketDataSyncService {
       'page_size': 10000,
       'request_id': requestId,
     });
-    _socketService.send({
-      'command': 'message',
-      'identifier': _channelIdentifier(),
-      'data': payload,
-    });
+    try {
+      _socketService.send({
+        'command': 'message',
+        'identifier': _channelIdentifier(),
+        'data': payload,
+      });
+    } on StateError catch (e) {
+      _logger.w('WebSocketDataSync: Snapshot request failed (connection closed): $e');
+    }
   }
 
   String _channelIdentifier() => jsonEncode(const {'channel': _channelName});
@@ -629,7 +637,10 @@ class WebSocketDataSyncService {
         } else {
           return 'offline';
         }
-      } on Exception catch (_) {}
+      } on Exception catch (e) {
+        // Date parsing failed - fallback to unknown status
+        _logger.d('WebSocketDataSync: Failed to parse device status date: $e');
+      }
     }
 
     return 'unknown';

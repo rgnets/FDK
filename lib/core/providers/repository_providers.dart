@@ -4,6 +4,7 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/config/logger_config.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
@@ -80,8 +81,8 @@ final deviceMockDataSourceProvider = Provider<DeviceDataSource>((ref) {
 
 /// Device data source provider (interface)
 final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
-  if (EnvironmentConfig.isDevelopment) {
-    // Use mock data source in development
+  if (EnvironmentConfig.useSyntheticData) {
+    // Use mock data source only when synthetic data flag is enabled
     return ref.watch(deviceMockDataSourceProvider);
   }
 
@@ -94,6 +95,7 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
     webSocketCacheIntegration: webSocketCacheIntegration,
     imageBaseUrl: storageService.siteUrl,
     logger: logger,
+    storageService: storageService,
   );
 });
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
@@ -175,8 +176,14 @@ class InitializationNotifier extends _$InitializationNotifier {
         unawaited(
           _dataSyncService
               .syncInitialData(timeout: const Duration(seconds: 45))
-              .catchError((_) {})
-              .whenComplete(() {
+              .catchError((Object e, StackTrace st) {
+            LoggerService.error(
+              'Background sync failed: $e',
+              tag: 'InitProvider',
+              error: e,
+              stackTrace: st,
+            );
+          }).whenComplete(() {
             _eventSubscription?.cancel();
             _eventSubscription = null;
           }),

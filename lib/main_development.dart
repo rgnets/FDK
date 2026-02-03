@@ -6,7 +6,6 @@ import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {

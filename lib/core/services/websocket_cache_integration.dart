@@ -135,9 +135,19 @@ class WebSocketCacheIntegration {
     _deviceDataCallbacks.add(callback);
   }
 
+  /// Remove a callback for device data updates.
+  void removeDeviceDataCallback(DeviceDataCallback callback) {
+    _deviceDataCallbacks.remove(callback);
+  }
+
   /// Register a callback for room data updates.
   void onRoomData(void Function(List<Map<String, dynamic>>) callback) {
     _roomDataCallbacks.add(callback);
+  }
+
+  /// Remove a callback for room data updates.
+  void removeRoomDataCallback(void Function(List<Map<String, dynamic>>) callback) {
+    _roomDataCallbacks.remove(callback);
   }
 
   /// Register a callback for speed test config data updates.
@@ -145,9 +155,19 @@ class WebSocketCacheIntegration {
     _speedTestConfigCallbacks.add(callback);
   }
 
+  /// Remove a callback for speed test config data updates.
+  void removeSpeedTestConfigCallback(void Function(List<SpeedTestConfig>) callback) {
+    _speedTestConfigCallbacks.remove(callback);
+  }
+
   /// Register a callback for speed test result data updates.
   void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
     _speedTestResultCallbacks.add(callback);
+  }
+
+  /// Remove a callback for speed test result data updates.
+  void removeSpeedTestResultCallback(void Function(List<SpeedTestResult>) callback) {
+    _speedTestResultCallbacks.remove(callback);
   }
 
   /// Get cached rooms.
@@ -773,10 +793,17 @@ class WebSocketCacheIntegration {
     }
     _logger.i('WebSocketCacheIntegration: Sending channel subscribe request');
     _channelSubscribeSent = true;
-    _webSocketService.send({
-      'command': 'subscribe',
-      'identifier': _channelIdentifier,
-    });
+    try {
+      _webSocketService.send({
+        'command': 'subscribe',
+        'identifier': _channelIdentifier,
+      });
+    } on StateError catch (e) {
+      // Connection closed between isConnected check and send - this is expected
+      _logger.w('WebSocketCacheIntegration: Send failed (connection closed): $e');
+      _channelSubscribeSent = false;
+      return false;
+    }
     return false;
   }
 
@@ -786,12 +813,18 @@ class WebSocketCacheIntegration {
       _logger.w('WebSocketCacheIntegration: Skipping send, WebSocket not connected');
       return false;
     }
-    _webSocketService.send({
-      'command': 'message',
-      'identifier': _channelIdentifier,
-      'data': jsonEncode(data),
-    });
-    return true;
+    try {
+      _webSocketService.send({
+        'command': 'message',
+        'identifier': _channelIdentifier,
+        'data': jsonEncode(data),
+      });
+      return true;
+    } on StateError catch (e) {
+      // Connection closed between isConnected check and send - this is expected
+      _logger.w('WebSocketCacheIntegration: Send failed (connection closed): $e');
+      return false;
+    }
   }
 
   /// Request full snapshots for all resource types.

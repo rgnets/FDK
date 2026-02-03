@@ -40,7 +40,7 @@ class RoomDeviceStats with _$RoomDeviceStats {
 ///
 /// Provides device filtering and statistics for a specific room.
 /// Follows Clean Architecture and MVVM patterns.
-@Riverpod(keepAlive: true)
+@riverpod
 class RoomDeviceNotifier extends _$RoomDeviceNotifier {
   @override
   RoomDeviceState build(String roomId) {
@@ -132,20 +132,10 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
   /// Filter devices for a specific room
   List<Device> _filterDevicesForRoom(List<Device> allDevices, int roomIdInt) {
     try {
-      // DEBUG: Log all devices with their pmsRoomId
-      print('DEBUG _filterDevicesForRoom: Looking for roomId=$roomIdInt in ${allDevices.length} devices');
-
       final filtered = allDevices.where((device) {
         // Use pmsRoomId for room association
-        // This is the established pattern from room_view_models.dart
         return device.pmsRoomId == roomIdInt;
       }).toList();
-
-      // DEBUG: Log filtered devices
-      print('DEBUG _filterDevicesForRoom: Found ${filtered.length} devices for room $roomIdInt:');
-      for (final d in filtered) {
-        print('  - id=${d.id}, name=${d.name}, type=${d.type}, pmsRoomId=${d.pmsRoomId}');
-      }
 
       return filtered;
     } on Exception catch (e) {

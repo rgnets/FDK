@@ -5,6 +5,31 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/widgets.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 
+/// Sensitive query parameter names that should be redacted from logs.
+const _sensitiveParams = {'api_key', 'apiKey', 'key', 'token', 'password', 'secret'};
+
+/// Redacts sensitive parameters from a URI for safe logging.
+String _redactUri(Uri? uri) {
+  if (uri == null) return 'null';
+
+  // If no query parameters, return as-is
+  if (uri.queryParameters.isEmpty) {
+    return uri.toString();
+  }
+
+  // Redact sensitive parameters
+  final redactedParams = <String, String>{};
+  for (final entry in uri.queryParameters.entries) {
+    if (_sensitiveParams.contains(entry.key)) {
+      redactedParams[entry.key] = '[REDACTED]';
+    } else {
+      redactedParams[entry.key] = entry.value;
+    }
+  }
+
+  return uri.replace(queryParameters: redactedParams).toString();
+}
+
 /// Credentials extracted from a deeplink URL.
 class DeeplinkCredentials {
   const DeeplinkCredentials({
@@ -109,7 +134,7 @@ class DeeplinkService {
     // Check for initial deeplink (cold start)
     try {
       final initialUri = await _appLinks.getInitialLink();
-      LoggerService.info('Initial URI: $initialUri', tag: _tag);
+      LoggerService.info('Initial URI: ${_redactUri(initialUri)}', tag: _tag);
       if (initialUri != null) {
         _hasPendingInitialLink = true;
         try {
@@ -127,7 +152,7 @@ class DeeplinkService {
     LoggerService.info('Setting up deeplink stream listener', tag: _tag);
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
-        LoggerService.info('Received URI from stream: $uri', tag: _tag);
+        LoggerService.info('Received URI from stream: ${_redactUri(uri)}', tag: _tag);
         await _handleUri(uri);
       },
       onError: (Object err) =>
@@ -137,7 +162,7 @@ class DeeplinkService {
 
   /// Handle an incoming URI.
   Future<void> _handleUri(Uri uri) async {
-    LoggerService.info('Received deeplink URI: $uri', tag: _tag);
+    LoggerService.info('Received deeplink URI: ${_redactUri(uri)}', tag: _tag);
 
     // Block if already processing
     if (_isProcessing) {

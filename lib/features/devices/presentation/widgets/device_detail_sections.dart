@@ -454,7 +454,7 @@ class DeviceDetailSections extends ConsumerWidget {
   ) {
     // Get api_key for passing to the dialog (images are already authenticated,
     // but we pass api_key for any additional operations the dialog may need)
-    final apiKey = ref.read(apiKeyProvider);
+    final apiKey = ref.read(apiKeyProvider).valueOrNull;
     final signedIds = _validImageSignedIds;
 
     showDialog<void>(

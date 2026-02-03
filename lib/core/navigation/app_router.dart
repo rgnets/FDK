@@ -54,11 +54,12 @@ class AppRouter {
         },
       ),
 
-      // Debug screen (outside of shell for direct access)
-      GoRoute(
-        path: '/debug',
-        builder: (context, state) => const DebugScreen(),
-      ),
+      // Debug screen - only available in non-production builds
+      if (!EnvironmentConfig.isProduction)
+        GoRoute(
+          path: '/debug',
+          builder: (context, state) => const DebugScreen(),
+        ),
       
       // Main app shell with bottom navigation
       ShellRoute(

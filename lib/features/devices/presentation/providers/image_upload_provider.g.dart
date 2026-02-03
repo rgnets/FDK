@@ -44,7 +44,7 @@ final imageUploadVerifierProvider =
 
 typedef ImageUploadVerifierRef = AutoDisposeProviderRef<ImageUploadVerifier>;
 String _$restImageUploadServiceHash() =>
-    r'ae944432b957b5c5b28d0f3d1b3d2bfc83e8d8b7';
+    r'fdb91a4bd0b69d14deccf8058ca32a02b27313ab';
 
 /// Provider for RestImageUploadService
 ///
@@ -54,7 +54,7 @@ String _$restImageUploadServiceHash() =>
 /// Copied from [restImageUploadService].
 @ProviderFor(restImageUploadService)
 final restImageUploadServiceProvider =
-    AutoDisposeProvider<RestImageUploadService>.internal(
+    AutoDisposeFutureProvider<RestImageUploadService>.internal(
   restImageUploadService,
   name: r'restImageUploadServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -65,9 +65,9 @@ final restImageUploadServiceProvider =
 );
 
 typedef RestImageUploadServiceRef
-    = AutoDisposeProviderRef<RestImageUploadService>;
+    = AutoDisposeFutureProviderRef<RestImageUploadService>;
 String _$imageUploadServiceHash() =>
-    r'aaa61109542998de8c8f6dbf99e6690d876a4ccd';
+    r'779fb74815410e33add5ecba792de80462deae9b';
 
 /// Provider for ImageUploadService
 ///
@@ -79,7 +79,7 @@ String _$imageUploadServiceHash() =>
 /// Copied from [imageUploadService].
 @ProviderFor(imageUploadService)
 final imageUploadServiceProvider =
-    AutoDisposeProvider<ImageUploadService>.internal(
+    AutoDisposeFutureProvider<ImageUploadService>.internal(
   imageUploadService,
   name: r'imageUploadServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -89,7 +89,8 @@ final imageUploadServiceProvider =
   allTransitiveDependencies: null,
 );
 
-typedef ImageUploadServiceRef = AutoDisposeProviderRef<ImageUploadService>;
+typedef ImageUploadServiceRef
+    = AutoDisposeFutureProviderRef<ImageUploadService>;
 String _$imageUploadEventsHash() => r'2b903f602f78530ec57b63f7b76fda4bfd3eebd2';
 
 /// Stream provider for image upload events
@@ -127,7 +128,7 @@ final cacheInvalidationEventsProvider =
 
 typedef CacheInvalidationEventsRef = StreamProviderRef<CacheInvalidationEvent>;
 String _$imageUploadNotifierHash() =>
-    r'ad3876fbcf972dddb303ed50cd83976df61b053e';
+    r'916c0a163541be1de68776072e8ade6cbe32ea6c';
 
 /// Copied from Dart SDK
 class _SystemHash {

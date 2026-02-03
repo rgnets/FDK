@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
@@ -11,6 +10,7 @@ import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
@@ -27,6 +27,8 @@ import 'package:rgnets_fdk/features/notifications/presentation/providers/device_
     as device_notifications;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart'
     as notifications_domain;
+import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart'
+    as rooms_providers;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -51,7 +53,7 @@ class Auth extends _$Auth {
   Future<AuthStatus> build() async {
     _logger = ref.watch(loggerProvider);
     final storage = ref.read(storageServiceProvider);
-    await storage.migrateLegacyCredentialsIfNeeded();
+    await storage.migrateToSecureStorageIfNeeded();
 
     _logger
       ..i('🔐 AUTH_NOTIFIER: build() called - initializing auth state')
@@ -116,7 +118,7 @@ class Auth extends _$Auth {
     final storage = ref.read(storageServiceProvider);
 
     // Check if we have the required credentials
-    final token = storage.token;
+    final token = await storage.getToken();
     final siteUrl = storage.siteUrl;
     final username = storage.username;
 
@@ -145,13 +147,15 @@ class Auth extends _$Auth {
     }
 
     try {
+      // Get auth signature from secure storage
+      final signature = await storage.getAuthSignature();
       final resolvedUser = await _performWebSocketHandshake(
         fqdn: fqdn,
         login: username,
         token: token,
         siteName: storage.siteName ?? fqdn,
         issuedAt: storage.authIssuedAt,
-        signature: storage.authSignature,
+        signature: signature,
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
@@ -178,12 +182,11 @@ class Auth extends _$Auth {
     String? signature,
   }) async {
     _authGeneration += 1;
-    final keyLength = math.min(4, token.length);
     _logger
       ..i('🔑 AUTH_NOTIFIER: authenticate() called')
       ..d('AUTH_NOTIFIER: FQDN: $fqdn')
       ..d('AUTH_NOTIFIER: Login: $login')
-      ..d('AUTH_NOTIFIER: API Key: ${token.substring(0, keyLength)}...')
+      ..d('AUTH_NOTIFIER: Token: [REDACTED, length=${token.length}]')
       ..d('AUTH_NOTIFIER: Auth generation: $_authGeneration')
       ..d('AUTH_NOTIFIER: Current state before auth: ${state.value}');
 
@@ -288,7 +291,7 @@ class Auth extends _$Auth {
 
     try {
       final storage = ref.read(storageServiceProvider);
-      final expectedToken = storage.token;
+      final expectedToken = await storage.getToken();
       final expectedSiteUrl = storage.siteUrl;
 
       // Set state to unauthenticated FIRST to unblock UI
@@ -364,7 +367,7 @@ class Auth extends _$Auth {
   }) async {
     try {
       final storage = ref.read(storageServiceProvider);
-      final currentToken = storage.token;
+      final currentToken = await storage.getToken();
       final currentSiteUrl = storage.siteUrl;
       if (!_credentialsMatch(
         expectedToken: expectedToken,
@@ -733,9 +736,10 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         unawaited(ref.read(ontLocalDataSourceProvider).clearCache());
         unawaited(ref.read(switchLocalDataSourceProvider).clearCache());
         unawaited(ref.read(wlanLocalDataSourceProvider).clearCache());
-        logger.d('AUTH_CLEANUP: Typed device caches cleared');
+        unawaited(ref.read(roomLocalDataSourceProvider).clearCache());
+        logger.d('AUTH_CLEANUP: Typed device and room caches cleared');
       } on Exception catch (e) {
-        logger.w('AUTH_CLEANUP: Failed to clear typed device caches: $e');
+        logger.w('AUTH_CLEANUP: Failed to clear typed caches: $e');
       }
 
       // Clear WebSocket cache integration
@@ -752,6 +756,7 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         ref.invalidate(device_notifications.deviceNotificationsNotifierProvider);
         ref.invalidate(notifications_domain.notificationsDomainNotifierProvider);
         ref.invalidate(dashboard_providers.dashboardStatsProvider);
+        ref.invalidate(rooms_providers.roomsNotifierProvider);
         logger.d('AUTH_CLEANUP: Data providers invalidated');
       } on Exception catch (e) {
         logger.w('AUTH_CLEANUP: Failed to invalidate data providers: $e');

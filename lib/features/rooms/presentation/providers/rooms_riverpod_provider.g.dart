@@ -6,7 +6,7 @@ part of 'rooms_riverpod_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$roomStatisticsHash() => r'16009c7965b05d31a8c231f853860c87823e85b3';
+String _$roomStatisticsHash() => r'5835a02ebcc4d518451ac59dfb2a24af0242c0e1';
 
 /// Provider for room statistics
 ///
@@ -23,7 +23,7 @@ final roomStatisticsProvider = AutoDisposeProvider<RoomStatistics>.internal(
 );
 
 typedef RoomStatisticsRef = AutoDisposeProviderRef<RoomStatistics>;
-String _$roomByIdHash() => r'310270c2acbb8b5f589cbf41241b5fdc99e32db4';
+String _$roomByIdHash() => r'998a73691a6cfb86501a2f6e48287add8f011cbf';
 
 /// Copied from Dart SDK
 class _SystemHash {
