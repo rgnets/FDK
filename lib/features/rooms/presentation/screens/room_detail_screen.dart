@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
-import 'package:rgnets_fdk/features/onboarding/presentation/widgets/onboarding_stage_badge.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/presentation/providers/device_onboarding_provider.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
@@ -538,17 +540,8 @@ class _DevicesTab extends ConsumerWidget {
             itemBuilder: (context, index) {
               final device = filteredDevices[index];
               return _DeviceListItem(
-                device: {
-                  'id': device.id,
-                  'name': device.name,
-                  'type': device.type,
-                  'status': device.status,
-                  'ipAddress': device.ipAddress,
-                },
-                onTap: () {
-                  // Navigate to device detail
-                  context.push('/devices/${device.id}');
-                },
+                device: device,
+                onTap: () => context.push('/devices/${device.id}'),
               );
             },
           ),
@@ -709,89 +702,295 @@ class _DeviceTypeChip extends StatelessWidget {
   }
 }
 
-class _DeviceListItem extends StatelessWidget {
-  
+class _DeviceListItem extends ConsumerStatefulWidget {
+
   const _DeviceListItem({
     required this.device,
     this.onTap,
   });
-  final Map<String, dynamic> device;
+  final Device device;
   final VoidCallback? onTap;
-  
+
+  @override
+  ConsumerState<_DeviceListItem> createState() => _DeviceListItemState();
+}
+
+class _DeviceListItemState extends ConsumerState<_DeviceListItem> {
+  bool _isExpanded = false;
+
   @override
   Widget build(BuildContext context) {
-    final statusColor = device['status'] == 'online' ? Colors.green :
-                       device['status'] == 'offline' ? Colors.red :
-                       device['status'] == 'warning' ? Colors.orange : Colors.grey;
-    
+    final device = widget.device;
+    final onboardingState = ref.watch(deviceOnboardingStateProvider(device.id));
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        onTap: onTap,
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: statusColor.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        children: [
+          // Header section (always visible)
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Device info (name + status)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Device name (tappable to go to detail)
+                        GestureDetector(
+                          onTap: widget.onTap,
+                          child: Text(
+                            device.name,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Stage indicator with dots
+                        _OnboardingStageIndicator(state: onboardingState),
+                      ],
+                    ),
+                  ),
+                  // Device icon
+                  _DeviceIcon(deviceType: device.type),
+                  const SizedBox(width: 8),
+                  // Expand/collapse chevron
+                  Icon(
+                    _isExpanded ? Icons.expand_less : Icons.chevron_right,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: Icon(
-            device['type'] == DeviceTypes.accessPoint ? Icons.wifi :
-            device['type'] == DeviceTypes.networkSwitch ? Icons.hub :
-            device['type'] == DeviceTypes.ont ? Icons.fiber_manual_record :
-            device['type'] == DeviceTypes.wlanController ? Icons.router :
-            Icons.device_hub,
-            color: statusColor,
-            size: 20,
+          // Expanded details section
+          if (_isExpanded) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _DeviceDetailRow(label: 'Name', value: device.name),
+                  _DeviceDetailRow(
+                    label: 'MAC',
+                    value: device.macAddress ?? 'N/A',
+                  ),
+                  _DeviceDetailRow(
+                    label: 'IP',
+                    value: device.ipAddress ?? 'N/A',
+                  ),
+                  _DeviceDetailRow(
+                    label: 'Uptime',
+                    value: _formatUptime(device.uptime),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatUptime(int? uptimeSeconds) {
+    if (uptimeSeconds == null) return 'N/A';
+
+    final days = uptimeSeconds ~/ 86400;
+    final hours = (uptimeSeconds % 86400) ~/ 3600;
+    final minutes = (uptimeSeconds % 3600) ~/ 60;
+
+    if (days > 0) {
+      return '${days}d ${hours}h';
+    } else if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    } else {
+      return '${minutes}m';
+    }
+  }
+}
+
+class _OnboardingStageIndicator extends StatelessWidget {
+  const _OnboardingStageIndicator({this.state});
+
+  final OnboardingState? state;
+
+  @override
+  Widget build(BuildContext context) {
+    // If no state or hasn't started, show "Not Started"
+    if (state == null || !state!.hasStarted) {
+      return Text(
+        'Not Started',
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey[600],
+        ),
+      );
+    }
+
+    final currentStage = state!.currentStage;
+    final maxStages = state!.maxStages;
+    final isComplete = state!.isComplete;
+
+    return Row(
+      children: [
+        // Stage dots
+        for (int i = 1; i <= maxStages; i++) ...[
+          _StageDot(
+            isCompleted: i < currentStage || isComplete,
+            isCurrent: i == currentStage && !isComplete,
+          ),
+          if (i < maxStages) const SizedBox(width: 4),
+        ],
+        const SizedBox(width: 12),
+        // Stage text
+        Text(
+          isComplete ? 'Complete' : 'Stage $currentStage of $maxStages',
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
           ),
         ),
-        title: Text(
-          device['name'] as String,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              device['type'] as String,
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-            if (device['ipAddress'] != null)
-              Text(
-                device['ipAddress'] as String,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+      ],
+    );
+  }
+}
+
+class _StageDot extends StatelessWidget {
+  const _StageDot({
+    required this.isCompleted,
+    required this.isCurrent,
+  });
+
+  final bool isCompleted;
+  final bool isCurrent;
+
+  @override
+  Widget build(BuildContext context) {
+    Color fillColor;
+    Color borderColor;
+    IconData? icon;
+
+    if (isCompleted) {
+      fillColor = Colors.green;
+      borderColor = Colors.green;
+      icon = Icons.check;
+    } else if (isCurrent) {
+      fillColor = Colors.transparent;
+      borderColor = Colors.grey;
+    } else {
+      fillColor = Colors.transparent;
+      borderColor = Colors.grey.shade300;
+    }
+
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        color: fillColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: icon != null
+          ? Icon(icon, size: 12, color: Colors.white)
+          : (isCurrent
+              ? Icon(Icons.close, size: 12, color: Colors.grey.shade400)
+              : null),
+    );
+  }
+}
+
+class _DeviceIcon extends StatelessWidget {
+  const _DeviceIcon({required this.deviceType});
+
+  final String deviceType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      _getIconPath(),
+      width: 48,
+      height: 48,
+      errorBuilder: (_, __, ___) => Icon(
+        _getFallbackIcon(),
+        size: 48,
+        color: Colors.grey,
+      ),
+    );
+  }
+
+  String _getIconPath() {
+    switch (deviceType) {
+      case DeviceTypes.accessPoint:
+        return 'assets/images/devices/access_point.png';
+      case DeviceTypes.ont:
+        return 'assets/images/devices/ont.png';
+      case DeviceTypes.networkSwitch:
+        return 'assets/images/devices/switch.png';
+      case DeviceTypes.wlanController:
+        return 'assets/images/devices/router.png';
+      default:
+        return 'assets/images/devices/device.png';
+    }
+  }
+
+  IconData _getFallbackIcon() {
+    switch (deviceType) {
+      case DeviceTypes.accessPoint:
+        return Icons.wifi;
+      case DeviceTypes.ont:
+        return Icons.fiber_manual_record;
+      case DeviceTypes.networkSwitch:
+        return Icons.hub;
+      case DeviceTypes.wlanController:
+        return Icons.router;
+      default:
+        return Icons.device_hub;
+    }
+  }
+}
+
+class _DeviceDetailRow extends StatelessWidget {
+  const _DeviceDetailRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
               ),
-          ],
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                device['status'].toString().toUpperCase(),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: statusColor,
-                ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 4),
-            // Onboarding stage badge for AP/ONT devices
-            OnboardingStageBadge(
-              deviceId: device['id'] as String,
-              compact: true,
-            ),
-            const SizedBox(height: 4),
-            const Icon(Icons.chevron_right, size: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
