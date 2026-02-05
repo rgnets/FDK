@@ -29,6 +29,11 @@ class DevicesNotifier extends _$DevicesNotifier {
   StreamSubscription<List<Device>>? _devicesStreamSub;
   bool _devicesStreamAttached = false;
   List<Device>? _latestDevices;
+  Timer? _streamDebounceTimer;
+
+  /// Debounce duration for coalescing rapid WebSocket updates.
+  /// Prevents UI flickering when data arrives in batches.
+  static const _streamDebounceDuration = Duration(milliseconds: 600);
 
   GetDevices get _getDevices => GetDevices(ref.read(deviceRepositoryProvider));
 
@@ -143,12 +148,24 @@ class DevicesNotifier extends _$DevicesNotifier {
       if (authStatus?.isUnauthenticated ?? false) {
         return;
       }
-      state = AsyncValue.data(devices);
+      // Debounce state updates to prevent UI flickering when WebSocket
+      // delivers data in rapid batches during initial load
+      _streamDebounceTimer?.cancel();
+      _streamDebounceTimer = Timer(_streamDebounceDuration, () {
+        _streamDebounceTimer = null;
+        // Use latest devices at debounce time (may have updated)
+        final currentDevices = _latestDevices;
+        if (currentDevices != null) {
+          state = AsyncValue.data(currentDevices);
+        }
+      });
     });
 
     ref.onDispose(() {
       _devicesStreamSub?.cancel();
       _devicesStreamSub = null;
+      _streamDebounceTimer?.cancel();
+      _streamDebounceTimer = null;
       _devicesStreamAttached = false;
     });
   }
