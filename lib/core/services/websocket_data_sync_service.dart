@@ -4,14 +4,28 @@ import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/device_normalizer.dart';
+import 'package:rgnets_fdk/core/services/room_data_processor.dart';
+import 'package:rgnets_fdk/core/services/snapshot_request_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 
+/// Orchestrates WebSocket-driven data synchronization for devices and rooms.
+///
+/// This service coordinates:
+/// - Lifecycle management (start/stop/dispose)
+/// - WebSocket message routing
+/// - Cache coordination across 4 typed device caches
+/// - Event broadcasting for UI refresh
+///
+/// Data processing is delegated to:
+/// - [DeviceNormalizer] for device JSON normalization
+/// - [RoomDataProcessor] for room model building
+/// - [SnapshotRequestService] for WebSocket requests
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
     required WebSocketService socketService,
@@ -23,17 +37,22 @@ class WebSocketDataSyncService {
     required CacheManager cacheManager,
     required StorageService storageService,
     Logger? logger,
-  }) : _socketService = socketService,
-       _apLocalDataSource = apLocalDataSource,
-       _ontLocalDataSource = ontLocalDataSource,
-       _switchLocalDataSource = switchLocalDataSource,
-       _wlanLocalDataSource = wlanLocalDataSource,
-       _roomLocalDataSource = roomLocalDataSource,
-       _cacheManager = cacheManager,
-       _storageService = storageService,
-       _logger = logger ?? Logger();
+  })  : _socketService = socketService,
+        _apLocalDataSource = apLocalDataSource,
+        _ontLocalDataSource = ontLocalDataSource,
+        _switchLocalDataSource = switchLocalDataSource,
+        _wlanLocalDataSource = wlanLocalDataSource,
+        _roomLocalDataSource = roomLocalDataSource,
+        _cacheManager = cacheManager,
+        _storageService = storageService,
+        _logger = logger ?? Logger(),
+        _deviceNormalizer = DeviceNormalizer(),
+        _roomProcessor = RoomDataProcessor(),
+        _snapshotService = SnapshotRequestService(
+          webSocketService: socketService,
+          logger: logger,
+        );
 
-  static const String _channelName = 'RxgChannel';
   static const List<String> _deviceResources = [
     'access_points',
     'media_converters',
@@ -51,6 +70,11 @@ class WebSocketDataSyncService {
   final CacheManager _cacheManager;
   final StorageService _storageService;
   final Logger _logger;
+
+  // Delegated services
+  final DeviceNormalizer _deviceNormalizer;
+  final RoomDataProcessor _roomProcessor;
+  final SnapshotRequestService _snapshotService;
 
   StreamSubscription<SocketMessage>? _messageSub;
   StreamSubscription<SocketConnectionState>? _stateSub;
@@ -172,54 +196,17 @@ class WebSocketDataSyncService {
     }
 
     for (final resource in _deviceResources) {
-      _sendSubscribe(resource);
-      _sendSnapshotRequest(resource);
+      _snapshotService
+        ..sendSubscribe(resource)
+        ..sendSnapshotRequest(resource);
     }
 
     for (final resource in _roomResources) {
-      _sendSubscribe(resource);
-      _sendSnapshotRequest(resource);
+      _snapshotService
+        ..sendSubscribe(resource)
+        ..sendSnapshotRequest(resource);
     }
   }
-
-  void _sendSubscribe(String resourceType) {
-    final payload = jsonEncode({
-      'action': 'subscribe_to_resource',
-      'resource_type': resourceType,
-    });
-    try {
-      _socketService.send({
-        'command': 'message',
-        'identifier': _channelIdentifier(),
-        'data': payload,
-      });
-    } on StateError catch (e) {
-      _logger.w('WebSocketDataSync: Subscribe send failed (connection closed): $e');
-    }
-  }
-
-  void _sendSnapshotRequest(String resourceType) {
-    final requestId = 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}';
-    final payload = jsonEncode({
-      'action': 'resource_action',
-      'resource_type': resourceType,
-      'crud_action': 'index',
-      'page': 1,
-      'page_size': 10000,
-      'request_id': requestId,
-    });
-    try {
-      _socketService.send({
-        'command': 'message',
-        'identifier': _channelIdentifier(),
-        'data': payload,
-      });
-    } on StateError catch (e) {
-      _logger.w('WebSocketDataSync: Snapshot request failed (connection closed): $e');
-    }
-  }
-
-  String _channelIdentifier() => jsonEncode(const {'channel': _channelName});
 
   void _handleMessage(SocketMessage message) {
     final resourceType = _resolveResourceType(message);
@@ -311,7 +298,8 @@ class WebSocketDataSyncService {
     }
 
     // Route to specific typed cache based on resource type
-    final deviceType = DeviceModelSealed.getDeviceTypeFromResourceType(resourceType);
+    final deviceType =
+        DeviceModelSealed.getDeviceTypeFromResourceType(resourceType);
     if (deviceType == null) {
       _logger.w('WebSocketDataSync: Unknown resource type: $resourceType');
       return;
@@ -352,17 +340,25 @@ class WebSocketDataSyncService {
       }
     }
 
-    if (apItems.isNotEmpty) _cacheAPDevices(apItems);
-    if (ontItems.isNotEmpty) _cacheONTDevices(ontItems);
-    if (switchItems.isNotEmpty) _cacheSwitchDevices(switchItems);
-    if (wlanItems.isNotEmpty) _cacheWLANDevices(wlanItems);
+    if (apItems.isNotEmpty) {
+      _cacheAPDevices(apItems);
+    }
+    if (ontItems.isNotEmpty) {
+      _cacheONTDevices(ontItems);
+    }
+    if (switchItems.isNotEmpty) {
+      _cacheSwitchDevices(switchItems);
+    }
+    if (wlanItems.isNotEmpty) {
+      _cacheWLANDevices(wlanItems);
+    }
   }
 
   void _cacheAPDevices(List<Map<String, dynamic>> items) {
     final models = <APModel>[];
     for (final item in items) {
       try {
-        final normalized = _normalizeToAPModel(item);
+        final normalized = _deviceNormalizer.normalizeToAP(item);
         models.add(normalized);
         _idToTypeIndex[normalized.id] = DeviceModelSealed.typeAccessPoint;
       } on Exception catch (e) {
@@ -381,7 +377,7 @@ class WebSocketDataSyncService {
     final models = <ONTModel>[];
     for (final item in items) {
       try {
-        final normalized = _normalizeToONTModel(item);
+        final normalized = _deviceNormalizer.normalizeToONT(item);
         models.add(normalized);
         _idToTypeIndex[normalized.id] = DeviceModelSealed.typeONT;
       } on Exception catch (e) {
@@ -400,7 +396,7 @@ class WebSocketDataSyncService {
     final models = <SwitchModel>[];
     for (final item in items) {
       try {
-        final normalized = _normalizeToSwitchModel(item);
+        final normalized = _deviceNormalizer.normalizeToSwitch(item);
         models.add(normalized);
         _idToTypeIndex[normalized.id] = DeviceModelSealed.typeSwitch;
       } on Exception catch (e) {
@@ -419,7 +415,7 @@ class WebSocketDataSyncService {
     final models = <WLANModel>[];
     for (final item in items) {
       try {
-        final normalized = _normalizeToWLANModel(item);
+        final normalized = _deviceNormalizer.normalizeToWLAN(item);
         models.add(normalized);
         _idToTypeIndex[normalized.id] = DeviceModelSealed.typeWLAN;
       } on Exception catch (e) {
@@ -450,7 +446,7 @@ class WebSocketDataSyncService {
     final models = <RoomModel>[];
     for (final item in items) {
       try {
-        models.add(_buildRoomModel(item));
+        models.add(_roomProcessor.buildRoomModel(item));
       } on Exception catch (e) {
         _logger.w('WebSocketDataSync: Failed to parse room: $e');
       }
@@ -493,366 +489,9 @@ class WebSocketDataSyncService {
       _initialSyncCompleter!.complete();
     }
   }
-
-  // ============================================================================
-  // Type-Specific Normalization Methods
-  // ============================================================================
-
-  APModel _normalizeToAPModel(Map<String, dynamic> data) {
-    return APModel(
-      id: (data['id'] ?? '').toString(),
-      name: data['name']?.toString() ?? 'Unknown AP',
-      status: _determineStatus(data),
-      pmsRoomId: _extractPmsRoomId(data),
-      ipAddress: data['ip']?.toString(),
-      macAddress: data['mac']?.toString(),
-      location: _extractLocation(data),
-      model: data['model']?.toString(),
-      serialNumber: data['serial_number']?.toString(),
-      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
-      note: data['note']?.toString(),
-      images: _extractImages(data),
-      metadata: data,
-      connectionState: data['connection_state']?.toString(),
-      signalStrength: data['signal_strength'] as int?,
-      connectedClients: data['connected_clients'] as int?,
-      ssid: data['ssid']?.toString(),
-      channel: data['channel'] as int?,
-      maxClients: data['max_clients'] as int?,
-      currentUpload: (data['current_upload'] as num?)?.toDouble(),
-      currentDownload: (data['current_download'] as num?)?.toDouble(),
-      onboardingStatus: data['ap_onboarding_status'] != null
-          ? OnboardingStatusPayload.fromJson(
-              data['ap_onboarding_status'] as Map<String, dynamic>,
-            )
-          : null,
-    );
-  }
-
-  ONTModel _normalizeToONTModel(Map<String, dynamic> data) {
-    return ONTModel(
-      id: (data['id'] ?? '').toString(),
-      name: data['name']?.toString() ?? 'Unknown ONT',
-      status: _determineStatus(data),
-      pmsRoomId: _extractPmsRoomId(data),
-      ipAddress: data['ip']?.toString(),
-      macAddress: data['mac']?.toString(),
-      location: _extractLocation(data),
-      model: data['model']?.toString(),
-      serialNumber: data['serial_number']?.toString(),
-      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
-      note: data['note']?.toString(),
-      images: _extractImages(data),
-      metadata: data,
-      isRegistered: data['is_registered'] as bool?,
-      switchPort: data['switch_port'] as Map<String, dynamic>?,
-      onboardingStatus: data['ont_onboarding_status'] != null
-          ? OnboardingStatusPayload.fromJson(
-              data['ont_onboarding_status'] as Map<String, dynamic>,
-            )
-          : null,
-      ports: (data['ont_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
-      uptime: data['uptime']?.toString(),
-      phase: data['phase']?.toString(),
-    );
-  }
-
-  SwitchModel _normalizeToSwitchModel(Map<String, dynamic> data) {
-    return SwitchModel(
-      id: (data['id'] ?? '').toString(),
-      name: data['name']?.toString() ?? 'Unknown Switch',
-      status: _determineStatus(data),
-      pmsRoomId: _extractPmsRoomId(data),
-      ipAddress: data['ip']?.toString() ?? data['host']?.toString(),
-      macAddress: data['mac']?.toString(),
-      location: _extractLocation(data),
-      model: data['model']?.toString(),
-      serialNumber: data['serial_number']?.toString(),
-      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
-      note: data['note']?.toString(),
-      images: _extractImages(data),
-      metadata: data,
-      host: data['host']?.toString(),
-      ports: (data['switch_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
-      cpuUsage: data['cpu_usage'] as int?,
-      memoryUsage: data['memory_usage'] as int?,
-      temperature: data['temperature'] as int?,
-    );
-  }
-
-  WLANModel _normalizeToWLANModel(Map<String, dynamic> data) {
-    return WLANModel(
-      id: (data['id'] ?? '').toString(),
-      name: data['name']?.toString() ?? 'Unknown WLAN',
-      status: _determineStatus(data),
-      pmsRoomId: _extractPmsRoomId(data),
-      ipAddress: data['ip']?.toString(),
-      macAddress: data['mac']?.toString(),
-      location: _extractLocation(data),
-      model: data['model']?.toString(),
-      serialNumber: data['serial_number']?.toString(),
-      firmware: data['firmware']?.toString() ?? data['version']?.toString(),
-      note: data['note']?.toString(),
-      images: _extractImages(data),
-      metadata: data,
-      controllerType: data['controller_type']?.toString(),
-      managedAPs: data['managed_aps'] as int?,
-      vlan: data['vlan'] as int?,
-      totalUpload: data['total_upload'] as int?,
-      totalDownload: data['total_download'] as int?,
-      packetLoss: (data['packet_loss'] as num?)?.toDouble(),
-      latency: data['latency'] as int?,
-      restartCount: data['restart_count'] as int?,
-    );
-  }
-
-  String _determineStatus(Map<String, dynamic> device) {
-    final onlineFlag = device['online'] as bool?;
-    final activeFlag = device['active'] as bool?;
-
-    if (onlineFlag != null) {
-      return onlineFlag ? 'online' : 'offline';
-    }
-    if (device['status']?.toString().toLowerCase() == 'online') {
-      return 'online';
-    }
-    if (device['status']?.toString().toLowerCase() == 'offline') {
-      return 'offline';
-    }
-    if (activeFlag != null) {
-      return activeFlag ? 'online' : 'offline';
-    }
-
-    if (device['last_seen'] != null || device['updated_at'] != null) {
-      try {
-        final lastSeenStr = (device['last_seen'] ?? device['updated_at'])
-            .toString();
-        final lastSeen = DateTime.parse(lastSeenStr);
-        final now = DateTime.now();
-        final difference = now.difference(lastSeen);
-        if (difference.inMinutes < 5) {
-          return 'online';
-        } else if (difference.inHours < 1) {
-          return 'warning';
-        } else {
-          return 'offline';
-        }
-      } on Exception catch (e) {
-        // Date parsing failed - fallback to unknown status
-        _logger.d('WebSocketDataSync: Failed to parse device status date: $e');
-      }
-    }
-
-    return 'unknown';
-  }
-
-  String _extractLocation(Map<String, dynamic> deviceMap) {
-    if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
-      final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
-      final pmsRoomName = pmsRoom['name']?.toString();
-      if (pmsRoomName != null && pmsRoomName.isNotEmpty) {
-        return pmsRoomName;
-      }
-    }
-    return deviceMap['location']?.toString() ??
-        deviceMap['room']?.toString() ??
-        deviceMap['zone']?.toString() ??
-        deviceMap['room_id']?.toString() ??
-        '';
-  }
-
-  int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
-    // Try direct pms_room_id field first
-    final directId = deviceMap['pms_room_id'];
-    if (directId != null) {
-      if (directId is int) {
-        return directId;
-      }
-      if (directId is String) {
-        final parsed = int.tryParse(directId);
-        if (parsed != null) {
-          return parsed;
-        }
-      }
-    }
-
-    // Try nested pms_room.id
-    if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
-      final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
-      final idValue = pmsRoom['id'];
-      if (idValue is int) {
-        return idValue;
-      }
-      if (idValue is String) {
-        return int.tryParse(idValue);
-      }
-    }
-
-    return null;
-  }
-
-  List<String>? _extractImages(Map<String, dynamic> deviceMap) {
-    final imageKeys = [
-      'images',
-      'image',
-      'image_url',
-      'imageUrl',
-      'photos',
-      'photo',
-      'photo_url',
-      'photoUrl',
-      'device_images',
-      'device_image',
-    ];
-
-    for (final key in imageKeys) {
-      final value = deviceMap[key];
-      if (value == null) continue;
-
-      if (value is List && value.isNotEmpty) {
-        final urls = value
-            .map((e) {
-              if (e is String) return e;
-              if (e is Map) {
-                return e['url']?.toString() ?? e['src']?.toString();
-              }
-              return e?.toString();
-            })
-            .where((e) => e != null && e.isNotEmpty)
-            .cast<String>()
-            .toList();
-        if (urls.isNotEmpty) return urls;
-      }
-
-      if (value is String && value.isNotEmpty) {
-        return [value];
-      }
-
-      if (value is Map) {
-        final url = value['url']?.toString() ?? value['src']?.toString();
-        if (url != null && url.isNotEmpty) {
-          return [url];
-        }
-      }
-    }
-
-    return null;
-  }
-
-  RoomModel _buildRoomModel(Map<String, dynamic> roomData) {
-    final displayName = _buildRoomDisplayName(roomData);
-    final rawId = roomData['id'];
-    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
-    return RoomModel(
-      id: id,
-      name: displayName,
-      deviceIds: _extractRoomDeviceIds(roomData),
-      metadata: roomData,
-    );
-  }
-
-  String _buildRoomDisplayName(Map<String, dynamic> roomData) {
-    final roomNumber = roomData['room']?.toString();
-    final pmsProperty = roomData['pms_property'];
-    final propertyName = pmsProperty is Map<String, dynamic>
-        ? pmsProperty['name']?.toString()
-        : null;
-    if (propertyName != null && roomNumber != null) {
-      return '($propertyName) $roomNumber';
-    }
-    return roomNumber ?? 'Room ${roomData['id']}';
-  }
-
-  List<String> _extractRoomDeviceIds(Map<String, dynamic> roomData) {
-    final deviceIds = <String>{};
-    final roomId = roomData['id']?.toString();
-    if (roomId == null) {
-      return [];
-    }
-
-    void addDevices(List<dynamic>? list, {String prefix = ''}) {
-      if (list == null) {
-        return;
-      }
-      for (final entry in list) {
-        if (entry is! Map<String, dynamic>) {
-          continue;
-        }
-        final id = entry['id'];
-        if (id != null) {
-          deviceIds.add('$prefix$id');
-        }
-
-        final nested = entry['devices'];
-        if (nested is List<dynamic>) {
-          for (final device in nested) {
-            if (device is Map<String, dynamic>) {
-              final nestedId = device['id'];
-              if (nestedId != null) {
-                deviceIds.add(nestedId.toString());
-              }
-            }
-          }
-        }
-      }
-    }
-
-    void addSwitchPortDevices(List<dynamic>? list) {
-      if (list == null) {
-        return;
-      }
-      for (final entry in list) {
-        if (entry is! Map<String, dynamic>) {
-          continue;
-        }
-        final switchDevice = entry['switch_device'];
-        final switchDeviceId = switchDevice is Map<String, dynamic>
-            ? switchDevice['id']
-            : entry['switch_device_id'];
-        final id = switchDeviceId ?? entry['id'];
-        if (id != null) {
-          deviceIds.add('sw_$id');
-        }
-
-        final nested = entry['devices'];
-        if (nested is List<dynamic>) {
-          for (final device in nested) {
-            if (device is Map<String, dynamic>) {
-              final nestedId = device['id'];
-              if (nestedId != null) {
-                deviceIds.add(nestedId.toString());
-              }
-            }
-          }
-        }
-      }
-    }
-
-    addDevices(roomData['access_points'] as List<dynamic>?, prefix: 'ap_');
-    addDevices(roomData['media_converters'] as List<dynamic>?, prefix: 'ont_');
-    final switchPorts = roomData['switch_ports'];
-    if (switchPorts is List && switchPorts.isNotEmpty) {
-      addSwitchPortDevices(switchPorts);
-    } else {
-      addDevices(roomData['switch_devices'] as List<dynamic>?, prefix: 'sw_');
-    }
-    addDevices(roomData['wlan_devices'] as List<dynamic>?, prefix: 'wlan_');
-    addDevices(roomData['infrastructure_devices'] as List<dynamic>?);
-
-    final routerStats = roomData['router_stats'];
-    if (routerStats is Map<String, dynamic>) {
-      final routerDevices = routerStats['devices'];
-      if (routerDevices is Map<String, dynamic>) {
-        addDevices(routerDevices['recent'] as List<dynamic>?);
-      }
-    }
-
-    return deviceIds.toList();
-  }
 }
 
 class WebSocketDataSyncEvent {
-
   factory WebSocketDataSyncEvent.devicesCached({required int count}) =>
       WebSocketDataSyncEvent._(
         type: WebSocketDataSyncEventType.devicesCached,
@@ -864,6 +503,7 @@ class WebSocketDataSyncEvent {
         type: WebSocketDataSyncEventType.roomsCached,
         count: count,
       );
+
   const WebSocketDataSyncEvent._({
     required this.type,
     required this.count,
