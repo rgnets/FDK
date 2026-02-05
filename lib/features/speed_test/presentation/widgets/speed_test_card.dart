@@ -190,8 +190,26 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
   Widget build(BuildContext context) {
     final testState = ref.watch(speedTestRunNotifierProvider);
     final status = testState.executionStatus;
-    final lastResult = testState.completedResult;
-    final hasError = lastResult?.hasError == true;
+    final sessionResult = testState.completedResult;
+
+    // Fall back to cached adhoc result if no session result
+    final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
+    final cachedAdhocResult = cacheIntegration.getMostRecentAdhocSpeedTestResult();
+
+    // Use session result if available, otherwise use cached adhoc result
+    final lastResult = sessionResult ?? cachedAdhocResult;
+    final hasError = sessionResult?.hasError == true;
+
+    // For display, prefer session state values if available, else use cached result
+    final displayDownload = sessionResult != null
+        ? testState.downloadSpeed
+        : (cachedAdhocResult?.downloadMbps ?? 0);
+    final displayUpload = sessionResult != null
+        ? testState.uploadSpeed
+        : (cachedAdhocResult?.uploadMbps ?? 0);
+    final displayLatency = sessionResult != null
+        ? testState.latency
+        : (cachedAdhocResult?.rtt ?? 0);
 
     return GestureDetector(
       onLongPress: _showConfigDialog,
@@ -256,12 +274,12 @@ class _SpeedTestCardState extends ConsumerState<SpeedTestCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildSpeedMetric('Down', testState.downloadSpeed,
+                    _buildSpeedMetric('Down', displayDownload,
                         AppColors.success, Icons.download),
-                    _buildSpeedMetric('Up', testState.uploadSpeed,
+                    _buildSpeedMetric('Up', displayUpload,
                         AppColors.info, Icons.upload),
                     _buildSpeedMetric(
-                        'Ping', testState.latency, Colors.orange, Icons.timer,
+                        'Ping', displayLatency, Colors.orange, Icons.timer,
                         isLatency: true),
                   ],
                 ),

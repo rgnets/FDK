@@ -217,6 +217,39 @@ class WebSocketCacheIntegration {
     return configs.first;
   }
 
+  /// Get the most recent adhoc speed test result.
+  /// Adhoc results are those that:
+  /// 1. Match the adhoc speed test config's ID, OR
+  /// 2. Have no device association (not tested via AP or ONT)
+  SpeedTestResult? getMostRecentAdhocSpeedTestResult() {
+    final results = getCachedSpeedTestResults();
+    if (results.isEmpty) return null;
+
+    final adhocConfig = getAdhocSpeedTestConfig();
+    final adhocConfigId = adhocConfig?.id;
+
+    // Filter for adhoc results
+    final adhocResults = results.where((r) {
+      // Match by adhoc config ID
+      if (adhocConfigId != null && r.speedTestId == adhocConfigId) {
+        return true;
+      }
+      // Or results with no device association (general adhoc tests)
+      if (r.testedViaAccessPointId == null &&
+          r.testedViaMediaConverterId == null) {
+        return true;
+      }
+      return false;
+    }).toList();
+
+    if (adhocResults.isEmpty) return null;
+
+    // Sort by timestamp (newest first)
+    adhocResults.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+    return adhocResults.first;
+  }
+
   /// Get speed test config by ID.
   SpeedTestConfig? getSpeedTestConfigById(int? id) {
     if (id == null) return null;
