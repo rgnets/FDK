@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 
 /// Generic pagination service for efficient data loading
 class PaginationService<T> {
@@ -18,7 +18,7 @@ class PaginationService<T> {
   final _items = <T>[];
   final _pageCache = HashMap<int, List<T>>();
   final _loadedPages = <int>{};
-  final _logger = LoggerConfig.getLogger();
+  final _logger = LoggerService.getLogger();
   bool _hasMore = true;
   bool _isLoading = false;
   int _currentPage = 0;

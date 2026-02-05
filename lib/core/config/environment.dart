@@ -5,9 +5,6 @@ enum Environment { development, staging, production }
 
 class EnvironmentConfig {
   static Environment _environment = Environment.development;
-  static const String _defaultStagingToken =
-      'xWCH1KHxwjHRZtNbyBDTrGQw1gDry98ChcXM7bpLbKaTUHZzUUBsCb77SHrJNHUKGLAKgmykxsxsAg6r';
-  static const String _defaultStagingUsername = 'fetoolreadonly';
 
   static void setEnvironment(Environment env) {
     _environment = env;
@@ -126,6 +123,10 @@ class EnvironmentConfig {
   }
 
   /// API Credentials
+  ///
+  /// For staging/production, credentials MUST be provided via environment variables:
+  /// - STAGING_API_LOGIN / API_USERNAME
+  /// - STAGING_API_KEY or STAGING_TOKEN / API_KEY or WS_TOKEN
   static String get apiUsername {
     switch (_environment) {
       case Environment.development:
@@ -135,10 +136,13 @@ class EnvironmentConfig {
           'STAGING_API_LOGIN',
           defaultValue: '',
         );
-        if (stagingLogin.isNotEmpty) {
-          return stagingLogin;
+        if (stagingLogin.isEmpty) {
+          throw StateError(
+            'STAGING_API_LOGIN environment variable is required for staging. '
+            'Build with: --dart-define=STAGING_API_LOGIN=your_username',
+          );
         }
-        return _defaultStagingUsername;
+        return stagingLogin;
       case Environment.production:
         return const String.fromEnvironment('API_USERNAME', defaultValue: '');
     }
@@ -159,8 +163,14 @@ class EnvironmentConfig {
         }
         const stagingToken = String.fromEnvironment(
           'STAGING_TOKEN',
-          defaultValue: _defaultStagingToken,
+          defaultValue: '',
         );
+        if (stagingToken.isEmpty) {
+          throw StateError(
+            'STAGING_API_KEY or STAGING_TOKEN environment variable is required for staging. '
+            'Build with: --dart-define=STAGING_API_KEY=your_key',
+          );
+        }
         return stagingToken;
       case Environment.production:
         return const String.fromEnvironment('API_KEY', defaultValue: '');
@@ -182,13 +192,19 @@ class EnvironmentConfig {
         }
         const stagingApiKey = String.fromEnvironment(
           'STAGING_API_KEY',
-          defaultValue: _defaultStagingToken,
+          defaultValue: '',
         );
+        if (stagingApiKey.isEmpty) {
+          throw StateError(
+            'STAGING_TOKEN or STAGING_API_KEY environment variable is required for staging. '
+            'Build with: --dart-define=STAGING_TOKEN=your_token',
+          );
+        }
         return stagingApiKey;
       case Environment.production:
         const tok = String.fromEnvironment('WS_TOKEN', defaultValue: '');
         if (tok.isEmpty) {
-          throw Exception('WS_TOKEN not provided for production');
+          throw StateError('WS_TOKEN not provided for production');
         }
         return tok;
     }

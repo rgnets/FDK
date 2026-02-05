@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
@@ -28,7 +28,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
   final roomLocalDataSource = ref.watch(roomLocalDataSourceProvider);
   final cacheManager = ref.watch(cacheManagerProvider);
   final storageService = ref.watch(storageServiceProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
 
   // Typed device local data sources (new architecture)
   final apLocalDataSource = ref.watch(apLocalDataSourceProvider);
@@ -53,7 +53,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
     // Using unawaited to make this explicit, with error logging.
     unawaited(
       service.dispose().catchError((Object e) {
-        LoggerConfig.getLogger().w('WebSocketDataSyncService dispose error: $e');
+        LoggerService.getLogger().w('WebSocketDataSyncService dispose error: $e');
       }),
     );
   });
@@ -63,7 +63,7 @@ final webSocketDataSyncServiceProvider = Provider<WebSocketDataSyncService>((
 /// Keeps WebSocket sync events wired to provider invalidation.
 final webSocketDataSyncListenerProvider = Provider<void>((ref) {
   final service = ref.watch(webSocketDataSyncServiceProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   final subscription = service.events.listen((event) {
     switch (event.type) {
       case WebSocketDataSyncEventType.devicesCached:
@@ -94,7 +94,7 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
   ref,
 ) {
   final webSocketService = ref.watch(webSocketServiceProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   final storageService = ref.watch(storageServiceProvider);
   final deviceUpdateEventBus = ref.watch(deviceUpdateEventBusProvider);
 

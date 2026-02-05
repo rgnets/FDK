@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/config/mock_network_config.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
@@ -23,7 +23,7 @@ class MockDataService {
   static final MockDataService _instance = MockDataService._internal();
 
   final Random _random = Random(42); // Seed for consistent generation
-  final _logger = LoggerConfig.getLogger();
+  final _logger = LoggerService.getLogger();
   late final List<Room> _rooms;
   late final List<Device> _devices;
   late final List<AppNotification> _notifications;

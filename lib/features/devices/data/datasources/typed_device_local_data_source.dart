@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:logger/logger.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 
@@ -20,7 +20,7 @@ abstract class TypedDeviceLocalDataSource<T extends DeviceModelSealed> {
     required this.timestampKey,
     this.cacheValidityDuration = const Duration(minutes: 30),
     this.flushDebounce = const Duration(seconds: 2),
-  }) : _logger = LoggerConfig.getLogger();
+  }) : _logger = LoggerService.getLogger();
 
   final StorageService storageService;
 

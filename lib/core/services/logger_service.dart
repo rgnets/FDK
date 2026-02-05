@@ -1,10 +1,16 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/config/logging_config.dart';
 import 'package:rgnets_fdk/core/services/error_reporter.dart';
 
 /// Logger service for consistent logging throughout the app.
+///
+/// This is the single source of truth for logging configuration.
+/// Use [LoggerService.getLogger] for instance-based logging or
+/// static methods like [LoggerService.debug] for simple logging.
 class LoggerService {
   LoggerService._();
 
@@ -12,6 +18,48 @@ class LoggerService {
 
   static LogLevel _currentLevel = LogLevel.debug;
   static Logger _logger = _buildLogger(_currentLevel);
+
+  /// Get a Logger instance for class-based logging.
+  ///
+  /// This is the preferred way to get a logger when you need to store
+  /// a reference (e.g., as a class field).
+  static Logger getLogger({String? className}) {
+    // Completely disable logging in production to prevent memory issues
+    if (EnvironmentConfig.isProduction || kReleaseMode) {
+      return Logger(level: Level.off, printer: _NullPrinter());
+    }
+
+    return Logger(
+      printer: PrettyPrinter(
+        methodCount: 0,
+        errorMethodCount: 2,
+        lineLength: 120,
+        colors: true,
+        printEmojis: false,
+        dateTimeFormat: DateTimeFormat.none,
+      ),
+      level: _getLoggerLevel(),
+      filter: DevelopmentFilter(),
+    );
+  }
+
+  static Level _getLoggerLevel() {
+    if (EnvironmentConfig.isDevelopment) {
+      return Level.debug;
+    }
+    if (EnvironmentConfig.isStaging) {
+      return Level.info;
+    }
+    return Level.warning;
+  }
+
+  /// Check if verbose logging is enabled
+  static bool get isVerboseLoggingEnabled {
+    return kDebugMode && EnvironmentConfig.isDevelopment;
+  }
+
+  /// Check if step-by-step logging should be shown
+  static bool get shouldShowStepLogging => false;
 
   /// Configure the logging service during application bootstrap.
   static void configure({LogLevel? level, bool? enableCrashReporting}) {
@@ -264,4 +312,10 @@ class LoggerService {
         return Level.trace;
     }
   }
+}
+
+/// Null printer that outputs nothing (used in production).
+class _NullPrinter extends LogPrinter {
+  @override
+  List<String> log(LogEvent event) => [];
 }

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
@@ -90,7 +90,7 @@ final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
   final webSocketCacheIntegration =
       ref.watch(webSocketCacheIntegrationProvider);
   final storageService = ref.watch(storageServiceProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   return DeviceWebSocketDataSource(
     webSocketCacheIntegration: webSocketCacheIntegration,
     imageBaseUrl: storageService.siteUrl,
@@ -114,7 +114,7 @@ final roomLocalDataSourceProvider = Provider<RoomLocalDataSource>((ref) {
 final roomWebSocketDataSourceProvider = Provider<RoomDataSource>((ref) {
   final webSocketCacheIntegration =
       ref.watch(webSocketCacheIntegrationProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   return RoomWebSocketDataSource(
     webSocketCacheIntegration: webSocketCacheIntegration,
     logger: logger,
@@ -215,7 +215,7 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 /// Room readiness WebSocket data source provider
 final roomReadinessDataSourceProvider = Provider<RoomReadinessDataSource>((ref) {
   final webSocketCacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   return RoomReadinessWebSocketDataSource(
     webSocketCacheIntegration: webSocketCacheIntegration,
     logger: logger,
@@ -233,7 +233,7 @@ final roomReadinessMockDataSourceProvider =
 final roomReadinessRepositoryProvider = Provider<RoomReadinessRepository>((ref) {
   final dataSource = ref.watch(roomReadinessDataSourceProvider);
   final mockDataSource = ref.watch(roomReadinessMockDataSourceProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
 
   return RoomReadinessRepositoryImpl(
     dataSource: dataSource,

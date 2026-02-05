@@ -107,6 +107,9 @@ class RoomReadinessUpdate with _$RoomReadinessUpdate {
     required RoomReadinessMetrics metrics,
     required RoomReadinessUpdateType type,
     required DateTime timestamp,
+    /// All room metrics for fullRefresh updates.
+    /// Only populated when type is [RoomReadinessUpdateType.fullRefresh].
+    List<RoomReadinessMetrics>? allMetrics,
   }) = _RoomReadinessUpdate;
 
   const RoomReadinessUpdate._();
@@ -114,6 +117,7 @@ class RoomReadinessUpdate with _$RoomReadinessUpdate {
   factory RoomReadinessUpdate.fromJson(Map<String, dynamic> json) =>
       _$RoomReadinessUpdateFromJson(json);
 
+  /// Create a single-room update (for incremental changes).
   factory RoomReadinessUpdate.create({
     required int roomId,
     required RoomReadinessMetrics metrics,
@@ -125,6 +129,34 @@ class RoomReadinessUpdate with _$RoomReadinessUpdate {
       metrics: metrics,
       type: type,
       timestamp: timestamp ?? DateTime.now(),
+    );
+  }
+
+  /// Create a full refresh update with all room metrics.
+  factory RoomReadinessUpdate.fullRefresh({
+    required List<RoomReadinessMetrics> allMetrics,
+    DateTime? timestamp,
+  }) {
+    // Use first room's metrics as the primary (for backwards compatibility)
+    // but include all metrics in allMetrics field
+    final primary = allMetrics.isNotEmpty
+        ? allMetrics.first
+        : RoomReadinessMetrics(
+            roomId: 0,
+            roomName: '',
+            status: RoomStatus.empty,
+            totalDevices: 0,
+            onlineDevices: 0,
+            offlineDevices: 0,
+            issues: const [],
+            lastUpdated: DateTime.now(),
+          );
+    return RoomReadinessUpdate(
+      roomId: 0,
+      metrics: primary,
+      type: RoomReadinessUpdateType.fullRefresh,
+      timestamp: timestamp ?? DateTime.now(),
+      allMetrics: allMetrics,
     );
   }
 }

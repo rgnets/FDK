@@ -1,7 +1,7 @@
 import 'package:logger/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/usecases/get_all_room_readiness.dart';
@@ -13,7 +13,7 @@ part 'room_readiness_provider.g.dart';
 /// Provider for room readiness metrics.
 @Riverpod(keepAlive: true)
 class RoomReadinessNotifier extends _$RoomReadinessNotifier {
-  Logger get _logger => LoggerConfig.getLogger();
+  Logger get _logger => LoggerService.getLogger();
 
   GetAllRoomReadiness get _getAllRoomReadiness =>
       GetAllRoomReadiness(ref.read(roomReadinessRepositoryProvider));
@@ -50,7 +50,7 @@ class RoomReadinessNotifier extends _$RoomReadinessNotifier {
 /// Provider for overall readiness percentage.
 @riverpod
 class OverallReadinessNotifier extends _$OverallReadinessNotifier {
-  Logger get _logger => LoggerConfig.getLogger();
+  Logger get _logger => LoggerService.getLogger();
 
   GetOverallReadiness get _getOverallReadiness =>
       GetOverallReadiness(ref.read(roomReadinessRepositoryProvider));
@@ -84,7 +84,7 @@ Future<RoomReadinessMetrics?> roomReadinessById(
   RoomReadinessByIdRef ref,
   int roomId,
 ) async {
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
   logger.i('roomReadinessById: Getting room $roomId');
 
   final usecase = GetRoomReadinessById(ref.read(roomReadinessRepositoryProvider));

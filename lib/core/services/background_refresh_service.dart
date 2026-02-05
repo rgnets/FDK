@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
@@ -27,7 +27,7 @@ class BackgroundRefreshService {
     required this.webSocketDataSyncService,
   });
 
-  static final _logger = LoggerConfig.getLogger();
+  static final _logger = LoggerService.getLogger();
 
   final DeviceDataSource deviceDataSource;
   final APLocalDataSource apLocalDataSource;

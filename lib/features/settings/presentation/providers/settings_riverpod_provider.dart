@@ -1,4 +1,4 @@
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart'
     show notificationGenerationServiceProvider;
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart'
@@ -53,7 +53,7 @@ class SettingsState {
 /// Main settings provider
 @riverpod
 class SettingsNotifier extends _$SettingsNotifier {
-  final _logger = LoggerConfig.getLogger();
+  final _logger = LoggerService.getLogger();
   AppSettings? _cachedSettings;
 
   @override

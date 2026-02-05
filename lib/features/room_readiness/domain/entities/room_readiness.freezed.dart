@@ -474,24 +474,41 @@ mixin _$RoomReadinessUpdate {
   RoomReadinessMetrics get metrics => throw _privateConstructorUsedError;
   RoomReadinessUpdateType get type => throw _privateConstructorUsedError;
   DateTime get timestamp => throw _privateConstructorUsedError;
+
+  /// All room metrics for fullRefresh updates.
+  /// Only populated when type is [RoomReadinessUpdateType.fullRefresh].
+  List<RoomReadinessMetrics>? get allMetrics =>
+      throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)
+    TResult Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)?
+    TResult? Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)?
+    TResult Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -528,7 +545,8 @@ abstract class $RoomReadinessUpdateCopyWith<$Res> {
       {int roomId,
       RoomReadinessMetrics metrics,
       RoomReadinessUpdateType type,
-      DateTime timestamp});
+      DateTime timestamp,
+      List<RoomReadinessMetrics>? allMetrics});
 
   $RoomReadinessMetricsCopyWith<$Res> get metrics;
 }
@@ -550,6 +568,7 @@ class _$RoomReadinessUpdateCopyWithImpl<$Res, $Val extends RoomReadinessUpdate>
     Object? metrics = null,
     Object? type = null,
     Object? timestamp = null,
+    Object? allMetrics = freezed,
   }) {
     return _then(_value.copyWith(
       roomId: null == roomId
@@ -568,6 +587,10 @@ class _$RoomReadinessUpdateCopyWithImpl<$Res, $Val extends RoomReadinessUpdate>
           ? _value.timestamp
           : timestamp // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      allMetrics: freezed == allMetrics
+          ? _value.allMetrics
+          : allMetrics // ignore: cast_nullable_to_non_nullable
+              as List<RoomReadinessMetrics>?,
     ) as $Val);
   }
 
@@ -592,7 +615,8 @@ abstract class _$$RoomReadinessUpdateImplCopyWith<$Res>
       {int roomId,
       RoomReadinessMetrics metrics,
       RoomReadinessUpdateType type,
-      DateTime timestamp});
+      DateTime timestamp,
+      List<RoomReadinessMetrics>? allMetrics});
 
   @override
   $RoomReadinessMetricsCopyWith<$Res> get metrics;
@@ -613,6 +637,7 @@ class __$$RoomReadinessUpdateImplCopyWithImpl<$Res>
     Object? metrics = null,
     Object? type = null,
     Object? timestamp = null,
+    Object? allMetrics = freezed,
   }) {
     return _then(_$RoomReadinessUpdateImpl(
       roomId: null == roomId
@@ -631,6 +656,10 @@ class __$$RoomReadinessUpdateImplCopyWithImpl<$Res>
           ? _value.timestamp
           : timestamp // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      allMetrics: freezed == allMetrics
+          ? _value._allMetrics
+          : allMetrics // ignore: cast_nullable_to_non_nullable
+              as List<RoomReadinessMetrics>?,
     ));
   }
 }
@@ -642,8 +671,10 @@ class _$RoomReadinessUpdateImpl extends _RoomReadinessUpdate {
       {required this.roomId,
       required this.metrics,
       required this.type,
-      required this.timestamp})
-      : super._();
+      required this.timestamp,
+      final List<RoomReadinessMetrics>? allMetrics})
+      : _allMetrics = allMetrics,
+        super._();
 
   factory _$RoomReadinessUpdateImpl.fromJson(Map<String, dynamic> json) =>
       _$$RoomReadinessUpdateImplFromJson(json);
@@ -657,9 +688,24 @@ class _$RoomReadinessUpdateImpl extends _RoomReadinessUpdate {
   @override
   final DateTime timestamp;
 
+  /// All room metrics for fullRefresh updates.
+  /// Only populated when type is [RoomReadinessUpdateType.fullRefresh].
+  final List<RoomReadinessMetrics>? _allMetrics;
+
+  /// All room metrics for fullRefresh updates.
+  /// Only populated when type is [RoomReadinessUpdateType.fullRefresh].
+  @override
+  List<RoomReadinessMetrics>? get allMetrics {
+    final value = _allMetrics;
+    if (value == null) return null;
+    if (_allMetrics is EqualUnmodifiableListView) return _allMetrics;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   @override
   String toString() {
-    return 'RoomReadinessUpdate(roomId: $roomId, metrics: $metrics, type: $type, timestamp: $timestamp)';
+    return 'RoomReadinessUpdate(roomId: $roomId, metrics: $metrics, type: $type, timestamp: $timestamp, allMetrics: $allMetrics)';
   }
 
   @override
@@ -671,13 +717,15 @@ class _$RoomReadinessUpdateImpl extends _RoomReadinessUpdate {
             (identical(other.metrics, metrics) || other.metrics == metrics) &&
             (identical(other.type, type) || other.type == type) &&
             (identical(other.timestamp, timestamp) ||
-                other.timestamp == timestamp));
+                other.timestamp == timestamp) &&
+            const DeepCollectionEquality()
+                .equals(other._allMetrics, _allMetrics));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, roomId, metrics, type, timestamp);
+  int get hashCode => Object.hash(runtimeType, roomId, metrics, type, timestamp,
+      const DeepCollectionEquality().hash(_allMetrics));
 
   @JsonKey(ignore: true)
   @override
@@ -689,33 +737,45 @@ class _$RoomReadinessUpdateImpl extends _RoomReadinessUpdate {
   @override
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)
+    TResult Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)
         $default,
   ) {
-    return $default(roomId, metrics, type, timestamp);
+    return $default(roomId, metrics, type, timestamp, allMetrics);
   }
 
   @override
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)?
+    TResult? Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)?
         $default,
   ) {
-    return $default?.call(roomId, metrics, type, timestamp);
+    return $default?.call(roomId, metrics, type, timestamp, allMetrics);
   }
 
   @override
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(int roomId, RoomReadinessMetrics metrics,
-            RoomReadinessUpdateType type, DateTime timestamp)?
+    TResult Function(
+            int roomId,
+            RoomReadinessMetrics metrics,
+            RoomReadinessUpdateType type,
+            DateTime timestamp,
+            List<RoomReadinessMetrics>? allMetrics)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
-      return $default(roomId, metrics, type, timestamp);
+      return $default(roomId, metrics, type, timestamp, allMetrics);
     }
     return orElse();
   }
@@ -758,10 +818,12 @@ class _$RoomReadinessUpdateImpl extends _RoomReadinessUpdate {
 
 abstract class _RoomReadinessUpdate extends RoomReadinessUpdate {
   const factory _RoomReadinessUpdate(
-      {required final int roomId,
-      required final RoomReadinessMetrics metrics,
-      required final RoomReadinessUpdateType type,
-      required final DateTime timestamp}) = _$RoomReadinessUpdateImpl;
+          {required final int roomId,
+          required final RoomReadinessMetrics metrics,
+          required final RoomReadinessUpdateType type,
+          required final DateTime timestamp,
+          final List<RoomReadinessMetrics>? allMetrics}) =
+      _$RoomReadinessUpdateImpl;
   const _RoomReadinessUpdate._() : super._();
 
   factory _RoomReadinessUpdate.fromJson(Map<String, dynamic> json) =
@@ -775,6 +837,11 @@ abstract class _RoomReadinessUpdate extends RoomReadinessUpdate {
   RoomReadinessUpdateType get type;
   @override
   DateTime get timestamp;
+  @override
+
+  /// All room metrics for fullRefresh updates.
+  /// Only populated when type is [RoomReadinessUpdateType.fullRefresh].
+  List<RoomReadinessMetrics>? get allMetrics;
   @override
   @JsonKey(ignore: true)
   _$$RoomReadinessUpdateImplCopyWith<_$RoomReadinessUpdateImpl> get copyWith =>

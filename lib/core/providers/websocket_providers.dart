@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 
 // NOTE: Sync providers are in websocket_sync_providers.dart
@@ -25,7 +25,7 @@ final webSocketConfigProvider = Provider<WebSocketConfig>((ref) {
 /// Provides a singleton [WebSocketService] for the application lifecycle.
 final webSocketServiceProvider = Provider<WebSocketService>((ref) {
   final config = ref.watch(webSocketConfigProvider);
-  final logger = LoggerConfig.getLogger();
+  final logger = LoggerService.getLogger();
 
   final service = WebSocketService(config: config, logger: logger);
   final stateSub = service.connectionState.listen((state) {

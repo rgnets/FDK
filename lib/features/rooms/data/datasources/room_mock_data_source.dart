@@ -1,4 +1,4 @@
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/utils/room_id_parser.dart';
 import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
@@ -15,7 +15,7 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
   const RoomMockDataSourceImpl({required this.mockDataService});
 
   final MockDataService mockDataService;
-  static final _logger = LoggerConfig.getLogger();
+  static final _logger = LoggerService.getLogger();
 
   @override
   Future<List<RoomModel>> getRooms() async {

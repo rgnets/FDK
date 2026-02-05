@@ -1,9 +1,9 @@
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 
 /// Utility to provide QR code credentials
 class QrDecoder {
-  static final _logger = LoggerConfig.getLogger();
+  static final _logger = LoggerService.getLogger();
 
   /// Get the test API credentials
   /// In production, this would decode an actual QR code image

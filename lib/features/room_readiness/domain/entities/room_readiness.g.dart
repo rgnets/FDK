@@ -49,16 +49,30 @@ _$RoomReadinessUpdateImpl _$$RoomReadinessUpdateImplFromJson(
           json['metrics'] as Map<String, dynamic>),
       type: $enumDecode(_$RoomReadinessUpdateTypeEnumMap, json['type']),
       timestamp: DateTime.parse(json['timestamp'] as String),
+      allMetrics: (json['all_metrics'] as List<dynamic>?)
+          ?.map((e) => RoomReadinessMetrics.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$$RoomReadinessUpdateImplToJson(
-        _$RoomReadinessUpdateImpl instance) =>
-    <String, dynamic>{
-      'room_id': instance.roomId,
-      'metrics': instance.metrics.toJson(),
-      'type': _$RoomReadinessUpdateTypeEnumMap[instance.type]!,
-      'timestamp': instance.timestamp.toIso8601String(),
-    };
+    _$RoomReadinessUpdateImpl instance) {
+  final val = <String, dynamic>{
+    'room_id': instance.roomId,
+    'metrics': instance.metrics.toJson(),
+    'type': _$RoomReadinessUpdateTypeEnumMap[instance.type]!,
+    'timestamp': instance.timestamp.toIso8601String(),
+  };
+
+  void writeNotNull(String key, dynamic value) {
+    if (value != null) {
+      val[key] = value;
+    }
+  }
+
+  writeNotNull(
+      'all_metrics', instance.allMetrics?.map((e) => e.toJson()).toList());
+  return val;
+}
 
 const _$RoomReadinessUpdateTypeEnumMap = {
   RoomReadinessUpdateType.deviceStatusChanged: 'deviceStatusChanged',

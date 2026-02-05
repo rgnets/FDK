@@ -146,11 +146,15 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
   ) {
     _logger.i('RoomReadinessWebSocketDataSource: Computing metrics for ${rooms.length} rooms');
 
+    // Build device lookup map ONCE for O(1) lookups instead of O(n) per room
+    final deviceLookup = _buildDeviceLookupMap(deviceModels);
+    _logger.i('RoomReadinessWebSocketDataSource: Built device lookup map with ${deviceLookup.length} entries');
+
     final metrics = <RoomReadinessMetrics>[];
 
     for (final roomData in rooms) {
       try {
-        final metric = _computeRoomMetrics(roomData, deviceModels);
+        final metric = _computeRoomMetrics(roomData, deviceLookup);
         metrics.add(metric);
         _metricsCache[metric.roomId] = metric;
       } catch (e) {
@@ -160,23 +164,60 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     _lastCacheUpdate = DateTime.now();
 
-    // Emit a full refresh update
+    // Emit a full refresh update with ALL room metrics
     if (metrics.isNotEmpty) {
       _updateController.add(
-        RoomReadinessUpdate.create(
-          roomId: 0,
-          metrics: metrics.first,
-          type: RoomReadinessUpdateType.fullRefresh,
-        ),
+        RoomReadinessUpdate.fullRefresh(allMetrics: metrics),
       );
     }
 
     return metrics;
   }
 
+  /// Build a lookup map from device models for O(1) lookups.
+  /// Keys include both raw IDs and prefixed IDs (e.g., "123" and "ap_123").
+  Map<String, dynamic> _buildDeviceLookupMap(List<dynamic> deviceModels) {
+    final lookup = <String, dynamic>{};
+
+    for (final device in deviceModels) {
+      try {
+        final deviceId = device.id as String?;
+        if (deviceId != null) {
+          lookup[deviceId] = device;
+          // Also add without prefix for flexible matching
+          final rawId = _extractRawId(deviceId);
+          if (rawId != deviceId) {
+            lookup[rawId] = device;
+          }
+        }
+      } catch (_) {
+        // Handle Map-based devices
+        if (device is Map<String, dynamic>) {
+          final id = device['id']?.toString();
+          if (id != null) {
+            lookup[id] = device;
+          }
+        }
+      }
+    }
+
+    return lookup;
+  }
+
+  /// Extract raw numeric ID from prefixed ID (e.g., "ap_123" -> "123").
+  String _extractRawId(String deviceId) {
+    final prefixes = ['ap_', 'ont_', 'sw_'];
+    for (final prefix in prefixes) {
+      if (deviceId.startsWith(prefix)) {
+        return deviceId.substring(prefix.length);
+      }
+    }
+    return deviceId;
+  }
+
   RoomReadinessMetrics _computeRoomMetrics(
     Map<String, dynamic> roomData,
-    List deviceModels,
+    Map<String, dynamic> deviceLookup,
   ) {
     final roomId = _parseRoomId(roomData['id']);
     final roomName = _buildRoomName(roomData);
@@ -186,7 +227,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     _logger.i('DEBUG ROOM $roomId: access_points = ${roomData['access_points']}');
     _logger.i('DEBUG ROOM $roomId: media_converters = ${roomData['media_converters']}');
     _logger.i('DEBUG ROOM $roomId: switch_ports = ${roomData['switch_ports']}');
-    _logger.i('DEBUG ROOM $roomId: deviceModels count = ${deviceModels.length}');
+    _logger.i('DEBUG ROOM $roomId: deviceLookup size = ${deviceLookup.length}');
 
     // Extract device references from room data
     final deviceRefs = _extractDeviceReferences(roomData);
@@ -213,7 +254,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final issues = <Issue>[];
 
     for (final ref in deviceRefs) {
-      final device = _findDevice(ref, deviceModels);
+      final device = _findDevice(ref, deviceLookup);
       _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
       if (device == null) {
         _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
@@ -365,7 +406,8 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     return refs;
   }
 
-  dynamic _findDevice(Map<String, dynamic> ref, List deviceModels) {
+  /// Find a device using O(1) map lookup instead of O(n) list search.
+  dynamic _findDevice(Map<String, dynamic> ref, Map<String, dynamic> deviceLookup) {
     final refId = ref['id']?.toString();
     final refType = ref['type'] as String?;
     if (refId == null) {
@@ -382,42 +424,25 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     };
     final prefixedId = '$prefix$refId';
 
-    _logger.i('DEBUG _findDevice: Looking for refId=$refId prefixedId=$prefixedId in ${deviceModels.length} devices');
+    _logger.d('DEBUG _findDevice: Looking for refId=$refId prefixedId=$prefixedId');
 
-    // Log first few device IDs for comparison
-    if (deviceModels.isNotEmpty) {
-      final sampleIds = deviceModels.take(5).map((d) {
-        try {
-          return d.id;
-        } catch (_) {
-          return d is Map ? d['id'] : 'unknown';
-        }
-      }).toList();
-      _logger.i('DEBUG _findDevice: Sample device IDs in cache: $sampleIds');
+    // O(1) lookup - try prefixed ID first, then raw ID
+    var device = deviceLookup[prefixedId];
+    if (device != null) {
+      _logger.d('DEBUG _findDevice: MATCH FOUND via prefixedId=$prefixedId');
+      return device;
     }
 
-    for (final device in deviceModels) {
-      try {
-        final deviceId = device.id as String?;
-        if (deviceId == prefixedId || deviceId == refId) {
-          _logger.i('DEBUG _findDevice: MATCH FOUND deviceId=$deviceId');
-          return device;
-        }
-      } catch (_) {
-        // Handle case where device is a Map
-        if (device is Map<String, dynamic>) {
-          if (device['id']?.toString() == refId) {
-            _logger.i('DEBUG _findDevice: MATCH FOUND (Map) id=${device['id']}');
-            return device;
-          }
-        }
-      }
+    device = deviceLookup[refId];
+    if (device != null) {
+      _logger.d('DEBUG _findDevice: MATCH FOUND via refId=$refId');
+      return device;
     }
 
     // Also check in the reference data itself (inline device data)
     final refData = ref['data'];
     if (refData is Map<String, dynamic> && refData.containsKey('online')) {
-      _logger.i('DEBUG _findDevice: Using inline refData with online=${refData['online']}');
+      _logger.d('DEBUG _findDevice: Using inline refData with online=${refData['online']}');
       return refData;
     }
 

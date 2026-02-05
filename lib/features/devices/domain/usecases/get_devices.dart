@@ -1,6 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/usecases/usecase.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
@@ -11,7 +11,7 @@ final class GetDevices extends UseCase<List<Device>, GetDevicesParams> {
   GetDevices(this.repository);
 
   final DeviceRepository repository;
-  final _logger = LoggerConfig.getLogger();
+  final _logger = LoggerService.getLogger();
 
   @override
   Future<Either<Failure, List<Device>>> call(GetDevicesParams params) async {

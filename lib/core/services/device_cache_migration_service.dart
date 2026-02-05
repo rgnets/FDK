@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:rgnets_fdk/core/config/logger_config.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
@@ -31,7 +31,7 @@ class DeviceCacheMigrationService {
   final ONTLocalDataSource ontDataSource;
   final SwitchLocalDataSource switchDataSource;
   final WLANLocalDataSource wlanDataSource;
-  final _logger = LoggerConfig.getLogger();
+  final _logger = LoggerService.getLogger();
 
   // Old cache keys
   static const String _oldIndexKey = 'device_index';
