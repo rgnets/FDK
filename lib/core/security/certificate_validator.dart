@@ -64,12 +64,27 @@ class CertificateValidator {
         return false;
       }
 
-      // Accept valid certificates (matches ATT-FE-Tool behavior)
-      LoggerService.debug(
-        'Accepting non-self-signed certificate for $host:$port',
+      // This callback is only invoked when the platform's default validation
+      // has already FAILED. Accepting here would bypass chain-of-trust checks
+      // (wrong hostname, untrusted CA, revoked cert) and enable MITM attacks.
+      if (kDebugMode) {
+        LoggerService.warning(
+          'DEBUG MODE: Accepting platform-rejected certificate for $host:$port. '
+          'This certificate failed platform validation (possible untrusted CA, '
+          'hostname mismatch, or revocation). Only accepted because debug mode is active.',
+          tag: 'CertificateValidator',
+        );
+        return true; // Accept in debug only for local development
+      }
+
+      LoggerService.error(
+        'CERTIFICATE REJECTED: $host:$port. '
+        'The certificate failed platform TLS validation (untrusted CA, '
+        'hostname mismatch, or revoked). Rejecting to prevent potential '
+        'man-in-the-middle attacks.',
         tag: 'CertificateValidator',
       );
-      return true;
+      return false; // REJECT in production - do not bypass platform validation
     } catch (e, stack) {
       LoggerService.error(
         'Certificate validation error for $host:$port',

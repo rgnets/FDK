@@ -12,6 +12,12 @@ import 'package:rgnets_fdk/features/devices/data/models/room_model.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/rooms/data/datasources/room_local_data_source.dart';
 
+// ARCHITECTURE NOTE (M1): This service imports from features/ layer, violating
+// Clean Architecture (core should not depend on features). This is a known
+// pattern across the codebase (16 core files import from features). Moving this
+// service alone would create inconsistency. A holistic architecture refactoring
+// using dependency inversion (abstract interfaces in core, implementations in
+// features) is the recommended approach for a future dedicated sprint.
 class WebSocketDataSyncService {
   WebSocketDataSyncService({
     required WebSocketService socketService,
@@ -102,7 +108,8 @@ class WebSocketDataSyncService {
     _wlanLocalDataSource.dispose();
   }
 
-  Future<void> syncInitialData({
+  /// Returns true if sync completed successfully, false if it timed out.
+  Future<bool> syncInitialData({
     Duration timeout = const Duration(seconds: 45),
   }) async {
     await start();
@@ -115,15 +122,19 @@ class WebSocketDataSyncService {
     _initialSyncCompleter = Completer<void>();
     _requestSnapshots();
 
+    var timedOut = false;
     await _initialSyncCompleter!.future.timeout(
       timeout,
       onTimeout: () {
-        _logger.w('WebSocketDataSync: Initial sync timed out');
-        return;
+        _logger.w(
+          'WebSocketDataSync: Initial sync timed out after ${timeout.inSeconds}s. '
+          'Pending: $_pendingSnapshots',
+        );
+        timedOut = true;
       },
     );
 
-    // Flush all typed caches to storage
+    // Flush all typed caches to storage (may be partial on timeout)
     await _flushAllDeviceCaches();
 
     // Wait for any pending room cache operations
@@ -133,10 +144,14 @@ class WebSocketDataSyncService {
         const Duration(seconds: 30),
         onTimeout: () {
           _logger.w('WebSocketDataSync: Room cache timed out');
+          timedOut = true;
         },
       );
     }
-    _logger.i('WebSocketDataSync: Cache operations completed');
+    _logger.i(
+      'WebSocketDataSync: Cache operations completed${timedOut ? ' (partial - timed out)' : ''}',
+    );
+    return !timedOut;
   }
 
   /// Flush all typed device caches to storage
@@ -277,22 +292,14 @@ class WebSocketDataSyncService {
 
   List<Map<String, dynamic>>? _extractSnapshotItems(SocketMessage message) {
     final payload = message.payload;
-    if (payload['results'] is List) {
-      return (payload['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
+    // Backend (RxgWebsocketCrudService) uses 'data' key for response arrays
     if (payload['data'] is List) {
       return (payload['data'] as List)
           .whereType<Map<String, dynamic>>()
           .toList();
     }
-    if (payload['items'] is List) {
-      return (payload['items'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (payload['results'] is List<dynamic>) {
+    // Fallback for legacy or alternative response formats
+    if (payload['results'] is List) {
       return (payload['results'] as List)
           .whereType<Map<String, dynamic>>()
           .toList();
@@ -370,7 +377,9 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_apLocalDataSource.cacheDevices(models));
+    unawaited(_apLocalDataSource.cacheDevices(models).catchError((Object e) {
+      _logger.e('WebSocketDataSync: Failed to cache APs: $e');
+    }));
     _logger.d('WebSocketDataSync: Cached ${models.length} APs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -389,7 +398,9 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_ontLocalDataSource.cacheDevices(models));
+    unawaited(_ontLocalDataSource.cacheDevices(models).catchError((Object e) {
+      _logger.e('WebSocketDataSync: Failed to cache ONTs: $e');
+    }));
     _logger.d('WebSocketDataSync: Cached ${models.length} ONTs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -408,7 +419,9 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_switchLocalDataSource.cacheDevices(models));
+    unawaited(_switchLocalDataSource.cacheDevices(models).catchError((Object e) {
+      _logger.e('WebSocketDataSync: Failed to cache Switches: $e');
+    }));
     _logger.d('WebSocketDataSync: Cached ${models.length} Switches');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -427,7 +440,9 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_wlanLocalDataSource.cacheDevices(models));
+    unawaited(_wlanLocalDataSource.cacheDevices(models).catchError((Object e) {
+      _logger.e('WebSocketDataSync: Failed to cache WLANs: $e');
+    }));
     _logger.d('WebSocketDataSync: Cached ${models.length} WLANs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -460,8 +475,7 @@ class WebSocketDataSyncService {
       _roomSnapshots
         ..clear()
         ..['rooms.summary'] = models;
-      _pendingRoomCache = _cacheRooms(models);
-      unawaited(_pendingRoomCache);
+      _chainRoomCache(models);
       return;
     }
 
@@ -471,9 +485,18 @@ class WebSocketDataSyncService {
       for (final entry in _roomResources) {
         combined.addAll(_roomSnapshots[entry] ?? const []);
       }
-      _pendingRoomCache = _cacheRooms(combined);
-      unawaited(_pendingRoomCache);
+      _chainRoomCache(combined);
     }
+  }
+
+  /// Chains a new room cache operation onto any pending one, preventing
+  /// the race condition where _pendingRoomCache gets overwritten while
+  /// syncInitialData is awaiting the previous future.
+  void _chainRoomCache(List<RoomModel> rooms) {
+    final previous = _pendingRoomCache ?? Future<void>.value();
+    _pendingRoomCache = previous.then((_) => _cacheRooms(rooms)).catchError((Object e) {
+      _logger.e('WebSocketDataSync: Failed to cache rooms: $e');
+    });
   }
 
   Future<void> _cacheRooms(List<RoomModel> rooms) async {
@@ -607,25 +630,22 @@ class WebSocketDataSyncService {
   }
 
   String _determineStatus(Map<String, dynamic> device) {
+    // Backend uses 'online' boolean field (AccessPoint.online)
     final onlineFlag = device['online'] as bool?;
-    final activeFlag = device['active'] as bool?;
-
     if (onlineFlag != null) {
       return onlineFlag ? 'online' : 'offline';
     }
-    if (device['status']?.toString().toLowerCase() == 'online') {
-      return 'online';
-    }
-    if (device['status']?.toString().toLowerCase() == 'offline') {
-      return 'offline';
-    }
-    if (activeFlag != null) {
-      return activeFlag ? 'online' : 'offline';
+
+    // Fallback: check string 'status' field
+    final statusStr = device['status']?.toString().toLowerCase();
+    if (statusStr == 'online' || statusStr == 'offline') {
+      return statusStr!;
     }
 
-    if (device['last_seen'] != null || device['updated_at'] != null) {
+    // Derive status from last_seen_at/last_seen timestamp (produces 'warning')
+    if (device['last_seen_at'] != null || device['last_seen'] != null || device['updated_at'] != null) {
       try {
-        final lastSeenStr = (device['last_seen'] ?? device['updated_at'])
+        final lastSeenStr = (device['last_seen_at'] ?? device['last_seen'] ?? device['updated_at'])
             .toString();
         final lastSeen = DateTime.parse(lastSeenStr);
         final now = DateTime.now();
@@ -692,17 +712,10 @@ class WebSocketDataSyncService {
   }
 
   List<String>? _extractImages(Map<String, dynamic> deviceMap) {
-    final imageKeys = [
+    // Backend uses 'images' key (has_many_base64_attached :images)
+    const imageKeys = [
       'images',
-      'image',
-      'image_url',
-      'imageUrl',
-      'photos',
-      'photo',
-      'photo_url',
-      'photoUrl',
-      'device_images',
-      'device_image',
+      'image', // Fallback for singular image field
     ];
 
     for (final key in imageKeys) {

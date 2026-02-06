@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -13,7 +11,6 @@ import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // Mocks
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -34,9 +31,19 @@ void main() {
     mockStorageService = MockStorageService();
     mockLogger = MockLogger();
 
-    // Setup default mock behavior
-    when(() => mockStorageService.migrateLegacyCredentialsIfNeeded())
+    // Setup default mock behavior for StorageService
+    when(() => mockStorageService.migrateToSecureStorageIfNeeded())
         .thenAnswer((_) async {});
+    when(() => mockStorageService.getToken())
+        .thenAnswer((_) async => null);
+    when(() => mockStorageService.getAuthSignature())
+        .thenAnswer((_) async => null);
+    when(() => mockStorageService.token).thenReturn(null);
+    when(() => mockStorageService.siteUrl).thenReturn(null);
+    when(() => mockStorageService.username).thenReturn(null);
+    when(() => mockStorageService.siteName).thenReturn(null);
+    when(() => mockStorageService.authIssuedAt).thenReturn(null);
+    when(() => mockStorageService.authSignature).thenReturn(null);
     when(() => mockLogger.i(any())).thenReturn(null);
     when(() => mockLogger.d(any())).thenReturn(null);
     when(() => mockLogger.w(any())).thenReturn(null);
@@ -54,6 +61,8 @@ void main() {
 
         // Credentials exist in storage
         when(() => mockStorageService.token).thenReturn('valid-token');
+        when(() => mockStorageService.getToken())
+            .thenAnswer((_) async => 'valid-token');
         when(() => mockStorageService.siteUrl)
             .thenReturn('https://test.rgnets.com');
         when(() => mockStorageService.username).thenReturn('testuser');
@@ -61,16 +70,12 @@ void main() {
         when(() => mockStorageService.authIssuedAt).thenReturn(null);
         when(() => mockStorageService.authSignature).thenReturn(null);
 
-        // Setup SharedPreferences for the container
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-
         // Create provider container with overrides
         final container = ProviderContainer(
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
             storageServiceProvider
-                .overrideWithValue(StorageService(prefs)),
+                .overrideWithValue(mockStorageService),
             loggerProvider.overrideWithValue(mockLogger),
           ],
         );
@@ -107,13 +112,10 @@ void main() {
         when(() => mockStorageService.siteUrl).thenReturn(null);
         when(() => mockStorageService.username).thenReturn(null);
 
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-
         final container = ProviderContainer(
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
-            storageServiceProvider.overrideWithValue(StorageService(prefs)),
+            storageServiceProvider.overrideWithValue(mockStorageService),
             loggerProvider.overrideWithValue(mockLogger),
           ],
         );
@@ -136,13 +138,10 @@ void main() {
         when(() => mockStorageService.siteUrl).thenReturn('');
         when(() => mockStorageService.username).thenReturn('');
 
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-
         final container = ProviderContainer(
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
-            storageServiceProvider.overrideWithValue(StorageService(prefs)),
+            storageServiceProvider.overrideWithValue(mockStorageService),
             loggerProvider.overrideWithValue(mockLogger),
           ],
         );
@@ -171,13 +170,10 @@ void main() {
         // recovery to ensure WebSocket is connected. Without credentials in
         // storage, this will return unauthenticated. In production, credentials
         // should always exist when user model exists.
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-
         final container = ProviderContainer(
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
-            storageServiceProvider.overrideWithValue(StorageService(prefs)),
+            storageServiceProvider.overrideWithValue(mockStorageService),
             loggerProvider.overrideWithValue(mockLogger),
           ],
         );
@@ -206,6 +202,8 @@ void main() {
 
         // But credentials exist
         when(() => mockStorageService.token).thenReturn('valid-token');
+        when(() => mockStorageService.getToken())
+            .thenAnswer((_) async => 'valid-token');
         when(() => mockStorageService.siteUrl)
             .thenReturn('https://test.rgnets.com');
         when(() => mockStorageService.username).thenReturn('testuser');
@@ -213,13 +211,10 @@ void main() {
         when(() => mockStorageService.authIssuedAt).thenReturn(null);
         when(() => mockStorageService.authSignature).thenReturn(null);
 
-        SharedPreferences.setMockInitialValues({});
-        final prefs = await SharedPreferences.getInstance();
-
         final container = ProviderContainer(
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
-            storageServiceProvider.overrideWithValue(StorageService(prefs)),
+            storageServiceProvider.overrideWithValue(mockStorageService),
             loggerProvider.overrideWithValue(mockLogger),
           ],
         );

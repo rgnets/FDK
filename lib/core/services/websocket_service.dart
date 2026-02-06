@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
+import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Connection states emitted by [WebSocketService].
@@ -110,6 +111,7 @@ class WebSocketService {
   int _reconnectAttempts = 0;
   int _consecutiveReconnectFailures = 0;
   bool _manuallyClosed = false;
+  bool _isReconnecting = false;
 
   /// Maximum consecutive reconnect failures before emitting auth failure signal.
   static const int _maxReconnectBeforeAuthCheck = 3;
@@ -143,9 +145,11 @@ class WebSocketService {
   }
 
   /// Disconnects from the socket and prevents automatic reconnection.
+  /// All pending requests are immediately failed with a descriptive error.
   Future<void> disconnect({int? code, String? reason}) async {
     _manuallyClosed = true;
     _reconnectAttempts = 0;
+    _failPendingRequests('WebSocket disconnected');
     await _closeChannel(code: code, reason: reason);
     _updateState(SocketConnectionState.disconnected);
   }
@@ -172,9 +176,11 @@ class WebSocketService {
     });
   }
 
+  static const _uuid = Uuid();
+
   /// Generates a unique request ID.
   String _generateRequestId() {
-    return '${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(100000)}';
+    return '${DateTime.now().millisecondsSinceEpoch}-${_uuid.v4()}';
   }
 
   /// Sends a request and waits for a response with matching request_id.
@@ -257,7 +263,7 @@ class WebSocketService {
           : SocketConnectionState.connecting,
     );
     try {
-      _logger.i('WebSocketService: Connecting to ${params.uri}');
+      _logger.i('WebSocketService: Connecting to ${_sanitizeUri(params.uri)}');
       final channel = _channelFactory(params.uri, headers: params.headers);
 
       _channel = channel;
@@ -383,43 +389,52 @@ class WebSocketService {
   }
 
   Future<void> _scheduleReconnect() async {
+    if (_isReconnecting) {
+      _logger.d('WebSocketService: Reconnect already in progress, skipping');
+      return;
+    }
     if (_currentParams == null) {
       _logger.w('WebSocketService: No connection params for reconnect');
       return;
     }
-    _reconnectAttempts += 1;
-    final delay = _computeBackoffDelay(_reconnectAttempts);
-    _logger.i('WebSocketService: Reconnecting in ${delay.inMilliseconds}ms');
-    _updateState(SocketConnectionState.reconnecting);
-    await Future<void>.delayed(delay);
-    if (_manuallyClosed) {
-      _logger.d('WebSocketService: Reconnect aborted (manually closed)');
-      return;
-    }
-
-    // Store state before reconnect attempt
-    final wasConnected = _state == SocketConnectionState.connected;
-
-    await _open(_currentParams!);
-
-    // Track reconnection success/failure
-    if (_state == SocketConnectionState.connected) {
-      // Reconnect succeeded - reset failure counter
-      _consecutiveReconnectFailures = 0;
-    } else if (!wasConnected) {
-      // Reconnect failed
-      _consecutiveReconnectFailures++;
-      _logger.w(
-        'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
-      );
-
-      if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
-        _logger.w(
-          'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
-          'may indicate auth issue',
-        );
-        _authFailureController.add(_consecutiveReconnectFailures);
+    _isReconnecting = true;
+    try {
+      _reconnectAttempts += 1;
+      final delay = _computeBackoffDelay(_reconnectAttempts);
+      _logger.i('WebSocketService: Reconnecting in ${delay.inMilliseconds}ms');
+      _updateState(SocketConnectionState.reconnecting);
+      await Future<void>.delayed(delay);
+      if (_manuallyClosed) {
+        _logger.d('WebSocketService: Reconnect aborted (manually closed)');
+        return;
       }
+
+      // Store state before reconnect attempt
+      final wasConnected = _state == SocketConnectionState.connected;
+
+      await _open(_currentParams!);
+
+      // Track reconnection success/failure
+      if (_state == SocketConnectionState.connected) {
+        // Reconnect succeeded - reset failure counter
+        _consecutiveReconnectFailures = 0;
+      } else if (!wasConnected) {
+        // Reconnect failed
+        _consecutiveReconnectFailures++;
+        _logger.w(
+          'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
+        );
+
+        if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
+          _logger.w(
+            'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
+            'may indicate auth issue',
+          );
+          _authFailureController.add(_consecutiveReconnectFailures);
+        }
+      }
+    } finally {
+      _isReconnecting = false;
     }
   }
 
@@ -458,22 +473,30 @@ class WebSocketService {
       });
     }
 
-    _heartbeatWatchdog = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_lastHeartbeat == null) {
-        return;
-      }
-      final diff = DateTime.now().difference(_lastHeartbeat!);
-      if (diff > _config.heartbeatTimeout) {
-        _logger.w(
-          'WebSocketService: Heartbeat timeout after ${diff.inSeconds}s, closing connection',
-        );
-        unawaited(
-          _handleError(
-            TimeoutException('Heartbeat timeout (${diff.inSeconds}s)'),
-          ),
-        );
-      }
-    });
+    // Only run the heartbeat watchdog when client pings are enabled.
+    // Without client pings, there is no guaranteed periodic traffic, so the
+    // watchdog would trigger spurious reconnects on idle connections.
+    // ActionCable servers typically send their own pings (~3s), but if client
+    // pings are disabled we cannot guarantee the server will keep the
+    // connection alive within the timeout window.
+    if (_config.sendClientPing) {
+      _heartbeatWatchdog = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (_lastHeartbeat == null) {
+          return;
+        }
+        final diff = DateTime.now().difference(_lastHeartbeat!);
+        if (diff > _config.heartbeatTimeout) {
+          _logger.w(
+            'WebSocketService: Heartbeat timeout after ${diff.inSeconds}s, closing connection',
+          );
+          unawaited(
+            _handleError(
+              TimeoutException('Heartbeat timeout (${diff.inSeconds}s)'),
+            ),
+          );
+        }
+      });
+    }
   }
 
   Future<void> _closeChannel({int? code, String? reason}) async {
@@ -487,6 +510,19 @@ class WebSocketService {
     _channel = null;
   }
 
+  /// Strips sensitive query parameters from a URI before logging.
+  static String _sanitizeUri(Uri uri) {
+    const sensitiveKeys = {'api_key', 'token', 'secret', 'password', 'key'};
+    if (uri.queryParameters.isEmpty) return uri.toString();
+    final sanitized = Map<String, String>.from(uri.queryParameters);
+    for (final key in sanitized.keys.toList()) {
+      if (sensitiveKeys.contains(key.toLowerCase())) {
+        sanitized[key] = '[REDACTED]';
+      }
+    }
+    return uri.replace(queryParameters: sanitized).toString();
+  }
+
   void _updateState(SocketConnectionState newState) {
     if (_state == newState) {
       return;
@@ -495,19 +531,20 @@ class WebSocketService {
     _stateController.add(newState);
   }
 
-  /// Releases resources. Call when the service is no longer needed.
-  Future<void> dispose() async {
-    // Cancel all pending requests
+  /// Fails all pending requests with the given reason.
+  void _failPendingRequests(String reason) {
     for (final pending in _pendingRequests.values) {
       pending.cancel();
       if (!pending.completer.isCompleted) {
-        pending.completer.completeError(
-          StateError('WebSocket service disposed'),
-        );
+        pending.completer.completeError(StateError(reason));
       }
     }
     _pendingRequests.clear();
+  }
 
+  /// Releases resources. Call when the service is no longer needed.
+  Future<void> dispose() async {
+    _failPendingRequests('WebSocket service disposed');
     await disconnect();
     await _stateController.close();
     await _messageController.close();

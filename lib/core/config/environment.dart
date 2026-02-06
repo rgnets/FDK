@@ -8,6 +8,7 @@ class EnvironmentConfig {
 
   static void setEnvironment(Environment env) {
     _environment = env;
+    warnIfCompileTimeCredentials();
     // Only log in debug mode to avoid memory issues
     if (kDebugMode) {
       debugPrint(
@@ -27,7 +28,10 @@ class EnvironmentConfig {
   static bool get isStaging => _environment == Environment.staging;
   static bool get isProduction => _environment == Environment.production;
 
-  /// API Configuration
+  /// REST API base URL - currently unused as the app uses WebSocket-only
+  /// communication. Retained for potential future REST endpoint needs.
+  @Deprecated('FDK uses WebSocket-only communication. '
+      'Use webSocketUrl instead for all data operations.')
   static String get apiBaseUrl {
     switch (_environment) {
       case Environment.development:
@@ -124,6 +128,11 @@ class EnvironmentConfig {
 
   /// API Credentials
   ///
+  /// SECURITY NOTE: Values provided via --dart-define are compiled as string
+  /// constants into the binary and can be extracted from APK/IPA files.
+  /// For production builds, use runtime credential injection (QR code scanning
+  /// or manual entry) instead of compile-time constants.
+  ///
   /// For staging/production, credentials MUST be provided via environment variables:
   /// - STAGING_API_LOGIN / API_USERNAME
   /// - STAGING_API_KEY or STAGING_TOKEN / API_KEY or WS_TOKEN
@@ -207,6 +216,24 @@ class EnvironmentConfig {
           throw StateError('WS_TOKEN not provided for production');
         }
         return tok;
+    }
+  }
+
+  /// Checks if compile-time credentials are present and logs a security
+  /// warning if they are being used in a release build.
+  /// Call this during app initialization to alert developers.
+  static void warnIfCompileTimeCredentials() {
+    const apiKey = String.fromEnvironment('API_KEY', defaultValue: '');
+    const wsToken = String.fromEnvironment('WS_TOKEN', defaultValue: '');
+    const apiUsername = String.fromEnvironment('API_USERNAME', defaultValue: '');
+
+    if (!kDebugMode && (apiKey.isNotEmpty || wsToken.isNotEmpty || apiUsername.isNotEmpty)) {
+      debugPrint(
+        'SECURITY WARNING: Compile-time credentials detected in a non-debug build. '
+        'Values passed via --dart-define are embedded as string constants in the binary '
+        'and can be extracted from APK/IPA files. For production, use runtime credential '
+        'injection (QR code scanning or manual entry) instead.',
+      );
     }
   }
 

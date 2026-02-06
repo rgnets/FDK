@@ -1,20 +1,18 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:logger/logger.dart';
-import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
-import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
+import 'package:rgnets_fdk/features/auth/data/services/action_cable_auth_service.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
@@ -33,6 +31,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'auth_notifier.g.dart';
+
+/// Provides the [ActionCableAuthService] for WebSocket handshake protocol.
+final actionCableAuthServiceProvider = Provider<ActionCableAuthService>((ref) {
+  final service = ref.watch(webSocketServiceProvider);
+  final logger = ref.read(loggerProvider);
+  return ActionCableAuthService(webSocketService: service, logger: logger);
+});
 
 // Modern Riverpod 2.0+ best practice: Use @Riverpod (capitalized) for classes
 // Use AsyncNotifier to match existing usage patterns
@@ -147,15 +152,11 @@ class Auth extends _$Auth {
     }
 
     try {
-      // Get auth signature from secure storage
-      final signature = await storage.getAuthSignature();
       final resolvedUser = await _performWebSocketHandshake(
         fqdn: fqdn,
         login: username,
         token: token,
         siteName: storage.siteName ?? fqdn,
-        issuedAt: storage.authIssuedAt,
-        signature: signature,
       ).timeout(
         const Duration(seconds: 15),
         onTimeout: () {
@@ -251,8 +252,6 @@ class Auth extends _$Auth {
               login: login,
               token: token,
               siteName: siteName,
-              issuedAt: issuedAt,
-              signature: signature,
             ).timeout(
               const Duration(seconds: 20),
               onTimeout: () {
@@ -497,114 +496,25 @@ class Auth extends _$Auth {
     required String login,
     required String token,
     String? siteName,
-    DateTime? issuedAt,
-    String? signature,
   }) async {
-    var failureHandled = false;
     final config = ref.read(webSocketConfigProvider);
     final storage = ref.read(storageServiceProvider);
     final localDataSource = ref.read(authLocalDataSourceProvider);
     final service = ref.read(webSocketServiceProvider);
+    final handshakeService = ref.read(actionCableAuthServiceProvider);
     _logger.i('AUTH_NOTIFIER: WebSocket service hashCode: ${service.hashCode}');
 
-    final resolvedSite =
-        (siteName ?? storage.siteName ?? fqdn).trim();
-    final uri = _buildActionCableUri(
-      baseUri: config.baseUri,
-      fqdn: fqdn,
-      token: token,
-    );
-    final headers = _buildAuthHeaders(token);
+    final resolvedSite = (siteName ?? storage.siteName ?? fqdn).trim();
 
-    if (service.isConnected) {
-      await service.disconnect(code: 4000, reason: 'Re-authenticating');
-    }
-
-    final identifier = jsonEncode(const {'channel': 'RxgChannel'});
-    final subscriptionPayload = <String, dynamic>{
-      'command': 'subscribe',
-      'identifier': identifier,
-    };
-
-    final completer = Completer<_ActionCableAuthResult>();
-    final subscription = service.messages.listen((message) {
-      _logger.d('AUTH_NOTIFIER: 📩 WebSocket message received: type=${message.type}, payload=${message.payload}');
-      if (message.type == 'confirm_subscription' &&
-          _identifierMatches(message, identifier)) {
-        _logger.i('AUTH_NOTIFIER: ✅ Subscription confirmed!');
-        if (!completer.isCompleted) {
-          completer.complete(const _ActionCableAuthResult.success());
-        }
-      } else if (message.type == 'reject_subscription' &&
-          _identifierMatches(message, identifier)) {
-        _logger.e('AUTH_NOTIFIER: ❌ Subscription REJECTED by server');
-        if (!completer.isCompleted) {
-          completer.complete(
-            const _ActionCableAuthResult.failure(
-              'Subscription rejected by server',
-            ),
-          );
-        }
-      } else if (message.type == 'disconnect') {
-        final reason =
-            message.payload['reason'] as String? ??
-            message.payload['message'] as String?;
-        _logger.e('AUTH_NOTIFIER: ❌ Server sent disconnect: $reason');
-        if (!completer.isCompleted) {
-          completer.complete(
-            _ActionCableAuthResult.failure(
-              reason ?? 'Connection closed by server',
-            ),
-          );
-        }
-      }
-    });
-
-    final stateSubscription = service.connectionState.listen((connState) {
-      _logger.d('AUTH_NOTIFIER: 🔌 WebSocket connection state changed: $connState');
-      if (connState == SocketConnectionState.disconnected &&
-          !completer.isCompleted) {
-        _logger.e('AUTH_NOTIFIER: ❌ Connection closed before subscription confirmed');
-        completer.complete(
-          const _ActionCableAuthResult.failure(
-            'Connection closed before subscription confirmed',
-          ),
-        );
-      }
-    });
-
-    _logger
-      ..i('AUTH_NOTIFIER: Initiating WebSocket handshake')
-      ..d('AUTH_NOTIFIER: WebSocket URI: $uri')
-      ..d('AUTH_NOTIFIER: Subscription identifier: $identifier');
-
+    var failureHandled = false;
     try {
-      _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
-      await service.connect(
-        WebSocketConnectionParams(uri: uri, headers: headers),
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after 10 seconds');
-          throw TimeoutException('Connection to server timed out');
-        },
-      );
-      _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
-      service.send(subscriptionPayload);
-      _logger.d('AUTH_NOTIFIER: Subscription sent, waiting for confirmation (15s timeout)...');
-
-      final result = await completer.future.timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          _logger.e('AUTH_NOTIFIER: ⏱️ WebSocket handshake TIMED OUT after 15 seconds');
-          return const _ActionCableAuthResult.failure(
-            'WebSocket handshake timed out',
-          );
-        },
+      final result = await handshakeService.performHandshake(
+        fqdn: fqdn,
+        token: token,
+        baseUri: config.baseUri,
       );
 
       if (!result.success) {
-        final errorMessage = result.message;
         await storage.setAuthenticated(value: false);
         await localDataSource.clearSession();
         await service.disconnect(code: 4401, reason: 'auth.error');
@@ -613,10 +523,10 @@ class Auth extends _$Auth {
           login: login,
           siteName: resolvedSite,
           success: false,
-          message: errorMessage,
+          message: result.message,
         );
         failureHandled = true;
-        throw Exception(errorMessage);
+        throw Exception(result.message);
       }
 
       await localDataSource.clearSession();
@@ -653,9 +563,6 @@ class Auth extends _$Auth {
         );
       }
       rethrow;
-    } finally {
-      await subscription.cancel();
-      await stateSubscription.cancel();
     }
   }
 
@@ -767,51 +674,3 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
   });
 });
 
-Uri _buildActionCableUri({
-  required Uri baseUri,
-  required String fqdn,
-  required String token,
-}) {
-  final useBaseUri = EnvironmentConfig.isDevelopment;
-  final uri = useBaseUri
-      ? baseUri
-      : Uri(
-        scheme: 'wss',
-        host: fqdn,
-        path: '/cable',
-      );
-
-  final queryParameters = Map<String, String>.from(uri.queryParameters);
-  if (token.isNotEmpty) {
-    queryParameters['api_key'] = token;
-  }
-
-  return uri.replace(
-    queryParameters: queryParameters.isEmpty ? null : queryParameters,
-  );
-}
-
-Map<String, dynamic> _buildAuthHeaders(String token) {
-  if (token.isEmpty) {
-    return const {};
-  }
-  return {'Authorization': 'Bearer $token'};
-}
-
-bool _identifierMatches(SocketMessage message, String identifier) {
-  final headerIdentifier = message.headers?['identifier'];
-  if (headerIdentifier is String && headerIdentifier.isNotEmpty) {
-    return headerIdentifier == identifier;
-  }
-  return false;
-}
-
-class _ActionCableAuthResult {
-  const _ActionCableAuthResult.success()
-      : success = true,
-        message = '';
-  const _ActionCableAuthResult.failure(this.message) : success = false;
-
-  final bool success;
-  final String message;
-}

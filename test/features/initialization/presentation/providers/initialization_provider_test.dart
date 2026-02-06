@@ -33,7 +33,7 @@ void main() {
       () => mockDataSyncService.syncInitialData(
         timeout: any(named: 'timeout'),
       ),
-    ).thenAnswer((_) async {});
+    ).thenAnswer((_) async => true);
     when(() => mockDataSyncService.events).thenAnswer(
       (_) => eventsController.stream,
     );
@@ -185,6 +185,7 @@ void main() {
       ).thenAnswer((_) async {
         callCount++;
         await Future<void>.delayed(const Duration(milliseconds: 100));
+        return true;
       });
 
       final notifier =
@@ -237,6 +238,7 @@ void main() {
         ),
       ).thenAnswer((_) async {
         await Future<void>.delayed(const Duration(milliseconds: 100));
+        return true;
       });
 
       // Start initialization and wait for it in the test
@@ -352,9 +354,10 @@ void main() {
         () => mockDataSyncService.syncInitialData(
           timeout: any(named: 'timeout'),
         ),
-      ).thenAnswer(
-        (_) async => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
+      ).thenAnswer((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        return true;
+      });
 
       await container
           .read(initializationNotifierProvider.notifier)
@@ -395,9 +398,10 @@ void main() {
         () => mockDataSyncService.syncInitialData(
           timeout: any(named: 'timeout'),
         ),
-      ).thenAnswer(
-        (_) async => Future<void>.delayed(const Duration(milliseconds: 800)),
-      );
+      ).thenAnswer((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        return true;
+      });
 
       final notifier =
           container.read(initializationNotifierProvider.notifier);
@@ -425,9 +429,10 @@ void main() {
         () => mockDataSyncService.syncInitialData(
           timeout: any(named: 'timeout'),
         ),
-      ).thenAnswer(
-        (_) async => Future<void>.delayed(const Duration(milliseconds: 600)),
-      );
+      ).thenAnswer((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        return true;
+      });
 
       final notifier =
           container.read(initializationNotifierProvider.notifier);

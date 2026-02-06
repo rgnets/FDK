@@ -34,8 +34,10 @@ class AppConfig {
   }
 
   /// Get the API base URL
+  @Deprecated('FDK uses WebSocket-only communication. '
+      'Use EnvironmentConfig.webSocketUrl instead.')
   static String get apiBaseUrl {
-    // This is deprecated - use EnvironmentConfig.apiBaseUrl instead
+    // ignore: deprecated_member_use_from_same_package
     return EnvironmentConfig.apiBaseUrl;
   }
 
