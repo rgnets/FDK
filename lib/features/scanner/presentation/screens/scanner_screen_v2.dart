@@ -208,23 +208,25 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
       return;
     }
 
-    for (final barcode in capture.barcodes) {
-      if (barcode.rawValue != null && barcode.rawValue != _lastScannedCode) {
-        LoggerService.debug('Barcode detected: ${barcode.rawValue}', tag: _tag);
+    // Collect all barcodes from the frame for batch processing.
+    // This is critical for ONT scanning where the part number (e.g. 3FE47273AAAA)
+    // is 12 hex chars and would be misclassified as MAC if processed individually.
+    final barcodeValues = capture.barcodes
+        .where((b) => b.rawValue != null && b.rawValue!.isNotEmpty)
+        .map((b) => b.rawValue!)
+        .toList();
 
-        setState(() {
-          _lastScannedCode = barcode.rawValue;
-        });
+    if (barcodeValues.isEmpty) return;
 
-        // Process through the new notifier
-        ref.read(scannerNotifierV2Provider.notifier).processBarcode(barcode.rawValue!);
+    LoggerService.debug('Frame detected ${barcodeValues.length} barcodes', tag: _tag);
 
-        // Check if scan is now complete
-        final updatedState = ref.read(scannerNotifierV2Provider);
-        if (updatedState.isScanComplete && !updatedState.isPopupShowing) {
-          _showRegistrationPopup();
-        }
-      }
+    // Process all barcodes from this frame as a batch
+    ref.read(scannerNotifierV2Provider.notifier).processBarcodeFrame(barcodeValues);
+
+    // Check if scan is now complete
+    final updatedState = ref.read(scannerNotifierV2Provider);
+    if (updatedState.isScanComplete && !updatedState.isPopupShowing) {
+      _showRegistrationPopup();
     }
   }
 

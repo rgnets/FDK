@@ -40,10 +40,51 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     }
   }
 
-  /// Process a scanned barcode value.
+  /// Process all barcodes from a single camera frame as a batch.
   ///
-  /// Handles auto-detection of device type from serial patterns,
-  /// MAC address detection, and accumulates scan data.
+  /// This is critical for ONT scanning where the part number (e.g. 3FE47273AAAA)
+  /// is 12 hex chars and would be misclassified as a MAC if processed individually.
+  /// Batch processing via parseONTBarcodes fills the MAC slot first, then subsequent
+  /// 12-hex values fall through to part number detection.
+  void processBarcodeFrame(List<String> barcodes) {
+    if (!state.canProcessBarcode && state.uiState != ScannerUIState.idle) {
+      return;
+    }
+
+    final values = barcodes.map((b) => b.trim()).where((b) => b.isNotEmpty).toList();
+    if (values.isEmpty) return;
+
+    LoggerService.debug('Processing frame with ${values.length} barcodes: $values', tag: _tag);
+
+    // Determine device type: use current mode if already locked, otherwise auto-detect
+    DeviceTypeFromSerial? detectedType;
+    if (state.isAutoLocked || state.isInDeviceMode) {
+      detectedType = _scanModeToDeviceType(state.scanMode);
+    } else {
+      // Auto mode: try to detect device type from any serial in the batch
+      for (final value in values) {
+        detectedType = ScannerValidationService.detectDeviceTypeFromBarcode(value);
+        if (detectedType != null) break;
+      }
+    }
+
+    // If we detected a device type, use batch parsing (critical for ONT)
+    if (detectedType != null) {
+      final result = ScannerValidationService.parseBarcodesForType(values, detectedType);
+      _applyBatchResult(result, detectedType);
+      return;
+    }
+
+    // No device type detected — process individually as fallback
+    for (final value in values) {
+      processBarcode(value);
+    }
+  }
+
+  /// Process a single scanned barcode value.
+  ///
+  /// Used as fallback when batch processing can't determine device type,
+  /// and for manual barcode entry.
   void processBarcode(String barcode) {
     if (!state.canProcessBarcode && state.uiState != ScannerUIState.idle) {
       LoggerService.debug('Cannot process barcode in current state', tag: _tag);
@@ -69,7 +110,7 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
-    // Check for part number pattern (ONT)
+    // Check for part number pattern
     if (_isPartNumber(value)) {
       _processPartNumber(value);
       return;
@@ -266,19 +307,81 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     state = const ScannerState();
   }
 
+  /// Apply batch-parsed result from ScannerValidationService to state.
+  void _applyBatchResult(ParsedDeviceData result, DeviceTypeFromSerial detectedType) {
+    LoggerService.debug(
+      'Batch result: MAC=${result.mac}, Serial=${result.serialNumber}, '
+      'PN=${result.partNumber}, complete=${result.isComplete}',
+      tag: _tag,
+    );
+
+    final now = DateTime.now();
+    final newHistory = <ScanRecord>[...state.scanData.scanHistory];
+
+    // Build updated scan data from batch result
+    var newMac = state.scanData.mac;
+    var newSerial = state.scanData.serialNumber;
+    var newPartNumber = state.scanData.partNumber;
+    var newHasValidSerial = state.scanData.hasValidSerial;
+
+    if (result.mac.isNotEmpty && result.mac != state.scanData.mac) {
+      newMac = result.mac;
+      newHistory.add(ScanRecord(value: result.mac, scannedAt: now, fieldType: 'mac'));
+    }
+    if (result.serialNumber.isNotEmpty && result.serialNumber != state.scanData.serialNumber) {
+      newSerial = result.serialNumber;
+      newHasValidSerial = true;
+      newHistory.add(ScanRecord(value: result.serialNumber, scannedAt: now, fieldType: 'serial'));
+    }
+    if (result.partNumber != null && result.partNumber!.isNotEmpty && result.partNumber != state.scanData.partNumber) {
+      newPartNumber = result.partNumber!;
+      newHistory.add(ScanRecord(value: result.partNumber!, scannedAt: now, fieldType: 'partNumber'));
+    }
+
+    // Auto-lock mode if in auto
+    final newMode = state.scanMode == ScanMode.auto ? _deviceTypeToScanMode(detectedType) : state.scanMode;
+    final autoLocked = state.scanMode == ScanMode.auto || state.isAutoLocked;
+
+    state = state.copyWith(
+      scanMode: newMode,
+      isAutoLocked: autoLocked,
+      lastSerialSeenAt: newSerial.isNotEmpty ? now : state.lastSerialSeenAt,
+      scanData: state.scanData.copyWith(
+        mac: newMac,
+        serialNumber: newSerial,
+        partNumber: newPartNumber,
+        hasValidSerial: newHasValidSerial,
+        scanHistory: newHistory,
+      ),
+    );
+
+    _checkCompletion();
+  }
+
   // Helper methods
+
+  DeviceTypeFromSerial? _scanModeToDeviceType(ScanMode mode) {
+    switch (mode) {
+      case ScanMode.accessPoint:
+        return DeviceTypeFromSerial.accessPoint;
+      case ScanMode.ont:
+        return DeviceTypeFromSerial.ont;
+      case ScanMode.switchDevice:
+        return DeviceTypeFromSerial.switchDevice;
+      case ScanMode.auto:
+      case ScanMode.rxg:
+        return null;
+    }
+  }
 
   bool _isMacAddress(String value) {
     return MACNormalizer.tryNormalize(value) != null;
   }
 
   bool _isPartNumber(String value) {
-    // Part number patterns: starts with 1P, 23S, or S prefix, or is alphanumeric with specific format
+    // Standard part number format (8-12 alphanumeric chars ending in letter)
+    // Note: 1P/23S/S prefixes are ONT barcode prefixes handled by parseONTBarcodes
     final v = value.toUpperCase();
-    if (v.startsWith('1P') || v.startsWith('23S') || v.startsWith('S')) {
-      return true;
-    }
-    // Also check for standard part number format (8-12 alphanumeric chars ending in letter)
     final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
     return pnRegex.hasMatch(v);
   }
