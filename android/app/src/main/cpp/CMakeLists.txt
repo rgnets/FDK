@@ -71,6 +71,11 @@ target_include_directories(iperf3_jni PRIVATE
     ${IPERF3_SRC_DIR}
 )
 
+# Support 16 KB page sizes (required for Android 15+)
+target_link_options(iperf3_jni PRIVATE
+    -Wl,-z,max-page-size=16384
+)
+
 # Link everything together
 target_link_libraries(iperf3_jni
     iperf3_bridge
