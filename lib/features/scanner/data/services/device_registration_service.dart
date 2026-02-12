@@ -87,16 +87,17 @@ class DeviceRegistrationService {
         };
 
       case DeviceType.ont:
-        // Use generic CRUD create/update for media_converters
+        // Use the dedicated register_ont_device extra collection action
+        // This associates the ONT with the OLT, sets approved=true, port_type=xgs
         return {
           'action': 'resource_action',
           'resource_type': 'media_converters',
-          'crud_action': existingDeviceId != null ? 'update' : 'create',
+          'crud_action': 'register_ont_device',
           'mac': mac,
           'serial_number': serialNumber,
           'pms_room_id': pmsRoomId,
           if (partNumber != null) 'part_number': partNumber,
-          if (existingDeviceId != null) 'id': existingDeviceId,
+          if (existingDeviceId != null) 'ont_id': existingDeviceId,
         };
 
       case DeviceType.switchDevice:
