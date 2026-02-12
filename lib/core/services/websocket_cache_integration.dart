@@ -514,36 +514,6 @@ class WebSocketCacheIntegration {
       final hnCounts = _extractHealthCounts(deviceMap);
       final healthNotices = _extractHealthNotices(deviceMap);
 
-      // Debug: Log onboarding status fields
-      if (resourceType == 'access_points') {
-        final hasOnboarding = deviceMap['ap_onboarding_status'] != null;
-        LoggerService.debug(
-          'ONBOARDING: AP ${deviceMap['name']} (${deviceMap['id']}) - '
-          'has ap_onboarding_status: $hasOnboarding',
-          tag: 'WebSocket',
-        );
-        if (hasOnboarding) {
-          LoggerService.info(
-            'ONBOARDING: AP data: ${deviceMap['ap_onboarding_status']}',
-            tag: 'WebSocket',
-          );
-        }
-      }
-      if (resourceType == 'media_converters') {
-        final hasOnboarding = deviceMap['ont_onboarding_status'] != null;
-        LoggerService.debug(
-          'ONBOARDING: ONT ${deviceMap['name']} (${deviceMap['id']}) - '
-          'has ont_onboarding_status: $hasOnboarding',
-          tag: 'WebSocket',
-        );
-        if (hasOnboarding) {
-          LoggerService.info(
-            'ONBOARDING: ONT data: ${deviceMap['ont_onboarding_status']}',
-            tag: 'WebSocket',
-          );
-        }
-      }
-
       switch (resourceType) {
         case 'access_points':
           final apImageData = _extractImagesData(deviceMap);
@@ -1704,6 +1674,14 @@ class WebSocketCacheIntegration {
   /// Request a specific resource type snapshot manually.
   void requestResourceSnapshot(String resourceType) {
     _logger.i('WebSocketCacheIntegration: Manual snapshot request for: $resourceType');
+    _requestSnapshot(resourceType);
+  }
+
+  /// Force-refresh a resource type by clearing the snapshot guard and re-requesting.
+  /// Use after device registration to immediately fetch updated data.
+  void refreshResourceSnapshot(String resourceType) {
+    _logger.i('WebSocketCacheIntegration: Force-refresh snapshot for: $resourceType');
+    _requestedSnapshots.remove(resourceType);
     _requestSnapshot(resourceType);
   }
 

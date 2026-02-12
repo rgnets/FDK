@@ -132,10 +132,6 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       final deviceNotices = device.healthNotices;
       if (deviceNotices != null && deviceNotices.isNotEmpty) {
         devicesWithNotices++;
-        LoggerService.debug(
-          'HEALTH: Device ${device.deviceName} (${device.deviceType}) has ${deviceNotices.length} notices',
-          tag: 'HealthNotices',
-        );
         for (final noticeModel in deviceNotices) {
           notices.add(noticeModel.toEntity().copyWith(
             deviceId: device.deviceId,

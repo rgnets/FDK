@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
@@ -565,6 +566,9 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         registeredAt: DateTime.now(),
       );
 
+      // Force-refresh the relevant resource snapshot so the new device appears immediately
+      _refreshResourceForDeviceType(deviceType);
+
       return RegistrationResult.success(
         deviceId: existingDeviceId ?? 0,
         deviceType: deviceType.name,
@@ -585,6 +589,33 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
       return RegistrationResult.failure(message: error);
     }
+  }
+
+  /// Force-refresh the resource snapshot for the given device type so newly
+  /// registered devices appear in the app without waiting for the next sync.
+  void _refreshResourceForDeviceType(DeviceType deviceType) {
+    final resourceType = switch (deviceType) {
+      DeviceType.accessPoint => 'access_points',
+      DeviceType.ont => 'media_converters',
+      DeviceType.switchDevice => 'switch_devices',
+    };
+
+    // Small delay to give the backend time to process the registration
+    Future.delayed(const Duration(seconds: 2), () {
+      try {
+        final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+        cacheIntegration.refreshResourceSnapshot(resourceType);
+        LoggerService.info(
+          'DeviceRegistration: Requested $resourceType refresh after registration',
+          tag: 'DeviceRegistration',
+        );
+      } catch (e) {
+        LoggerService.warning(
+          'DeviceRegistration: Could not refresh $resourceType: $e',
+          tag: 'DeviceRegistration',
+        );
+      }
+    });
   }
 
   /// Reset registration state to idle.

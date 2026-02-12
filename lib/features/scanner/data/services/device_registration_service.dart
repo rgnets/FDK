@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
@@ -15,7 +17,10 @@ class DeviceRegistrationService {
   bool get isConnected => _wsService.isConnected;
 
   /// Register a device via WebSocket.
-  /// Sends a 'device.register' message with device data.
+  /// Sends an ActionCable-formatted resource_action through RxgChannel.
+  ///
+  /// For access points, uses the dedicated `register_ap_device` extra action.
+  /// For ONTs and switches, uses generic CRUD create/update.
   /// Returns true if message was sent, false if WebSocket not connected.
   bool registerDevice({
     required DeviceType deviceType,
@@ -34,7 +39,14 @@ class DeviceRegistrationService {
       return false;
     }
 
-    final payload = _buildPayload(
+    LoggerService.info(
+      'Registering ${deviceType.displayName} via WebSocket',
+      tag: _tag,
+    );
+
+    final channelIdentifier = jsonEncode(const {'channel': 'RxgChannel'});
+
+    final data = _buildActionCableData(
       deviceType: deviceType,
       mac: mac,
       serialNumber: serialNumber,
@@ -44,16 +56,15 @@ class DeviceRegistrationService {
       existingDeviceId: existingDeviceId,
     );
 
-    LoggerService.info(
-      'Registering ${deviceType.displayName} via WebSocket',
-      tag: _tag,
-    );
-
-    _wsService.sendType('device.register', payload: payload);
+    _wsService.send({
+      'command': 'message',
+      'identifier': channelIdentifier,
+      'data': jsonEncode(data),
+    });
     return true;
   }
 
-  Map<String, dynamic> _buildPayload({
+  Map<String, dynamic> _buildActionCableData({
     required DeviceType deviceType,
     required String mac,
     required String serialNumber,
@@ -63,28 +74,38 @@ class DeviceRegistrationService {
     int? existingDeviceId,
   }) {
     switch (deviceType) {
-      case DeviceType.ont:
+      case DeviceType.accessPoint:
+        // Use the dedicated register_ap_device extra collection action
         return {
-          'device_type': 'ont',
+          'action': 'resource_action',
+          'resource_type': 'access_points',
+          'crud_action': 'register_ap_device',
+          'mac': mac,
+          'serial_number': serialNumber,
+          'pms_room_id': pmsRoomId,
+          if (existingDeviceId != null) 'ap_id': existingDeviceId,
+        };
+
+      case DeviceType.ont:
+        // Use the dedicated register_ont_device extra collection action
+        // This associates the ONT with the OLT, sets approved=true, port_type=xgs
+        return {
+          'action': 'resource_action',
+          'resource_type': 'media_converters',
+          'crud_action': 'register_ont_device',
           'mac': mac,
           'serial_number': serialNumber,
           'pms_room_id': pmsRoomId,
           if (partNumber != null) 'part_number': partNumber,
-          if (existingDeviceId != null) 'id': existingDeviceId,
-        };
-
-      case DeviceType.accessPoint:
-        return {
-          'device_type': 'access_point',
-          'mac': mac,
-          'serial_number': serialNumber,
-          'pms_room_id': pmsRoomId,
-          if (existingDeviceId != null) 'id': existingDeviceId,
+          if (existingDeviceId != null) 'ont_id': existingDeviceId,
         };
 
       case DeviceType.switchDevice:
+        // Use generic CRUD create/update for switch_devices
         return {
-          'device_type': 'switch',
+          'action': 'resource_action',
+          'resource_type': 'switch_devices',
+          'crud_action': existingDeviceId != null ? 'update' : 'create',
           'mac': mac,
           'serial_number': serialNumber,
           'pms_room_id': pmsRoomId,

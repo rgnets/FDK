@@ -66,7 +66,9 @@ class ScannerValidationService {
     String mac = '';
     String serialNumber = '';
     bool hasALCLSerial = false;
+    final hexCandidates = <String>[]; // 12 hex-char values (could be MAC or PN)
 
+    // First pass: categorize all barcodes
     for (String barcode in barcodes) {
       if (barcode.isEmpty) continue;
 
@@ -81,14 +83,7 @@ class ScannerValidationService {
         value = value.substring(1);
       }
 
-      // Check for MAC address (12 hex chars)
-      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
-        mac = value.toUpperCase();
-        LoggerService.debug('Found MAC: $mac', tag: _tag);
-        continue;
-      }
-
-      // ONT-SPECIFIC: Only accept ALCL serials (strict)
+      // ONT-SPECIFIC: Only accept ALCL serials (strict) — check first
       if (SerialPatterns.isONTSerial(value)) {
         serialNumber = value.toUpperCase();
         hasALCLSerial = true;
@@ -96,18 +91,68 @@ class ScannerValidationService {
         continue;
       }
 
-      // Check for Part Number pattern
+      // Collect 12-hex candidates (could be MAC or part number)
+      if (value.length == 12 && _isValidMacAddress(value)) {
+        final upper = value.toUpperCase();
+        if (!hexCandidates.contains(upper)) {
+          hexCandidates.add(upper);
+        }
+        continue;
+      }
+
+      // Check for Part Number pattern (non-hex values)
       final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
       if (pnRegex.hasMatch(value) && value.length >= 8 && partNumber.isEmpty) {
         partNumber = value;
         LoggerService.debug('Found part number: $partNumber', tag: _tag);
         continue;
       }
+    }
 
-      // Log ignored non-ALCL serials
-      if (serialNumber.isEmpty && value.length >= 10 && !value.startsWith('ALCL')) {
-        LoggerService.warning('Ignored non-ALCL serial in ONT mode: $value', tag: _tag);
+    // Second pass: disambiguate 12-hex candidates into MAC vs part number.
+    // ONT part numbers (e.g. 3FE47273AAAA) can be 12 hex chars just like MACs.
+    final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
+    if (hexCandidates.length == 1) {
+      // Single candidate: check if it's actually a part number (ends with letter)
+      // and we don't have a PN yet — if so, it might be PN not MAC
+      if (partNumber.isEmpty && pnRegex.hasMatch(hexCandidates[0])) {
+        // Ambiguous — treat as MAC since we can't tell with one candidate
+        mac = hexCandidates[0];
+      } else {
+        mac = hexCandidates[0];
       }
+      LoggerService.debug('Found MAC (sole candidate): $mac', tag: _tag);
+    } else if (hexCandidates.length >= 2) {
+      // Multiple 12-hex candidates. Use OUI database if loaded for clear results,
+      // otherwise use heuristic: part numbers end with a letter (A-Z).
+      if (macDatabase.isLoaded) {
+        String? knownMac;
+        String? unknownCandidate;
+        for (final c in hexCandidates) {
+          if (isKnownManufacturer(c)) {
+            knownMac ??= c;
+          } else {
+            unknownCandidate ??= c;
+          }
+        }
+        if (knownMac != null && unknownCandidate != null) {
+          mac = knownMac;
+          if (partNumber.isEmpty) partNumber = unknownCandidate;
+        }
+      }
+
+      // Fallback heuristic: PN matches regex (ends with letter), MAC doesn't
+      if (mac.isEmpty) {
+        for (final candidate in hexCandidates) {
+          if (pnRegex.hasMatch(candidate) && partNumber.isEmpty) {
+            partNumber = candidate;
+          } else if (mac.isEmpty) {
+            mac = candidate;
+          }
+        }
+        if (mac.isEmpty) mac = hexCandidates.first;
+      }
+      LoggerService.debug('Disambiguated: MAC=$mac, PN=$partNumber', tag: _tag);
     }
 
     // STRICT validation: ALL three required for ONT
