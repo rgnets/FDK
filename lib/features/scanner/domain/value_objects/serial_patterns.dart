@@ -9,8 +9,8 @@ class SerialPatterns {
   // ONT serial prefixes (Optical Network Terminal / Media Converter)
   static const List<String> ontPrefixes = ['ALCL'];
 
-  // Switch serial prefixes
-  static const List<String> switchPrefixes = ['LL'];
+  // Switch serial prefixes (LL for legacy, EC for Edge-core)
+  static const List<String> switchPrefixes = ['LL', 'EC'];
 
   /// Check if serial is an Access Point serial number.
   /// AP serials start with 1K9, 1M3, or 1HN and are at least 10 characters.
@@ -27,10 +27,10 @@ class SerialPatterns {
   }
 
   /// Check if serial is a Switch serial number.
-  /// Switch serials start with LL and are at least 14 characters.
+  /// Switch serials start with LL or EC and are at least 12 characters.
   static bool isSwitchSerial(String serial) {
     final s = serial.toUpperCase().trim();
-    return s.length >= 14 &&
+    return s.length >= 12 &&
         switchPrefixes.any((prefix) => s.startsWith(prefix));
   }
 
@@ -69,7 +69,7 @@ class SerialPatterns {
       case DeviceTypeFromSerial.ont:
         return 'ONT serials start with ${ontPrefixes.join(", ")} (exactly 12 chars)';
       case DeviceTypeFromSerial.switchDevice:
-        return 'Switch serials start with ${switchPrefixes.join(", ")} (min 14 chars)';
+        return 'Switch serials start with ${switchPrefixes.join(", ")} (min 12 chars)';
     }
   }
 }

@@ -21,7 +21,7 @@ enum ScanMode {
   /// ONT device (ALCL serials).
   ont,
 
-  /// Network Switch (LL serials).
+  /// Network Switch (LL/EC serials).
   switchDevice,
 }
 
@@ -93,7 +93,7 @@ class AccumulatedScanData with _$AccumulatedScanData {
         // AP requires: MAC + AP Serial (1K9/1M3/1HN)
         return mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial;
       case ScanMode.switchDevice:
-        // Switch requires: MAC + LL Serial
+        // Switch requires: MAC + LL/EC Serial
         return mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial;
       case ScanMode.rxg:
       case ScanMode.auto:
@@ -123,7 +123,7 @@ class AccumulatedScanData with _$AccumulatedScanData {
         }
       case ScanMode.switchDevice:
         if (serialNumber.isEmpty || !hasValidSerial) {
-          missing.add('Serial Number (LL)');
+          missing.add('Serial Number (LL/EC)');
         }
       case ScanMode.rxg:
       case ScanMode.auto:
@@ -319,7 +319,7 @@ extension ScanModeX on ScanMode {
       case ScanMode.accessPoint:
         return ['MAC Address', 'Serial Number (1K9/1M3/1HN)'];
       case ScanMode.switchDevice:
-        return ['MAC Address', 'Serial Number (LL)'];
+        return ['MAC Address', 'Serial Number (LL/EC)'];
       case ScanMode.rxg:
         return ['QR Code'];
       case ScanMode.auto:
