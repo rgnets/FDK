@@ -1677,6 +1677,14 @@ class WebSocketCacheIntegration {
     _requestSnapshot(resourceType);
   }
 
+  /// Force-refresh a resource type by clearing the snapshot guard and re-requesting.
+  /// Use after device registration to immediately fetch updated data.
+  void refreshResourceSnapshot(String resourceType) {
+    _logger.i('WebSocketCacheIntegration: Force-refresh snapshot for: $resourceType');
+    _requestedSnapshots.remove(resourceType);
+    _requestSnapshot(resourceType);
+  }
+
   /// Expose the WebSocket service for direct requests.
   WebSocketService get webSocketService => _webSocketService;
 }
