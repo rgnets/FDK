@@ -111,31 +111,38 @@ class ScannerValidationService {
 
     // Second pass: disambiguate 12-hex candidates into MAC vs part number.
     // ONT part numbers (e.g. 3FE47273AAAA) can be 12 hex chars just like MACs.
-    // Use OUI database to identify real MACs (known manufacturer prefix).
+    final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
     if (hexCandidates.length == 1) {
-      mac = hexCandidates[0];
+      // Single candidate: check if it's actually a part number (ends with letter)
+      // and we don't have a PN yet — if so, it might be PN not MAC
+      if (partNumber.isEmpty && pnRegex.hasMatch(hexCandidates[0])) {
+        // Ambiguous — treat as MAC since we can't tell with one candidate
+        mac = hexCandidates[0];
+      } else {
+        mac = hexCandidates[0];
+      }
       LoggerService.debug('Found MAC (sole candidate): $mac', tag: _tag);
     } else if (hexCandidates.length >= 2) {
-      // Try OUI database to find the real MAC
-      String? ouiMac;
-      final nonOui = <String>[];
-      for (final candidate in hexCandidates) {
-        if (isKnownManufacturer(candidate)) {
-          ouiMac ??= candidate;
-        } else {
-          nonOui.add(candidate);
+      // Multiple 12-hex candidates. Use OUI database if loaded for clear results,
+      // otherwise use heuristic: part numbers end with a letter (A-Z).
+      if (macDatabase.isLoaded) {
+        String? knownMac;
+        String? unknownCandidate;
+        for (final c in hexCandidates) {
+          if (isKnownManufacturer(c)) {
+            knownMac ??= c;
+          } else {
+            unknownCandidate ??= c;
+          }
+        }
+        if (knownMac != null && unknownCandidate != null) {
+          mac = knownMac;
+          if (partNumber.isEmpty) partNumber = unknownCandidate;
         }
       }
 
-      if (ouiMac != null) {
-        mac = ouiMac;
-        if (partNumber.isEmpty && nonOui.isNotEmpty) {
-          partNumber = nonOui.first;
-        }
-      } else {
-        // OUI database unavailable or no match — use heuristic:
-        // part numbers typically end with a letter, MACs end with any hex digit
-        final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
+      // Fallback heuristic: PN matches regex (ends with letter), MAC doesn't
+      if (mac.isEmpty) {
         for (final candidate in hexCandidates) {
           if (pnRegex.hasMatch(candidate) && partNumber.isEmpty) {
             partNumber = candidate;
@@ -143,10 +150,7 @@ class ScannerValidationService {
             mac = candidate;
           }
         }
-        // If nothing matched PN regex, just use first as MAC
-        if (mac.isEmpty && hexCandidates.isNotEmpty) {
-          mac = hexCandidates.first;
-        }
+        if (mac.isEmpty) mac = hexCandidates.first;
       }
       LoggerService.debug('Disambiguated: MAC=$mac, PN=$partNumber', tag: _tag);
     }
