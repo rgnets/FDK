@@ -991,7 +991,7 @@ class _ModeSelectorSheet extends StatelessWidget {
       case ScanMode.ont:
         return 'Scan ONT (ALCL serial + part number)';
       case ScanMode.switchDevice:
-        return 'Scan Switch (LL serial)';
+        return 'Scan Switch (LL/EC serial)';
     }
   }
 }
