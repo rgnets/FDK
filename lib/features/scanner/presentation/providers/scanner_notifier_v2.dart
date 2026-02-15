@@ -63,19 +63,77 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
+    // Check if it's an ambiguous EC2 serial
+    if (SerialPatterns.isAmbiguousEC2Serial(value)) {
+      // In manual mode (AP or Switch), process as valid serial for that mode
+      if (state.scanMode == ScanMode.accessPoint || state.scanMode == ScanMode.switchDevice) {
+        _processManualModeEC2Serial(value);
+      } else {
+        // In auto mode, wait for part number to determine type
+        _processAmbiguousEC2Serial(value);
+      }
+      return;
+    }
+
     // Check if it's a MAC address
     if (_isMacAddress(value)) {
       _processMacAddress(value);
       return;
     }
 
-    // Check for part number pattern (ONT)
+    // Check for part number pattern
     if (_isPartNumber(value)) {
       _processPartNumber(value);
       return;
     }
 
     LoggerService.debug('Barcode did not match any known pattern: $value', tag: _tag);
+  }
+
+  /// Process an ambiguous EC2 serial (could be AP or Switch).
+  /// Stores the serial but doesn't auto-lock mode - waits for part number.
+  void _processAmbiguousEC2Serial(String serial) {
+    final upperSerial = serial.toUpperCase();
+    LoggerService.debug('Processing ambiguous EC2 serial: $upperSerial (awaiting part number)', tag: _tag);
+
+    // Store the serial but don't auto-lock mode yet
+    state = state.copyWith(
+      lastSerialSeenAt: DateTime.now(),
+      scanData: state.scanData.copyWith(
+        serialNumber: upperSerial,
+        hasValidSerial: true,
+        scanHistory: [
+          ...state.scanData.scanHistory,
+          ScanRecord(value: upperSerial, scannedAt: DateTime.now(), fieldType: 'serial'),
+        ],
+      ),
+    );
+
+    // Don't check completion - we need part number to determine device type
+  }
+
+  /// Process an EC2 serial when user has manually selected AP or Switch mode.
+  /// No need to wait for part number - user already chose the device type.
+  void _processManualModeEC2Serial(String serial) {
+    final upperSerial = serial.toUpperCase();
+    LoggerService.debug(
+      'Processing EC2 serial in manual ${state.scanMode.displayName} mode: $upperSerial',
+      tag: _tag,
+    );
+
+    state = state.copyWith(
+      lastSerialSeenAt: DateTime.now(),
+      scanData: state.scanData.copyWith(
+        serialNumber: upperSerial,
+        hasValidSerial: true,
+        scanHistory: [
+          ...state.scanData.scanHistory,
+          ScanRecord(value: upperSerial, scannedAt: DateTime.now(), fieldType: 'serial'),
+        ],
+      ),
+    );
+
+    _checkCompletion();
   }
 
   /// Process a serial number barcode.
@@ -153,10 +211,42 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     _checkCompletion();
   }
 
-  /// Process a part number barcode (for ONT).
+  /// Process a part number barcode.
+  /// For EC2 devices, uses part number to determine AP vs Switch.
   void _processPartNumber(String partNumber) {
     LoggerService.debug('Processing part number: $partNumber', tag: _tag);
 
+    // Check if we have an EC2 serial and are in auto mode - use part number to determine type
+    if (state.scanMode == ScanMode.auto &&
+        state.scanData.serialNumber.isNotEmpty &&
+        SerialPatterns.isAmbiguousEC2Serial(state.scanData.serialNumber)) {
+      final detectedType = SerialPatterns.detectDeviceTypeFromPartNumber(partNumber);
+
+      if (detectedType != null) {
+        final newMode = _deviceTypeToScanMode(detectedType);
+        LoggerService.debug(
+          'Part number detected device type: ${detectedType.displayName}, auto-locking to $newMode',
+          tag: _tag,
+        );
+
+        state = state.copyWith(
+          scanMode: newMode,
+          isAutoLocked: true,
+          scanData: state.scanData.copyWith(
+            partNumber: partNumber,
+            scanHistory: [
+              ...state.scanData.scanHistory,
+              ScanRecord(value: partNumber, scannedAt: DateTime.now(), fieldType: 'partNumber'),
+            ],
+          ),
+        );
+
+        _checkCompletion();
+        return;
+      }
+    }
+
+    // Normal part number processing (for ONT or manual mode)
     state = state.copyWith(
       scanData: state.scanData.copyWith(
         partNumber: partNumber,
@@ -202,9 +292,12 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   /// Hide the registration popup.
   void hideRegistrationPopup() {
     LoggerService.debug('Hiding registration popup', tag: _tag);
+    // If scan data is still complete, go back to success state so user can tap Register again
+    // Otherwise go to idle state
+    final newUiState = state.isScanComplete ? ScannerUIState.success : ScannerUIState.idle;
     state = state.copyWith(
       isPopupShowing: false,
-      uiState: ScannerUIState.idle,
+      uiState: newUiState,
     );
   }
 

@@ -15,13 +15,13 @@ enum ScanMode {
   /// RxG credentials QR code.
   rxg,
 
-  /// Access Point (1K9/1M3/1HN/C0C serials).
+  /// Access Point (1K9/1M3/1HN/EC2 serials).
   accessPoint,
 
   /// ONT device (ALCL serials).
   ont,
 
-  /// Network Switch (LL serials).
+  /// Network Switch (LL/EC2 serials).
   switchDevice,
 }
 
@@ -119,11 +119,11 @@ class AccumulatedScanData with _$AccumulatedScanData {
         }
       case ScanMode.accessPoint:
         if (serialNumber.isEmpty || !hasValidSerial) {
-          missing.add('Serial Number (1K9/1M3/1HN/C0C)');
+          missing.add('Serial Number (1K9/1M3/1HN/EC2)');
         }
       case ScanMode.switchDevice:
         if (serialNumber.isEmpty || !hasValidSerial) {
-          missing.add('Serial Number (LL)');
+          missing.add('Serial Number (LL/EC2)');
         }
       case ScanMode.rxg:
       case ScanMode.auto:
@@ -317,9 +317,9 @@ extension ScanModeX on ScanMode {
       case ScanMode.ont:
         return ['MAC Address', 'Serial Number (ALCL)', 'Part Number'];
       case ScanMode.accessPoint:
-        return ['MAC Address', 'Serial Number (1K9/1M3/1HN/C0C)'];
+        return ['MAC Address', 'Serial Number (1K9/1M3/1HN/EC2)'];
       case ScanMode.switchDevice:
-        return ['MAC Address', 'Serial Number (LL)'];
+        return ['MAC Address', 'Serial Number (LL/EC2)'];
       case ScanMode.rxg:
         return ['QR Code'];
       case ScanMode.auto:

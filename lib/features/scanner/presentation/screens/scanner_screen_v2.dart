@@ -277,11 +277,11 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     LoggerService.debug('Showing registration popup', tag: _tag);
 
     ScannerRegistrationPopup.show(context).then((result) {
-      if (result == true) {
-        // Registration successful - reset for next scan
-        ref.read(scannerNotifierV2Provider.notifier).clearScanData();
-      }
-      // Always reset lastScannedCode so same barcode can be re-scanned if needed
+      // Always clear scan data and reset state when popup is dismissed
+      ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+      ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
+
+      // Reset lastScannedCode so same barcode can be re-scanned
       setState(() {
         _lastScannedCode = null;
       });
@@ -985,11 +985,11 @@ class _ModeSelectorSheet extends StatelessWidget {
       case ScanMode.rxg:
         return 'Scan RxG credentials QR code';
       case ScanMode.accessPoint:
-        return 'Scan AP (1K9/1M3/1HN/C0C serial)';
+        return 'Scan AP (1K9/1M3/1HN/EC2 serial)';
       case ScanMode.ont:
         return 'Scan ONT (ALCL serial + part number)';
       case ScanMode.switchDevice:
-        return 'Scan Switch (LL serial)';
+        return 'Scan Switch (LL/EC2 serial)';
     }
   }
 }

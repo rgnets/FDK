@@ -509,10 +509,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     );
 
     try {
-      // Validate serial pattern
-      final detectedType = SerialPatterns.detectDeviceType(serial);
-      if (detectedType == null) {
-        final error = 'Invalid serial number format for ${deviceType.displayName}';
+      // Validate serial pattern matches the device type
+      // Use isValidForType instead of detectDeviceType to support EC2 serials
+      // (EC2 is valid for both AP and Switch in manual mode)
+      final serialType = _deviceTypeToSerialType(deviceType);
+      final isValidSerial = SerialPatterns.isValidForType(serial, serialType);
+      if (!isValidSerial) {
+        final expected = SerialPatterns.getExpectedFormat(serialType);
+        final error = 'Invalid serial number format for ${deviceType.displayName}. $expected';
         state = state.copyWith(
           status: RegistrationStatus.error,
           errorMessage: error,
@@ -596,6 +600,18 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   void clearIndexes() {
     _deviceIndexByMac.clear();
     _deviceIndexBySerial.clear();
+  }
+
+  /// Convert DeviceType to DeviceTypeFromSerial for serial validation.
+  DeviceTypeFromSerial _deviceTypeToSerialType(DeviceType type) {
+    switch (type) {
+      case DeviceType.accessPoint:
+        return DeviceTypeFromSerial.accessPoint;
+      case DeviceType.ont:
+        return DeviceTypeFromSerial.ont;
+      case DeviceType.switchDevice:
+        return DeviceTypeFromSerial.switchDevice;
+    }
   }
 }
 

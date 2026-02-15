@@ -3,14 +3,27 @@
 class SerialPatterns {
   SerialPatterns._();
 
-  // AP serial prefixes (Access Points)
-  static const List<String> apPrefixes = ['1K9', '1M3', '1HN', 'C0C'];
+  // AP serial prefixes (Access Points) - for manual mode validation
+  static const List<String> apPrefixes = ['1K9', '1M3', '1HN', 'EC2'];
+
+  // AP prefixes for auto-detect (excludes ambiguous EC2)
+  static const List<String> _apAutoDetectPrefixes = ['1K9', '1M3', '1HN'];
 
   // ONT serial prefixes (Optical Network Terminal / Media Converter)
   static const List<String> ontPrefixes = ['ALCL'];
 
-  // Switch serial prefixes
-  static const List<String> switchPrefixes = ['LL'];
+  // Switch serial prefixes - for manual mode validation
+  static const List<String> switchPrefixes = ['LL', 'EC2'];
+
+  // Switch prefixes for auto-detect (excludes ambiguous EC2)
+  static const List<String> _switchAutoDetectPrefixes = ['LL'];
+
+  // Part number prefixes for Edge-core device differentiation
+  // FI2WL = Edge-core AP (EAP models)
+  static const List<String> apPartNumberPrefixes = ['FI2WL'];
+
+  // F0PWL = Edge-core Switch (ECS models)
+  static const List<String> switchPartNumberPrefixes = ['F0PWL'];
 
   /// Check if serial is an Access Point serial number.
   /// AP serials start with 1K9, 1M3, or 1HN and are at least 10 characters.
@@ -27,25 +40,58 @@ class SerialPatterns {
   }
 
   /// Check if serial is a Switch serial number.
-  /// Switch serials start with LL and are at least 14 characters.
+  /// Switch serials start with LL or EC2 and are at least 12 characters.
   static bool isSwitchSerial(String serial) {
     final s = serial.toUpperCase().trim();
-    return s.length >= 14 &&
+    return s.length >= 12 &&
         switchPrefixes.any((prefix) => s.startsWith(prefix));
   }
 
-  /// Detect device type from serial number.
-  /// Returns null if serial doesn't match any known pattern.
-  static DeviceTypeFromSerial? detectDeviceType(String serial) {
-    if (isAPSerial(serial)) {
+  /// Check if serial is an ambiguous EC2 serial (could be AP or Switch).
+  static bool isAmbiguousEC2Serial(String serial) {
+    final s = serial.toUpperCase().trim();
+    return s.startsWith('EC2') && s.length >= 10;
+  }
+
+  /// Detect device type from part number (for EC2 devices).
+  /// Returns null if part number doesn't match known patterns.
+  static DeviceTypeFromSerial? detectDeviceTypeFromPartNumber(String partNumber) {
+    final p = partNumber.toUpperCase().trim();
+
+    // Check AP part number prefixes (FI2WL = Edge-core EAP)
+    if (apPartNumberPrefixes.any((prefix) => p.startsWith(prefix))) {
       return DeviceTypeFromSerial.accessPoint;
     }
+
+    // Check Switch part number prefixes (F0PWL = Edge-core ECS)
+    if (switchPartNumberPrefixes.any((prefix) => p.startsWith(prefix))) {
+      return DeviceTypeFromSerial.switchDevice;
+    }
+
+    return null;
+  }
+
+  /// Detect device type from serial number for auto-detect mode.
+  /// Returns null if serial doesn't match any unique pattern.
+  /// Note: EC2 serials return null - use detectDeviceTypeFromPartNumber instead.
+  static DeviceTypeFromSerial? detectDeviceType(String serial) {
+    final s = serial.toUpperCase().trim();
+
+    // Check AP auto-detect prefixes (excludes EC2)
+    if (s.length >= 10 && _apAutoDetectPrefixes.any((prefix) => s.startsWith(prefix))) {
+      return DeviceTypeFromSerial.accessPoint;
+    }
+
+    // Check ONT
     if (isONTSerial(serial)) {
       return DeviceTypeFromSerial.ont;
     }
-    if (isSwitchSerial(serial)) {
+
+    // Check Switch auto-detect prefixes (excludes EC2)
+    if (s.length >= 12 && _switchAutoDetectPrefixes.any((prefix) => s.startsWith(prefix))) {
       return DeviceTypeFromSerial.switchDevice;
     }
+
     return null;
   }
 
@@ -69,7 +115,7 @@ class SerialPatterns {
       case DeviceTypeFromSerial.ont:
         return 'ONT serials start with ${ontPrefixes.join(", ")} (exactly 12 chars)';
       case DeviceTypeFromSerial.switchDevice:
-        return 'Switch serials start with ${switchPrefixes.join(", ")} (min 14 chars)';
+        return 'Switch serials start with ${switchPrefixes.join(", ")} (min 12 chars)';
     }
   }
 }

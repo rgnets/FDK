@@ -949,8 +949,7 @@ class _ScannerRegistrationPopupState
   }
 
   void _handleCancel() {
-    ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
-    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+    // Just pop with false - let the .then() callback in scanner_screen handle state cleanup
     Navigator.pop(context, false);
     widget.onCancel?.call();
   }
