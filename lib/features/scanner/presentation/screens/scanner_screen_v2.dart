@@ -985,11 +985,11 @@ class _ModeSelectorSheet extends StatelessWidget {
       case ScanMode.rxg:
         return 'Scan RxG credentials QR code';
       case ScanMode.accessPoint:
-        return 'Scan AP (1K9/1M3/1HN serial)';
+        return 'Scan AP (1K9/1M3/1HN/C0C serial)';
       case ScanMode.ont:
         return 'Scan ONT (ALCL serial + part number)';
       case ScanMode.switchDevice:
-        return 'Scan Switch (LL/EC serial)';
+        return 'Scan Switch (LL serial)';
     }
   }
 }
