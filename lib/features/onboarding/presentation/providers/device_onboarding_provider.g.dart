@@ -42,7 +42,7 @@ final messageResolverProvider = AutoDisposeProvider<MessageResolver>.internal(
 
 typedef MessageResolverRef = AutoDisposeProviderRef<MessageResolver>;
 String _$deviceOnboardingStateHash() =>
-    r'a6bb3f939d79c780098bca9aecae84a7b9d83e86';
+    r'a7bd7deee31826a567b72b254f10aa7dc8d51424';
 
 /// Copied from Dart SDK
 class _SystemHash {
