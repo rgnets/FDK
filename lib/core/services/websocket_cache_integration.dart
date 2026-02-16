@@ -492,7 +492,7 @@ class WebSocketCacheIntegration {
 
       for (final deviceMap in devices) {
         try {
-          final model = _mapToDeviceModel(resourceType, deviceMap);
+          final model = mapToDeviceModel(resourceType, deviceMap);
           if (model != null) {
             allDevices.add(model);
           }
@@ -505,7 +505,11 @@ class WebSocketCacheIntegration {
     return allDevices;
   }
 
-  DeviceModelSealed? _mapToDeviceModel(
+  /// Maps raw device data to a [DeviceModelSealed] model.
+  ///
+  /// Public so that [DeviceWebSocketDataSource] can use this single mapper
+  /// instead of maintaining a separate (incomplete) copy.
+  DeviceModelSealed? mapToDeviceModel(
     String resourceType,
     Map<String, dynamic> deviceMap,
   ) {
