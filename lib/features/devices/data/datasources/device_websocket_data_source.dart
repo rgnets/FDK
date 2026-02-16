@@ -2,7 +2,6 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/data/services/rest_image_upload_service.dart';
@@ -16,12 +15,10 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     Logger? logger,
     StorageService? storageService,
   })  : _cacheIntegration = webSocketCacheIntegration,
-        _imageBaseUrl = imageBaseUrl,
         _storageService = storageService,
         _logger = logger ?? Logger();
 
   final WebSocketCacheIntegration _cacheIntegration;
-  final String? _imageBaseUrl;
   final StorageService? _storageService;
   final Logger _logger;
 
@@ -451,106 +448,18 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     return null;
   }
 
+  /// Delegates to [WebSocketCacheIntegration.mapToDeviceModel] so there is
+  /// a single, complete mapper for all device data (includes onboardingStatus,
+  /// hnCounts, healthNotices, metadata).
   DeviceModelSealed _mapToDeviceModel(
     String resourceType,
     Map<String, dynamic> deviceMap,
   ) {
-    // Extract images with both URLs and signed IDs
-    final imageData = _extractImagesData(deviceMap);
-
-    switch (resourceType) {
-      case 'access_points':
-        return DeviceModelSealed.ap(
-          id: 'ap_${deviceMap['id']}',
-          name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
-          status: _determineStatus(deviceMap),
-          pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['mac']?.toString(),
-          ipAddress: deviceMap['ip']?.toString(),
-          model: deviceMap['model']?.toString(),
-          serialNumber: deviceMap['serial_number']?.toString(),
-          note: deviceMap['note']?.toString(),
-          images: imageData?.urls,
-          imageSignedIds: imageData?.signedIds,
-        );
-
-      case 'media_converters':
-        return DeviceModelSealed.ont(
-          id: 'ont_${deviceMap['id']}',
-          name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
-          status: _determineStatus(deviceMap),
-          pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['mac']?.toString(),
-          ipAddress: deviceMap['ip']?.toString(),
-          model: deviceMap['model']?.toString(),
-          serialNumber: deviceMap['serial_number']?.toString(),
-          note: deviceMap['note']?.toString(),
-          images: imageData?.urls,
-          imageSignedIds: imageData?.signedIds,
-        );
-
-      case 'switch_devices':
-        return DeviceModelSealed.switchDevice(
-          id: 'sw_${deviceMap['id']}',
-          name: deviceMap['name']?.toString() ??
-              deviceMap['nickname']?.toString() ??
-              'Switch-${deviceMap['id']}',
-          status: _determineStatus(deviceMap),
-          pmsRoomId: _extractPmsRoomId(deviceMap),
-          macAddress: deviceMap['scratch']?.toString(),
-          ipAddress: deviceMap['host']?.toString(),
-          host: deviceMap['host']?.toString(),
-          model:
-              deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
-          serialNumber: deviceMap['serial_number']?.toString(),
-          note: deviceMap['note']?.toString(),
-          images: imageData?.urls,
-          imageSignedIds: imageData?.signedIds,
-        );
-
-      case 'wlan_devices':
-        return DeviceModelSealed.wlan(
-          id: 'wlan_${deviceMap['id']}',
-          name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
-          status: _determineStatus(deviceMap),
-          macAddress: deviceMap['mac']?.toString(),
-          ipAddress: deviceMap['host']?.toString() ??
-              deviceMap['ip']?.toString(),
-          model:
-              deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
-          serialNumber: deviceMap['serial_number']?.toString(),
-          note: deviceMap['note']?.toString(),
-          images: imageData?.urls,
-          imageSignedIds: imageData?.signedIds,
-        );
-
-      default:
-        throw Exception('Unknown resource type: $resourceType');
+    final model = _cacheIntegration.mapToDeviceModel(resourceType, deviceMap);
+    if (model == null) {
+      throw Exception('Failed to map device of type: $resourceType');
     }
-  }
-
-  String _determineStatus(Map<String, dynamic> device) {
-    final onlineFlag = device['online'] as bool?;
-    if (onlineFlag != null) {
-      return onlineFlag ? 'online' : 'offline';
-    }
-    return 'unknown';
-  }
-
-  int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
-    if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
-      final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
-      final idValue = pmsRoom['id'];
-      if (idValue is int) return idValue;
-      if (idValue is String) return int.tryParse(idValue);
-    }
-    return null;
-  }
-
-  /// Extract images with both URLs (for display) and signed IDs (for API operations)
-  ImageExtraction? _extractImagesData(Map<String, dynamic> deviceMap) {
-    final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
-    return extractImagesWithSignedIds(imagesValue, baseUrl: _imageBaseUrl);
+    return model;
   }
 
   @override

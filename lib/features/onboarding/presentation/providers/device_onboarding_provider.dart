@@ -187,63 +187,70 @@ OnboardingState? deviceOnboardingState(
 ) {
   final states = ref.watch(deviceOnboardingNotifierProvider);
 
-  // Return cached state if available
-  if (states.containsKey(deviceId)) {
-    return states[deviceId];
-  }
+  // Watch device cache updates so this provider re-evaluates when
+  // broadcasts or show responses update onboarding data in the cache.
+  ref.watch(webSocketDeviceLastUpdateProvider);
 
-  // Fall back to WebSocket cache
+  // Always check the WebSocket cache for the latest device data and push
+  // it into the notifier. Without this, the notifier holds stale onboarding
+  // state after broadcasts update the cache.
   final wsCache = ref.watch(webSocketCacheIntegrationProvider);
   final allDevices = wsCache.getAllCachedDeviceModels();
-
-  // Find the device by ID
   final device = allDevices.where((d) => d.deviceId == deviceId).firstOrNull;
-  if (device == null) {
-    return null;
+
+  if (device != null) {
+    final payload = device.map(
+      ap: (d) => d.onboardingStatus,
+      ont: (d) => d.onboardingStatus,
+      switchDevice: (_) => null,
+      wlan: (_) => null,
+    );
+
+    if (payload != null) {
+      // Push updated device data into the notifier (async to avoid modifying
+      // provider state during build). The notifier update will trigger a
+      // rebuild via the watch on deviceOnboardingNotifierProvider above.
+      Future.microtask(() {
+        ref
+            .read(deviceOnboardingNotifierProvider.notifier)
+            .updateFromDevice(device);
+      });
+
+      // Return notifier state if available (will have timing data etc.)
+      if (states.containsKey(deviceId)) {
+        return states[deviceId];
+      }
+
+      // Return a temporary state for immediate display on first load
+      final deviceType = device.map(
+        ap: (_) => 'AP',
+        ont: (_) => 'ONT',
+        switchDevice: (_) => 'SWITCH',
+        wlan: (_) => 'WLAN',
+      );
+      final currentStage = payload.stage ?? 1;
+      final maxStages = payload.maxStages ??
+          OnboardingConfig.instance.getMaxStages(deviceType);
+
+      return OnboardingState(
+        deviceId: deviceId,
+        deviceType: deviceType,
+        currentStage: currentStage,
+        maxStages: maxStages,
+        statusText: payload.status,
+        stageDisplay: payload.stageDisplay,
+        nextAction: payload.nextAction,
+        errorText: payload.error,
+        lastUpdate: payload.lastUpdate,
+        lastUpdateAgeSecs: payload.lastUpdateAgeSecs,
+        isComplete: payload.onboardingComplete ?? (currentStage >= maxStages),
+        isOverdue: false, // Will be updated by notifier
+      );
+    }
   }
 
-  final deviceType = device.map(
-    ap: (_) => 'AP',
-    ont: (_) => 'ONT',
-    switchDevice: (_) => 'SWITCH',
-    wlan: (_) => 'WLAN',
-  );
-
-  // Build a temporary state for immediate display
-  final payload = device.map(
-    ap: (d) => d.onboardingStatus,
-    ont: (d) => d.onboardingStatus,
-    switchDevice: (_) => null,
-    wlan: (_) => null,
-  );
-
-  if (payload == null) {
-    return null;
-  }
-
-  // Update the notifier with this device (async, but we return immediately)
-  Future.microtask(() {
-    ref.read(deviceOnboardingNotifierProvider.notifier).updateFromDevice(device);
-  });
-
-  final currentStage = payload.stage ?? 1;
-  final maxStages = payload.maxStages ??
-      OnboardingConfig.instance.getMaxStages(deviceType);
-
-  return OnboardingState(
-    deviceId: deviceId,
-    deviceType: deviceType,
-    currentStage: currentStage,
-    maxStages: maxStages,
-    statusText: payload.status,
-    stageDisplay: payload.stageDisplay,
-    nextAction: payload.nextAction,
-    errorText: payload.error,
-    lastUpdate: payload.lastUpdate,
-    lastUpdateAgeSecs: payload.lastUpdateAgeSecs,
-    isComplete: payload.onboardingComplete ?? (currentStage >= maxStages),
-    isOverdue: false, // Will be updated by notifier
-  );
+  // No device in cache or no onboarding data — return notifier state if any
+  return states[deviceId];
 }
 
 /// Provider to check if a device has onboarding data
