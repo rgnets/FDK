@@ -258,7 +258,27 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         return _mapToDeviceModel(resourceType, deviceData);
       }
 
-      // Fetch fresh device data if response didn't include it
+      // Response didn't include parseable device data. The update was still
+      // sent successfully (got a response, no timeout). Log the response for
+      // debugging, then return the cached device with the note applied locally.
+      _logger.w(
+        'DeviceWebSocketDataSource: update_resource response missing device '
+        'data for $deviceId. payload keys: ${response.payload.keys.toList()}',
+      );
+
+      // Fall back to cached device with local note update
+      final cachedModels = _cacheIntegration.getAllCachedDeviceModels();
+      final cached = cachedModels.where((d) => d.deviceId == deviceId).firstOrNull;
+      if (cached != null) {
+        return cached.map(
+          ap: (d) => d.copyWith(note: note),
+          ont: (d) => d.copyWith(note: note),
+          switchDevice: (d) => d.copyWith(note: note),
+          wlan: (d) => d.copyWith(note: note),
+        );
+      }
+
+      // No cached device either — last resort
       return getDevice(deviceId, forceRefresh: true);
     } on Exception catch (e) {
       _logger.e('DeviceWebSocketDataSource: Failed to update note: $e');

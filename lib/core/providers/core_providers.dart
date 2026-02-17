@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
-import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/config/logging_config.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
@@ -10,16 +10,33 @@ import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Logger provider for consistent logging across the app
-final loggerProvider = Provider<Logger>((ref) {
-  // Disable logging in production
-  if (EnvironmentConfig.isProduction) {
-    return Logger(level: Level.off, printer: PrettyPrinter(methodCount: 0));
+/// Map app LogLevel to logger package Level
+Level _toLoggerLevel(LogLevel logLevel) {
+  switch (logLevel) {
+    case LogLevel.off:
+      return Level.off;
+    case LogLevel.error:
+      return Level.error;
+    case LogLevel.warning:
+      return Level.warning;
+    case LogLevel.info:
+      return Level.info;
+    case LogLevel.debug:
+      return Level.debug;
+    case LogLevel.trace:
+      return Level.trace;
   }
+}
+
+/// Logger provider for consistent logging across the app.
+/// Respects LOG_LEVEL dart-define even in production builds.
+final loggerProvider = Provider<Logger>((ref) {
+  final level = _toLoggerLevel(LoggingConfig.logLevel);
 
   return Logger(
+    level: level,
     printer: PrettyPrinter(
-      methodCount: 2,
+      methodCount: level == Level.off ? 0 : 2,
       errorMethodCount: 8,
       lineLength: 120,
       colors: true,

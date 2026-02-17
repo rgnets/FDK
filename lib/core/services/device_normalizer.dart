@@ -23,13 +23,13 @@ class DeviceNormalizer {
       images: extractImages(data),
       metadata: data,
       connectionState: data['connection_state']?.toString(),
-      signalStrength: data['signal_strength'] as int?,
-      connectedClients: data['connected_clients'] as int?,
+      signalStrength: _toInt(data['signal_strength']),
+      connectedClients: _toInt(data['connected_clients']),
       ssid: data['ssid']?.toString(),
-      channel: data['channel'] as int?,
-      maxClients: data['max_clients'] as int?,
-      currentUpload: (data['current_upload'] as num?)?.toDouble(),
-      currentDownload: (data['current_download'] as num?)?.toDouble(),
+      channel: _toInt(data['channel']),
+      maxClients: _toInt(data['max_clients']),
+      currentUpload: _toDouble(data['current_upload']),
+      currentDownload: _toDouble(data['current_download']),
       onboardingStatus: data['ap_onboarding_status'] != null
           ? OnboardingStatusPayload.fromJson(
               data['ap_onboarding_status'] as Map<String, dynamic>,
@@ -85,9 +85,9 @@ class DeviceNormalizer {
       metadata: data,
       host: data['host']?.toString(),
       ports: (data['switch_ports'] as List<dynamic>?)?.cast<Map<String, dynamic>>(),
-      cpuUsage: data['cpu_usage'] as int?,
-      memoryUsage: data['memory_usage'] as int?,
-      temperature: data['temperature'] as int?,
+      cpuUsage: _toInt(data['cpu_usage']),
+      memoryUsage: _toInt(data['memory_usage']),
+      temperature: _toInt(data['temperature']),
     );
   }
 
@@ -108,13 +108,13 @@ class DeviceNormalizer {
       images: extractImages(data),
       metadata: data,
       controllerType: data['controller_type']?.toString(),
-      managedAPs: data['managed_aps'] as int?,
-      vlan: data['vlan'] as int?,
-      totalUpload: data['total_upload'] as int?,
-      totalDownload: data['total_download'] as int?,
-      packetLoss: (data['packet_loss'] as num?)?.toDouble(),
-      latency: data['latency'] as int?,
-      restartCount: data['restart_count'] as int?,
+      managedAPs: _toInt(data['managed_aps']),
+      vlan: _toInt(data['vlan']),
+      totalUpload: _toInt(data['total_upload']),
+      totalDownload: _toInt(data['total_download']),
+      packetLoss: _toDouble(data['packet_loss']),
+      latency: _toInt(data['latency']),
+      restartCount: _toInt(data['restart_count']),
     );
   }
 
@@ -257,6 +257,45 @@ class DeviceNormalizer {
       }
     }
 
+    return null;
+  }
+
+  /// Safely convert a dynamic value to int.
+  /// Handles int, num, String, and List (returns length for count fields
+  /// like connected_clients which may arrive as a list of client objects).
+  static int? _toInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value);
+    }
+    if (value is List) {
+      return value.length;
+    }
+    return null;
+  }
+
+  /// Safely convert a dynamic value to double.
+  static double? _toDouble(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is double) {
+      return value;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value);
+    }
     return null;
   }
 }
