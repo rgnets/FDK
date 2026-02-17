@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,7 +32,6 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
   static const String _tag = 'ScannerScreenV2';
 
   MobileScannerController? _controller;
-  StreamSubscription<BarcodeCapture>? _barcodeSubscription;
   String? _lastScannedCode;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -77,14 +74,6 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
         ],
       );
 
-      // Subscribe directly to barcode stream
-      _barcodeSubscription = _controller!.barcodes.listen(
-        _handleBarcode,
-        onError: (Object error) {
-          LoggerService.error('Barcode stream error', error: error, tag: _tag);
-        },
-      );
-
       LoggerService.debug('Scanner controller initialized', tag: _tag);
     } on Exception catch (e) {
       LoggerService.error('Failed to initialize scanner', error: e, tag: _tag);
@@ -93,8 +82,6 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
 
   @override
   void dispose() {
-    _barcodeSubscription?.cancel();
-    _barcodeSubscription = null;
     // Turn off flash if it's on before disposing
     if (_isFlashOn && _controller != null) {
       _controller!.toggleTorch();
