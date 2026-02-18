@@ -89,6 +89,11 @@ class WebSocketDataSyncService {
   Future<void>? _pendingRoomCache;
   final _eventController = StreamController<WebSocketDataSyncEvent>.broadcast();
 
+  /// Debounce timer for device cache events.
+  /// Collapses rapid AP/ONT/Switch/WLAN caching into a single event.
+  Timer? _deviceCacheDebounce;
+  int _pendingDeviceCount = 0;
+
   bool get isRunning => _started;
   Stream<WebSocketDataSyncEvent> get events => _eventController.stream;
 
@@ -119,6 +124,7 @@ class WebSocketDataSyncService {
 
   Future<void> dispose() async {
     await stop();
+    _deviceCacheDebounce?.cancel();
     await _eventController.close();
     _apLocalDataSource.dispose();
     _ontLocalDataSource.dispose();
@@ -436,7 +442,21 @@ class WebSocketDataSyncService {
       DeviceFieldSets.listFields,
     );
     _cacheManager.invalidate(cacheKey);
-    _eventController.add(WebSocketDataSyncEvent.devicesCached(count: count));
+
+    // Debounce: accumulate counts and fire a single event after 600ms of quiet.
+    // This collapses rapid AP/ONT/Switch/WLAN caching into one provider refresh.
+    _pendingDeviceCount += count;
+    _deviceCacheDebounce?.cancel();
+    _deviceCacheDebounce = Timer(const Duration(milliseconds: 600), () {
+      _logger.i(
+        'WebSocketDataSync: Emitting debounced devicesCached '
+        '(total=$_pendingDeviceCount)',
+      );
+      _eventController.add(
+        WebSocketDataSyncEvent.devicesCached(count: _pendingDeviceCount),
+      );
+      _pendingDeviceCount = 0;
+    });
   }
 
   void _handleRoomSnapshot(

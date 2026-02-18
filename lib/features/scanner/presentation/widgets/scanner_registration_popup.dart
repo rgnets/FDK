@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
@@ -843,6 +844,10 @@ class _ScannerRegistrationPopupState
           if (value == 'create_new') {
             _createNewDevice = true;
             _selectedDevice = null;
+            LoggerService.info(
+              'Dropdown: selected Create New',
+              tag: 'ScannerRegistration',
+            );
           } else {
             _createNewDevice = false;
             final parts = value.split('_');
@@ -853,6 +858,13 @@ class _ScannerRegistrationPopupState
               if (_selectedDevice == null) {
                 _createNewDevice = true;
               }
+              LoggerService.info(
+                'Dropdown: value=$value, parsedId=$deviceId, '
+                'found=${_selectedDevice != null}, '
+                'deviceName=${_selectedDevice?.name}, '
+                'createNew=$_createNewDevice',
+                tag: 'ScannerRegistration',
+              );
             }
           }
         });
@@ -909,17 +921,10 @@ class _ScannerRegistrationPopupState
         const SizedBox(width: 16),
         Expanded(
           flex: 2,
-          child: FilledButton(
-            onPressed: canRegister ? _handleRegister : null,
-            style: buttonColor != null
-                ? FilledButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  )
-                : FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-            child: Text(buttonText),
+          child: _HoldToConfirmButton(
+            onConfirmed: canRegister ? _handleRegister : null,
+            color: buttonColor ?? Theme.of(context).colorScheme.primary,
+            label: buttonText,
           ),
         ),
       ],
@@ -968,6 +973,15 @@ class _ScannerRegistrationPopupState
     } else if (!_createNewDevice && _selectedDevice != null) {
       existingDeviceId = int.tryParse(_selectedDevice!.id);
     }
+
+    LoggerService.info(
+      'Register: isExisting=$isExisting, _createNewDevice=$_createNewDevice, '
+      '_selectedDevice=${_selectedDevice?.id}/${_selectedDevice?.name}, '
+      'existingDeviceId=$existingDeviceId, '
+      'matchStatus=${scannerState.matchStatus}, '
+      'roomId=${scannerState.selectedRoomId}',
+      tag: 'ScannerRegistration',
+    );
 
     try {
       final result = await ref
@@ -1304,6 +1318,127 @@ class _RoomListTile extends StatelessWidget {
             const Icon(Icons.chevron_right),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Hold-to-confirm button matching ATT-FE-Tool (1.6s hold duration).
+class _HoldToConfirmButton extends StatefulWidget {
+  const _HoldToConfirmButton({
+    required this.onConfirmed,
+    required this.color,
+    required this.label,
+  });
+
+  final VoidCallback? onConfirmed;
+  final Color color;
+  final String label;
+
+  @override
+  State<_HoldToConfirmButton> createState() => _HoldToConfirmButtonState();
+}
+
+class _HoldToConfirmButtonState extends State<_HoldToConfirmButton>
+    with SingleTickerProviderStateMixin {
+  static const _holdDuration = Duration(milliseconds: 1600);
+
+  late AnimationController _controller;
+  bool _isHolding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _holdDuration)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          setState(() {
+            _isHolding = false;
+          });
+          widget.onConfirmed?.call();
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onPointerDown() {
+    if (widget.onConfirmed == null) {
+      return;
+    }
+    setState(() {
+      _isHolding = true;
+    });
+    _controller.forward(from: 0);
+  }
+
+  void _onPointerUp() {
+    if (!_isHolding) {
+      return;
+    }
+    setState(() {
+      _isHolding = false;
+    });
+    _controller.reset();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onConfirmed != null;
+    final foreground = enabled ? Colors.white : Colors.white70;
+    final background =
+        enabled ? widget.color : widget.color.withValues(alpha: 0.4);
+
+    return GestureDetector(
+      onLongPressStart: enabled ? (_) => _onPointerDown() : null,
+      onLongPressEnd: enabled ? (_) => _onPointerUp() : null,
+      onLongPressCancel: enabled ? _onPointerUp : null,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              children: [
+                // Progress fill
+                if (_isHolding)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: _controller.value,
+                          child: Container(
+                            color: Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                // Label
+                Center(
+                  child: Text(
+                    _isHolding ? 'Hold to confirm...' : widget.label,
+                    style: TextStyle(
+                      color: foreground,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

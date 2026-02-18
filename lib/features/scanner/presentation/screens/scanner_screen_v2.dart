@@ -69,8 +69,6 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
         formats: const [
           BarcodeFormat.qrCode,
           BarcodeFormat.code128,
-          BarcodeFormat.code39,
-          BarcodeFormat.dataMatrix,
         ],
       );
 
@@ -195,23 +193,35 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
       return;
     }
 
+    // Collect all new barcodes from this frame
+    final frameBarcodes = <String>[];
     for (final barcode in capture.barcodes) {
       if (barcode.rawValue != null && barcode.rawValue != _lastScannedCode) {
-        LoggerService.debug('Barcode detected: ${barcode.rawValue}', tag: _tag);
-
-        setState(() {
-          _lastScannedCode = barcode.rawValue;
-        });
-
-        // Process through the new notifier
-        ref.read(scannerNotifierV2Provider.notifier).processBarcode(barcode.rawValue!);
-
-        // Check if scan is now complete
-        final updatedState = ref.read(scannerNotifierV2Provider);
-        if (updatedState.isScanComplete && !updatedState.isPopupShowing) {
-          _showRegistrationPopup();
-        }
+        frameBarcodes.add(barcode.rawValue!);
       }
+    }
+
+    if (frameBarcodes.isEmpty) {
+      return;
+    }
+
+    // Update last scanned code to prevent re-processing same frame
+    setState(() {
+      _lastScannedCode = frameBarcodes.last;
+    });
+
+    LoggerService.debug(
+      'Frame detected ${frameBarcodes.length} barcode(s): $frameBarcodes',
+      tag: _tag,
+    );
+
+    // Process entire frame as a batch for correct ONT disambiguation
+    ref.read(scannerNotifierV2Provider.notifier).processBarcodeFrame(frameBarcodes);
+
+    // Check if scan is now complete
+    final updatedState = ref.read(scannerNotifierV2Provider);
+    if (updatedState.isScanComplete && !updatedState.isPopupShowing) {
+      _showRegistrationPopup();
     }
   }
 

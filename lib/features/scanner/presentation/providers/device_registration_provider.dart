@@ -186,7 +186,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   }
 
   /// Query the backend via WebSocket to find devices matching MAC or serial.
-  /// Returns a list of matching devices from all device types.
+  /// Runs all queries in parallel for fast lookups.
   Future<List<Map<String, dynamic>>> _queryDevicesFromBackend({
     String? mac,
     String? serial,
@@ -200,30 +200,35 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       return [];
     }
 
-    final results = <Map<String, dynamic>>[];
     final resourceTypes = ['access_points', 'media_converters', 'switch_devices'];
+    final futures = <Future<List<Map<String, dynamic>>>>[];
+
+    final formattedMac = (mac != null && mac.isNotEmpty)
+        ? _formatMacForBackend(mac)
+        : null;
 
     for (final resourceType in resourceTypes) {
-      // Query by MAC if provided - format for backend (lowercase with colons)
-      if (mac != null && mac.isNotEmpty) {
-        final formattedMac = _formatMacForBackend(mac);
-        LoggerService.debug(
-          'DeviceRegistration: Querying $resourceType with formatted MAC: $formattedMac (original: $mac)',
-          tag: 'DeviceRegistration',
-        );
-        final byMac = await _queryResource(wsService, resourceType, {'mac': formattedMac});
-        results.addAll(byMac);
+      if (formattedMac != null) {
+        futures.add(_queryResource(wsService, resourceType, {'mac': formattedMac}));
       }
-
-      // Query by serial if provided
       if (serial != null && serial.isNotEmpty) {
-        final bySerial = await _queryResource(wsService, resourceType, {'serial_number': serial});
-        // Avoid duplicates if already found by MAC
-        for (final device in bySerial) {
-          final deviceId = device['id'];
-          if (!results.any((d) => d['id'] == deviceId)) {
-            results.add(device);
-          }
+        futures.add(_queryResource(wsService, resourceType, {'serial_number': serial}));
+      }
+    }
+
+    if (futures.isEmpty) {
+      return [];
+    }
+
+    final allResults = await Future.wait(futures);
+
+    // Flatten and deduplicate by device ID
+    final seen = <dynamic>{};
+    final results = <Map<String, dynamic>>[];
+    for (final batch in allResults) {
+      for (final device in batch) {
+        if (seen.add(device['id'])) {
+          results.add(device);
         }
       }
     }
@@ -301,7 +306,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   }
 
   /// Check if a device already exists with the given MAC and serial.
-  /// Queries the backend via WebSocket to find existing devices.
+  /// Checks local cache first (O(1) lookup), falls back to backend query.
   Future<void> checkDeviceMatch({
     required String mac,
     required String serial,
@@ -321,12 +326,34 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       final normalizedMac = _normalizeMac(mac);
       final normalizedSerial = serial.toUpperCase().trim();
 
+      // Try local cache first — O(1) lookup from WebSocket-populated indexes
+      final deviceByMac = normalizedMac.isNotEmpty
+          ? _deviceIndexByMac[normalizedMac]
+          : null;
+      final deviceBySerial = normalizedSerial.isNotEmpty
+          ? _deviceIndexBySerial[normalizedSerial]
+          : null;
+
+      if (deviceByMac != null || deviceBySerial != null) {
+        LoggerService.debug(
+          'DeviceRegistration: Cache hit — MAC=${deviceByMac != null}, Serial=${deviceBySerial != null}',
+          tag: 'DeviceRegistration',
+        );
+        _resolveMatch(
+          deviceByMac: deviceByMac,
+          deviceBySerial: deviceBySerial,
+          normalizedMac: normalizedMac,
+          normalizedSerial: normalizedSerial,
+        );
+        return;
+      }
+
+      // Cache miss — query backend (parallel across resource types)
       LoggerService.debug(
-        'DeviceRegistration: Querying backend for MAC=$normalizedMac, Serial=$normalizedSerial',
+        'DeviceRegistration: Cache miss, querying backend for MAC=$normalizedMac, Serial=$normalizedSerial',
         tag: 'DeviceRegistration',
       );
 
-      // Query the backend for devices matching MAC or serial
       final matchingDevices = await _queryDevicesFromBackend(
         mac: normalizedMac,
         serial: normalizedSerial,
@@ -338,7 +365,6 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       );
 
       if (matchingDevices.isEmpty) {
-        // No existing device found
         state = state.copyWith(
           status: RegistrationStatus.idle,
           matchStatus: DeviceMatchStatus.noMatch,
@@ -346,138 +372,32 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         return;
       }
 
-      // Find devices that match by MAC and/or serial
-      Map<String, dynamic>? deviceByMac;
-      Map<String, dynamic>? deviceBySerial;
+      // Find devices that match by MAC and/or serial from query results
+      Map<String, dynamic>? queryDeviceByMac;
+      Map<String, dynamic>? queryDeviceBySerial;
 
       for (final device in matchingDevices) {
-        final rawMac = (device['mac'] ?? device['mac_address'] ?? '').toString();
-        final devMac = _normalizeMac(rawMac);
-        final rawSerial = (device['serial_number'] ?? device['sn'] ?? '').toString();
-        final devSerial = rawSerial.toUpperCase().trim();
-
-        LoggerService.debug(
-          'DeviceRegistration: Checking device ${device['id']} - '
-          'rawMac="$rawMac" normalizedMac="$devMac" vs scannedMac="$normalizedMac" | '
-          'rawSerial="$rawSerial" normalizedSerial="$devSerial" vs scannedSerial="$normalizedSerial"',
-          tag: 'DeviceRegistration',
+        final devMac = _normalizeMac(
+          (device['mac'] ?? device['mac_address'] ?? '').toString(),
         );
-
-        // Compare normalized values - if scanned value is empty, don't set match
-        if (normalizedMac.isNotEmpty && devMac.isNotEmpty && devMac == normalizedMac) {
-          LoggerService.debug('DeviceRegistration: MAC match found!', tag: 'DeviceRegistration');
-          deviceByMac = device;
-        }
-        if (normalizedSerial.isNotEmpty && devSerial.isNotEmpty && devSerial == normalizedSerial) {
-          LoggerService.debug('DeviceRegistration: Serial match found!', tag: 'DeviceRegistration');
-          deviceBySerial = device;
-        }
-      }
-
-      LoggerService.debug(
-        'DeviceRegistration: After matching - deviceByMac=${deviceByMac != null ? "found(${deviceByMac['id']})" : "null"}, '
-        'deviceBySerial=${deviceBySerial != null ? "found(${deviceBySerial['id']})" : "null"}',
-        tag: 'DeviceRegistration',
-      );
-
-      // If we found any device, it's a match - don't be strict about both fields
-      // The backend found the device by MAC or serial, so it exists
-      if (matchingDevices.isNotEmpty) {
-        final existingDevice = matchingDevices.first;
-        final existingMac = _normalizeMac(
-          (existingDevice['mac'] ?? existingDevice['mac_address'] ?? '').toString(),
-        );
-        final existingSerial = (existingDevice['serial_number'] ?? existingDevice['sn'] ?? '')
+        final devSerial = (device['serial_number'] ?? device['sn'] ?? '')
             .toString()
             .toUpperCase()
             .trim();
 
-        // Check if BOTH fields were scanned AND the device has BOTH fields AND they DIFFER
-        // This is the only true mismatch case
-        final hasMacMismatch = normalizedMac.isNotEmpty &&
-            existingMac.isNotEmpty &&
-            normalizedMac != existingMac;
-        final hasSerialMismatch = normalizedSerial.isNotEmpty &&
-            existingSerial.isNotEmpty &&
-            normalizedSerial != existingSerial;
-
-        LoggerService.debug(
-          'DeviceRegistration: Mismatch check - hasMacMismatch=$hasMacMismatch, hasSerialMismatch=$hasSerialMismatch',
-          tag: 'DeviceRegistration',
-        );
-
-        // Only flag as mismatch if we have conflicting data
-        // (e.g., scanned MAC matches device A, but scanned serial matches device B)
-        if (deviceByMac != null && deviceBySerial != null && deviceByMac['id'] != deviceBySerial['id']) {
-          LoggerService.debug(
-            'DeviceRegistration: Multiple devices match - MAC matches ${deviceByMac['id']}, serial matches ${deviceBySerial['id']}',
-            tag: 'DeviceRegistration',
-          );
-          state = state.copyWith(
-            status: RegistrationStatus.idle,
-            matchStatus: DeviceMatchStatus.multipleMatch,
-            errorMessage: 'MAC and serial match different devices',
-          );
-          return;
+        if (normalizedMac.isNotEmpty && devMac == normalizedMac) {
+          queryDeviceByMac = device;
         }
-
-        // If we found a device by one field, but the OTHER scanned field doesn't match
-        // that device's stored value, it's a true mismatch
-        if ((deviceByMac != null && hasSerialMismatch) || (deviceBySerial != null && hasMacMismatch)) {
-          final mismatches = <String>[];
-          if (hasMacMismatch) mismatches.add('MAC Address');
-          if (hasSerialMismatch) mismatches.add('Serial Number');
-
-          LoggerService.debug(
-            'DeviceRegistration: Data mismatch detected - $mismatches',
-            tag: 'DeviceRegistration',
-          );
-
-          state = state.copyWith(
-            status: RegistrationStatus.idle,
-            matchStatus: DeviceMatchStatus.mismatch,
-            matchedDeviceId: existingDevice['id'] as int?,
-            matchedDeviceName: existingDevice['name'] as String?,
-            mismatchInfo: MatchMismatchInfo(
-              mismatchedFields: mismatches,
-              expected: {
-                'mac': existingMac,
-                'serial_number': existingSerial,
-              },
-              scanned: {
-                'mac': normalizedMac,
-                'serial_number': normalizedSerial,
-              },
-            ),
-          );
-          return;
+        if (normalizedSerial.isNotEmpty && devSerial == normalizedSerial) {
+          queryDeviceBySerial = device;
         }
-
-        // Device found - this is a full match (existing device)
-        final roomId = _extractRoomId(existingDevice);
-        final roomName = _extractRoomName(existingDevice);
-
-        LoggerService.debug(
-          'DeviceRegistration: Full match - device ${existingDevice['id']} in room $roomName',
-          tag: 'DeviceRegistration',
-        );
-
-        state = state.copyWith(
-          status: RegistrationStatus.idle,
-          matchStatus: DeviceMatchStatus.fullMatch,
-          matchedDeviceId: existingDevice['id'] as int?,
-          matchedDeviceName: existingDevice['name'] as String?,
-          matchedDeviceRoomId: roomId,
-          matchedDeviceRoomName: roomName,
-        );
-        return;
       }
 
-      // No devices found at all
-      LoggerService.debug('DeviceRegistration: No matching devices found', tag: 'DeviceRegistration');
-      state = state.copyWith(
-        status: RegistrationStatus.idle,
-        matchStatus: DeviceMatchStatus.noMatch,
+      _resolveMatch(
+        deviceByMac: queryDeviceByMac,
+        deviceBySerial: queryDeviceBySerial,
+        normalizedMac: normalizedMac,
+        normalizedSerial: normalizedSerial,
       );
     } catch (e, stack) {
       LoggerService.error(
@@ -491,6 +411,108 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         errorMessage: 'Failed to check device: $e',
       );
     }
+  }
+
+  /// Resolve match status from device lookups (shared by cache and query paths).
+  void _resolveMatch({
+    required Map<String, dynamic>? deviceByMac,
+    required Map<String, dynamic>? deviceBySerial,
+    required String normalizedMac,
+    required String normalizedSerial,
+  }) {
+    if (deviceByMac == null && deviceBySerial == null) {
+      state = state.copyWith(
+        status: RegistrationStatus.idle,
+        matchStatus: DeviceMatchStatus.noMatch,
+      );
+      return;
+    }
+
+    // Check if MAC and serial point to different devices
+    if (deviceByMac != null &&
+        deviceBySerial != null &&
+        deviceByMac['id'] != deviceBySerial['id']) {
+      LoggerService.debug(
+        'DeviceRegistration: Multiple devices — MAC→${deviceByMac['id']}, Serial→${deviceBySerial['id']}',
+        tag: 'DeviceRegistration',
+      );
+      state = state.copyWith(
+        status: RegistrationStatus.idle,
+        matchStatus: DeviceMatchStatus.multipleMatch,
+        errorMessage: 'MAC and serial match different devices',
+      );
+      return;
+    }
+
+    final existingDevice = deviceByMac ?? deviceBySerial!;
+    final existingMac = _normalizeMac(
+      (existingDevice['mac'] ?? existingDevice['mac_address'] ?? '').toString(),
+    );
+    final existingSerial = (existingDevice['serial_number'] ?? existingDevice['sn'] ?? '')
+        .toString()
+        .toUpperCase()
+        .trim();
+
+    final hasMacMismatch = normalizedMac.isNotEmpty &&
+        existingMac.isNotEmpty &&
+        normalizedMac != existingMac;
+    final hasSerialMismatch = normalizedSerial.isNotEmpty &&
+        existingSerial.isNotEmpty &&
+        normalizedSerial != existingSerial;
+
+    // Mismatch: found device by one field but the other field conflicts
+    if ((deviceByMac != null && hasSerialMismatch) ||
+        (deviceBySerial != null && hasMacMismatch)) {
+      final mismatches = <String>[];
+      if (hasMacMismatch) {
+        mismatches.add('MAC Address');
+      }
+      if (hasSerialMismatch) {
+        mismatches.add('Serial Number');
+      }
+
+      LoggerService.debug(
+        'DeviceRegistration: Mismatch — $mismatches',
+        tag: 'DeviceRegistration',
+      );
+
+      state = state.copyWith(
+        status: RegistrationStatus.idle,
+        matchStatus: DeviceMatchStatus.mismatch,
+        matchedDeviceId: existingDevice['id'] as int?,
+        matchedDeviceName: existingDevice['name'] as String?,
+        mismatchInfo: MatchMismatchInfo(
+          mismatchedFields: mismatches,
+          expected: {
+            'mac': existingMac,
+            'serial_number': existingSerial,
+          },
+          scanned: {
+            'mac': normalizedMac,
+            'serial_number': normalizedSerial,
+          },
+        ),
+      );
+      return;
+    }
+
+    // Full match — existing device found
+    final roomId = _extractRoomId(existingDevice);
+    final roomName = _extractRoomName(existingDevice);
+
+    LoggerService.debug(
+      'DeviceRegistration: Full match — device ${existingDevice['id']} in room $roomName',
+      tag: 'DeviceRegistration',
+    );
+
+    state = state.copyWith(
+      status: RegistrationStatus.idle,
+      matchStatus: DeviceMatchStatus.fullMatch,
+      matchedDeviceId: existingDevice['id'] as int?,
+      matchedDeviceName: existingDevice['name'] as String?,
+      matchedDeviceRoomId: roomId,
+      matchedDeviceRoomName: roomName,
+    );
   }
 
   /// Register a new device via WebSocket.
@@ -524,20 +546,9 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         return RegistrationResult.failure(message: error);
       }
 
-      // Get the registration service and register via WebSocket
       final registrationService = ref.read(deviceRegistrationServiceProvider);
 
-      // Check if WebSocket is connected before attempting registration
-      if (!registrationService.isConnected) {
-        const error = 'Cannot register device: WebSocket not connected';
-        state = state.copyWith(
-          status: RegistrationStatus.error,
-          errorMessage: error,
-        );
-        return RegistrationResult.failure(message: error);
-      }
-
-      final sent = registrationService.registerDevice(
+      final response = await registrationService.registerDevice(
         deviceType: deviceType,
         mac: mac,
         serialNumber: serial,
@@ -547,33 +558,39 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         existingDeviceId: existingDeviceId,
       );
 
-      if (!sent) {
-        const error = 'Failed to send registration message';
-        state = state.copyWith(
-          status: RegistrationStatus.error,
-          errorMessage: error,
-        );
-        return RegistrationResult.failure(message: error);
-      }
+      // Server confirmed — extract device ID from response
+      final data = response.payload['data'] ?? response.payload;
+      final deviceId = data is Map<String, dynamic>
+          ? (data['id'] as int? ?? existingDeviceId ?? 0)
+          : (existingDeviceId ?? 0);
 
       LoggerService.info(
-        'DeviceRegistration: Sent registration via WebSocket - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
+        'DeviceRegistration: Server confirmed registration - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
         tag: 'DeviceRegistration',
       );
 
-      // WebSocket registration is fire-and-forget
-      // The device.created event will be received via the WebSocket listener
-      // Mark as pending until we receive confirmation
       state = state.copyWith(
         status: RegistrationStatus.success,
         registeredAt: DateTime.now(),
       );
 
       return RegistrationResult.success(
-        deviceId: existingDeviceId ?? 0,
+        deviceId: deviceId,
         deviceType: deviceType.name,
       );
-    } catch (e, stack) {
+    } on TimeoutException {
+      const error =
+          'Server did not confirm registration. Check the device on the RXG.';
+      LoggerService.warning(
+        'DeviceRegistration: Registration timed out - $deviceType MAC=$mac, SN=$serial',
+        tag: 'DeviceRegistration',
+      );
+      state = state.copyWith(
+        status: RegistrationStatus.error,
+        errorMessage: error,
+      );
+      return const RegistrationResult.failure(message: error);
+    } on Exception catch (e, stack) {
       LoggerService.error(
         'DeviceRegistration: Registration failed',
         error: e,

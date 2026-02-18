@@ -56,6 +56,11 @@ class ScannerValidationService {
 
   /// Parses ONT barcodes from multiple scanned values.
   /// STRICT MODE: Requires ALCL serial, valid MAC, and part number.
+  ///
+  /// Uses two-pass parsing with OUI-based disambiguation to correctly
+  /// distinguish MAC addresses from part numbers (both are 12 hex chars).
+  /// Pass 1: Classify unambiguous values (ALCL serial, prefixed part numbers).
+  /// Pass 2: Resolve ambiguous 12-hex candidates using OUI database lookup.
   static ParsedDeviceData parseONTBarcodes(List<String> barcodes) {
     LoggerService.debug(
       'Parsing ONT barcodes from ${barcodes.length} values',
@@ -66,25 +71,29 @@ class ScannerValidationService {
     String mac = '';
     String serialNumber = '';
     bool hasALCLSerial = false;
+    final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
 
+    // Collect ambiguous 12-hex candidates for OUI-based resolution
+    final hexCandidates = <String>[];
+
+    // --- Pass 1: Classify unambiguous values ---
     for (String barcode in barcodes) {
       if (barcode.isEmpty) continue;
 
       String value = barcode.trim();
 
-      // Remove known ONT prefixes
+      // Remove known ONT prefixes — these are definitively part numbers
       if (value.startsWith('1P')) {
-        value = value.substring(2);
+        partNumber = value.substring(2);
+        LoggerService.debug('Found prefixed part number (1P): $partNumber', tag: _tag);
+        continue;
       } else if (value.startsWith('23S')) {
-        value = value.substring(3);
-      } else if (value.startsWith('S')) {
-        value = value.substring(1);
-      }
-
-      // Check for MAC address (12 hex chars)
-      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
-        mac = value.toUpperCase();
-        LoggerService.debug('Found MAC: $mac', tag: _tag);
+        partNumber = value.substring(3);
+        LoggerService.debug('Found prefixed part number (23S): $partNumber', tag: _tag);
+        continue;
+      } else if (value.startsWith('S') && value.length > 1 && !SerialPatterns.isONTSerial(value)) {
+        partNumber = value.substring(1);
+        LoggerService.debug('Found prefixed part number (S): $partNumber', tag: _tag);
         continue;
       }
 
@@ -96,10 +105,15 @@ class ScannerValidationService {
         continue;
       }
 
-      // Check for Part Number pattern
-      final pnRegex = RegExp(r'^[A-Z0-9]{8,12}[A-Z]$');
-      if (pnRegex.hasMatch(value) && value.length >= 8 && partNumber.isEmpty) {
-        partNumber = value;
+      // Ambiguous: 12-hex value could be MAC or part number — defer to Pass 2
+      if (value.length == 12 && _isValidMacAddress(value)) {
+        hexCandidates.add(value.toUpperCase());
+        continue;
+      }
+
+      // Non-hex part number (matches regex but wasn't 12 hex chars)
+      if (pnRegex.hasMatch(value.toUpperCase()) && value.length >= 8 && partNumber.isEmpty) {
+        partNumber = value.toUpperCase();
         LoggerService.debug('Found part number: $partNumber', tag: _tag);
         continue;
       }
@@ -107,6 +121,80 @@ class ScannerValidationService {
       // Log ignored non-ALCL serials
       if (serialNumber.isEmpty && value.length >= 10 && !value.startsWith('ALCL')) {
         LoggerService.warning('Ignored non-ALCL serial in ONT mode: $value', tag: _tag);
+      }
+    }
+
+    // --- Pass 2: Resolve 12-hex candidates using OUI database ---
+    if (hexCandidates.isNotEmpty) {
+      // Deduplicate while preserving order
+      final seen = <String>{};
+      final unique = hexCandidates.where(seen.add).toList();
+
+      LoggerService.debug(
+        'Resolving ${unique.length} hex candidate(s) via OUI lookup: $unique',
+        tag: _tag,
+      );
+
+      if (unique.length == 1) {
+        // Single candidate: assign to whichever slot is empty
+        final value = unique.first;
+        if (mac.isEmpty) {
+          mac = value;
+          LoggerService.debug('Single hex candidate → MAC: $mac', tag: _tag);
+        } else if (partNumber.isEmpty) {
+          partNumber = value;
+          LoggerService.debug('Single hex candidate → part number: $partNumber', tag: _tag);
+        }
+      } else {
+        // Multiple candidates: use OUI to disambiguate
+        final withOUI = <String>[];
+        final withoutOUI = <String>[];
+
+        for (final value in unique) {
+          if (macDatabase.isLoaded && macDatabase.isKnownMAC(value)) {
+            withOUI.add(value);
+          } else {
+            withoutOUI.add(value);
+          }
+        }
+
+        LoggerService.debug(
+          'OUI results — known: $withOUI, unknown: $withoutOUI',
+          tag: _tag,
+        );
+
+        // Assign MAC from known-OUI candidates
+        if (mac.isEmpty && withOUI.isNotEmpty) {
+          mac = withOUI.first;
+          LoggerService.debug('OUI-resolved MAC: $mac', tag: _tag);
+        }
+
+        // Assign part number from unknown-OUI candidates
+        if (partNumber.isEmpty && withoutOUI.isNotEmpty) {
+          partNumber = withoutOUI.first;
+          LoggerService.debug('OUI-resolved part number: $partNumber', tag: _tag);
+        }
+
+        // Fallback: if OUI database wasn't loaded or all candidates had same
+        // OUI status, fall back to first-come = MAC, second = part number
+        if (mac.isEmpty && partNumber.isEmpty && unique.length >= 2) {
+          mac = unique.first;
+          partNumber = unique[1];
+          LoggerService.debug(
+            'OUI unavailable, fallback order → MAC: $mac, PN: $partNumber',
+            tag: _tag,
+          );
+        } else if (mac.isEmpty && unique.isNotEmpty) {
+          mac = unique.first;
+          LoggerService.debug('Fallback → MAC: $mac', tag: _tag);
+        } else if (partNumber.isEmpty && unique.isNotEmpty) {
+          // MAC already set, remaining candidate is part number
+          final remaining = unique.where((v) => v != mac).toList();
+          if (remaining.isNotEmpty) {
+            partNumber = remaining.first;
+            LoggerService.debug('Remaining hex candidate → part number: $partNumber', tag: _tag);
+          }
+        }
       }
     }
 
@@ -281,21 +369,10 @@ class ScannerValidationService {
   }
 
   /// Auto-detect device type from a single barcode value.
+  /// Uses auto-detect-safe prefixes that exclude ambiguous EC2 serials,
+  /// so the caller can route EC2 to the ambiguous handler instead.
   static DeviceTypeFromSerial? detectDeviceTypeFromBarcode(String barcode) {
-    final value = barcode.trim().toUpperCase();
-
-    // Check serial patterns
-    if (SerialPatterns.isAPSerial(value)) {
-      return DeviceTypeFromSerial.accessPoint;
-    }
-    if (SerialPatterns.isONTSerial(value)) {
-      return DeviceTypeFromSerial.ont;
-    }
-    if (SerialPatterns.isSwitchSerial(value)) {
-      return DeviceTypeFromSerial.switchDevice;
-    }
-
-    return null;
+    return SerialPatterns.detectDeviceType(barcode);
   }
 
   /// Parses RxG credentials from QR code.

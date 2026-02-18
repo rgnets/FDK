@@ -40,6 +40,58 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     }
   }
 
+  /// Process all barcodes from a single camera frame as a batch.
+  ///
+  /// Critical for ONT disambiguation where MAC and part number are both
+  /// 12-hex characters. Batch parsing uses ordering/elimination to
+  /// correctly assign fields. Falls back to individual [processBarcode]
+  /// if no device type can be determined.
+  void processBarcodeFrame(List<String> barcodes) {
+    if (!state.canProcessBarcode && state.uiState != ScannerUIState.idle) {
+      return;
+    }
+
+    final values =
+        barcodes.map((b) => b.trim()).where((b) => b.isNotEmpty).toList();
+    if (values.isEmpty) {
+      return;
+    }
+
+    // Determine device type from current mode or auto-detect
+    DeviceTypeFromSerial? detectedType;
+    if (state.isAutoLocked || state.isInDeviceMode) {
+      detectedType = _scanModeToDeviceType(state.scanMode);
+    } else {
+      for (final value in values) {
+        detectedType =
+            ScannerValidationService.detectDeviceTypeFromBarcode(value);
+        if (detectedType != null) {
+          break;
+        }
+      }
+    }
+
+    if (detectedType != null) {
+      // Replay raw scan history instead of pre-classified state values.
+      // This allows the batch parser to re-disambiguate from scratch when
+      // the device type becomes known (e.g. a 12-hex value initially
+      // classified as MAC in auto mode may actually be a part number).
+      final allValues = [
+        ...state.scanData.scanHistory.map((r) => r.value),
+        ...values,
+      ];
+      final result =
+          ScannerValidationService.parseBarcodesForType(allValues, detectedType);
+      _applyBatchResult(result, detectedType);
+      return;
+    }
+
+    // No type detected — fall back to individual processing
+    for (final value in values) {
+      processBarcode(value);
+    }
+  }
+
   /// Process a scanned barcode value.
   ///
   /// Handles auto-detection of device type from serial patterns,
@@ -77,6 +129,17 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
     // Check if it's a MAC address
     if (_isMacAddress(value)) {
+      // Guard: if MAC is already captured and this value also matches part
+      // number heuristics, classify as part number instead. Prevents a 12-hex
+      // part number from overwriting the real MAC during individual processing.
+      if (state.scanData.mac.isNotEmpty && _isPartNumber(value)) {
+        LoggerService.debug(
+          'MAC already set, 12-hex value matches part number pattern → part number: $value',
+          tag: _tag,
+        );
+        _processPartNumber(value);
+        return;
+      }
       _processMacAddress(value);
       return;
     }
@@ -360,6 +423,80 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   }
 
   // Helper methods
+
+  /// Apply batch-parsed result from [ScannerValidationService] to state.
+  void _applyBatchResult(
+    ParsedDeviceData result,
+    DeviceTypeFromSerial detectedType,
+  ) {
+    final now = DateTime.now();
+    final newHistory = <ScanRecord>[...state.scanData.scanHistory];
+
+    var newMac = state.scanData.mac;
+    var newSerial = state.scanData.serialNumber;
+    var newPartNumber = state.scanData.partNumber;
+    var newHasValidSerial = state.scanData.hasValidSerial;
+
+    if (result.mac.isNotEmpty && result.mac != state.scanData.mac) {
+      newMac = result.mac;
+      newHistory.add(
+        ScanRecord(value: result.mac, scannedAt: now, fieldType: 'mac'),
+      );
+    }
+
+    if (result.serialNumber.isNotEmpty &&
+        result.serialNumber != state.scanData.serialNumber) {
+      newSerial = result.serialNumber;
+      newHasValidSerial = true;
+      newHistory.add(
+        ScanRecord(value: result.serialNumber, scannedAt: now, fieldType: 'serial'),
+      );
+    }
+
+    if (result.partNumber != null &&
+        result.partNumber!.isNotEmpty &&
+        result.partNumber != state.scanData.partNumber) {
+      newPartNumber = result.partNumber!;
+      newHistory.add(
+        ScanRecord(value: result.partNumber!, scannedAt: now, fieldType: 'partNumber'),
+      );
+    }
+
+    final newMode = state.scanMode == ScanMode.auto
+        ? _deviceTypeToScanMode(detectedType)
+        : state.scanMode;
+    final autoLocked = state.scanMode == ScanMode.auto || state.isAutoLocked;
+
+    state = state.copyWith(
+      scanMode: newMode,
+      isAutoLocked: autoLocked,
+      lastSerialSeenAt: newSerial.isNotEmpty ? now : state.lastSerialSeenAt,
+      scanData: state.scanData.copyWith(
+        mac: newMac,
+        serialNumber: newSerial,
+        partNumber: newPartNumber,
+        hasValidSerial: newHasValidSerial,
+        scanHistory: newHistory,
+      ),
+    );
+
+    _checkCompletion();
+  }
+
+  /// Convert [ScanMode] to [DeviceTypeFromSerial] for batch parsing.
+  DeviceTypeFromSerial? _scanModeToDeviceType(ScanMode mode) {
+    switch (mode) {
+      case ScanMode.accessPoint:
+        return DeviceTypeFromSerial.accessPoint;
+      case ScanMode.ont:
+        return DeviceTypeFromSerial.ont;
+      case ScanMode.switchDevice:
+        return DeviceTypeFromSerial.switchDevice;
+      case ScanMode.auto:
+      case ScanMode.rxg:
+        return null;
+    }
+  }
 
   bool _isMacAddress(String value) {
     return MACNormalizer.tryNormalize(value) != null;
