@@ -32,20 +32,18 @@ class DeviceRegistrationService {
     int? existingDeviceId,
   }) {
     final resourceType = _deviceTypeToResourceType(deviceType);
-    final isUpdate = existingDeviceId != null;
-    final action = isUpdate ? 'update_resource' : 'create_resource';
 
     LoggerService.info(
       'Registering ${deviceType.displayName} via ActionCable '
-      '($action on $resourceType, existingId=$existingDeviceId)',
+      '(update_resource on $resourceType, deviceId=$existingDeviceId)',
       tag: _tag,
     );
 
     return _wsService.requestActionCable(
-      action: action,
+      action: 'update_resource',
       resourceType: resourceType,
       additionalData: {
-        if (isUpdate) 'id': existingDeviceId,
+        if (existingDeviceId != null) 'id': existingDeviceId,
         'params': {
           'mac': mac,
           'serial_number': serialNumber,

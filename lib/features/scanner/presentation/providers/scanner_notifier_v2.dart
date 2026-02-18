@@ -115,15 +115,9 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
-    // Check if it's an ambiguous EC2 serial
+    // EC2 serials are always manually placed (user selects AP or Switch mode)
     if (SerialPatterns.isAmbiguousEC2Serial(value)) {
-      // In manual mode (AP or Switch), process as valid serial for that mode
-      if (state.scanMode == ScanMode.accessPoint || state.scanMode == ScanMode.switchDevice) {
-        _processManualModeEC2Serial(value);
-      } else {
-        // In auto mode, wait for part number to determine type
-        _processAmbiguousEC2Serial(value);
-      }
+      _processManualModeEC2Serial(value);
       return;
     }
 
@@ -153,30 +147,8 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     LoggerService.debug('Barcode did not match any known pattern: $value', tag: _tag);
   }
 
-  /// Process an ambiguous EC2 serial (could be AP or Switch).
-  /// Stores the serial but doesn't auto-lock mode - waits for part number.
-  void _processAmbiguousEC2Serial(String serial) {
-    final upperSerial = serial.toUpperCase();
-    LoggerService.debug('Processing ambiguous EC2 serial: $upperSerial (awaiting part number)', tag: _tag);
-
-    // Store the serial but don't auto-lock mode yet
-    state = state.copyWith(
-      lastSerialSeenAt: DateTime.now(),
-      scanData: state.scanData.copyWith(
-        serialNumber: upperSerial,
-        hasValidSerial: true,
-        scanHistory: [
-          ...state.scanData.scanHistory,
-          ScanRecord(value: upperSerial, scannedAt: DateTime.now(), fieldType: 'serial'),
-        ],
-      ),
-    );
-
-    // Don't check completion - we need part number to determine device type
-  }
-
-  /// Process an EC2 serial when user has manually selected AP or Switch mode.
-  /// No need to wait for part number - user already chose the device type.
+  /// Process an EC2 serial. EC2 devices are always manually placed,
+  /// so no part number disambiguation is needed.
   void _processManualModeEC2Serial(String serial) {
     final upperSerial = serial.toUpperCase();
     LoggerService.debug(
@@ -275,41 +247,9 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   }
 
   /// Process a part number barcode.
-  /// For EC2 devices, uses part number to determine AP vs Switch.
   void _processPartNumber(String partNumber) {
     LoggerService.debug('Processing part number: $partNumber', tag: _tag);
 
-    // Check if we have an EC2 serial and are in auto mode - use part number to determine type
-    if (state.scanMode == ScanMode.auto &&
-        state.scanData.serialNumber.isNotEmpty &&
-        SerialPatterns.isAmbiguousEC2Serial(state.scanData.serialNumber)) {
-      final detectedType = SerialPatterns.detectDeviceTypeFromPartNumber(partNumber);
-
-      if (detectedType != null) {
-        final newMode = _deviceTypeToScanMode(detectedType);
-        LoggerService.debug(
-          'Part number detected device type: ${detectedType.displayName}, auto-locking to $newMode',
-          tag: _tag,
-        );
-
-        state = state.copyWith(
-          scanMode: newMode,
-          isAutoLocked: true,
-          scanData: state.scanData.copyWith(
-            partNumber: partNumber,
-            scanHistory: [
-              ...state.scanData.scanHistory,
-              ScanRecord(value: partNumber, scannedAt: DateTime.now(), fieldType: 'partNumber'),
-            ],
-          ),
-        );
-
-        _checkCompletion();
-        return;
-      }
-    }
-
-    // Normal part number processing (for ONT or manual mode)
     state = state.copyWith(
       scanData: state.scanData.copyWith(
         partNumber: partNumber,
@@ -397,9 +337,12 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     );
   }
 
-  /// Clear all accumulated scan data and reset mode to auto.
+  /// Clear all accumulated scan data, preserving the current scan mode.
   void clearScanData() {
-    LoggerService.debug('Clearing scan data and resetting to auto mode', tag: _tag);
+    LoggerService.debug(
+      'Clearing scan data (preserving mode: ${state.scanMode.displayName})',
+      tag: _tag,
+    );
     state = state.copyWith(
       scanData: const AccumulatedScanData(),
       selectedRoomId: null,
@@ -412,7 +355,6 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       isAutoLocked: false,
       wasAutoReverted: false,
       lastSerialSeenAt: null,
-      scanMode: ScanMode.auto,
     );
   }
 

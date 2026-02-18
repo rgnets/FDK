@@ -27,9 +27,10 @@ DeviceRegistrationService deviceRegistrationService(
 class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   StreamSubscription<SocketMessage>? _wsSubscription;
 
-  // Dual-index cache for O(1) device lookup (populated from WebSocket events)
+  // Triple-index cache for O(1) device lookup (populated from WebSocket events)
   final Map<String, Map<String, dynamic>> _deviceIndexByMac = {};
   final Map<String, Map<String, dynamic>> _deviceIndexBySerial = {};
+  final Map<String, Map<String, dynamic>> _deviceIndexByName = {};
 
   @override
   DeviceRegistrationState build() {
@@ -98,6 +99,10 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     if (serial.isNotEmpty) {
       _deviceIndexBySerial[serial] = device;
     }
+    final name = (device['name'] ?? '').toString();
+    if (name.isNotEmpty) {
+      _deviceIndexByName[name] = device;
+    }
 
     LoggerService.debug(
       'DeviceRegistration: Upserted device MAC=$mac, SN=$serial',
@@ -126,6 +131,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     // Rebuild indexes from snapshot
     _deviceIndexByMac.clear();
     _deviceIndexBySerial.clear();
+    _deviceIndexByName.clear();
 
     for (final item in items) {
       if (item is Map<String, dynamic>) {
@@ -617,6 +623,24 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   void clearIndexes() {
     _deviceIndexByMac.clear();
     _deviceIndexBySerial.clear();
+    _deviceIndexByName.clear();
+  }
+
+  /// Look up a device's numeric server ID by its name.
+  /// Returns null if no device with that name is cached.
+  int? lookupDeviceIdByName(String name) {
+    final device = _deviceIndexByName[name];
+    if (device == null) {
+      return null;
+    }
+    final id = device['id'];
+    if (id is int) {
+      return id;
+    }
+    if (id is String) {
+      return int.tryParse(id);
+    }
+    return null;
   }
 
   /// Convert DeviceType to DeviceTypeFromSerial for serial validation.

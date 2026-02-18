@@ -223,7 +223,7 @@ class ScannerValidationService {
   }
 
   /// Parses AP barcodes from multiple scanned values.
-  /// STRICT MODE: Requires AP serial (1K9/1M3/1HN) and valid MAC.
+  /// Requires AP serial (1K9/1M3/1HN/EC2) and valid MAC.
   static ParsedDeviceData parseAPBarcodes(List<String> barcodes) {
     LoggerService.debug(
       'Parsing AP barcodes from ${barcodes.length} values',
@@ -246,23 +246,15 @@ class ScannerValidationService {
         continue;
       }
 
-      // AP-SPECIFIC: Only accept approved prefixes (strict)
+      // Accept approved AP prefixes including EC2
       if (SerialPatterns.isAPSerial(value)) {
         serialNumber = value.toUpperCase();
         hasAPSerial = true;
-        LoggerService.debug('Found AP serial (1K9/1M3/1HN): $serialNumber', tag: _tag);
+        LoggerService.debug('Found AP serial: $serialNumber', tag: _tag);
         continue;
-      }
-
-      // Log ignored non-AP serials
-      if (serialNumber.isEmpty &&
-          value.length >= 10 &&
-          !SerialPatterns.apPrefixes.any((p) => value.toUpperCase().startsWith(p))) {
-        LoggerService.warning('Ignored non-AP serial format in AP mode: $value', tag: _tag);
       }
     }
 
-    // STRICT validation: Both required for AP
     final isComplete = mac.isNotEmpty && hasAPSerial;
 
     if (!isComplete) {
@@ -279,13 +271,13 @@ class ScannerValidationService {
       detectedType: DeviceTypeFromSerial.accessPoint,
       missingFields: [
         if (mac.isEmpty) 'MAC Address',
-        if (!hasAPSerial) 'Serial Number (1K9/1M3/1HN)',
+        if (!hasAPSerial) 'Serial Number',
       ],
     );
   }
 
   /// Parses Switch barcodes from multiple scanned values.
-  /// STRICT MODE: Requires valid MAC and LL serial (14+ chars).
+  /// Requires valid MAC and Switch serial (LL or EC2).
   static ParsedDeviceData parseSwitchBarcodes(List<String> barcodes) {
     LoggerService.debug(
       'Parsing Switch barcodes from ${barcodes.length} values',
@@ -295,7 +287,7 @@ class ScannerValidationService {
     String mac = '';
     String serialNumber = '';
     String model = '';
-    bool hasLLSerial = false;
+    bool hasSwitchSerial = false;
 
     for (String barcode in barcodes) {
       if (barcode.isEmpty) continue;
@@ -309,33 +301,30 @@ class ScannerValidationService {
         continue;
       }
 
-      // SWITCH-SPECIFIC: Only accept LL serials (14+ chars)
+      // Accept LL or EC2 switch serials
       if (SerialPatterns.isSwitchSerial(value) && serialNumber.isEmpty) {
-        // Validate characters after LL (alphanumeric and dashes)
-        final afterLL = value.substring(2);
-        if (RegExp(r'^[A-Za-z0-9\-]+$').hasMatch(afterLL)) {
-          serialNumber = value.toUpperCase();
-          hasLLSerial = true;
-          LoggerService.debug('Found LL serial: $serialNumber', tag: _tag);
-          continue;
-        }
+        serialNumber = value.toUpperCase();
+        hasSwitchSerial = true;
+        LoggerService.debug('Found Switch serial: $serialNumber', tag: _tag);
+        continue;
       }
 
       // Check for model number (optional)
       if (value.length >= 4 && value.length <= 20 && model.isEmpty) {
-        if (!value.toUpperCase().startsWith('LL') && !_isValidMacAddress(value)) {
+        if (!value.toUpperCase().startsWith('LL') &&
+            !value.toUpperCase().startsWith('EC2') &&
+            !_isValidMacAddress(value)) {
           model = value;
           LoggerService.debug('Found possible model: $model', tag: _tag);
         }
       }
     }
 
-    // STRICT validation: require both MAC and LL serial
-    final isComplete = mac.isNotEmpty && serialNumber.isNotEmpty && hasLLSerial;
+    final isComplete = mac.isNotEmpty && hasSwitchSerial;
 
     if (!isComplete) {
       LoggerService.warning(
-        'Switch incomplete - MAC: ${mac.isNotEmpty}, LL: $hasLLSerial',
+        'Switch incomplete - MAC: ${mac.isNotEmpty}, serial: $hasSwitchSerial',
         tag: _tag,
       );
     }
@@ -348,7 +337,7 @@ class ScannerValidationService {
       detectedType: DeviceTypeFromSerial.switchDevice,
       missingFields: [
         if (mac.isEmpty) 'MAC Address',
-        if (!hasLLSerial) 'Serial Number (LL)',
+        if (!hasSwitchSerial) 'Serial Number',
       ],
     );
   }

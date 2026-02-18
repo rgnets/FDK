@@ -971,7 +971,7 @@ class _ScannerRegistrationPopupState
     if (isExisting) {
       existingDeviceId = scannerState.matchedDeviceId;
     } else if (!_createNewDevice && _selectedDevice != null) {
-      existingDeviceId = int.tryParse(_selectedDevice!.id);
+      existingDeviceId = _parseDeviceId(_selectedDevice!.id);
     }
 
     LoggerService.info(
@@ -1051,6 +1051,15 @@ class _ScannerRegistrationPopupState
         );
       }
     }
+  }
+
+  /// Extract numeric server ID from prefixed device ID (e.g., "ap_123" → 123).
+  int? _parseDeviceId(String id) {
+    final underscoreIndex = id.indexOf('_');
+    if (underscoreIndex >= 0 && underscoreIndex < id.length - 1) {
+      return int.tryParse(id.substring(underscoreIndex + 1));
+    }
+    return int.tryParse(id);
   }
 
   String _getDeviceTypeName(ScanMode mode) {
