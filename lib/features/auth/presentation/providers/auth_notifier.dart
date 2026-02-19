@@ -13,8 +13,6 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
-import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
@@ -622,13 +620,12 @@ class Auth extends _$Auth {
       await localDataSource.clearSession();
       await storage.setAuthenticated(value: true);
 
-      final userModel = UserModel(
-        username: login,
-        siteUrl: 'https://$fqdn',
-        displayName: resolvedSite.isEmpty ? login : resolvedSite,
-        email: null,
+      final repository = ref.read(authRepositoryProvider);
+      final user = await repository.createAndSaveUser(
+        login: login,
+        fqdn: fqdn,
+        siteName: resolvedSite,
       );
-      await localDataSource.saveUser(userModel);
 
       await _recordAuthAttempt(
         fqdn: fqdn,
@@ -638,7 +635,7 @@ class Auth extends _$Auth {
         message: 'action_cable.confirm_subscription',
       );
 
-      return userModel.toEntity();
+      return user;
     } on Exception catch (e) {
       if (!failureHandled) {
         await storage.setAuthenticated(value: false);
@@ -667,16 +664,14 @@ class Auth extends _$Auth {
     String? message,
   }) async {
     try {
-      final storage = ref.read(storageServiceProvider);
-      final attempt = AuthAttempt(
+      final repository = ref.read(authRepositoryProvider);
+      await repository.recordAuthAttempt(
         fqdn: fqdn,
         login: login,
-        siteName: siteName,
         success: success,
+        siteName: siteName,
         message: message,
-        timestamp: DateTime.now().toUtc(),
       );
-      await storage.logAuthAttempt(attempt);
     } on Exception catch (e) {
       _logger.w('AUTH_NOTIFIER: Failed to record auth attempt: $e');
     }

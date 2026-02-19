@@ -6,7 +6,7 @@ import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 import 'package:rgnets_fdk/features/onboarding/presentation/providers/device_onboarding_provider.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';

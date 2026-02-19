@@ -1,8 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
-import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
-import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_counts.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -45,7 +43,7 @@ class AggregateHealthCountsNotifier extends _$AggregateHealthCountsNotifier {
     final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
 
     // Get cached devices with health notice data from in-memory WebSocket cache
-    final devices = cacheIntegration.getAllCachedDeviceModels();
+    final devices = cacheIntegration.getAllCachedDevices();
 
     // Aggregate health counts from all devices
     var totalFatal = 0;
@@ -117,7 +115,7 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
 
     // Get cached devices with health notice data from in-memory WebSocket cache
-    final devices = cacheIntegration.getAllCachedDeviceModels();
+    final devices = cacheIntegration.getAllCachedDevices();
 
     LoggerService.debug(
       'HEALTH: Found ${devices.length} cached devices',
@@ -132,11 +130,11 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       final deviceNotices = device.healthNotices;
       if (deviceNotices != null && deviceNotices.isNotEmpty) {
         devicesWithNotices++;
-        for (final noticeModel in deviceNotices) {
-          notices.add(noticeModel.toEntity().copyWith(
-            deviceId: device.deviceId,
-            deviceName: device.deviceName,
-            deviceType: device.deviceType,
+        for (final notice in deviceNotices) {
+          notices.add(notice.copyWith(
+            deviceId: device.id,
+            deviceName: device.name,
+            deviceType: device.type,
           ));
         }
       }

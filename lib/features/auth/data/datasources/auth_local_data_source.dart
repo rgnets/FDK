@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:rgnets_fdk/core/services/storage_service.dart';
+import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 
 abstract class AuthLocalDataSource {
@@ -23,6 +24,9 @@ abstract class AuthLocalDataSource {
     required DateTime expiresAt,
   });
   Future<void> clearSession();
+
+  /// Logs an authentication attempt for auditing/debugging.
+  Future<void> logAuthAttempt(AuthAttempt attempt);
 }
 
 class AuthLocalDataSourceImpl implements AuthLocalDataSource {
@@ -125,6 +129,15 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
       await storageService.clearSession();
     } on Exception catch (e) {
       throw Exception('Failed to clear session: $e');
+    }
+  }
+
+  @override
+  Future<void> logAuthAttempt(AuthAttempt attempt) async {
+    try {
+      await storageService.logAuthAttempt(attempt);
+    } on Exception catch (e) {
+      throw Exception('Failed to log auth attempt: $e');
     }
   }
 }
