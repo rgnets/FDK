@@ -326,11 +326,15 @@ class DeviceRepositoryImpl implements DeviceRepository {
       _logger.i('DeviceRepositoryImpl: Got ${deviceModels.length} device models from remote data source');
       
       // Cache in background to avoid blocking
-      unawaited(PerformanceMonitorService.instance.trackFuture(
-        'DeviceRepository.cache',
-        () => _cacheDevicesToTypedCaches(deviceModels),
-        metadata: {'count': deviceModels.length},
-      ));
+      unawaited(
+        PerformanceMonitorService.instance.trackFuture(
+          'DeviceRepository.cache',
+          () => _cacheDevicesToTypedCaches(deviceModels),
+          metadata: {'count': deviceModels.length},
+        ).catchError((Object e, StackTrace st) {
+          _logger.e('DeviceRepositoryImpl: Background cache failed: $e');
+        }),
+      );
       
       final devices = deviceModels.map((model) => model.toEntity()).toList();
 

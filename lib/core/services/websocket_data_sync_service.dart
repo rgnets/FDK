@@ -366,7 +366,11 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_apLocalDataSource.cacheDevices(models));
+    unawaited(
+      _apLocalDataSource.cacheDevices(models).catchError((Object e, StackTrace st) {
+        _logger.e('WebSocketDataSync: Failed to cache APs: $e');
+      }),
+    );
     _logger.d('WebSocketDataSync: Cached ${models.length} APs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -385,7 +389,11 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_ontLocalDataSource.cacheDevices(models));
+    unawaited(
+      _ontLocalDataSource.cacheDevices(models).catchError((Object e, StackTrace st) {
+        _logger.e('WebSocketDataSync: Failed to cache ONTs: $e');
+      }),
+    );
     _logger.d('WebSocketDataSync: Cached ${models.length} ONTs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -404,7 +412,11 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_switchLocalDataSource.cacheDevices(models));
+    unawaited(
+      _switchLocalDataSource.cacheDevices(models).catchError((Object e, StackTrace st) {
+        _logger.e('WebSocketDataSync: Failed to cache Switches: $e');
+      }),
+    );
     _logger.d('WebSocketDataSync: Cached ${models.length} Switches');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
@@ -423,7 +435,11 @@ class WebSocketDataSyncService {
       }
     }
     // Always cache to clear stale data when snapshot is empty
-    unawaited(_wlanLocalDataSource.cacheDevices(models));
+    unawaited(
+      _wlanLocalDataSource.cacheDevices(models).catchError((Object e, StackTrace st) {
+        _logger.e('WebSocketDataSync: Failed to cache WLANs: $e');
+      }),
+    );
     _logger.d('WebSocketDataSync: Cached ${models.length} WLANs');
     if (models.isNotEmpty) {
       _emitDevicesCached(models.length);
