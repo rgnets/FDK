@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
+import 'package:rgnets_fdk/features/issues/domain/entities/health_counts.dart';
+import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
 
 part 'device.freezed.dart';
 
@@ -42,6 +44,12 @@ class Device with _$Device {
     /// Signed IDs for images - used for API operations (upload/delete).
     /// When updating images, the server expects signed IDs for existing images.
     List<String>? imageSignedIds,
+
+    /// Health notices associated with this device
+    List<HealthNotice>? healthNotices,
+
+    /// Aggregated health notice counts
+    HealthCounts? hnCounts,
   }) = _Device;
   
   const Device._();

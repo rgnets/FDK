@@ -8,11 +8,11 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
@@ -503,6 +503,14 @@ class WebSocketCacheIntegration {
     }
 
     return allDevices;
+  }
+
+  /// Get all cached devices as domain entities.
+  ///
+  /// This is the preferred method for presentation layer code that needs
+  /// device data, as it returns domain entities instead of data models.
+  List<Device> getAllCachedDevices() {
+    return getAllCachedDeviceModels().map((m) => m.toEntity()).toList();
   }
 
   /// Maps raw device data to a [DeviceModelSealed] model.

@@ -253,6 +253,8 @@ extension DeviceModelSealedX on DeviceModelSealed {
         maxClients: ap.maxClients,
         currentUpload: ap.currentUpload,
         currentDownload: ap.currentDownload,
+        healthNotices: ap.healthNotices?.map((m) => m.toEntity()).toList(),
+        hnCounts: ap.hnCounts?.toEntity(),
       ),
       ont: (ont) => Device(
         id: ont.id,
@@ -272,6 +274,8 @@ extension DeviceModelSealedX on DeviceModelSealed {
         note: ont.note,
         images: ont.images,
         imageSignedIds: ont.imageSignedIds,
+        healthNotices: ont.healthNotices?.map((m) => m.toEntity()).toList(),
+        hnCounts: ont.hnCounts?.toEntity(),
       ),
       switchDevice: (sw) => Device(
         id: sw.id,
@@ -294,6 +298,8 @@ extension DeviceModelSealedX on DeviceModelSealed {
         cpuUsage: sw.cpuUsage,
         memoryUsage: sw.memoryUsage,
         temperature: sw.temperature,
+        healthNotices: sw.healthNotices?.map((m) => m.toEntity()).toList(),
+        hnCounts: sw.hnCounts?.toEntity(),
       ),
       wlan: (wlan) => Device(
         id: wlan.id,
@@ -319,6 +325,8 @@ extension DeviceModelSealedX on DeviceModelSealed {
         packetLoss: wlan.packetLoss,
         latency: wlan.latency,
         restartCount: wlan.restartCount,
+        healthNotices: wlan.healthNotices?.map((m) => m.toEntity()).toList(),
+        hnCounts: wlan.hnCounts?.toEntity(),
       ),
     );
   }
