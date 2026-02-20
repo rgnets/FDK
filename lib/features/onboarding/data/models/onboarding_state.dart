@@ -61,7 +61,7 @@ class OnboardingState with _$OnboardingState {
         deviceId: deviceId,
         deviceType: deviceType,
         currentStage: 1,
-        maxStages: deviceType == 'AP' ? 6 : 5,
+        maxStages: 6,
       );
 
   /// Progress as a fraction (0.0 to 1.0)
