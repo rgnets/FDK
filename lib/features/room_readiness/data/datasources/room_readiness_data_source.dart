@@ -514,8 +514,8 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
   bool _isOnboardingComplete(dynamic status, String? deviceType) {
     final stage = _getOnboardingStage(status);
-    // AP success is stage 6, ONT success is stage 5
-    final successStage = deviceType == 'AP' ? 6 : 5;
+    // Both AP and ONT success is stage 6
+    final successStage = 6;
     return stage >= successStage;
   }
 

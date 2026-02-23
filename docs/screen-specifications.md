@@ -971,7 +971,7 @@ ontLockedPortInfo: Map<String, dynamic> - Lock data cache
 ### Advanced Features
 
 #### Onboarding Visualization
-- **ONTs**: 5-stage progress (0-5)
+- **ONTs**: 6-stage progress (0-6)
 - **APs**: 6-stage progress (0-6)
 - **Color Coding**: Green (complete), Orange (progress), Red (error)
 - **Stage Descriptions**: Human-readable status
