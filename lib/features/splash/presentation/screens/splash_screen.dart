@@ -546,10 +546,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // read yet.  Reading it here is idempotent (Riverpod deduplicates).
         ref.read(webSocketDataSyncListenerProvider);
 
-        // Explicitly trigger initialization so data loads via WebSocket.
-        logger.i('SPLASH_SCREEN: Triggering initialization');
-        ref.read(initializationNotifierProvider.notifier).initialize();
-
+        // Navigate to home — the ref.listen in FDKApp.build() will
+        // trigger initializationNotifierProvider.initialize() when it
+        // detects the auth state change.  We don't call initialize()
+        // directly here because there's a race where the WebSocket may
+        // briefly disconnect during provider graph updates; the init
+        // provider now waits up to 10s for reconnection.
         context.go('/home');
       } else {
         logger.e('SPLASH_SCREEN: Deeplink auth failed');
