@@ -61,8 +61,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
     final isComplete = state.isComplete;
     final isStageOne = state.currentStage == 1;
 
-
-    
     final titleColor = isStageOne ? Colors.orange : Colors.white;
     final stageColor = isComplete ? Colors.green : Colors.orange;
     final titleBgColor = isComplete
@@ -96,7 +94,7 @@ class OnboardingStatusCardContent extends StatelessWidget {
             ),
           ),
 
-        if (!isComplete && isStageOne)
+        if (isStageOne)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
