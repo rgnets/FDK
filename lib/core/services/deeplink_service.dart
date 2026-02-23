@@ -88,6 +88,7 @@ class DeeplinkService {
   DateTime? _lastProcessedTime;
   bool _isProcessing = false;
   bool _hasPendingInitialLink = false;
+  bool _skipNextStreamEvent = false;
 
   /// Whether a deeplink is currently being processed.
   bool get isProcessing => _isProcessing;
@@ -166,6 +167,14 @@ class DeeplinkService {
     LoggerService.info('Setting up deeplink stream listener', tag: _tag);
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
+        if (_skipNextStreamEvent) {
+          _skipNextStreamEvent = false;
+          LoggerService.info(
+            'SKIPPING stream URI (already handled): ${_redactUri(uri)}',
+            tag: _tag,
+          );
+          return;
+        }
         LoggerService.info('Received URI from stream: ${_redactUri(uri)}', tag: _tag);
         await _handleUri(uri);
       },
@@ -367,6 +376,18 @@ class DeeplinkService {
     await _handleUri(uri);
   }
 
+  /// Tell the service that the next deeplink has already been handled
+  /// externally (e.g. by the SplashScreen). Both [getInitialLink] and
+  /// [uriLinkStream] can fire for the same cold-start deeplink; this
+  /// flag causes the stream listener to skip its first delivery.
+  void markNextDeeplinkHandled() {
+    _skipNextStreamEvent = true;
+    LoggerService.info(
+      'Will skip next uriLinkStream event (already handled)',
+      tag: _tag,
+    );
+  }
+
   /// Dispose of resources.
   void dispose() {
     _linkSubscription?.cancel();
@@ -375,5 +396,6 @@ class DeeplinkService {
     _lastProcessedTime = null;
     _isProcessing = false;
     _hasPendingInitialLink = false;
+    _skipNextStreamEvent = false;
   }
 }

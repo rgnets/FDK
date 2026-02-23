@@ -55,6 +55,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (pendingUri != null) {
       AppRouter.pendingDeeplinkUri = null;
       logger.i('SPLASH_SCREEN: Processing router-captured deeplink directly');
+
+      // Tell DeeplinkService to skip the next stream event — app_links fires
+      // both getInitialLink() and uriLinkStream for cold-start deeplinks.
+      ref.read(deeplinkServiceProvider).markNextDeeplinkHandled();
+
       await _handleDeeplinkDirectly(pendingUri, logger);
       return;
     }
