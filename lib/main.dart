@@ -203,6 +203,9 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       onSuccess: () => AppRouter.router.go('/home'),
       onCancel: () => AppRouter.router.go('/auth'),
       onError: () => AppRouter.router.go('/auth'),
+      // Skip getInitialLink() when the router already captured the deeplink —
+      // the SplashScreen handles it directly to avoid a duplicate dialog.
+      skipInitialLink: AppRouter.deeplinkCapturedByRouter,
     );
   }
 

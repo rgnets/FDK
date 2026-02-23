@@ -117,6 +117,8 @@ class DeeplinkService {
   /// [onSuccess] - Called after successful authentication.
   /// [onCancel] - Called if user cancels or declines.
   /// [onError] - Called on any error during processing.
+  /// [skipInitialLink] - If true, skip getInitialLink() check. Use when the
+  ///   router already captured the deeplink and the SplashScreen handles it.
   Future<void> initialize({
     required Future<bool> Function(DeeplinkCredentials credentials)
         confirmCallback,
@@ -125,6 +127,7 @@ class DeeplinkService {
     required VoidCallback onSuccess,
     required VoidCallback onCancel,
     VoidCallback? onError,
+    bool skipInitialLink = false,
   }) async {
     LoggerService.info('Initializing DeeplinkService', tag: _tag);
 
@@ -134,21 +137,29 @@ class DeeplinkService {
     _onCancelCallback = onCancel;
     _onErrorCallback = onError;
 
-    // Check for initial deeplink (cold start)
-    try {
-      final initialUri = await _appLinks.getInitialLink();
-      LoggerService.info('Initial URI: ${_redactUri(initialUri)}', tag: _tag);
-      if (initialUri != null) {
-        _hasPendingInitialLink = true;
-        try {
-          await _handleUri(initialUri);
-        } finally {
-          _hasPendingInitialLink = false;
+    // Check for initial deeplink (cold start), unless the router already
+    // captured it (the SplashScreen handles those directly).
+    if (skipInitialLink) {
+      LoggerService.info(
+        'Skipping initial link check — router captured deeplink',
+        tag: _tag,
+      );
+    } else {
+      try {
+        final initialUri = await _appLinks.getInitialLink();
+        LoggerService.info('Initial URI: ${_redactUri(initialUri)}', tag: _tag);
+        if (initialUri != null) {
+          _hasPendingInitialLink = true;
+          try {
+            await _handleUri(initialUri);
+          } finally {
+            _hasPendingInitialLink = false;
+          }
         }
+      } on Exception catch (e) {
+        _hasPendingInitialLink = false;
+        LoggerService.error('Error getting initial URI: $e', tag: _tag);
       }
-    } on Exception catch (e) {
-      _hasPendingInitialLink = false;
-      LoggerService.error('Error getting initial URI: $e', tag: _tag);
     }
 
     // Listen for deeplinks while app is running

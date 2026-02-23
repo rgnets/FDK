@@ -24,6 +24,11 @@ class AppRouter {
   /// GoRouter's redirect prevents app_links from receiving the URI.
   static Uri? pendingDeeplinkUri;
 
+  /// Set to true when the redirect captures a deeplink. Stays true so
+  /// DeeplinkService.initialize() knows to skip getInitialLink() (which
+  /// would return the same URI and show a duplicate dialog).
+  static bool deeplinkCapturedByRouter = false;
+
   /// Check whether a URI looks like a deeplink (fdk://login?...) that
   /// may have had its scheme/host stripped by GoRouter.
   static bool _isDeeplinkUri(Uri uri) {
@@ -61,6 +66,7 @@ class AppRouter {
     redirect: (context, state) {
       if (_isDeeplinkUri(state.uri)) {
         pendingDeeplinkUri = _reconstructDeeplinkUri(state.uri);
+        deeplinkCapturedByRouter = true;
         return '/splash';
       }
       return null;
