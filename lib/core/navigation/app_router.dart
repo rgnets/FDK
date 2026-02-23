@@ -19,28 +19,48 @@ class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+  /// Deeplink URI captured by the redirect before GoRouter consumed it.
+  /// The SplashScreen checks this and feeds it to DeeplinkService, since
+  /// GoRouter's redirect prevents app_links from receiving the URI.
+  static Uri? pendingDeeplinkUri;
+
+  /// Check whether a URI looks like a deeplink (fdk://login?...) that
+  /// may have had its scheme/host stripped by GoRouter.
+  static bool _isDeeplinkUri(Uri uri) {
+    if (uri.scheme == 'fdk') return true;
+    final path = uri.path;
+    if (path == '/login' || path == 'login') return true;
+    final params = uri.queryParameters;
+    if (params.containsKey('fqdn') || params.containsKey('apiKey') ||
+        params.containsKey('api_key') || params.containsKey('data')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Reconstruct a canonical fdk://login URI from whatever GoRouter gave us.
+  static Uri _reconstructDeeplinkUri(Uri uri) {
+    if (uri.scheme == 'fdk') return uri;
+    return Uri(
+      scheme: 'fdk',
+      host: 'login',
+      queryParameters: uri.queryParameters,
+    );
+  }
+
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: EnvironmentConfig.isDevelopment,
-    // Redirect deeplinks (fdk:// scheme) to splash - the DeeplinkService handles them.
-    // GoRouter strips the custom scheme differently per platform:
-    //   fdk://login?fqdn=...  may arrive as:
-    //     - scheme='fdk', host='login'  (scheme preserved)
-    //     - path='/login'               (scheme stripped, host becomes path)
-    //     - path='/' with ?fqdn=...     (scheme AND host stripped)
+    // Redirect deeplinks to splash. GoRouter strips the custom scheme
+    // differently per platform (fdk://login?... may arrive as /login?...
+    // or just /?fqdn=...), so we check multiple variants.
+    // The original URI is saved in pendingDeeplinkUri because GoRouter
+    // consumes the platform route event, preventing app_links from
+    // independently receiving it.
     redirect: (context, state) {
-      if (state.uri.scheme == 'fdk') {
-        return '/splash';
-      }
-      final path = state.uri.path;
-      if (path == '/login' || path == 'login') {
-        return '/splash';
-      }
-      // Deeplink query params present on root — scheme and host were stripped
-      final params = state.uri.queryParameters;
-      if (params.containsKey('fqdn') || params.containsKey('apiKey') ||
-          params.containsKey('api_key') || params.containsKey('data')) {
+      if (_isDeeplinkUri(state.uri)) {
+        pendingDeeplinkUri = _reconstructDeeplinkUri(state.uri);
         return '/splash';
       }
       return null;
@@ -168,14 +188,7 @@ class AppRouter {
     // Fallback page — shown when GoRouter can't match a route.
     // Most commonly hit when a deeplink URI leaks past the redirect.
     errorBuilder: (context, state) {
-      final params = state.uri.queryParameters;
-      final isDeeplink = state.uri.scheme == 'fdk' ||
-          state.uri.toString().contains('fdk://') ||
-          state.uri.host == 'login' ||
-          params.containsKey('fqdn') ||
-          params.containsKey('apiKey') ||
-          params.containsKey('api_key') ||
-          params.containsKey('data');
+      final isDeeplink = _isDeeplinkUri(state.uri);
 
       return Scaffold(
         body: Center(

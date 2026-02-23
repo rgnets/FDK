@@ -339,6 +339,20 @@ class DeeplinkService {
     }
   }
 
+  /// Process a deeplink URI that was captured by GoRouter's redirect.
+  ///
+  /// GoRouter consumes the platform route event, which can prevent
+  /// [AppLinks] from independently receiving the URI. This method
+  /// allows the caller (e.g. SplashScreen) to feed the captured URI
+  /// back into the normal deeplink flow.
+  Future<void> handleCapturedUri(Uri uri) async {
+    LoggerService.info(
+      'Processing router-captured URI: ${_redactUri(uri)}',
+      tag: _tag,
+    );
+    await _handleUri(uri);
+  }
+
   /// Dispose of resources.
   void dispose() {
     _linkSubscription?.cancel();

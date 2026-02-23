@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/utils/qr_decoder.dart';
@@ -42,6 +43,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (kIsWeb) {
       // Navigation starting - environment info available in logger
+    }
+
+    // Check if the router captured a deeplink URI that app_links missed.
+    // Process it immediately — no splash delay needed for deeplinks.
+    final pendingUri = AppRouter.pendingDeeplinkUri;
+    if (pendingUri != null) {
+      AppRouter.pendingDeeplinkUri = null;
+      logger.i('SPLASH_SCREEN: Router-captured deeplink found, forwarding to DeeplinkService');
+      final deeplinkService = ref.read(deeplinkServiceProvider);
+      // Fire and forget — DeeplinkService will navigate on success/cancel/error
+      unawaited(deeplinkService.handleCapturedUri(pendingUri));
+      return;
     }
 
     // Brief splash display (reduced for faster startup)
