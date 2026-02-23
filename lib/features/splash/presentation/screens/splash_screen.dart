@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,16 +52,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     // Check if the router captured a deeplink URI. GoRouter consumes the
     // platform route event so app_links / DeeplinkService never see it.
     // Handle it directly here to avoid all timing issues.
-    final pendingUri = AppRouter.pendingDeeplinkUri;
-    if (pendingUri != null) {
+    Uri? deeplinkUri = AppRouter.pendingDeeplinkUri;
+    if (deeplinkUri != null) {
       AppRouter.pendingDeeplinkUri = null;
-      logger.i('SPLASH_SCREEN: Processing router-captured deeplink directly');
+      logger.i('SPLASH_SCREEN: Found router-captured deeplink');
+    } else {
+      // On cold boot, GoRouter may NOT see the deeplink (app_links intercepts
+      // the intent separately). Check app_links directly as a fallback.
+      try {
+        final initialLink = await AppLinks().getInitialLink();
+        if (initialLink != null && initialLink.scheme == 'fdk') {
+          deeplinkUri = initialLink;
+          logger.i('SPLASH_SCREEN: Found deeplink from app_links getInitialLink');
+        }
+      } on Exception catch (e) {
+        logger.e('SPLASH_SCREEN: Error checking app_links initial link: $e');
+      }
+    }
 
-      // Tell DeeplinkService to skip the next stream event — app_links fires
-      // both getInitialLink() and uriLinkStream for cold-start deeplinks.
+    if (deeplinkUri != null) {
+      logger.i('SPLASH_SCREEN: Processing deeplink directly');
+
+      // Tell DeeplinkService to skip both getInitialLink() and the next
+      // stream event — we're handling it here.
+      AppRouter.deeplinkCapturedByRouter = true;
       ref.read(deeplinkServiceProvider).markNextDeeplinkHandled();
 
-      await _handleDeeplinkDirectly(pendingUri, logger);
+      await _handleDeeplinkDirectly(deeplinkUri, logger);
       return;
     }
 
