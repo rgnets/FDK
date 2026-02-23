@@ -30,6 +30,13 @@ class AppRouter {
       if (state.uri.scheme == 'fdk') {
         return '/splash';
       }
+      // On some platforms GoRouter strips the custom scheme and only sees
+      // the host as a path segment (e.g. /login). Catch that here so we
+      // don't fall through to the error page.
+      final path = state.uri.path;
+      if (path == '/login' || path == 'login') {
+        return '/splash';
+      }
       return null;
     },
     routes: [
@@ -152,32 +159,51 @@ class AppRouter {
       ),
     ],
     
-    // Error page
+    // Fallback page — shown when GoRouter can't match a route.
+    // Most commonly hit when a deeplink URI leaks past the redirect.
     errorBuilder: (context, state) {
+      final isDeeplink = state.uri.scheme == 'fdk' ||
+          state.uri.toString().contains('fdk://') ||
+          state.uri.host == 'login';
+
       return Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
+              Icon(
+                isDeeplink ? Icons.link : Icons.error_outline,
                 size: 64,
-                color: Colors.red,
+                color: isDeeplink
+                    ? const Color(0xFF4A90E2)
+                    : Colors.red,
               ),
               const SizedBox(height: 16),
               Text(
-                'Page not found',
+                isDeeplink ? 'Deeplink Login' : 'Page not found',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               Text(
-                state.uri.toString(),
-                style: Theme.of(context).textTheme.bodyMedium,
+                isDeeplink
+                    ? 'Processing login request...'
+                    : state.uri.toString(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => context.go('/home'),
-                child: const Text('Go Home'),
+              if (isDeeplink) ...[
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Color(0xFF4A90E2)),
+                ),
+              ],
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/auth'),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Go Back'),
               ),
             ],
           ),
