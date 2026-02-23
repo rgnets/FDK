@@ -95,6 +95,9 @@ class DeeplinkService {
   /// Whether there's a pending initial link (cold start deeplink) being processed.
   bool get hasPendingInitialLink => _hasPendingInitialLink;
 
+  /// Whether [initialize] has been called and callbacks are ready.
+  bool get isInitialized => _confirmCallback != null;
+
   // Callbacks
   Future<bool> Function(DeeplinkCredentials credentials)? _confirmCallback;
   Future<void> Function(DeeplinkCredentials credentials)? _authenticateCallback;

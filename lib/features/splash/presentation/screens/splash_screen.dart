@@ -46,12 +46,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
 
     // Check if the router captured a deeplink URI that app_links missed.
-    // Process it immediately — no splash delay needed for deeplinks.
+    // GoRouter consumes the platform route event, so we must feed the URI
+    // to DeeplinkService manually.
     final pendingUri = AppRouter.pendingDeeplinkUri;
     if (pendingUri != null) {
       AppRouter.pendingDeeplinkUri = null;
-      logger.i('SPLASH_SCREEN: Router-captured deeplink found, forwarding to DeeplinkService');
       final deeplinkService = ref.read(deeplinkServiceProvider);
+
+      // On cold start, _initializeDeeplinkService() in main.dart runs
+      // concurrently and may not have set up callbacks yet. Wait for it.
+      if (!deeplinkService.isInitialized) {
+        logger.d('SPLASH_SCREEN: Waiting for DeeplinkService initialization...');
+        for (var i = 0; i < 50; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          if (!mounted) return;
+          if (deeplinkService.isInitialized) break;
+        }
+        if (!deeplinkService.isInitialized) {
+          logger.e('SPLASH_SCREEN: DeeplinkService init timed out');
+          if (mounted) context.go('/auth');
+          return;
+        }
+      }
+
+      logger.i('SPLASH_SCREEN: Forwarding captured deeplink to DeeplinkService');
       // Fire and forget — DeeplinkService will navigate on success/cancel/error
       unawaited(deeplinkService.handleCapturedUri(pendingUri));
       return;
