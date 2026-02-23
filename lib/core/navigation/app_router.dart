@@ -23,18 +23,24 @@ class AppRouter {
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: EnvironmentConfig.isDevelopment,
-    // Redirect deeplinks (fdk:// scheme) to splash - the DeeplinkService handles them
+    // Redirect deeplinks (fdk:// scheme) to splash - the DeeplinkService handles them.
+    // GoRouter strips the custom scheme differently per platform:
+    //   fdk://login?fqdn=...  may arrive as:
+    //     - scheme='fdk', host='login'  (scheme preserved)
+    //     - path='/login'               (scheme stripped, host becomes path)
+    //     - path='/' with ?fqdn=...     (scheme AND host stripped)
     redirect: (context, state) {
-      // If the URI has a custom scheme (like fdk://), redirect to splash
-      // The DeeplinkService will handle the actual deeplink processing
       if (state.uri.scheme == 'fdk') {
         return '/splash';
       }
-      // On some platforms GoRouter strips the custom scheme and only sees
-      // the host as a path segment (e.g. /login). Catch that here so we
-      // don't fall through to the error page.
       final path = state.uri.path;
       if (path == '/login' || path == 'login') {
+        return '/splash';
+      }
+      // Deeplink query params present on root — scheme and host were stripped
+      final params = state.uri.queryParameters;
+      if (params.containsKey('fqdn') || params.containsKey('apiKey') ||
+          params.containsKey('api_key') || params.containsKey('data')) {
         return '/splash';
       }
       return null;
@@ -162,9 +168,14 @@ class AppRouter {
     // Fallback page — shown when GoRouter can't match a route.
     // Most commonly hit when a deeplink URI leaks past the redirect.
     errorBuilder: (context, state) {
+      final params = state.uri.queryParameters;
       final isDeeplink = state.uri.scheme == 'fdk' ||
           state.uri.toString().contains('fdk://') ||
-          state.uri.host == 'login';
+          state.uri.host == 'login' ||
+          params.containsKey('fqdn') ||
+          params.containsKey('apiKey') ||
+          params.containsKey('api_key') ||
+          params.containsKey('data');
 
       return Scaffold(
         body: Center(
