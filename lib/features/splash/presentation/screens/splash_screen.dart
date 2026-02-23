@@ -11,11 +11,13 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/utils/qr_decoder.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
+import 'package:rgnets_fdk/features/initialization/initialization.dart';
 
 /// Splash screen shown on app launch
 class SplashScreen extends ConsumerStatefulWidget {
@@ -535,7 +537,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ) ?? false;
 
       if (isAuthenticated) {
-        logger.i('SPLASH_SCREEN: Deeplink auth successful, navigating to /home');
+        logger.i('SPLASH_SCREEN: Deeplink auth successful');
+
+        // Ensure the WebSocket data sync listener is active — it wires
+        // cache events to provider invalidation.  On cold boot,
+        // _initializeServices() in FDKApp may still be awaiting the
+        // deeplink-service init, so this provider might not have been
+        // read yet.  Reading it here is idempotent (Riverpod deduplicates).
+        ref.read(webSocketDataSyncListenerProvider);
+
+        // Explicitly trigger initialization so data loads via WebSocket.
+        logger.i('SPLASH_SCREEN: Triggering initialization');
+        ref.read(initializationNotifierProvider.notifier).initialize();
+
         context.go('/home');
       } else {
         logger.e('SPLASH_SCREEN: Deeplink auth failed');
