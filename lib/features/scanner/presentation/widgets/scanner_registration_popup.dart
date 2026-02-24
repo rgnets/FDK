@@ -958,6 +958,17 @@ class _ScannerRegistrationPopupState
   Future<void> _handleRegister() async {
     final scannerState = ref.read(scannerNotifierV2Provider);
 
+    if (scannerState.selectedRoomId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a room before registering'),
+          ),
+        );
+      }
+      return;
+    }
+
     ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(true);
 
     final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;

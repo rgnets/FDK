@@ -36,114 +36,117 @@ void _configureImageCache() {
   cache.maximumSize = maxCount;
 }
 
-void main() async {
+void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await _initializeApp();
+  }, (error, stackTrace) async {
+    await ErrorReporter.report(error, stackTrace: stackTrace);
+  });
+}
 
-    // Lock orientation to portrait mode
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+/// App initialization extracted from main() so the retry path does not
+/// re-enter runZonedGuarded or re-call ensureInitialized.
+Future<void> _initializeApp() async {
+  // Lock orientation to portrait mode
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-    // Set environment from dart-define
-    const envString = String.fromEnvironment(
-      'ENVIRONMENT',
-      defaultValue: 'development',
-    );
-    // Starting app - environment info available via EnvironmentConfig
+  // Set environment from dart-define
+  const envString = String.fromEnvironment(
+    'ENVIRONMENT',
+    defaultValue: 'development',
+  );
 
-    Environment env;
-    switch (envString.toLowerCase()) {
-      case 'staging':
-        env = Environment.staging;
-        break;
-      case 'production':
-        env = Environment.production;
-        break;
-      case 'development':
-      default:
-        env = Environment.development;
-        break;
+  Environment env;
+  switch (envString.toLowerCase()) {
+    case 'staging':
+      env = Environment.staging;
+      break;
+    case 'production':
+      env = Environment.production;
+      break;
+    case 'development':
+    default:
+      env = Environment.development;
+      break;
+  }
+
+  EnvironmentConfig.setEnvironment(env);
+  await AppInitializer.initializeSentry();
+  final enableCrashReporting = EnvironmentConfig.sentryDsn.isNotEmpty;
+  LoggerService.configure(enableCrashReporting: enableCrashReporting);
+  _configureImageCache();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (ErrorReporter.isEnabled) {
+      unawaited(
+        Sentry.captureException(
+          details.exception,
+          stackTrace: details.stack,
+        ),
+      );
     }
+  };
 
-    EnvironmentConfig.setEnvironment(env);
-    await AppInitializer.initializeSentry();
-    final enableCrashReporting = EnvironmentConfig.sentryDsn.isNotEmpty;
-    LoggerService.configure(enableCrashReporting: enableCrashReporting);
-    _configureImageCache();
-    // Environment configuration complete - details available via EnvironmentConfig getters
-
-    FlutterError.onError = (details) {
-      FlutterError.presentError(details);
-      if (ErrorReporter.isEnabled) {
-        unawaited(
-          Sentry.captureException(
-            details.exception,
-            stackTrace: details.stack,
-          ),
-        );
-      }
-    };
-
-    // Initialize providers with error handling
-    late final SharedPreferences sharedPreferences;
-    try {
-      sharedPreferences = await SharedPreferences.getInstance();
-    } on Exception catch (e) {
-      debugPrint('Failed to initialize SharedPreferences: $e');
-      // Show error UI instead of silent exit
-      runApp(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Storage Initialization Failed',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Error: $e', textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => main(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
+  // Initialize providers with error handling
+  late final SharedPreferences sharedPreferences;
+  try {
+    sharedPreferences = await SharedPreferences.getInstance();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize SharedPreferences: $e');
+    // Show error UI instead of silent exit
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Storage Initialization Failed',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Error: $e', textAlign: TextAlign.center),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => _initializeApp(),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      );
-      return;
-    }
-
-    // Initialize onboarding configuration
-    try {
-      await OnboardingConfig.initialize();
-    } on Exception catch (e) {
-      debugPrint('Failed to initialize OnboardingConfig: $e');
-      // Non-fatal - app can continue without onboarding UI
-    }
-
-    runApp(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-        ],
-        child: const FDKApp(),
       ),
     );
-  }, (error, stackTrace) async {
-    await ErrorReporter.report(error, stackTrace: stackTrace);
-  });
+    return;
+  }
+
+  // Initialize onboarding configuration
+  try {
+    await OnboardingConfig.initialize();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize OnboardingConfig: $e');
+    // Non-fatal - app can continue without onboarding UI
+  }
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const FDKApp(),
+    ),
+  );
 }
 
 class FDKApp extends ConsumerStatefulWidget {
@@ -238,7 +241,9 @@ class _FDKAppState extends ConsumerState<FDKApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for auth state changes in build (required by Riverpod)
+    // ref.listen in build() is Riverpod's recommended pattern for ConsumerStatefulWidget.
+    // The framework automatically removes the previous listener on rebuild,
+    // preventing duplicate side-effects.
     ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
       final wasAuthenticated = previous ?? false;
       if (isAuthenticated && !wasAuthenticated) {
