@@ -55,9 +55,16 @@ class Auth extends _$Auth {
     final storage = ref.read(storageServiceProvider);
     await storage.migrateToSecureStorageIfNeeded();
 
+    // Capture the generation at the start of build(). If authenticate() is
+    // called while build() is running, it increments _authGeneration. We
+    // check at the end — if the generation changed, authenticate() has taken
+    // over and we must NOT overwrite its state with our return value.
+    final buildGeneration = _authGeneration;
+
     _logger
       ..i('🔐 AUTH_NOTIFIER: build() called - initializing auth state')
-      ..d('AUTH_NOTIFIER: Provider hash: $hashCode');
+      ..d('AUTH_NOTIFIER: Provider hash: $hashCode')
+      ..d('AUTH_NOTIFIER: build generation: $buildGeneration');
 
     // Listen for API key revocation events from WebSocket
     _setupRevocationListener();
@@ -79,7 +86,7 @@ class Auth extends _$Auth {
       final getCurrentUser = _getCurrentUser;
       final result = await getCurrentUser();
 
-      return await result.fold(
+      final recoveryResult = await result.fold(
         (failure) async {
           _logger
             ..w(
@@ -104,8 +111,30 @@ class Auth extends _$Auth {
           }
         },
       );
+
+      // Generation guard: if authenticate() was called while build() was
+      // running, it has already set the state. Return the current state
+      // value instead of overwriting it with our (now stale) result.
+      if (_authGeneration != buildGeneration) {
+        _logger.i(
+          'AUTH_NOTIFIER: build() generation stale ($buildGeneration → $_authGeneration), '
+          'yielding to authenticate(). Current state: ${state.valueOrNull}',
+        );
+        return state.valueOrNull ?? recoveryResult;
+      }
+
+      return recoveryResult;
     } on Exception catch (e) {
       _logger.e('AUTH_NOTIFIER: Error checking for existing session: $e');
+
+      // Generation guard on error path too
+      if (_authGeneration != buildGeneration) {
+        _logger.i(
+          'AUTH_NOTIFIER: build() generation stale on error path, yielding to authenticate()',
+        );
+        return state.valueOrNull ?? const AuthStatus.unauthenticated();
+      }
+
       return _attemptCredentialRecovery();
     }
   }

@@ -517,6 +517,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       return;
     }
 
+    // Wait for auth provider build() to complete before calling authenticate().
+    // On cold boot with stored credentials, build() performs its own WebSocket
+    // handshake via _attemptCredentialRecovery(). If we call authenticate()
+    // while build() is still in-flight, the two handshakes race — authenticate()
+    // disconnects the socket build() is using, build() fails and eventually
+    // returns unauthenticated, and Riverpod's AsyncNotifier overwrites
+    // authenticate()'s successful state with build()'s unauthenticated return.
+    logger.i('SPLASH_SCREEN: Waiting for auth provider build() to complete...');
+    try {
+      await ref.read(authProvider.future).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () {
+          logger.w('SPLASH_SCREEN: Auth build() timed out, proceeding anyway');
+          return const AuthStatus.unauthenticated();
+        },
+      );
+    } on Exception catch (e) {
+      logger.w('SPLASH_SCREEN: Auth build() error (proceeding): $e');
+    }
+    if (!mounted) return;
+
     // Authenticate
     logger.i('SPLASH_SCREEN: User approved, authenticating...');
     try {
