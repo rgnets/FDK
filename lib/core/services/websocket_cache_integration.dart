@@ -1,32 +1,29 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_room_cache_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/core/utils/image_url_normalizer.dart';
+import 'package:rgnets_fdk/core/services/websocket_speed_test_cache_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
-import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
-import 'package:rgnets_fdk/features/issues/data/models/health_counts_model.dart';
-import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
-/// Callback type for when device data is received via WebSocket.
-typedef DeviceDataCallback = void Function(
-  String resourceType,
-  List<Map<String, dynamic>> devices,
-);
+// Re-export so consumers that import DeviceDataCallback from here keep working.
+export 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart'
+    show DeviceDataCallback;
 
-/// Keeps device and room caches in sync with WebSocket messages.
-/// Similar to ATT-FE-Tool's WebSocketCacheIntegration.
+/// Keeps device, room, and speed test caches in sync with WebSocket messages.
+///
+/// Acts as a thin facade: owns connection lifecycle, message routing, and
+/// snapshot batching, then delegates data operations to domain-specific
+/// sub-services.
 class WebSocketCacheIntegration {
   WebSocketCacheIntegration({
     required WebSocketService webSocketService,
@@ -34,26 +31,44 @@ class WebSocketCacheIntegration {
     Logger? logger,
     DeviceUpdateEventBus? deviceUpdateEventBus,
   })  : _webSocketService = webSocketService,
-        _imageBaseUrl = imageBaseUrl,
-        _logger = logger ?? Logger(),
-        _deviceUpdateEventBus = deviceUpdateEventBus;
+        _logger = logger ?? Logger() {
+    _speedTestCacheService = WebSocketSpeedTestCacheService(
+      webSocketService: webSocketService,
+      logger: _logger,
+      onDataChanged: _bumpLastUpdate,
+    );
+    _deviceCacheService = WebSocketDeviceCacheService(
+      imageBaseUrl: imageBaseUrl,
+      logger: _logger,
+      deviceUpdateEventBus: deviceUpdateEventBus,
+      onDataChanged: _bumpLastUpdate,
+    );
+    _roomCacheService = WebSocketRoomCacheService(
+      onDataChanged: _bumpLastUpdate,
+    );
+  }
 
   final WebSocketService _webSocketService;
-  final String? _imageBaseUrl;
   final Logger _logger;
-  final DeviceUpdateEventBus? _deviceUpdateEventBus;
 
-  /// Device resource types to subscribe to.
-  static const List<String> _deviceResourceTypes = [
-    'access_points',
-    'switch_devices',
-    'media_converters',
-  ];
+  late final WebSocketSpeedTestCacheService _speedTestCacheService;
+  late final WebSocketDeviceCacheService _deviceCacheService;
+  late final WebSocketRoomCacheService _roomCacheService;
 
-  /// Room resource type.
+  // ---------------------------------------------------------------------------
+  // Sub-service accessors
+  // ---------------------------------------------------------------------------
+
+  WebSocketSpeedTestCacheService get speedTestCacheService =>
+      _speedTestCacheService;
+  WebSocketDeviceCacheService get deviceCacheService => _deviceCacheService;
+  WebSocketRoomCacheService get roomCacheService => _roomCacheService;
+
+  // ---------------------------------------------------------------------------
+  // Resource type constants
+  // ---------------------------------------------------------------------------
+
   static const String _roomResourceType = 'pms_rooms';
-
-  /// Speed test resource types.
   static const String _speedTestConfigResourceType = 'speed_tests';
   static const String _speedTestResultResourceType = 'speed_test_results';
 
@@ -67,8 +82,23 @@ class WebSocketCacheIntegration {
     'speed_test_results',
   ];
 
+  // ---------------------------------------------------------------------------
+  // Global state
+  // ---------------------------------------------------------------------------
+
   final ValueNotifier<DateTime?> lastUpdate = ValueNotifier<DateTime?>(null);
-  final ValueNotifier<DateTime?> lastDeviceUpdate = ValueNotifier<DateTime?>(null);
+
+  /// Stream controller for API key revocation events.
+  final _apiKeyRevocationController =
+      StreamController<ApiKeyRevocationEvent>.broadcast();
+
+  /// Stream of API key revocation events.
+  Stream<ApiKeyRevocationEvent> get apiKeyRevocations =>
+      _apiKeyRevocationController.stream;
+
+  // ---------------------------------------------------------------------------
+  // Connection / subscription bookkeeping
+  // ---------------------------------------------------------------------------
 
   StreamSubscription<SocketMessage>? _messageSub;
   StreamSubscription<SocketConnectionState>? _connectionSub;
@@ -86,256 +116,46 @@ class WebSocketCacheIntegration {
   final Map<String, Timer> _snapshotFlushTimers = {};
   static const Duration _snapshotMergeWindow = Duration(seconds: 2);
   static const Duration _snapshotFlushDelay = Duration(milliseconds: 500);
+  static const String _channelIdentifier = '{"channel":"RxgChannel"}';
 
-  /// Callbacks for when device data is received.
-  final List<DeviceDataCallback> _deviceDataCallbacks = [];
+  // ---------------------------------------------------------------------------
+  // Delegated public API: Speed Tests
+  // ---------------------------------------------------------------------------
 
-  /// Cached device data by resource type.
-  final Map<String, List<Map<String, dynamic>>> _deviceCache = {};
+  ValueNotifier<DateTime?> get lastSpeedTestConfigUpdate =>
+      _speedTestCacheService.lastSpeedTestConfigUpdate;
+  ValueNotifier<DateTime?> get lastSpeedTestResultUpdate =>
+      _speedTestCacheService.lastSpeedTestResultUpdate;
 
-  /// Cached room data.
-  final List<Map<String, dynamic>> _roomCache = [];
+  bool get hasSpeedTestConfigCache =>
+      _speedTestCacheService.hasSpeedTestConfigCache;
+  bool get hasSpeedTestResultCache =>
+      _speedTestCacheService.hasSpeedTestResultCache;
 
-  /// Callbacks for when room data is received.
-  final List<void Function(List<Map<String, dynamic>>)> _roomDataCallbacks = [];
+  List<SpeedTestConfig> getCachedSpeedTestConfigs() =>
+      _speedTestCacheService.getCachedSpeedTestConfigs();
+  SpeedTestConfig? getAdhocSpeedTestConfig() =>
+      _speedTestCacheService.getAdhocSpeedTestConfig();
+  SpeedTestResult? getMostRecentAdhocSpeedTestResult() =>
+      _speedTestCacheService.getMostRecentAdhocSpeedTestResult();
+  SpeedTestConfig? getSpeedTestConfigById(int? id) =>
+      _speedTestCacheService.getSpeedTestConfigById(id);
+  List<SpeedTestResult> getCachedSpeedTestResults() =>
+      _speedTestCacheService.getCachedSpeedTestResults();
+  List<SpeedTestResult> getSpeedTestResultsForDevice(String deviceId,
+          {String? deviceType}) =>
+      _speedTestCacheService.getSpeedTestResultsForDevice(deviceId,
+          deviceType: deviceType);
+  List<SpeedTestResult> getSpeedTestResultsForAccessPointId(
+          int accessPointId) =>
+      _speedTestCacheService
+          .getSpeedTestResultsForAccessPointId(accessPointId);
+  List<SpeedTestResult> getSpeedTestResultsForConfigId(int speedTestId) =>
+      _speedTestCacheService.getSpeedTestResultsForConfigId(speedTestId);
 
-  /// Cached speed test config data.
-  final List<Map<String, dynamic>> _speedTestConfigCache = [];
+  void updateSpeedTestResultInCache(Map<String, dynamic> data) =>
+      _speedTestCacheService.updateSpeedTestResultInCache(data);
 
-  /// Cached speed test result data.
-  final List<Map<String, dynamic>> _speedTestResultCache = [];
-
-  /// Update notifier for speed test configs.
-  final ValueNotifier<DateTime?> lastSpeedTestConfigUpdate =
-      ValueNotifier<DateTime?>(null);
-
-  /// Update notifier for speed test results.
-  final ValueNotifier<DateTime?> lastSpeedTestResultUpdate =
-      ValueNotifier<DateTime?>(null);
-
-  /// Callbacks for when speed test config data is received.
-  final List<void Function(List<SpeedTestConfig>)> _speedTestConfigCallbacks =
-      [];
-
-  /// Callbacks for when speed test result data is received.
-  final List<void Function(List<SpeedTestResult>)> _speedTestResultCallbacks =
-      [];
-
-  /// Stream controller for API key revocation events.
-  final _apiKeyRevocationController =
-      StreamController<ApiKeyRevocationEvent>.broadcast();
-
-  /// Stream of API key revocation events.
-  /// Listen to this stream to be notified when the API key has been revoked.
-  Stream<ApiKeyRevocationEvent> get apiKeyRevocations =>
-      _apiKeyRevocationController.stream;
-
-  /// Register a callback for device data updates.
-  void onDeviceData(DeviceDataCallback callback) {
-    _deviceDataCallbacks.add(callback);
-  }
-
-  /// Remove a callback for device data updates.
-  void removeDeviceDataCallback(DeviceDataCallback callback) {
-    _deviceDataCallbacks.remove(callback);
-  }
-
-  /// Register a callback for room data updates.
-  void onRoomData(void Function(List<Map<String, dynamic>>) callback) {
-    _roomDataCallbacks.add(callback);
-  }
-
-  /// Remove a callback for room data updates.
-  void removeRoomDataCallback(void Function(List<Map<String, dynamic>>) callback) {
-    _roomDataCallbacks.remove(callback);
-  }
-
-  /// Register a callback for speed test config data updates.
-  void onSpeedTestConfigData(void Function(List<SpeedTestConfig>) callback) {
-    _speedTestConfigCallbacks.add(callback);
-  }
-
-  /// Remove a callback for speed test config data updates.
-  void removeSpeedTestConfigCallback(void Function(List<SpeedTestConfig>) callback) {
-    _speedTestConfigCallbacks.remove(callback);
-  }
-
-  /// Register a callback for speed test result data updates.
-  void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) {
-    _speedTestResultCallbacks.add(callback);
-  }
-
-  /// Remove a callback for speed test result data updates.
-  void removeSpeedTestResultCallback(void Function(List<SpeedTestResult>) callback) {
-    _speedTestResultCallbacks.remove(callback);
-  }
-
-  /// Get cached rooms.
-  List<Map<String, dynamic>> getCachedRooms() {
-    return List.unmodifiable(_roomCache);
-  }
-
-  /// Check if we have cached room data.
-  bool get hasRoomCache => _roomCache.isNotEmpty;
-
-  /// Check if we have cached device data.
-  bool get hasDeviceCache => _deviceCache.values.any((list) => list.isNotEmpty);
-
-  /// Check if we have cached speed test config data.
-  bool get hasSpeedTestConfigCache => _speedTestConfigCache.isNotEmpty;
-
-  /// Check if we have cached speed test result data.
-  bool get hasSpeedTestResultCache => _speedTestResultCache.isNotEmpty;
-
-  /// Get all cached speed test configs.
-  List<SpeedTestConfig> getCachedSpeedTestConfigs() {
-    return _speedTestConfigCache
-        .map((json) {
-          try {
-            return SpeedTestConfig.fromJson(json);
-          } catch (e) {
-            _logger.w('Failed to parse speed test config: $e');
-            return null;
-          }
-        })
-        .whereType<SpeedTestConfig>()
-        .toList();
-  }
-
-  /// Get adhoc speed test config (name contains 'adhoc' or first available).
-  SpeedTestConfig? getAdhocSpeedTestConfig() {
-    final configs = getCachedSpeedTestConfigs();
-    if (configs.isEmpty) return null;
-
-    // Try to find one with 'adhoc' in the name
-    final adhocConfig = configs.firstWhereOrNull(
-      (SpeedTestConfig c) => c.name?.toLowerCase().contains('adhoc') ?? false,
-    );
-    if (adhocConfig != null) return adhocConfig;
-
-    // Fall back to first config
-    return configs.first;
-  }
-
-  /// Get the most recent adhoc speed test result.
-  /// Adhoc results are those that:
-  /// 1. Match the adhoc speed test config's ID, OR
-  /// 2. Have no device association (not tested via AP or ONT)
-  SpeedTestResult? getMostRecentAdhocSpeedTestResult() {
-    final results = getCachedSpeedTestResults();
-    if (results.isEmpty) return null;
-
-    final adhocConfig = getAdhocSpeedTestConfig();
-    final adhocConfigId = adhocConfig?.id;
-
-    // Filter for adhoc results
-    final adhocResults = results.where((r) {
-      // Match by adhoc config ID
-      if (adhocConfigId != null && r.speedTestId == adhocConfigId) {
-        return true;
-      }
-      // Or results with no device association (general adhoc tests)
-      if (r.testedViaAccessPointId == null &&
-          r.testedViaMediaConverterId == null) {
-        return true;
-      }
-      return false;
-    }).toList();
-
-    if (adhocResults.isEmpty) return null;
-
-    // Sort by timestamp (newest first)
-    adhocResults.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-
-    return adhocResults.first;
-  }
-
-  /// Get speed test config by ID.
-  SpeedTestConfig? getSpeedTestConfigById(int? id) {
-    if (id == null) return null;
-    final match = _speedTestConfigCache.firstWhereOrNull(
-      (Map<String, dynamic> json) => json['id'] == id,
-    );
-    return match != null ? SpeedTestConfig.fromJson(match) : null;
-  }
-
-  /// Get all cached speed test results.
-  List<SpeedTestResult> getCachedSpeedTestResults() {
-    return _speedTestResultCache
-        .map((json) {
-          try {
-            return SpeedTestResult.fromJsonWithValidation(json);
-          } catch (e) {
-            _logger.w('Failed to parse speed test result: $e');
-            return null;
-          }
-        })
-        .whereType<SpeedTestResult>()
-        .toList();
-  }
-
-  /// Get speed test results filtered by device ID.
-  List<SpeedTestResult> getSpeedTestResultsForDevice(
-    String deviceId, {
-    String? deviceType,
-  }) {
-    final results = getCachedSpeedTestResults();
-    // Parse numeric ID from prefixed ID (e.g., "ap_123" -> 123)
-    final numericId = int.tryParse(deviceId.split('_').last);
-    if (numericId == null) return [];
-
-    if (deviceType == DeviceTypes.accessPoint || deviceId.startsWith('ap_')) {
-      return results
-          .where((r) => r.testedViaAccessPointId == numericId)
-          .toList();
-    } else if (deviceType == DeviceTypes.ont || deviceId.startsWith('ont_')) {
-      return results
-          .where((r) => r.testedViaMediaConverterId == numericId)
-          .toList();
-    }
-    return [];
-  }
-
-  /// Get speed test results filtered by access point ID.
-  List<SpeedTestResult> getSpeedTestResultsForAccessPointId(int accessPointId) {
-    return getCachedSpeedTestResults()
-        .where((r) => r.testedViaAccessPointId == accessPointId)
-        .toList();
-  }
-
-  /// Get speed test results filtered by speed test config ID.
-  List<SpeedTestResult> getSpeedTestResultsForConfigId(int speedTestId) {
-    return getCachedSpeedTestResults()
-        .where((r) => r.speedTestId == speedTestId)
-        .toList();
-  }
-
-  /// Update a single speed test result in the cache.
-  /// Used when we receive a direct response from an update request
-  /// to ensure cache consistency without waiting for broadcast.
-  /// Follows the same pattern as device cache updates.
-  void updateSpeedTestResultInCache(Map<String, dynamic> data) {
-    final id = data['id'];
-    if (id == null) {
-      _logger.w('updateSpeedTestResultInCache: Missing id in data');
-      return;
-    }
-
-    final index = _speedTestResultCache.indexWhere((item) => item['id'] == id);
-    if (index >= 0) {
-      _speedTestResultCache[index] = data;
-    } else {
-      _speedTestResultCache.add(data);
-    }
-    _bumpLastUpdate();
-    _bumpSpeedTestResultUpdate();
-    _notifySpeedTestResultCallbacks();
-
-    _logger.i('updateSpeedTestResultInCache: Updated result $id in cache');
-  }
-
-  /// Create an adhoc speed test result via WebSocket.
-  /// Returns true if the creation was successful.
   Future<bool> createAdhocSpeedTestResult({
     required double downloadSpeed,
     required double uploadSpeed,
@@ -349,55 +169,22 @@ class WebSocketCacheIntegration {
     DateTime? completedAt,
     int? pmsRoomId,
     String? roomType,
-  }) async {
-    if (!_webSocketService.isConnected) {
-      _logger.w('Cannot create speed test result: WebSocket not connected');
-      return false;
-    }
-
-    try {
-      // Get adhoc config to associate the result with
-      final adhocConfig = getAdhocSpeedTestConfig();
-
-      final params = <String, dynamic>{
-        'download_mbps': downloadSpeed,
-        'upload_mbps': uploadSpeed,
-        'rtt': latency,
-        'passed': passed,
-        'test_type': 'iperf3',
-        'initiated_at': (initiatedAt ?? DateTime.now()).toIso8601String(),
-        'completed_at': (completedAt ?? DateTime.now()).toIso8601String(),
-        if (adhocConfig?.id != null) 'speed_test_id': adhocConfig!.id,
-        if (source != null) 'source': source,
-        if (destination != null) 'destination': destination,
-        if (port != null) 'port': port,
-        if (protocol != null) 'iperf_protocol': protocol,
-        if (pmsRoomId != null) 'pms_room_id': pmsRoomId,
-        if (roomType != null) 'room_type': roomType,
-      };
-
-      final response = await _webSocketService.requestActionCable(
-        action: 'create_resource',
-        resourceType: _speedTestResultResourceType,
-        additionalData: {'params': params},
-        timeout: const Duration(seconds: 15),
+  }) =>
+      _speedTestCacheService.createAdhocSpeedTestResult(
+        downloadSpeed: downloadSpeed,
+        uploadSpeed: uploadSpeed,
+        latency: latency,
+        source: source,
+        destination: destination,
+        port: port,
+        protocol: protocol,
+        passed: passed,
+        initiatedAt: initiatedAt,
+        completedAt: completedAt,
+        pmsRoomId: pmsRoomId,
+        roomType: roomType,
       );
 
-      // Add to local cache on success
-      final data = response.payload['data'];
-      if (data is Map<String, dynamic>) {
-        _applyUpsert(_speedTestResultResourceType, data);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _logger.e('Failed to create adhoc speed test result: $e');
-      return false;
-    }
-  }
-
-  /// Update an existing device speed test result via WebSocket.
-  /// Returns true if the update was successful.
   Future<bool> updateDeviceSpeedTestResult({
     required String deviceId,
     required double downloadSpeed,
@@ -412,305 +199,105 @@ class WebSocketCacheIntegration {
     DateTime? completedAt,
     int? pmsRoomId,
     String? roomType,
-  }) async {
-    if (!_webSocketService.isConnected) {
-      _logger.w('Cannot update speed test result: WebSocket not connected');
-      return false;
-    }
-
-    try {
-      // Parse numeric ID from prefixed device ID (e.g., "ap_123" -> 123)
-      final numericId = int.tryParse(deviceId.split('_').last);
-      if (numericId == null) {
-        _logger.w('Cannot update speed test result: Invalid device ID format');
-        return false;
-      }
-
-      // Look up existing results for this device to get the speed_test_id
-      final existingResults = getSpeedTestResultsForDevice(deviceId);
-      final speedTestId = existingResults.isNotEmpty
-          ? existingResults.first.speedTestId // Results are sorted newest first
-          : getAdhocSpeedTestConfig()?.id; // Fall back to adhoc config
-
-      // Determine which ID field to use based on device type prefix
-      final params = <String, dynamic>{
-        'download_mbps': downloadSpeed,
-        'upload_mbps': uploadSpeed,
-        'rtt': latency,
-        'passed': passed,
-        'test_type': 'iperf3',
-        'initiated_at': (initiatedAt ?? DateTime.now()).toIso8601String(),
-        'completed_at': (completedAt ?? DateTime.now()).toIso8601String(),
-        if (speedTestId != null) 'speed_test_id': speedTestId,
-        if (source != null) 'source': source,
-        if (destination != null) 'destination': destination,
-        if (port != null) 'port': port,
-        if (protocol != null) 'iperf_protocol': protocol,
-        if (pmsRoomId != null) 'pms_room_id': pmsRoomId,
-        if (roomType != null) 'room_type': roomType,
-      };
-
-      // Set the appropriate device association field based on prefix
-      if (deviceId.startsWith('ap_')) {
-        params['tested_via_access_point_id'] = numericId;
-      } else if (deviceId.startsWith('ont_')) {
-        params['tested_via_media_converter_id'] = numericId;
-      }
-
-      final response = await _webSocketService.requestActionCable(
-        action: 'create_resource',
-        resourceType: _speedTestResultResourceType,
-        additionalData: {'params': params},
-        timeout: const Duration(seconds: 15),
+  }) =>
+      _speedTestCacheService.updateDeviceSpeedTestResult(
+        deviceId: deviceId,
+        downloadSpeed: downloadSpeed,
+        uploadSpeed: uploadSpeed,
+        latency: latency,
+        source: source,
+        destination: destination,
+        port: port,
+        protocol: protocol,
+        passed: passed,
+        initiatedAt: initiatedAt,
+        completedAt: completedAt,
+        pmsRoomId: pmsRoomId,
+        roomType: roomType,
       );
 
-      // Add to local cache on success
-      final data = response.payload['data'];
-      if (data is Map<String, dynamic>) {
-        _applyUpsert(_speedTestResultResourceType, data);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _logger.e('Failed to update device speed test result: $e');
-      return false;
-    }
-  }
+  void onSpeedTestConfigData(void Function(List<SpeedTestConfig>) callback) =>
+      _speedTestCacheService.onSpeedTestConfigData(callback);
+  void removeSpeedTestConfigCallback(
+          void Function(List<SpeedTestConfig>) callback) =>
+      _speedTestCacheService.removeSpeedTestConfigCallback(callback);
+  void onSpeedTestResultData(void Function(List<SpeedTestResult>) callback) =>
+      _speedTestCacheService.onSpeedTestResultData(callback);
+  void removeSpeedTestResultCallback(
+          void Function(List<SpeedTestResult>) callback) =>
+      _speedTestCacheService.removeSpeedTestResultCallback(callback);
 
-  /// Get cached devices by resource type.
-  List<Map<String, dynamic>>? getCachedDevices(String resourceType) {
-    return _deviceCache[resourceType];
-  }
+  // ---------------------------------------------------------------------------
+  // Delegated public API: Devices
+  // ---------------------------------------------------------------------------
 
-  /// Get all cached devices as DeviceModelSealed.
-  List<DeviceModelSealed> getAllCachedDeviceModels() {
-    final allDevices = <DeviceModelSealed>[];
+  ValueNotifier<DateTime?> get lastDeviceUpdate =>
+      _deviceCacheService.lastDeviceUpdate;
 
-    for (final entry in _deviceCache.entries) {
-      final resourceType = entry.key;
-      final devices = entry.value;
+  bool get hasDeviceCache => _deviceCacheService.hasDeviceCache;
 
-      for (final deviceMap in devices) {
-        try {
-          final model = mapToDeviceModel(resourceType, deviceMap);
-          if (model != null) {
-            allDevices.add(model);
-          }
-        } catch (e) {
-          _logger.w('Failed to map device: $e');
-        }
-      }
-    }
-
-    return allDevices;
-  }
-
-  /// Maps raw device data to a [DeviceModelSealed] model.
-  ///
-  /// Public so that [DeviceWebSocketDataSource] can use this single mapper
-  /// instead of maintaining a separate (incomplete) copy.
+  List<Map<String, dynamic>>? getCachedDevices(String resourceType) =>
+      _deviceCacheService.getCachedDevices(resourceType);
+  List<DeviceModelSealed> getAllCachedDeviceModels() =>
+      _deviceCacheService.getAllCachedDeviceModels();
   DeviceModelSealed? mapToDeviceModel(
-    String resourceType,
-    Map<String, dynamic> deviceMap,
-  ) {
-    try {
-      // Extract health notice counts if present
-      final hnCounts = _extractHealthCounts(deviceMap);
-      final healthNotices = _extractHealthNotices(deviceMap);
+          String resourceType, Map<String, dynamic> deviceMap) =>
+      _deviceCacheService.mapToDeviceModel(resourceType, deviceMap);
 
-      switch (resourceType) {
-        case 'access_points':
-          final apImageData = _extractImagesData(deviceMap);
-          return DeviceModelSealed.ap(
-            id: 'ap_${deviceMap['id']}',
-            name: deviceMap['name']?.toString() ?? 'AP-${deviceMap['id']}',
-            status: _determineStatus(deviceMap),
-            pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['mac']?.toString(),
-            ipAddress: deviceMap['ip']?.toString(),
-            model: deviceMap['model']?.toString(),
-            serialNumber: deviceMap['serial_number']?.toString(),
-            note: deviceMap['note']?.toString(),
-            images: apImageData?.urls,
-            imageSignedIds: apImageData?.signedIds,
-            hnCounts: hnCounts,
-            healthNotices: healthNotices,
-            metadata: deviceMap,
-            onboardingStatus: deviceMap['ap_onboarding_status'] != null
-                ? OnboardingStatusPayload.fromJson(
-                    deviceMap['ap_onboarding_status'] as Map<String, dynamic>,
-                  )
-                : null,
-          );
+  void onDeviceData(DeviceDataCallback callback) =>
+      _deviceCacheService.onDeviceData(callback);
+  void removeDeviceDataCallback(DeviceDataCallback callback) =>
+      _deviceCacheService.removeDeviceDataCallback(callback);
 
-        case 'media_converters':
-          final mcImageData = _extractImagesData(deviceMap);
-          return DeviceModelSealed.ont(
-            id: 'ont_${deviceMap['id']}',
-            name: deviceMap['name']?.toString() ?? 'ONT-${deviceMap['id']}',
-            status: _determineStatus(deviceMap),
-            pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['mac']?.toString(),
-            ipAddress: deviceMap['ip']?.toString(),
-            model: deviceMap['model']?.toString(),
-            serialNumber: deviceMap['serial_number']?.toString(),
-            note: deviceMap['note']?.toString(),
-            images: mcImageData?.urls,
-            imageSignedIds: mcImageData?.signedIds,
-            hnCounts: hnCounts,
-            healthNotices: healthNotices,
-            metadata: deviceMap,
-            onboardingStatus: deviceMap['ont_onboarding_status'] != null
-                ? OnboardingStatusPayload.fromJson(
-                    deviceMap['ont_onboarding_status'] as Map<String, dynamic>,
-                  )
-                : null,
-          );
+  void updateDeviceFromRest(
+          String resourceType, Map<String, dynamic> deviceData) =>
+      _deviceCacheService.updateDeviceFromRest(resourceType, deviceData);
 
-        case 'switch_devices':
-          final swImageData = _extractImagesData(deviceMap);
-          return DeviceModelSealed.switchDevice(
-            id: 'sw_${deviceMap['id']}',
-            name: deviceMap['name']?.toString() ??
-                deviceMap['nickname']?.toString() ??
-                'Switch-${deviceMap['id']}',
-            status: _determineStatus(deviceMap),
-            pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['scratch']?.toString(),
-            ipAddress: deviceMap['host']?.toString(),
-            host: deviceMap['host']?.toString(),
-            model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
-            serialNumber: deviceMap['serial_number']?.toString(),
-            note: deviceMap['note']?.toString(),
-            images: swImageData?.urls,
-            imageSignedIds: swImageData?.signedIds,
-            hnCounts: hnCounts,
-            healthNotices: healthNotices,
-            metadata: deviceMap,
-          );
+  // ---------------------------------------------------------------------------
+  // Delegated public API: Rooms
+  // ---------------------------------------------------------------------------
 
-        case 'wlan_devices':
-          final wlanImageData = _extractImagesData(deviceMap);
-          return DeviceModelSealed.wlan(
-            id: 'wlan_${deviceMap['id']}',
-            name: deviceMap['name']?.toString() ?? 'WLAN-${deviceMap['id']}',
-            status: _determineStatus(deviceMap),
-            macAddress: deviceMap['mac']?.toString(),
-            ipAddress: deviceMap['host']?.toString() ?? deviceMap['ip']?.toString(),
-            model: deviceMap['model']?.toString() ?? deviceMap['device']?.toString(),
-            serialNumber: deviceMap['serial_number']?.toString(),
-            note: deviceMap['note']?.toString(),
-            images: wlanImageData?.urls,
-            imageSignedIds: wlanImageData?.signedIds,
-            hnCounts: hnCounts,
-            healthNotices: healthNotices,
-            metadata: deviceMap,
-          );
+  bool get hasRoomCache => _roomCacheService.hasRoomCache;
+  List<Map<String, dynamic>> getCachedRooms() =>
+      _roomCacheService.getCachedRooms();
 
-        default:
-          return null;
-      }
-    } catch (e) {
-      _logger.e('Error mapping device: $e');
-      return null;
-    }
-  }
+  void onRoomData(void Function(List<Map<String, dynamic>>) callback) =>
+      _roomCacheService.onRoomData(callback);
+  void removeRoomDataCallback(
+          void Function(List<Map<String, dynamic>>) callback) =>
+      _roomCacheService.removeRoomDataCallback(callback);
 
-  String _determineStatus(Map<String, dynamic> device) {
-    final onlineFlag = device['online'] as bool?;
-    if (onlineFlag != null) {
-      return onlineFlag ? 'online' : 'offline';
-    }
-    return 'unknown';
-  }
-
-  int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
-    // Primary: direct pms_room_id column (what backend actually sends)
-    final directId = deviceMap['pms_room_id'];
-    if (directId is int) return directId;
-    if (directId is String) {
-      final parsed = int.tryParse(directId);
-      if (parsed != null) return parsed;
-    }
-    // Fallback: nested pms_room object (legacy/future compatibility)
-    if (deviceMap['pms_room'] != null && deviceMap['pms_room'] is Map) {
-      final pmsRoom = deviceMap['pms_room'] as Map<String, dynamic>;
-      final idValue = pmsRoom['id'];
-      if (idValue is int) {
-        return idValue;
-      }
-      if (idValue is String) {
-        return int.tryParse(idValue);
-      }
-    }
-
-    return null;
-  }
-
-  /// Extract images with both URLs and signed IDs.
-  ImageExtraction? _extractImagesData(Map<String, dynamic> deviceMap) {
-    final imagesValue = deviceMap['images'] ?? deviceMap['pictures'];
-    return extractImagesWithSignedIds(imagesValue, baseUrl: _imageBaseUrl);
-  }
-
-  HealthCountsModel? _extractHealthCounts(Map<String, dynamic> deviceMap) {
-    final hnCountsData = deviceMap['hn_counts'];
-    if (hnCountsData == null) {
-      return null;
-    }
-    _logger.i('WebSocketCacheIntegration: Found hn_counts for device ${deviceMap['name'] ?? deviceMap['id']}: $hnCountsData');
-    if (hnCountsData is Map<String, dynamic>) {
-      try {
-        return HealthCountsModel.fromJson(hnCountsData);
-      } catch (e) {
-        _logger.w('Failed to parse hn_counts: $e');
-        return null;
-      }
-    }
-    return null;
-  }
-
-  List<HealthNoticeModel>? _extractHealthNotices(Map<String, dynamic> deviceMap) {
-    final healthNoticesData = deviceMap['health_notices'];
-    if (healthNoticesData == null) {
-      return null;
-    }
-    if (healthNoticesData is List) {
-      try {
-        return healthNoticesData
-            .whereType<Map<String, dynamic>>()
-            .map(HealthNoticeModel.fromJson)
-            .toList();
-      } catch (e) {
-        _logger.w('Failed to parse health_notices: $e');
-        return null;
-      }
-    }
-    return null;
-  }
+  // ---------------------------------------------------------------------------
+  // Initialization & connection lifecycle
+  // ---------------------------------------------------------------------------
 
   void initialize() {
     if (_initialized) return;
     _initialized = true;
 
     _logger.i('WebSocketCacheIntegration: Initializing');
-    _logger.i('WebSocketCacheIntegration: WebSocket connected: ${_webSocketService.isConnected}');
+    _logger.i(
+        'WebSocketCacheIntegration: WebSocket connected: ${_webSocketService.isConnected}');
 
     _messageSub = _webSocketService.messages.listen((message) {
-      _logger.d('WebSocketCacheIntegration: Message received - type: ${message.type}');
+      _logger.d(
+          'WebSocketCacheIntegration: Message received - type: ${message.type}');
       _handleMessage(message);
     });
 
     _connectionSub = _webSocketService.connectionState.listen((state) {
-      _logger.i('WebSocketCacheIntegration: Connection state changed: $state');
+      _logger.i(
+          'WebSocketCacheIntegration: Connection state changed: $state');
       _handleConnection(state);
     });
 
     if (_webSocketService.isConnected) {
-      _logger.i('WebSocketCacheIntegration: Already connected, subscribing to resources');
+      _logger.i(
+          'WebSocketCacheIntegration: Already connected, subscribing to resources');
       _subscribeToChannel();
     } else {
-      _logger.i('WebSocketCacheIntegration: Waiting for WebSocket connection...');
+      _logger.i(
+          'WebSocketCacheIntegration: Waiting for WebSocket connection...');
     }
   }
 
@@ -718,7 +305,8 @@ class WebSocketCacheIntegration {
     _logger.i('WebSocketCacheIntegration: handleConnection - state: $state');
 
     if (state == SocketConnectionState.connected) {
-      _logger.i('WebSocketCacheIntegration: Connected! Subscribing to resources...');
+      _logger.i(
+          'WebSocketCacheIntegration: Connected! Subscribing to resources...');
       _needsSnapshot = true;
       _channelSubscribeSent = false;
       _subscribeToChannel();
@@ -743,26 +331,29 @@ class WebSocketCacheIntegration {
     }
   }
 
-  static const String _channelIdentifier = '{"channel":"RxgChannel"}';
+  // ---------------------------------------------------------------------------
+  // Channel subscription
+  // ---------------------------------------------------------------------------
 
   void _subscribeToChannel() {
     if (!_webSocketService.isConnected) {
-      _logger.w('WebSocketCacheIntegration: Cannot subscribe, WebSocket not connected');
+      _logger.w(
+          'WebSocketCacheIntegration: Cannot subscribe, WebSocket not connected');
       return;
     }
     if (!_channelConfirmed) {
       _ensureChannelSubscription();
-      _logger.i('WebSocketCacheIntegration: Waiting for channel confirmation before subscribing');
+      _logger.i(
+          'WebSocketCacheIntegration: Waiting for channel confirmation before subscribing');
       return;
     }
     if (_resourcesSubscribed) {
       _logger.d('WebSocketCacheIntegration: Resources already subscribed');
       return;
     }
-    _logger.i('WebSocketCacheIntegration: Channel already subscribed via auth, subscribing to resources');
+    _logger.i(
+        'WebSocketCacheIntegration: Channel already subscribed via auth, subscribing to resources');
 
-    // The channel is already subscribed during auth.
-    // Subscribe to resources using ActionCable message format.
     var allSubscribed = true;
     for (final resource in _resourceTypes) {
       final subscribed = _subscribeToResource(resource);
@@ -772,18 +363,18 @@ class WebSocketCacheIntegration {
     }
     _resourcesSubscribed = allSubscribed;
 
-    // Request snapshots after a short delay to allow subscription confirmation
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (_needsSnapshot && _webSocketService.isConnected && _channelConfirmed) {
+      if (_needsSnapshot &&
+          _webSocketService.isConnected &&
+          _channelConfirmed) {
         _requestFullSnapshots();
       }
     });
   }
 
   bool _subscribeToResource(String resourceType) {
-    _logger.d('WebSocketCacheIntegration: Subscribing to resource: $resourceType');
-
-    // Send ActionCable formatted message
+    _logger.d(
+        'WebSocketCacheIntegration: Subscribing to resource: $resourceType');
     return _sendActionCableMessage({
       'action': 'subscribe_to_resource',
       'resource_type': resourceType,
@@ -795,10 +386,12 @@ class WebSocketCacheIntegration {
       return _channelConfirmed;
     }
     if (!_webSocketService.isConnected) {
-      _logger.w('WebSocketCacheIntegration: Cannot subscribe to channel, WebSocket not connected');
+      _logger.w(
+          'WebSocketCacheIntegration: Cannot subscribe to channel, WebSocket not connected');
       return false;
     }
-    _logger.i('WebSocketCacheIntegration: Sending channel subscribe request');
+    _logger.i(
+        'WebSocketCacheIntegration: Sending channel subscribe request');
     _channelSubscribeSent = true;
     try {
       _webSocketService.send({
@@ -806,18 +399,18 @@ class WebSocketCacheIntegration {
         'identifier': _channelIdentifier,
       });
     } on StateError catch (e) {
-      // Connection closed between isConnected check and send - this is expected
-      _logger.w('WebSocketCacheIntegration: Send failed (connection closed): $e');
+      _logger.w(
+          'WebSocketCacheIntegration: Send failed (connection closed): $e');
       _channelSubscribeSent = false;
       return false;
     }
     return false;
   }
 
-  /// Send a message using ActionCable protocol format
   bool _sendActionCableMessage(Map<String, dynamic> data) {
     if (!_webSocketService.isConnected) {
-      _logger.w('WebSocketCacheIntegration: Skipping send, WebSocket not connected');
+      _logger.w(
+          'WebSocketCacheIntegration: Skipping send, WebSocket not connected');
       return false;
     }
     try {
@@ -828,13 +421,16 @@ class WebSocketCacheIntegration {
       });
       return true;
     } on StateError catch (e) {
-      // Connection closed between isConnected check and send - this is expected
-      _logger.w('WebSocketCacheIntegration: Send failed (connection closed): $e');
+      _logger.w(
+          'WebSocketCacheIntegration: Send failed (connection closed): $e');
       return false;
     }
   }
 
-  /// Request full snapshots for all resource types.
+  // ---------------------------------------------------------------------------
+  // Snapshot requests
+  // ---------------------------------------------------------------------------
+
   void requestFullSnapshots() {
     _logger.i('WebSocketCacheIntegration: Manual sync requested');
     _needsSnapshot = true;
@@ -848,11 +444,13 @@ class WebSocketCacheIntegration {
       return;
     }
     if (!_webSocketService.isConnected || !_channelConfirmed) {
-      _logger.w('WebSocketCacheIntegration: Delaying snapshot request until channel is ready');
+      _logger.w(
+          'WebSocketCacheIntegration: Delaying snapshot request until channel is ready');
       return;
     }
 
-    _logger.i('WebSocketCacheIntegration: Requesting snapshots for: $_resourceTypes');
+    _logger.i(
+        'WebSocketCacheIntegration: Requesting snapshots for: $_resourceTypes');
 
     _snapshotInFlight = true;
     _needsSnapshot = false;
@@ -863,9 +461,7 @@ class WebSocketCacheIntegration {
 
     var allSent = true;
     for (final resource in _resourceTypes) {
-      // Use field selection for device resources to optimize payload size
-      // Rooms don't need field selection (already small)
-      final fields = _deviceResourceTypes.contains(resource)
+      final fields = WebSocketDeviceCacheService.isDeviceResourceType(resource)
           ? DeviceFieldSets.listFields
           : null;
       final sent = _requestSnapshot(resource, fields: fields);
@@ -874,7 +470,8 @@ class WebSocketCacheIntegration {
       }
     }
     if (!allSent) {
-      _logger.w('WebSocketCacheIntegration: Snapshot requests deferred, will retry');
+      _logger.w(
+          'WebSocketCacheIntegration: Snapshot requests deferred, will retry');
       _snapshotInFlight = false;
       _needsSnapshot = true;
     }
@@ -890,18 +487,16 @@ class WebSocketCacheIntegration {
         '${fields != null ? " with ${fields.length} fields" : ""}');
     _requestedSnapshots.add(resourceType);
 
-    // Send ActionCable formatted resource_action index request
     final payload = <String, dynamic>{
       'action': 'resource_action',
       'resource_type': resourceType,
       'crud_action': 'index',
       'page': 1,
       'page_size': 10000,
-      'request_id': 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
+      'request_id':
+          'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
     };
 
-    // Add field selection to optimize payload size (reduces by ~80%)
-    // Must be comma-separated string, not array - RESTFramework expects string format
     if (fields != null && fields.isNotEmpty) {
       payload['only'] = fields.join(',');
     }
@@ -914,17 +509,32 @@ class WebSocketCacheIntegration {
     return true;
   }
 
+  void requestResourceSnapshot(String resourceType) {
+    _logger.i(
+        'WebSocketCacheIntegration: Manual snapshot request for: $resourceType');
+    _requestSnapshot(resourceType);
+  }
+
+  void refreshResourceSnapshot(String resourceType) {
+    _logger.i(
+        'WebSocketCacheIntegration: Force-refresh snapshot for: $resourceType');
+    _requestedSnapshots.remove(resourceType);
+    _requestSnapshot(resourceType);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Message handling & routing
+  // ---------------------------------------------------------------------------
+
   void _handleMessage(SocketMessage message) {
     final payload = message.payload;
     final raw = message.raw ?? {};
 
-    // Log all messages for debugging
     _logger.d(
       'WebSocketCacheIntegration: Received message - type: ${message.type}, '
       'payload keys: ${payload.keys.toList()}, raw keys: ${raw.keys.toList()}',
     );
 
-    // Check for API key revocation BEFORE other message processing
     if (_isApiKeyRevocation(message)) {
       _handleApiKeyRevocation(message);
       return;
@@ -951,7 +561,6 @@ class WebSocketCacheIntegration {
     final action = _extractAction(message, payload, raw);
 
     if (resourceType == null || !_resourceTypes.contains(resourceType)) {
-      // Log why we're ignoring this message
       if (resourceType != null) {
         _logger.d(
           'WebSocketCacheIntegration: Ignoring message for unknown resource: $resourceType',
@@ -964,14 +573,13 @@ class WebSocketCacheIntegration {
       'WebSocketCacheIntegration: Processing message - action=$action, resource=$resourceType',
     );
 
-    // Check if it's a subscription confirmation
     if (action == 'subscription_confirmed') {
       _confirmedResources.add(resourceType);
-      _logger.i('WebSocketCacheIntegration: Subscription confirmed: $resourceType');
+      _logger.i(
+          'WebSocketCacheIntegration: Subscription confirmed: $resourceType');
       return;
     }
 
-    // Check if it's a snapshot/index response
     if (_isSnapshotMessage(action, payload, raw)) {
       final items = _extractSnapshotItems(payload, raw);
       if (items != null) {
@@ -979,7 +587,6 @@ class WebSocketCacheIntegration {
           'WebSocketCacheIntegration: Received snapshot for $resourceType: ${items.length} items',
         );
 
-        // Log first item to debug images
         if (items.isNotEmpty) {
           final firstItem = items.first;
           _logger.d(
@@ -994,7 +601,6 @@ class WebSocketCacheIntegration {
       return;
     }
 
-    // Handle individual updates
     final resourceData = _extractResourceData(payload, raw);
     if (resourceData != null) {
       if (_isUpsertAction(action)) {
@@ -1005,52 +611,34 @@ class WebSocketCacheIntegration {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Message classification helpers
+  // ---------------------------------------------------------------------------
+
   bool _isChannelConfirmation(SocketMessage message) {
-    if (message.type != 'confirm_subscription') {
-      return false;
-    }
+    if (message.type != 'confirm_subscription') return false;
     return _identifierMatches(message);
   }
 
   bool _isChannelRejection(SocketMessage message) {
-    if (message.type != 'reject_subscription') {
-      return false;
-    }
+    if (message.type != 'reject_subscription') return false;
     return _identifierMatches(message);
   }
 
-  /// Checks if the message indicates an API key revocation.
-  ///
-  /// Revocation can be indicated by:
-  /// - A message with type 'api_key_revoked'
-  /// - A 'disconnect' message with reason 'api_key_revoked'
-  /// - ActionCable wrapped message with type in payload
   bool _isApiKeyRevocation(SocketMessage message) {
-    // Direct revocation message type
-    if (message.type == 'api_key_revoked') {
-      return true;
-    }
+    if (message.type == 'api_key_revoked') return true;
 
-    // ActionCable wraps messages - check payload for type field
-    // When server broadcasts via ActionCable, the outer message.type may be 'message'
-    // and the actual type is in payload['type']
     final payloadType = message.payload['type'] as String?;
-    if (payloadType == 'api_key_revoked') {
-      return true;
-    }
+    if (payloadType == 'api_key_revoked') return true;
 
-    // Disconnect message with revocation reason
     if (message.type == 'disconnect' || payloadType == 'disconnect') {
       final reason = message.payload['reason'] as String?;
-      if (reason == 'api_key_revoked') {
-        return true;
-      }
+      if (reason == 'api_key_revoked') return true;
     }
 
     return false;
   }
 
-  /// Handles an API key revocation message by emitting an event.
   void _handleApiKeyRevocation(SocketMessage message) {
     final reason = message.payload['reason'] as String? ?? 'unknown';
     final userMessage = message.payload['message'] as String? ??
@@ -1065,7 +653,6 @@ class WebSocketCacheIntegration {
       'WebSocketCacheIntegration: API key revoked - reason: $reason',
     );
 
-    // Emit revocation event for auth layer to handle
     _apiKeyRevocationController.add(ApiKeyRevocationEvent(
       reason: reason,
       message: userMessage,
@@ -1075,28 +662,18 @@ class WebSocketCacheIntegration {
 
   bool _identifierMatches(SocketMessage message) {
     final headerIdentifier = message.headers?['identifier'];
-    if (_identifierMatchesChannel(headerIdentifier)) {
-      return true;
-    }
+    if (_identifierMatchesChannel(headerIdentifier)) return true;
     final rawIdentifier = message.raw?['identifier'];
-    if (_identifierMatchesChannel(rawIdentifier)) {
-      return true;
-    }
+    if (_identifierMatchesChannel(rawIdentifier)) return true;
     return false;
   }
 
   bool _identifierMatchesChannel(Object? identifier) {
-    if (identifier is! String || identifier.isEmpty) {
-      return false;
-    }
-    if (identifier == _channelIdentifier) {
-      return true;
-    }
+    if (identifier is! String || identifier.isEmpty) return false;
+    if (identifier == _channelIdentifier) return true;
     try {
       final decoded = jsonDecode(identifier);
-      if (decoded is Map && decoded['channel'] == 'RxgChannel') {
-        return true;
-      }
+      if (decoded is Map && decoded['channel'] == 'RxgChannel') return true;
     } catch (_) {
       return false;
     }
@@ -1115,11 +692,8 @@ class WebSocketCacheIntegration {
         action == 'list') {
       return true;
     }
-
-    // Check for results array
     if (payload['results'] is List) return true;
     if (raw['results'] is List) return true;
-
     return false;
   }
 
@@ -1128,7 +702,8 @@ class WebSocketCacheIntegration {
     Map<String, dynamic> payload,
     Map<String, dynamic> raw,
   ) {
-    final resourceAction = payload['resource_action'] ?? raw['resource_action'];
+    final resourceAction =
+        payload['resource_action'] ?? raw['resource_action'];
     if (resourceAction is String && resourceAction.isNotEmpty) {
       return resourceAction.toLowerCase();
     }
@@ -1156,58 +731,9 @@ class WebSocketCacheIntegration {
         action == 'destroy';
   }
 
-  /// Returns true for mutation actions that should emit update events.
-  /// Excludes 'show' to prevent feedback loops when DeviceNotifier refreshes.
-  bool _isMutationAction(String action) {
-    return action == 'resource_created' ||
-        action == 'resource_updated' ||
-        action == 'created' ||
-        action == 'updated' ||
-        action == 'create' ||
-        action == 'update';
-  }
-
-  /// Maps resource type and raw ID to prefixed device ID (e.g., 'ap_123').
-  String? _mapToDeviceId(String resourceType, dynamic id) {
-    if (id == null) return null;
-    switch (resourceType) {
-      case 'access_points':
-        return 'ap_$id';
-      case 'media_converters':
-        return 'ont_$id';
-      case 'switch_devices':
-        return 'sw_$id';
-      default:
-        return null;
-    }
-  }
-
-  /// Emits a device update event if the event bus is available.
-  void _emitDeviceUpdateEvent(
-    String resourceType,
-    dynamic id,
-    DeviceUpdateAction action, {
-    List<String>? changedFields,
-  }) {
-    if (_deviceUpdateEventBus == null) return;
-    if (!_deviceResourceTypes.contains(resourceType)) return;
-
-    final deviceId = _mapToDeviceId(resourceType, id);
-    if (deviceId == null) return;
-
-    _logger.d(
-      'WebSocketCacheIntegration: Emitting device update event - '
-      'deviceId=$deviceId, action=$action',
-    );
-
-    _deviceUpdateEventBus.emit(
-      DeviceUpdateEvent(
-        deviceId: deviceId,
-        action: action,
-        changedFields: changedFields,
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Data extraction helpers
+  // ---------------------------------------------------------------------------
 
   List<Map<String, dynamic>>? _extractSnapshotItems(
     Map<String, dynamic> payload,
@@ -1245,72 +771,20 @@ class WebSocketCacheIntegration {
     return null;
   }
 
-  void _applySnapshot(String resourceType, List<Map<String, dynamic>> items) {
-    if (resourceType == _roomResourceType) {
-      // Handle room data
-      _roomCache
-        ..clear()
-        ..addAll(items);
-      _bumpLastUpdate();
-
-      // Notify room callbacks
-      for (final callback in _roomDataCallbacks) {
-        callback(items);
-      }
-    } else if (resourceType == _speedTestConfigResourceType) {
-      // Handle speed test config data
-      _speedTestConfigCache
-        ..clear()
-        ..addAll(items);
-      _bumpLastUpdate();
-      _bumpSpeedTestConfigUpdate();
-
-      _logger.i(
-        'WebSocketCacheIntegration: speed_tests snapshot - ${items.length} items',
-      );
-
-      // Notify speed test config callbacks
-      _notifySpeedTestConfigCallbacks();
-    } else if (resourceType == _speedTestResultResourceType) {
-      // Handle speed test result data
-      _speedTestResultCache
-        ..clear()
-        ..addAll(items);
-      _bumpLastUpdate();
-      _bumpSpeedTestResultUpdate();
-
-      _logger.i(
-        'WebSocketCacheIntegration: speed_test_results snapshot - ${items.length} items',
-      );
-
-      // Notify speed test result callbacks
-      _notifySpeedTestResultCallbacks();
-    } else if (_deviceResourceTypes.contains(resourceType)) {
-      // Handle device data
-      _deviceCache[resourceType] = items;
-      _bumpLastUpdate();
-      _bumpDeviceUpdate();
-
-      // Debug: Log first device's keys to see what fields backend is sending
-      if (items.isNotEmpty) {
-        final firstItem = items.first;
-        final hasHnCounts = firstItem.containsKey('hn_counts');
-        final hasHealthNotices = firstItem.containsKey('health_notices');
-        _logger.i(
-          'WebSocketCacheIntegration: $resourceType snapshot - ${items.length} items, '
-          'has hn_counts: $hasHnCounts, has health_notices: $hasHealthNotices',
-        );
-        if (!hasHnCounts && !hasHealthNotices) {
-          _logger.i('  First item keys: ${firstItem.keys.toList()}');
-        }
-      }
-
-      // Notify device callbacks
-      for (final callback in _deviceDataCallbacks) {
-        callback(resourceType, items);
-      }
-    }
+  String? _extractSnapshotRequestId(
+    Map<String, dynamic> payload,
+    Map<String, dynamic> raw,
+  ) {
+    final idFromPayload = payload['request_id'];
+    if (idFromPayload != null) return idFromPayload.toString();
+    final idFromRaw = raw['request_id'];
+    if (idFromRaw != null) return idFromRaw.toString();
+    return null;
   }
+
+  // ---------------------------------------------------------------------------
+  // Snapshot accumulation & dispatch
+  // ---------------------------------------------------------------------------
 
   void _applySnapshotAccumulated(
     String resourceType,
@@ -1329,21 +803,9 @@ class WebSocketCacheIntegration {
 
     if (items.isEmpty) {
       accumulator.touch();
-      // Check appropriate cache based on resource type
-      bool hasCached;
-      if (resourceType == _speedTestConfigResourceType) {
-        hasCached = _speedTestConfigCache.isNotEmpty;
-      } else if (resourceType == _speedTestResultResourceType) {
-        hasCached = _speedTestResultCache.isNotEmpty;
-      } else if (resourceType == _roomResourceType) {
-        hasCached = _roomCache.isNotEmpty;
-      } else {
-        hasCached = _deviceCache[resourceType]?.isNotEmpty ?? false;
-      }
+      final hasCached = _hasCachedItems(resourceType);
       final hasAccumulated = accumulator.items.isNotEmpty;
-      if (hasAccumulated || hasCached) {
-        return;
-      }
+      if (hasAccumulated || hasCached) return;
       _scheduleSnapshotFlush(resourceType, accumulator);
       return;
     }
@@ -1352,50 +814,57 @@ class WebSocketCacheIntegration {
     _scheduleSnapshotFlush(resourceType, accumulator);
   }
 
+  bool _hasCachedItems(String resourceType) {
+    if (resourceType == _speedTestConfigResourceType) {
+      return _speedTestCacheService.hasCachedItems(isConfig: true);
+    } else if (resourceType == _speedTestResultResourceType) {
+      return _speedTestCacheService.hasCachedItems(isConfig: false);
+    } else if (resourceType == _roomResourceType) {
+      return _roomCacheService.hasRoomCache;
+    } else {
+      return _deviceCacheService.hasCachedItems(resourceType);
+    }
+  }
+
   bool _shouldResetAccumulator(
     _SnapshotAccumulator accumulator,
     String? requestId,
   ) {
-    if (requestId != null && requestId != accumulator.requestId) {
-      return true;
-    }
+    if (requestId != null && requestId != accumulator.requestId) return true;
     if (requestId == null) {
       final age = DateTime.now().difference(accumulator.lastUpdated);
-      if (age > _snapshotMergeWindow) {
-        return true;
-      }
+      if (age > _snapshotMergeWindow) return true;
     }
     return false;
-  }
-
-  String? _extractSnapshotRequestId(
-    Map<String, dynamic> payload,
-    Map<String, dynamic> raw,
-  ) {
-    final idFromPayload = payload['request_id'];
-    if (idFromPayload != null) {
-      return idFromPayload.toString();
-    }
-    final idFromRaw = raw['request_id'];
-    if (idFromRaw != null) {
-      return idFromRaw.toString();
-    }
-    return null;
   }
 
   void _scheduleSnapshotFlush(
     String resourceType,
     _SnapshotAccumulator accumulator,
   ) {
-    final existingTimer = _snapshotFlushTimers[resourceType];
-    if (existingTimer != null) {
-      existingTimer.cancel();
-    }
+    _snapshotFlushTimers[resourceType]?.cancel();
 
     _snapshotFlushTimers[resourceType] = Timer(_snapshotFlushDelay, () {
       _snapshotFlushTimers.remove(resourceType);
       _applySnapshot(resourceType, accumulator.items);
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dispatch: snapshot / upsert / delete → sub-services
+  // ---------------------------------------------------------------------------
+
+  void _applySnapshot(String resourceType, List<Map<String, dynamic>> items) {
+    if (resourceType == _speedTestConfigResourceType) {
+      _speedTestCacheService.applySnapshot(items, isConfig: true);
+    } else if (resourceType == _speedTestResultResourceType) {
+      _speedTestCacheService.applySnapshot(items, isConfig: false);
+    } else if (resourceType == _roomResourceType) {
+      _roomCacheService.applySnapshot(items);
+    } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
+      _deviceCacheService.applySnapshot(resourceType, items);
+    }
+    _bumpLastUpdate();
   }
 
   void _applyUpsert(
@@ -1406,118 +875,34 @@ class WebSocketCacheIntegration {
     final id = data['id'];
     if (id == null) return;
 
-    if (resourceType == _roomResourceType) {
-      // Handle room upsert
-      final index = _roomCache.indexWhere((item) => item['id'] == id);
-      if (index >= 0) {
-        _roomCache[index] = data;
-      } else {
-        _roomCache.add(data);
-      }
-      _bumpLastUpdate();
-
-      // Notify room callbacks
-      for (final callback in _roomDataCallbacks) {
-        callback(_roomCache);
-      }
-    } else if (resourceType == _speedTestConfigResourceType) {
-      // Handle speed test config upsert
-      final index = _speedTestConfigCache.indexWhere((item) => item['id'] == id);
-      if (index >= 0) {
-        _speedTestConfigCache[index] = data;
-      } else {
-        _speedTestConfigCache.add(data);
-      }
-      _bumpLastUpdate();
-      _bumpSpeedTestConfigUpdate();
-      _notifySpeedTestConfigCallbacks();
+    if (resourceType == _speedTestConfigResourceType) {
+      _speedTestCacheService.applyUpsert(data,
+          isConfig: true, action: action);
     } else if (resourceType == _speedTestResultResourceType) {
-      // Handle speed test result upsert
-      final index = _speedTestResultCache.indexWhere((item) => item['id'] == id);
-      if (index >= 0) {
-        _speedTestResultCache[index] = data;
-      } else {
-        _speedTestResultCache.add(data);
-      }
-      _bumpLastUpdate();
-      _bumpSpeedTestResultUpdate();
-      _notifySpeedTestResultCallbacks();
-    } else if (_deviceResourceTypes.contains(resourceType)) {
-      // Handle device upsert
-      final cache = _deviceCache[resourceType] ?? [];
-      final index = cache.indexWhere((item) => item['id'] == id);
-      final isNew = index < 0;
-      if (isNew) {
-        cache.add(data);
-      } else {
-        cache[index] = data;
-      }
-      _deviceCache[resourceType] = cache;
-      _bumpLastUpdate();
-      _bumpDeviceUpdate();
-
-      // Notify device callbacks
-      for (final callback in _deviceDataCallbacks) {
-        callback(resourceType, cache);
-      }
-
-      // Emit device update event only for mutation actions (not 'show')
-      // to prevent feedback loops when DeviceNotifier refreshes
-      if (action != null && _isMutationAction(action)) {
-        _emitDeviceUpdateEvent(
-          resourceType,
-          id,
-          isNew ? DeviceUpdateAction.created : DeviceUpdateAction.updated,
-        );
-      }
+      _speedTestCacheService.applyUpsert(data,
+          isConfig: false, action: action);
+    } else if (resourceType == _roomResourceType) {
+      _roomCacheService.applyUpsert(data);
+    } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
+      _deviceCacheService.applyUpsert(resourceType, data, action: action);
     }
+    _bumpLastUpdate();
   }
 
   void _applyDelete(String resourceType, Map<String, dynamic> data) {
     final id = data['id'];
     if (id == null) return;
 
-    if (resourceType == _roomResourceType) {
-      // Handle room delete
-      _roomCache.removeWhere((item) => item['id'] == id);
-      _bumpLastUpdate();
-
-      // Notify room callbacks
-      for (final callback in _roomDataCallbacks) {
-        callback(_roomCache);
-      }
-    } else if (resourceType == _speedTestConfigResourceType) {
-      // Handle speed test config delete
-      _speedTestConfigCache.removeWhere((item) => item['id'] == id);
-      _bumpLastUpdate();
-      _bumpSpeedTestConfigUpdate();
-      _notifySpeedTestConfigCallbacks();
+    if (resourceType == _speedTestConfigResourceType) {
+      _speedTestCacheService.applyDelete(data, isConfig: true);
     } else if (resourceType == _speedTestResultResourceType) {
-      // Handle speed test result delete
-      _speedTestResultCache.removeWhere((item) => item['id'] == id);
-      _bumpLastUpdate();
-      _bumpSpeedTestResultUpdate();
-      _notifySpeedTestResultCallbacks();
-    } else if (_deviceResourceTypes.contains(resourceType)) {
-      // Handle device delete
-      final cache = _deviceCache[resourceType] ?? [];
-      cache.removeWhere((item) => item['id'] == id);
-      _deviceCache[resourceType] = cache;
-      _bumpLastUpdate();
-      _bumpDeviceUpdate();
-
-      // Notify device callbacks
-      for (final callback in _deviceDataCallbacks) {
-        callback(resourceType, cache);
-      }
-
-      // Emit device update event for external apps to trigger refresh
-      _emitDeviceUpdateEvent(
-        resourceType,
-        id,
-        DeviceUpdateAction.destroyed,
-      );
+      _speedTestCacheService.applyDelete(data, isConfig: false);
+    } else if (resourceType == _roomResourceType) {
+      _roomCacheService.applyDelete(data);
+    } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
+      _deviceCacheService.applyDelete(resourceType, data);
     }
+    _bumpLastUpdate();
   }
 
   void _markSnapshotHandled(String resourceType) {
@@ -1534,103 +919,36 @@ class WebSocketCacheIntegration {
     lastUpdate.value = DateTime.now();
   }
 
-  void _bumpDeviceUpdate() {
-    lastDeviceUpdate.value = DateTime.now();
-  }
+  // ---------------------------------------------------------------------------
+  // Cache management
+  // ---------------------------------------------------------------------------
 
-  void _bumpSpeedTestConfigUpdate() {
-    lastSpeedTestConfigUpdate.value = DateTime.now();
-  }
-
-  void _bumpSpeedTestResultUpdate() {
-    lastSpeedTestResultUpdate.value = DateTime.now();
-  }
-
-  void _notifySpeedTestConfigCallbacks() {
-    final configs = getCachedSpeedTestConfigs();
-    for (final callback in _speedTestConfigCallbacks) {
-      callback(configs);
-    }
-  }
-
-  void _notifySpeedTestResultCallbacks() {
-    final results = getCachedSpeedTestResults();
-    for (final callback in _speedTestResultCallbacks) {
-      callback(results);
-    }
-  }
-
-  /// Updates a single device in the cache with data from a REST response.
-  ///
-  /// Use this after a REST-based operation (like image upload) to ensure
-  /// the WebSocket cache reflects the latest server state. This enables
-  /// immediate UI updates without waiting for a WebSocket broadcast.
-  ///
-  /// Note: This uses `action: 'show'` to avoid emitting DeviceUpdateEvent,
-  /// since the ImageUploadService already emits CacheInvalidationEvent
-  /// which triggers DeviceNotifier refresh. Using 'update' would cause
-  /// redundant refresh calls.
-  ///
-  /// [resourceType] - The resource type (e.g., 'access_points', 'media_converters')
-  /// [deviceData] - The raw device data map from the REST response
-  void updateDeviceFromRest(String resourceType, Map<String, dynamic> deviceData) {
-    if (!_deviceResourceTypes.contains(resourceType)) {
-      _logger.w(
-        'WebSocketCacheIntegration: updateDeviceFromRest called with non-device resource: $resourceType',
-      );
-      return;
-    }
-
-    final id = deviceData['id'];
-    if (id == null) {
-      _logger.w('WebSocketCacheIntegration: updateDeviceFromRest called with no id');
-      return;
-    }
-
-    _logger.i(
-      'WebSocketCacheIntegration: Updating device from REST - '
-      'resource=$resourceType, id=$id',
-    );
-
-    // Use existing upsert logic to update cache and notify listeners
-    // Pass action: 'show' to avoid emitting DeviceUpdateEvent (prevents redundant refresh)
-    _applyUpsert(resourceType, deviceData, action: 'show');
-  }
-
-  /// Clears device/room/speed test data caches and requests fresh data from server.
-  /// Use this for "Clear Cache" in settings - keeps WebSocket connection alive.
   void clearDataAndRefresh() {
-    _logger.i('WebSocketCacheIntegration: Clearing data caches and requesting refresh');
+    _logger.i(
+        'WebSocketCacheIntegration: Clearing data caches and requesting refresh');
 
-    // Clear device, room, and speed test caches
-    _deviceCache.clear();
-    _roomCache.clear();
-    _speedTestConfigCache.clear();
-    _speedTestResultCache.clear();
+    _deviceCacheService.clearCaches();
+    _roomCacheService.clearCaches();
+    _speedTestCacheService.clearCaches();
 
-    // Request fresh snapshots if connected
     if (_webSocketService.isConnected && _channelConfirmed) {
       _needsSnapshot = true;
       _snapshotInFlight = false;
       _requestFullSnapshots();
     } else {
-      _logger.w('WebSocketCacheIntegration: Not connected, will request data when reconnected');
+      _logger.w(
+          'WebSocketCacheIntegration: Not connected, will request data when reconnected');
       _needsSnapshot = true;
     }
   }
 
-  /// Clears all cached data without disposing the integration.
-  /// Call this during sign-out to prevent stale data from leaking to new sessions.
   void clearCaches() {
     _logger.i('WebSocketCacheIntegration: Clearing all caches');
 
-    // Clear device, room, and speed test caches
-    _deviceCache.clear();
-    _roomCache.clear();
-    _speedTestConfigCache.clear();
-    _speedTestResultCache.clear();
+    _deviceCacheService.clearCaches();
+    _roomCacheService.clearCaches();
+    _speedTestCacheService.clearCaches();
 
-    // Clear snapshot state
     for (final timer in _snapshotFlushTimers.values) {
       timer.cancel();
     }
@@ -1639,17 +957,16 @@ class WebSocketCacheIntegration {
     _pendingSnapshots.clear();
     _requestedSnapshots.clear();
 
-    // Reset snapshot flags to request fresh data on next connection
     _needsSnapshot = true;
     _snapshotInFlight = false;
 
-    // Reset subscription state
     _channelSubscribeSent = false;
     _channelConfirmed = false;
     _resourcesSubscribed = false;
     _confirmedResources.clear();
 
-    _logger.d('WebSocketCacheIntegration: All caches cleared, ready for fresh data');
+    _logger.d(
+        'WebSocketCacheIntegration: All caches cleared, ready for fresh data');
   }
 
   void dispose() {
@@ -1662,31 +979,10 @@ class WebSocketCacheIntegration {
     _snapshotFlushTimers.clear();
     _snapshotAccumulators.clear();
     lastUpdate.dispose();
-    lastDeviceUpdate.dispose();
-    lastSpeedTestConfigUpdate.dispose();
-    lastSpeedTestResultUpdate.dispose();
-    _deviceDataCallbacks.clear();
-    _roomDataCallbacks.clear();
-    _speedTestConfigCallbacks.clear();
-    _speedTestResultCallbacks.clear();
-    _deviceCache.clear();
-    _roomCache.clear();
-    _speedTestConfigCache.clear();
-    _speedTestResultCache.clear();
-  }
 
-  /// Request a specific resource type snapshot manually.
-  void requestResourceSnapshot(String resourceType) {
-    _logger.i('WebSocketCacheIntegration: Manual snapshot request for: $resourceType');
-    _requestSnapshot(resourceType);
-  }
-
-  /// Force-refresh a resource type by clearing the snapshot guard and re-requesting.
-  /// Use after device registration to immediately fetch updated data.
-  void refreshResourceSnapshot(String resourceType) {
-    _logger.i('WebSocketCacheIntegration: Force-refresh snapshot for: $resourceType');
-    _requestedSnapshots.remove(resourceType);
-    _requestSnapshot(resourceType);
+    _speedTestCacheService.dispose();
+    _deviceCacheService.dispose();
+    _roomCacheService.dispose();
   }
 
   /// Expose the WebSocket service for direct requests.
@@ -1713,9 +1009,7 @@ class _SnapshotAccumulator {
   void addItems(List<Map<String, dynamic>> items) {
     for (final item in items) {
       final idValue = item['id'];
-      if (idValue == null) {
-        continue;
-      }
+      if (idValue == null) continue;
       _itemsById[idValue.toString()] = item;
     }
     lastUpdated = DateTime.now();
