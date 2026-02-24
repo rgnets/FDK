@@ -8,7 +8,7 @@ class ImageViewerDialog extends StatefulWidget {
     required this.images,
     required this.initialIndex,
     this.onDeleteAtIndex,
-    this.apiKey,
+    this.httpHeaders,
     super.key,
   });
 
@@ -16,9 +16,8 @@ class ImageViewerDialog extends StatefulWidget {
   final int initialIndex;
   /// Callback when an image is deleted, provides the index of the deleted image
   final void Function(int index)? onDeleteAtIndex;
-  /// Optional API key for authenticating image URLs.
-  /// If provided, will be appended to image URLs that don't already have it.
-  final String? apiKey;
+  /// Optional HTTP headers for authenticating image requests.
+  final Map<String, String>? httpHeaders;
 
   @override
   State<ImageViewerDialog> createState() => _ImageViewerDialogState();
@@ -107,6 +106,7 @@ class _ImageViewerDialogState extends State<ImageViewerDialog> {
                 child: Center(
                   child: CachedNetworkImage(
                     imageUrl: widget.images[index],
+                    httpHeaders: widget.httpHeaders,
                     fit: BoxFit.contain,
                     memCacheWidth: cacheWidth,
                     memCacheHeight: cacheHeight,
