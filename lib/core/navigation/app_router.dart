@@ -19,15 +19,54 @@ class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
+  /// Deeplink URI captured by the redirect before GoRouter consumed it.
+  /// The SplashScreen checks this and feeds it to DeeplinkService, since
+  /// GoRouter's redirect prevents app_links from receiving the URI.
+  static Uri? pendingDeeplinkUri;
+
+  /// Set to true when the redirect captures a deeplink. Stays true so
+  /// DeeplinkService.initialize() knows to skip getInitialLink() (which
+  /// would return the same URI and show a duplicate dialog).
+  static bool deeplinkCapturedByRouter = false;
+
+  /// Check whether a URI looks like a deeplink (fdk://login?...) that
+  /// may have had its scheme/host stripped by GoRouter.
+  static bool _isDeeplinkUri(Uri uri) {
+    if (uri.scheme == 'fdk') return true;
+    final path = uri.path;
+    if (path == '/login' || path == 'login') return true;
+    final params = uri.queryParameters;
+    if (params.containsKey('fqdn') || params.containsKey('apiKey') ||
+        params.containsKey('api_key') || params.containsKey('data')) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Reconstruct a canonical fdk://login URI from whatever GoRouter gave us.
+  static Uri _reconstructDeeplinkUri(Uri uri) {
+    if (uri.scheme == 'fdk') return uri;
+    return Uri(
+      scheme: 'fdk',
+      host: 'login',
+      queryParameters: uri.queryParameters,
+    );
+  }
+
   static final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: EnvironmentConfig.isDevelopment,
-    // Redirect deeplinks (fdk:// scheme) to splash - the DeeplinkService handles them
+    // Redirect deeplinks to splash. GoRouter strips the custom scheme
+    // differently per platform (fdk://login?... may arrive as /login?...
+    // or just /?fqdn=...), so we check multiple variants.
+    // The original URI is saved in pendingDeeplinkUri because GoRouter
+    // consumes the platform route event, preventing app_links from
+    // independently receiving it.
     redirect: (context, state) {
-      // If the URI has a custom scheme (like fdk://), redirect to splash
-      // The DeeplinkService will handle the actual deeplink processing
-      if (state.uri.scheme == 'fdk') {
+      if (_isDeeplinkUri(state.uri)) {
+        pendingDeeplinkUri = _reconstructDeeplinkUri(state.uri);
+        deeplinkCapturedByRouter = true;
         return '/splash';
       }
       return null;
@@ -152,32 +191,49 @@ class AppRouter {
       ),
     ],
     
-    // Error page
+    // Fallback page — shown when GoRouter can't match a route.
+    // Most commonly hit when a deeplink URI leaks past the redirect.
     errorBuilder: (context, state) {
+      final isDeeplink = _isDeeplinkUri(state.uri);
+
       return Scaffold(
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
+              Icon(
+                isDeeplink ? Icons.link : Icons.error_outline,
                 size: 64,
-                color: Colors.red,
+                color: isDeeplink
+                    ? const Color(0xFF4A90E2)
+                    : Colors.red,
               ),
               const SizedBox(height: 16),
               Text(
-                'Page not found',
+                isDeeplink ? 'Deeplink Login' : 'Page not found',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
               Text(
-                state.uri.toString(),
-                style: Theme.of(context).textTheme.bodyMedium,
+                isDeeplink
+                    ? 'Processing login request...'
+                    : state.uri.toString(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey[600],
+                    ),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => context.go('/home'),
-                child: const Text('Go Home'),
+              if (isDeeplink) ...[
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Color(0xFF4A90E2)),
+                ),
+              ],
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => context.go('/auth'),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Go Back'),
               ),
             ],
           ),

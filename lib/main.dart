@@ -15,6 +15,7 @@ import 'package:rgnets_fdk/core/services/error_reporter.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
@@ -203,6 +204,9 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       onSuccess: () => AppRouter.router.go('/home'),
       onCancel: () => AppRouter.router.go('/auth'),
       onError: () => AppRouter.router.go('/auth'),
+      // Skip getInitialLink() when the router already captured the deeplink —
+      // the SplashScreen handles it directly to avoid a duplicate dialog.
+      skipInitialLink: AppRouter.deeplinkCapturedByRouter,
     );
   }
 
@@ -238,65 +242,92 @@ class _FDKAppState extends ConsumerState<FDKApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for auth state changes in build (required by Riverpod)
-    ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
-      final wasAuthenticated = previous ?? false;
-      if (isAuthenticated && !wasAuthenticated) {
+    // Listen for auth state changes in build (required by Riverpod).
+    // We watch the full authProvider (not just isAuthenticatedProvider) so we
+    // can distinguish between a true sign-out (→ unauthenticated/failure) and
+    // an intermediate re-auth (→ authenticating) triggered by deeplink login.
+    ref.listen<AsyncValue<AuthStatus>>(authProvider, (previous, next) {
+      final prevStatus = previous?.valueOrNull;
+      final nextStatus = next.valueOrNull;
+      final wasAuthenticated = prevStatus?.isAuthenticated ?? false;
+      final isNowAuthenticated = nextStatus?.isAuthenticated ?? false;
+
+      if (isNowAuthenticated && !wasAuthenticated) {
         LoggerService.info(
           'User authenticated, starting initialization',
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).initialize();
-      } else if (!isAuthenticated && wasAuthenticated) {
+      } else if (!isNowAuthenticated && wasAuthenticated) {
+        // Only treat as a real sign-out if the new state is unauthenticated
+        // or failure. The "authenticating" state is an intermediate step
+        // during deeplink re-auth and should NOT trigger sign-out navigation.
+        final isRealSignOut = nextStatus?.maybeWhen(
+              unauthenticated: () => true,
+              failure: (_) => true,
+              orElse: () => false,
+            ) ??
+            false;
+
+        if (!isRealSignOut) {
+          LoggerService.info(
+            'Auth state changed to $nextStatus (not a sign-out, ignoring)',
+            tag: 'Init',
+          );
+          return;
+        }
+
         LoggerService.info(
           'User signed out, navigating to auth screen',
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).reset();
 
-        // Check if there's a sign-out reason to display
+        // Navigate to auth screen FIRST — this must happen regardless of
+        // whether a sign-out reason dialog is shown. Previously the dialog
+        // used `return` to defer navigation to the dialog's button, but
+        // concurrent data-provider invalidation (from authSignOutCleanupProvider)
+        // could cause rebuilds that dismissed the dialog, leaving the user
+        // stuck on an empty home screen.
+        AppRouter.router.go('/auth');
+
+        // If there's a sign-out reason, show it as a dialog on top of /auth
         final signOutReason = ref.read(signOutReasonProvider);
         if (signOutReason != null) {
-          // Clear the reason so it doesn't show again
           ref.read(signOutReasonProvider.notifier).state = null;
 
-          // Show dialog explaining why the user was signed out
-          final navigatorContext =
-              AppRouter.router.routerDelegate.navigatorKey.currentContext;
-          if (navigatorContext != null) {
-            LoggerService.info(
-              'Showing sign-out reason dialog',
-              tag: 'Auth',
-            );
-            showDialog<void>(
-              context: navigatorContext,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 12),
-                    Expanded(child: Text('Session Ended')),
+          // Schedule dialog after the navigation frame completes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final navigatorContext =
+                AppRouter.router.routerDelegate.navigatorKey.currentContext;
+            if (navigatorContext != null) {
+              LoggerService.info(
+                'Showing sign-out reason dialog',
+                tag: 'Auth',
+              );
+              showDialog<void>(
+                context: navigatorContext,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange),
+                      SizedBox(width: 12),
+                      Expanded(child: Text('Session Ended')),
+                    ],
+                  ),
+                  content: Text(signOutReason),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
                   ],
                 ),
-                content: Text(signOutReason),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      AppRouter.router.go('/auth');
-                    },
-                    child: const Text('Sign In'),
-                  ),
-                ],
-              ),
-            );
-            return; // Don't navigate yet - dialog will handle it
-          }
+              );
+            }
+          });
         }
-
-        // Navigate to auth screen so user can sign back in
-        AppRouter.router.go('/auth');
       }
     });
 

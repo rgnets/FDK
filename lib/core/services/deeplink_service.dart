@@ -88,12 +88,16 @@ class DeeplinkService {
   DateTime? _lastProcessedTime;
   bool _isProcessing = false;
   bool _hasPendingInitialLink = false;
+  bool _skipNextStreamEvent = false;
 
   /// Whether a deeplink is currently being processed.
   bool get isProcessing => _isProcessing;
 
   /// Whether there's a pending initial link (cold start deeplink) being processed.
   bool get hasPendingInitialLink => _hasPendingInitialLink;
+
+  /// Whether [initialize] has been called and callbacks are ready.
+  bool get isInitialized => _confirmCallback != null;
 
   // Callbacks
   Future<bool> Function(DeeplinkCredentials credentials)? _confirmCallback;
@@ -114,6 +118,8 @@ class DeeplinkService {
   /// [onSuccess] - Called after successful authentication.
   /// [onCancel] - Called if user cancels or declines.
   /// [onError] - Called on any error during processing.
+  /// [skipInitialLink] - If true, skip getInitialLink() check. Use when the
+  ///   router already captured the deeplink and the SplashScreen handles it.
   Future<void> initialize({
     required Future<bool> Function(DeeplinkCredentials credentials)
         confirmCallback,
@@ -122,6 +128,7 @@ class DeeplinkService {
     required VoidCallback onSuccess,
     required VoidCallback onCancel,
     VoidCallback? onError,
+    bool skipInitialLink = false,
   }) async {
     LoggerService.info('Initializing DeeplinkService', tag: _tag);
 
@@ -131,27 +138,43 @@ class DeeplinkService {
     _onCancelCallback = onCancel;
     _onErrorCallback = onError;
 
-    // Check for initial deeplink (cold start)
-    try {
-      final initialUri = await _appLinks.getInitialLink();
-      LoggerService.info('Initial URI: ${_redactUri(initialUri)}', tag: _tag);
-      if (initialUri != null) {
-        _hasPendingInitialLink = true;
-        try {
-          await _handleUri(initialUri);
-        } finally {
-          _hasPendingInitialLink = false;
+    // Check for initial deeplink (cold start), unless the router already
+    // captured it (the SplashScreen handles those directly).
+    if (skipInitialLink) {
+      LoggerService.info(
+        'Skipping initial link check — router captured deeplink',
+        tag: _tag,
+      );
+    } else {
+      try {
+        final initialUri = await _appLinks.getInitialLink();
+        LoggerService.info('Initial URI: ${_redactUri(initialUri)}', tag: _tag);
+        if (initialUri != null) {
+          _hasPendingInitialLink = true;
+          try {
+            await _handleUri(initialUri);
+          } finally {
+            _hasPendingInitialLink = false;
+          }
         }
+      } on Exception catch (e) {
+        _hasPendingInitialLink = false;
+        LoggerService.error('Error getting initial URI: $e', tag: _tag);
       }
-    } on Exception catch (e) {
-      _hasPendingInitialLink = false;
-      LoggerService.error('Error getting initial URI: $e', tag: _tag);
     }
 
     // Listen for deeplinks while app is running
     LoggerService.info('Setting up deeplink stream listener', tag: _tag);
     _linkSubscription = _appLinks.uriLinkStream.listen(
       (uri) async {
+        if (_skipNextStreamEvent) {
+          _skipNextStreamEvent = false;
+          LoggerService.info(
+            'SKIPPING stream URI (already handled): ${_redactUri(uri)}',
+            tag: _tag,
+          );
+          return;
+        }
         LoggerService.info('Received URI from stream: ${_redactUri(uri)}', tag: _tag);
         await _handleUri(uri);
       },
@@ -339,6 +362,32 @@ class DeeplinkService {
     }
   }
 
+  /// Process a deeplink URI that was captured by GoRouter's redirect.
+  ///
+  /// GoRouter consumes the platform route event, which can prevent
+  /// [AppLinks] from independently receiving the URI. This method
+  /// allows the caller (e.g. SplashScreen) to feed the captured URI
+  /// back into the normal deeplink flow.
+  Future<void> handleCapturedUri(Uri uri) async {
+    LoggerService.info(
+      'Processing router-captured URI: ${_redactUri(uri)}',
+      tag: _tag,
+    );
+    await _handleUri(uri);
+  }
+
+  /// Tell the service that the next deeplink has already been handled
+  /// externally (e.g. by the SplashScreen). Both [getInitialLink] and
+  /// [uriLinkStream] can fire for the same cold-start deeplink; this
+  /// flag causes the stream listener to skip its first delivery.
+  void markNextDeeplinkHandled() {
+    _skipNextStreamEvent = true;
+    LoggerService.info(
+      'Will skip next uriLinkStream event (already handled)',
+      tag: _tag,
+    );
+  }
+
   /// Dispose of resources.
   void dispose() {
     _linkSubscription?.cancel();
@@ -347,5 +396,6 @@ class DeeplinkService {
     _lastProcessedTime = null;
     _isProcessing = false;
     _hasPendingInitialLink = false;
+    _skipNextStreamEvent = false;
   }
 }

@@ -1,16 +1,23 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
+import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+import 'package:rgnets_fdk/core/services/deeplink_service.dart';
 import 'package:rgnets_fdk/core/utils/qr_decoder.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
+import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
+import 'package:rgnets_fdk/features/initialization/initialization.dart';
 
 /// Splash screen shown on app launch
 class SplashScreen extends ConsumerStatefulWidget {
@@ -42,6 +49,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (kIsWeb) {
       // Navigation starting - environment info available in logger
+    }
+
+    // Check if the router captured a deeplink URI. GoRouter consumes the
+    // platform route event so app_links / DeeplinkService never see it.
+    // Handle it directly here to avoid all timing issues.
+    Uri? deeplinkUri = AppRouter.pendingDeeplinkUri;
+    if (deeplinkUri != null) {
+      AppRouter.pendingDeeplinkUri = null;
+      logger.i('SPLASH_SCREEN: Found router-captured deeplink');
+    } else {
+      // On cold boot, GoRouter may NOT see the deeplink (app_links intercepts
+      // the intent separately). Check app_links directly as a fallback.
+      try {
+        final initialLink = await AppLinks().getInitialLink();
+        if (initialLink != null && initialLink.scheme == 'fdk') {
+          deeplinkUri = initialLink;
+          logger.i('SPLASH_SCREEN: Found deeplink from app_links getInitialLink');
+        }
+      } on Exception catch (e) {
+        logger.e('SPLASH_SCREEN: Error checking app_links initial link: $e');
+      }
+    }
+
+    if (deeplinkUri != null) {
+      logger.i('SPLASH_SCREEN: Processing deeplink directly');
+
+      // Tell DeeplinkService to skip both getInitialLink() and the next
+      // stream event — we're handling it here.
+      AppRouter.deeplinkCapturedByRouter = true;
+      ref.read(deeplinkServiceProvider).markNextDeeplinkHandled();
+
+      await _handleDeeplinkDirectly(deeplinkUri, logger);
+      return;
     }
 
     // Brief splash display (reduced for faster startup)
@@ -426,6 +466,121 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
     } else {
       logger.w('SPLASH_SCREEN: ⚠️ Widget not mounted, cannot navigate');
+    }
+  }
+
+  /// Handle a deeplink URI directly — parse credentials, show approval sheet,
+  /// authenticate. This bypasses DeeplinkService entirely to avoid cold-start
+  /// timing issues between _initializeServices() and _navigateToNext().
+  Future<void> _handleDeeplinkDirectly(Uri uri, Logger logger) async {
+    // Parse credentials from the URI query parameters
+    final params = uri.queryParameters;
+    final fqdn = params['fqdn'] ?? params['server'] ?? params['host'];
+    final apiKey = params['apiKey'] ?? params['key'] ?? params['token'] ?? params['api_key'];
+    final login = params['login'] ?? params['user'] ?? params['username'];
+
+    if (fqdn == null || apiKey == null || login == null) {
+      logger.e('SPLASH_SCREEN: Deeplink missing required params (fqdn=$fqdn, login=$login, apiKey=${apiKey != null ? "[present]" : "null"})');
+      if (mounted) context.go('/auth');
+      return;
+    }
+
+    if (!DeeplinkService.isValidFqdn(fqdn)) {
+      logger.e('SPLASH_SCREEN: Invalid FQDN in deeplink: $fqdn');
+      if (mounted) context.go('/auth');
+      return;
+    }
+
+    logger.i('SPLASH_SCREEN: Deeplink parsed — fqdn=$fqdn, login=$login');
+
+    // Brief delay for the UI to settle
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    // Show the approval dialog directly
+    final approved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CredentialApprovalSheet(
+        fqdn: fqdn,
+        login: login,
+        token: apiKey,
+        siteName: params['siteName'],
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (approved != true) {
+      logger.i('SPLASH_SCREEN: User declined deeplink credentials');
+      context.go('/auth');
+      return;
+    }
+
+    // Wait for auth provider build() to complete before calling authenticate().
+    // On cold boot with stored credentials, build() performs its own WebSocket
+    // handshake via _attemptCredentialRecovery(). If we call authenticate()
+    // while build() is still in-flight, the two handshakes race — authenticate()
+    // disconnects the socket build() is using, build() fails and eventually
+    // returns unauthenticated, and Riverpod's AsyncNotifier overwrites
+    // authenticate()'s successful state with build()'s unauthenticated return.
+    logger.i('SPLASH_SCREEN: Waiting for auth provider build() to complete...');
+    try {
+      await ref.read(authProvider.future).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () {
+          logger.w('SPLASH_SCREEN: Auth build() timed out, proceeding anyway');
+          return const AuthStatus.unauthenticated();
+        },
+      );
+    } on Exception catch (e) {
+      logger.w('SPLASH_SCREEN: Auth build() error (proceeding): $e');
+    }
+    if (!mounted) return;
+
+    // Authenticate
+    logger.i('SPLASH_SCREEN: User approved, authenticating...');
+    try {
+      await ref.read(authProvider.notifier).authenticate(
+        fqdn: fqdn,
+        login: login,
+        token: apiKey,
+        siteName: params['siteName'] ?? fqdn,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
+
+      final authState = ref.read(authProvider).valueOrNull;
+      final isAuthenticated = authState?.maybeWhen(
+        authenticated: (_) => true,
+        orElse: () => false,
+      ) ?? false;
+
+      if (isAuthenticated) {
+        logger.i('SPLASH_SCREEN: Deeplink auth successful');
+
+        // Ensure the WebSocket data sync listener is active — it wires
+        // cache events to provider invalidation.  On cold boot,
+        // _initializeServices() in FDKApp may still be awaiting the
+        // deeplink-service init, so this provider might not have been
+        // read yet.  Reading it here is idempotent (Riverpod deduplicates).
+        ref.read(webSocketDataSyncListenerProvider);
+
+        // Navigate to home — the ref.listen in FDKApp.build() will
+        // trigger initializationNotifierProvider.initialize() when it
+        // detects the auth state change.  We don't call initialize()
+        // directly here because there's a race where the WebSocket may
+        // briefly disconnect during provider graph updates; the init
+        // provider now waits up to 10s for reconnection.
+        context.go('/home');
+      } else {
+        logger.e('SPLASH_SCREEN: Deeplink auth failed');
+        context.go('/auth');
+      }
+    } on Exception catch (e) {
+      logger.e('SPLASH_SCREEN: Deeplink auth error: $e');
+      if (mounted) context.go('/auth');
     }
   }
 

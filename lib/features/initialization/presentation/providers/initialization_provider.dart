@@ -108,12 +108,16 @@ class InitializationNotifier extends _$InitializationNotifier {
       );
 
       if (!isConnected) {
-        // Wait up to 1 second for connection (reduced for faster startup)
+        // Wait up to 10 seconds for WebSocket to connect or auto-reconnect.
+        // On cold boot from a deeplink the auth handshake establishes a
+        // connection, but provider graph updates can briefly drop it.
+        // ATT-FE-Tool avoids this by validating via REST first; in FDK we
+        // give the auto-reconnect enough time to re-establish.
         LoggerService.debug(
-          'WebSocket not connected, waiting up to 1s...',
+          'WebSocket not connected, waiting up to 10s...',
           tag: 'InitProvider',
         );
-        for (var i = 0; i < 10 && !isConnected; i++) {
+        for (var i = 0; i < 100 && !isConnected; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 100));
           isConnected = _webSocketService.isConnected;
         }
@@ -125,7 +129,7 @@ class InitializationNotifier extends _$InitializationNotifier {
 
       if (!isConnected) {
         LoggerService.error(
-          'WebSocket not connected after 1s wait, setting error state',
+          'WebSocket not connected after 10s wait, setting error state',
           tag: 'InitProvider',
         );
         state = InitializationState.error(
