@@ -187,24 +187,24 @@ void main() {
       expect(result, 'https://example.com/image.jpg');
     });
 
-    test('should append api_key to URL without query params', () {
+    // authenticateImageUrl now returns URLs unmodified (auth is via HTTP headers)
+    test('should return URL unmodified (auth via headers now)', () {
       final result = authenticateImageUrl(
         'https://example.com/image.jpg',
         'my_api_key',
       );
-      expect(result, 'https://example.com/image.jpg?api_key=my_api_key');
+      expect(result, 'https://example.com/image.jpg');
     });
 
-    test('should append api_key to URL with existing query params', () {
+    test('should return URL with existing query params unmodified', () {
       final result = authenticateImageUrl(
         'https://example.com/image.jpg?size=large',
         'my_api_key',
       );
-      expect(result, contains('api_key=my_api_key'));
-      expect(result, contains('size=large'));
+      expect(result, 'https://example.com/image.jpg?size=large');
     });
 
-    test('should not duplicate api_key if already present', () {
+    test('should return URL with existing api_key unmodified', () {
       final result = authenticateImageUrl(
         'https://example.com/image.jpg?api_key=existing_key',
         'new_api_key',
@@ -212,7 +212,7 @@ void main() {
       expect(result, 'https://example.com/image.jpg?api_key=existing_key');
     });
 
-    test('should not modify data URLs', () {
+    test('should return data URLs unmodified', () {
       final result = authenticateImageUrl(
         'data:image/png;base64,iVBORw0KGgo=',
         'my_api_key',
@@ -220,25 +220,25 @@ void main() {
       expect(result, 'data:image/png;base64,iVBORw0KGgo=');
     });
 
-    test('should not modify non-HTTP URLs', () {
+    test('should return non-HTTP URLs unmodified', () {
       final result = authenticateImageUrl('/relative/path/image.jpg', 'my_api_key');
       expect(result, '/relative/path/image.jpg');
     });
 
-    test('should handle http URLs (not just https)', () {
+    test('should return http URLs unmodified', () {
       final result = authenticateImageUrl(
         'http://example.com/image.jpg',
         'my_api_key',
       );
-      expect(result, 'http://example.com/image.jpg?api_key=my_api_key');
+      expect(result, 'http://example.com/image.jpg');
     });
 
-    test('should trim whitespace from URL', () {
+    test('should return whitespace-padded URL as-is', () {
       final result = authenticateImageUrl(
         '  https://example.com/image.jpg  ',
         'my_api_key',
       );
-      expect(result, 'https://example.com/image.jpg?api_key=my_api_key');
+      expect(result, '  https://example.com/image.jpg  ');
     });
   });
 
@@ -255,13 +255,13 @@ void main() {
       expect(result, urls);
     });
 
-    test('should authenticate all URLs in list', () {
+    test('should return all URLs unmodified (auth via headers now)', () {
       final urls = ['https://example.com/1.jpg', 'https://example.com/2.jpg'];
       final result = authenticateImageUrls(urls, 'my_api_key');
 
       expect(result.length, 2);
-      expect(result[0], 'https://example.com/1.jpg?api_key=my_api_key');
-      expect(result[1], 'https://example.com/2.jpg?api_key=my_api_key');
+      expect(result[0], 'https://example.com/1.jpg');
+      expect(result[1], 'https://example.com/2.jpg');
     });
 
     test('should handle empty list', () {

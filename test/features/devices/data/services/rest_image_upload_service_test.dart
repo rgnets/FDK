@@ -72,8 +72,8 @@ void main() {
       test('should return signed IDs from response', () async {
         const deviceId = '123';
         const resourceType = 'access_points';
-        final url =
-            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json?api_key=$testApiKey';
+        final expectedUrl =
+            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json';
 
         final responseData = {
           'images': [
@@ -84,9 +84,14 @@ void main() {
           ],
         };
 
-        when(() => mockDio.get<Map<String, dynamic>>(any())).thenAnswer(
+        when(
+          () => mockDio.get<Map<String, dynamic>>(
+            any(),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
           (_) async => buildResponse(
-            url: url,
+            url: expectedUrl,
             statusCode: 200,
             data: responseData,
           ),
@@ -100,18 +105,23 @@ void main() {
         expect(result, ['signed_1', 'signed_2']);
 
         final captured = verify(
-          () => mockDio.get<Map<String, dynamic>>(captureAny()),
+          () => mockDio.get<Map<String, dynamic>>(
+            captureAny(),
+            options: captureAny(named: 'options'),
+          ),
         ).captured;
 
-        final capturedUrl = captured.first as String;
-        expect(capturedUrl, url);
+        final capturedUrl = captured[0] as String;
+        final capturedOptions = captured[1] as Options;
+        expect(capturedUrl, expectedUrl);
+        expect(capturedOptions.headers?['X-API-Key'], testApiKey);
       });
 
       test('should return empty list on DioException', () async {
         const deviceId = '123';
         const resourceType = 'access_points';
         final url =
-            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json?api_key=$testApiKey';
+            'https://example.rgnetworks.com/api/$resourceType/$deviceId.json';
 
         final exception = DioException(
           type: DioExceptionType.connectionError,
@@ -119,7 +129,12 @@ void main() {
           message: 'Connection failed',
         );
 
-        when(() => mockDio.get<Map<String, dynamic>>(any())).thenThrow(exception);
+        when(
+          () => mockDio.get<Map<String, dynamic>>(
+            any(),
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(exception);
 
         final result = await service.fetchCurrentSignedIds(
           resourceType: resourceType,
@@ -179,10 +194,11 @@ void main() {
         final capturedOptions = captured[2] as Options;
 
         expect(capturedUrl, contains('/api/access_points/123.json'));
-        expect(capturedUrl, contains('api_key=$testApiKey'));
+        expect(capturedUrl, isNot(contains('api_key=')));
         expect(capturedBody['images'], equals(images));
         expect(capturedOptions.contentType, equals('application/json'));
         expect(capturedOptions.responseType, equals(ResponseType.json));
+        expect(capturedOptions.headers?['X-API-Key'], testApiKey);
       });
 
       test('should send PUT request to correct endpoint for media_converters',

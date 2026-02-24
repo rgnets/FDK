@@ -256,9 +256,7 @@ class DeviceDetailSections extends ConsumerWidget {
 
   Widget _buildImagesSection(BuildContext context, WidgetRef ref) {
     final validImages = _validImages;
-    // Authenticate image URLs with api_key for RXG backend access
-    final authenticateUrls = ref.watch(authenticatedImageUrlsProvider);
-    final authenticatedImages = authenticateUrls(validImages);
+    final authHeaders = ref.watch(imageAuthHeadersProvider);
     final uploadState = ref.watch(imageUploadNotifierProvider(device.id));
 
     // Listen for upload state changes to show snackbars and refresh
@@ -293,21 +291,22 @@ class DeviceDetailSections extends ConsumerWidget {
           height: 120,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            itemCount: authenticatedImages.length + 1, // +1 for add button
+            itemCount: validImages.length + 1, // +1 for add button
             itemBuilder: (context, index) {
               // Last item is the add button
-              if (index == authenticatedImages.length) {
+              if (index == validImages.length) {
                 return _buildAddImageButton(context, ref, uploadState);
               }
 
-              final imageUrl = authenticatedImages[index];
+              final imageUrl = validImages[index];
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: GestureDetector(
                   onTap: () => _showImageViewer(
                     context,
                     ref,
-                    authenticatedImages,
+                    validImages,
+                    authHeaders,
                     index,
                   ),
                   child: ClipRRect(
@@ -317,6 +316,7 @@ class DeviceDetailSections extends ConsumerWidget {
                       height: 120,
                       child: CachedNetworkImage(
                         imageUrl: imageUrl,
+                        httpHeaders: authHeaders,
                         fit: BoxFit.cover,
                         memCacheWidth: 240,
                         memCacheHeight: 240,
@@ -450,11 +450,9 @@ class DeviceDetailSections extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     List<String> images,
+    Map<String, String> authHeaders,
     int initialIndex,
   ) {
-    // Get api_key for passing to the dialog (images are already authenticated,
-    // but we pass api_key for any additional operations the dialog may need)
-    final apiKey = ref.read(apiKeyProvider).valueOrNull;
     final signedIds = _validImageSignedIds;
 
     showDialog<void>(
@@ -463,8 +461,6 @@ class DeviceDetailSections extends ConsumerWidget {
       builder: (context) => ImageViewerDialog(
         images: images,
         initialIndex: initialIndex,
-        // Pass the index and look up the signedId for deletion
-        // This avoids URL mismatch issues since signedIds are stable
         onDeleteAtIndex: onImageDeletedBySignedId != null
             ? (index) {
                 if (index >= 0 && index < signedIds.length) {
@@ -472,7 +468,7 @@ class DeviceDetailSections extends ConsumerWidget {
                 }
               }
             : null,
-        apiKey: apiKey,
+        httpHeaders: authHeaders,
       ),
     );
   }
