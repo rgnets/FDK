@@ -239,18 +239,19 @@ class ScannerValidationService {
 
       String value = barcode.trim();
 
-      // Check for MAC address (12 hex chars)
-      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
-        mac = value.toUpperCase();
-        LoggerService.debug('Found MAC: $mac', tag: _tag);
-        continue;
-      }
-
-      // Accept approved AP prefixes including EC2
+      // Check for AP serial FIRST (before MAC, to avoid EC2 hex serials
+      // being misclassified as MAC addresses)
       if (SerialPatterns.isAPSerial(value)) {
         serialNumber = value.toUpperCase();
         hasAPSerial = true;
         LoggerService.debug('Found AP serial: $serialNumber', tag: _tag);
+        continue;
+      }
+
+      // Check for MAC address (12 hex chars)
+      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
+        mac = value.toUpperCase();
+        LoggerService.debug('Found MAC: $mac', tag: _tag);
         continue;
       }
     }
@@ -294,18 +295,19 @@ class ScannerValidationService {
 
       String value = barcode.trim();
 
-      // Check for MAC address first (12 hex chars)
-      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
-        mac = value.toUpperCase();
-        LoggerService.debug('Found MAC: $mac', tag: _tag);
-        continue;
-      }
-
-      // Accept LL or EC2 switch serials
+      // Check for switch serial FIRST (before MAC, to avoid EC2 hex serials
+      // being misclassified as MAC addresses)
       if (SerialPatterns.isSwitchSerial(value) && serialNumber.isEmpty) {
         serialNumber = value.toUpperCase();
         hasSwitchSerial = true;
         LoggerService.debug('Found Switch serial: $serialNumber', tag: _tag);
+        continue;
+      }
+
+      // Check for MAC address (12 hex chars)
+      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
+        mac = value.toUpperCase();
+        LoggerService.debug('Found MAC: $mac', tag: _tag);
         continue;
       }
 

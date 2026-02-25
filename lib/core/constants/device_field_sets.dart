@@ -21,6 +21,7 @@ class DeviceFieldSets {
     'mac', // Access points/ONTs use 'mac'
     'scratch', // Switches store MAC in 'scratch'
     'pms_room', // Full nested object
+    'pms_room_id', // Flat field (switches may not have nested pms_room)
     'location',
     'last_seen',
     'signal_strength',

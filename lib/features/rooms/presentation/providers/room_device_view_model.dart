@@ -129,12 +129,23 @@ class RoomDeviceNotifier extends _$RoomDeviceNotifier {
     }
   }
 
-  /// Filter devices for a specific room
+  /// Get the room's deviceIds from the room view model for fallback matching.
+  Set<String>? _getRoomDeviceIds(String roomId) {
+    final roomVm = ref.read(roomViewModelByIdProvider(roomId));
+    return roomVm?.deviceIds?.toSet();
+  }
+
+  /// Filter devices for a specific room.
+  /// Matches by pmsRoomId first, then falls back to the room's deviceIds
+  /// list (populated from switch_ports/switch_devices in room data).
+  /// This ensures switches are included even when they lack a direct pms_room_id.
   List<Device> _filterDevicesForRoom(List<Device> allDevices, int roomIdInt) {
     try {
+      final deviceIdSet = _getRoomDeviceIds(roomIdInt.toString());
       final filtered = allDevices.where((device) {
-        // Use pmsRoomId for room association
-        return device.pmsRoomId == roomIdInt;
+        if (device.pmsRoomId == roomIdInt) return true;
+        if (deviceIdSet != null && deviceIdSet.contains(device.id)) return true;
+        return false;
       }).toList();
 
       return filtered;

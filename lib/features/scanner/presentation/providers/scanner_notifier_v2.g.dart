@@ -6,7 +6,7 @@ part of 'scanner_notifier_v2.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$scannerNotifierV2Hash() => r'36b1e87dafb5a7c4da3a8ea3acf3b563cf9255b9';
+String _$scannerNotifierV2Hash() => r'f3852a562b3bb14760972c39117f979461dccbab';
 
 /// New scanner notifier using freezed ScannerState with auto-detection support.
 ///

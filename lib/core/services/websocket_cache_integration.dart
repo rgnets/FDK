@@ -53,16 +53,22 @@ class WebSocketCacheIntegration {
   /// Room resource type.
   static const String _roomResourceType = 'pms_rooms';
 
+  /// Switch ports resource — primary source for switch→room associations.
+  /// SwitchDevice has no pms_room_id; the link is only through switch_ports
+  /// (infrastructure_device_id → pms_room_id).
+  static const String _switchPortResourceType = 'switch_ports';
+
   /// Speed test resource types.
   static const String _speedTestConfigResourceType = 'speed_tests';
   static const String _speedTestResultResourceType = 'speed_test_results';
 
-  /// All resource types (devices + rooms + speed tests).
+  /// All resource types (devices + rooms + switch_ports + speed tests).
   static const List<String> _resourceTypes = [
     'access_points',
     'switch_devices',
     'media_converters',
     'pms_rooms',
+    'switch_ports',
     'speed_tests',
     'speed_test_results',
   ];
@@ -95,6 +101,9 @@ class WebSocketCacheIntegration {
 
   /// Cached room data.
   final List<Map<String, dynamic>> _roomCache = [];
+
+  /// Cached switch_ports data for building switch→room index.
+  final List<Map<String, dynamic>> _switchPortCache = [];
 
   /// Callbacks for when room data is received.
   final List<void Function(List<Map<String, dynamic>>)> _roomDataCallbacks = [];
@@ -1271,9 +1280,163 @@ class WebSocketCacheIntegration {
     return null;
   }
 
+  int? _parseIntId(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    if (value is num) return value.toInt();
+    return null;
+  }
+
+  /// Build switch device ID → room ID index.
+  ///
+  /// Primary source: `_switchPortCache` — each record has
+  /// `infrastructure_device_id` (switch) and `pms_room_id` (room).
+  /// Fallback: embedded `switch_ports`/`switch_devices` in room data.
+  Map<int, int> _buildSwitchToRoomIndex() {
+    final index = <int, int>{};
+    final sampleSwitchIds = <int>[];
+
+    // Primary: build from dedicated switch_ports snapshot
+    if (_switchPortCache.isNotEmpty) {
+      for (final port in _switchPortCache) {
+        final swId = _parseIntId(
+          port['infrastructure_device_id'] ?? port['switch_device_id'],
+        );
+        final roomId = _parseIntId(port['pms_room_id']);
+        if (swId != null && roomId != null) {
+          index[swId] = roomId;
+          if (sampleSwitchIds.length < 5) {
+            sampleSwitchIds.add(swId);
+          }
+        }
+      }
+      _logger.i(
+        'WebSocketCacheIntegration: switch→room index built from switch_ports '
+        '(ports=${_switchPortCache.length}, mappings=${index.length}, '
+        'sample=${sampleSwitchIds.join(', ')})',
+      );
+      return index;
+    }
+
+    // Fallback: extract from room data (if server embeds switch_ports in rooms)
+    var switchPortEntries = 0;
+    var switchDeviceEntries = 0;
+    for (final room in _roomCache) {
+      final roomId = _parseIntId(room['id']);
+      if (roomId == null) {
+        continue;
+      }
+
+      final switchPorts = room['switch_ports'];
+      if (switchPorts is List && switchPorts.isNotEmpty) {
+        for (final entry in switchPorts) {
+          if (entry is! Map<String, dynamic>) continue;
+          final sw = entry['switch_device'];
+          final swIdRaw = sw is Map<String, dynamic>
+              ? sw['id']
+              : entry['switch_device_id'] ?? entry['id'];
+          final swId = _parseIntId(swIdRaw);
+          if (swId != null) {
+            index[swId] = roomId;
+            switchPortEntries++;
+            if (sampleSwitchIds.length < 5) {
+              sampleSwitchIds.add(swId);
+            }
+          }
+        }
+      } else {
+        final switchDevices = room['switch_devices'];
+        if (switchDevices is List) {
+          for (final entry in switchDevices) {
+            if (entry is! Map<String, dynamic>) continue;
+            final swId = _parseIntId(entry['id']);
+            if (swId != null) {
+              index[swId] = roomId;
+              switchDeviceEntries++;
+              if (sampleSwitchIds.length < 5) {
+                sampleSwitchIds.add(swId);
+              }
+            }
+          }
+        }
+      }
+    }
+    _logger.i(
+      'WebSocketCacheIntegration: switch→room index built from rooms (fallback) '
+      '(rooms=${_roomCache.length}, index=${index.length}, '
+      'switch_ports=$switchPortEntries, switch_devices=$switchDeviceEntries, '
+      'sample=${sampleSwitchIds.join(', ')})',
+    );
+    return index;
+  }
+
+  /// Stamp pms_room_id onto cached switch devices using room data.
+  /// Returns the number of devices stamped.
+  int _backPopulateSwitchRoomIds() {
+    final switches = _deviceCache['switch_devices'];
+    if (switches == null || switches.isEmpty) {
+      _logger.i(
+        'WebSocketCacheIntegration: Back-populate skipped (no switch cache)',
+      );
+      return 0;
+    }
+    if (_switchPortCache.isEmpty && _roomCache.isEmpty) {
+      _logger.i(
+        'WebSocketCacheIntegration: Back-populate skipped (no switch_ports or room cache)',
+      );
+      return 0;
+    }
+
+    final index = _buildSwitchToRoomIndex();
+    if (index.isEmpty) {
+      _logger.i(
+        'WebSocketCacheIntegration: Back-populate skipped (empty index)',
+      );
+      return 0;
+    }
+
+    var stamped = 0;
+    var missingMapping = 0;
+    var alreadySet = 0;
+    var invalidIds = 0;
+    final sampleMissing = <int>[];
+    for (final sw in switches) {
+      final swId = _parseIntId(sw['id']);
+      if (swId == null) {
+        invalidIds++;
+        continue;
+      }
+      final roomId = index[swId];
+      if (roomId == null) {
+        missingMapping++;
+        if (sampleMissing.length < 5) {
+          sampleMissing.add(swId);
+        }
+        continue;
+      }
+      if (sw['pms_room_id'] == null) {
+        sw['pms_room_id'] = roomId;
+        stamped++;
+      } else {
+        alreadySet++;
+      }
+    }
+
+    _logger.i(
+      'WebSocketCacheIntegration: Back-populate summary '
+      '(switches=${switches.length}, stamped=$stamped, '
+      'alreadySet=$alreadySet, missingMap=$missingMapping, '
+      'invalidIds=$invalidIds, sampleMissing=${sampleMissing.join(', ')})',
+    );
+    return stamped;
+  }
+
   void _applySnapshot(String resourceType, List<Map<String, dynamic>> items) {
     if (resourceType == _roomResourceType) {
       // Handle room data
+      _logger.i(
+        'WebSocketCacheIntegration: rooms snapshot - ${items.length} items',
+      );
       _roomCache
         ..clear()
         ..addAll(items);
@@ -1282,6 +1445,41 @@ class WebSocketCacheIntegration {
       // Notify room callbacks
       for (final callback in _roomDataCallbacks) {
         callback(items);
+      }
+
+      // Back-populate pms_room_id onto switch devices now that rooms are updated
+      final stamped = _backPopulateSwitchRoomIds();
+      if (stamped > 0) {
+        _bumpDeviceUpdate();
+        final switchCache = _deviceCache['switch_devices'];
+        if (switchCache != null) {
+          for (final callback in _deviceDataCallbacks) {
+            callback('switch_devices', switchCache);
+          }
+        }
+      }
+    } else if (resourceType == _switchPortResourceType) {
+      // Handle switch_ports — build switch→room index directly from port records.
+      // SwitchDevice has no pms_room_id; the association is only through
+      // switch_ports (infrastructure_device_id → pms_room_id).
+      _logger.i(
+        'WebSocketCacheIntegration: switch_ports snapshot - ${items.length} items',
+      );
+      _switchPortCache
+        ..clear()
+        ..addAll(items);
+      _bumpLastUpdate();
+
+      // Back-populate switches using the new switch_ports data
+      final spStamped = _backPopulateSwitchRoomIds();
+      if (spStamped > 0) {
+        _bumpDeviceUpdate();
+        final switchCache = _deviceCache['switch_devices'];
+        if (switchCache != null) {
+          for (final callback in _deviceDataCallbacks) {
+            callback('switch_devices', switchCache);
+          }
+        }
       }
     } else if (resourceType == _speedTestConfigResourceType) {
       // Handle speed test config data
@@ -1316,6 +1514,11 @@ class WebSocketCacheIntegration {
       _deviceCache[resourceType] = items;
       _bumpLastUpdate();
       _bumpDeviceUpdate();
+
+      // Back-populate pms_room_id onto switch devices from room data
+      if (resourceType == 'switch_devices') {
+        _backPopulateSwitchRoomIds();
+      }
 
       // Debug: Log first device's keys to see what fields backend is sending
       if (items.isNotEmpty) {
@@ -1446,6 +1649,18 @@ class WebSocketCacheIntegration {
       for (final callback in _roomDataCallbacks) {
         callback(_roomCache);
       }
+
+      // Back-populate pms_room_id onto switch devices now that room data changed
+      final stamped = _backPopulateSwitchRoomIds();
+      if (stamped > 0) {
+        _bumpDeviceUpdate();
+        final switchCache = _deviceCache['switch_devices'];
+        if (switchCache != null) {
+          for (final callback in _deviceDataCallbacks) {
+            callback('switch_devices', switchCache);
+          }
+        }
+      }
     } else if (resourceType == _speedTestConfigResourceType) {
       // Handle speed test config upsert
       final index = _speedTestConfigCache.indexWhere((item) => item['id'] == id);
@@ -1481,6 +1696,11 @@ class WebSocketCacheIntegration {
       _deviceCache[resourceType] = cache;
       _bumpLastUpdate();
       _bumpDeviceUpdate();
+
+      // Back-populate pms_room_id onto switch devices from room data
+      if (resourceType == 'switch_devices') {
+        _backPopulateSwitchRoomIds();
+      }
 
       // Notify device callbacks
       for (final callback in _deviceDataCallbacks) {
@@ -1628,9 +1848,10 @@ class WebSocketCacheIntegration {
   void clearDataAndRefresh() {
     _logger.i('WebSocketCacheIntegration: Clearing data caches and requesting refresh');
 
-    // Clear device, room, and speed test caches
+    // Clear device, room, switch_ports, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
+    _switchPortCache.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
 
@@ -1650,9 +1871,10 @@ class WebSocketCacheIntegration {
   void clearCaches() {
     _logger.i('WebSocketCacheIntegration: Clearing all caches');
 
-    // Clear device, room, and speed test caches
+    // Clear device, room, switch_ports, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
+    _switchPortCache.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
 
@@ -1697,6 +1919,7 @@ class WebSocketCacheIntegration {
     _speedTestResultCallbacks.clear();
     _deviceCache.clear();
     _roomCache.clear();
+    _switchPortCache.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
   }

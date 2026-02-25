@@ -216,9 +216,15 @@ class RoomStats {
   final int empty;
 }
 
-/// Private helper to get devices for a room using unified approach
-/// Matches devices by pmsRoomId (consistent for both mock and API data)
+/// Private helper to get devices for a room using unified approach.
+/// Matches devices by pmsRoomId first, then falls back to the room's
+/// deviceIds list (populated from switch_ports/switch_devices in room data).
+/// This ensures switches are included even when they lack a direct pms_room_id.
 List<Device> _getDevicesForRoom(Room room, List<Device> allDevices) {
-  // Filter devices where pmsRoomId matches the room's numeric ID
-  return allDevices.where((device) => device.pmsRoomId == room.id).toList();
+  final deviceIdSet = room.deviceIds?.toSet();
+  return allDevices.where((device) {
+    if (device.pmsRoomId == room.id) return true;
+    if (deviceIdSet != null && deviceIdSet.contains(device.id)) return true;
+    return false;
+  }).toList();
 }

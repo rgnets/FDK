@@ -9,7 +9,7 @@ class DeviceNormalizer {
   /// Normalize raw JSON to APModel
   APModel normalizeToAP(Map<String, dynamic> data) {
     return APModel(
-      id: (data['id'] ?? '').toString(),
+      id: 'ap_${data['id'] ?? ''}',
       name: data['name']?.toString() ?? 'Unknown AP',
       status: determineStatus(data),
       pmsRoomId: extractPmsRoomId(data),
@@ -41,7 +41,7 @@ class DeviceNormalizer {
   /// Normalize raw JSON to ONTModel
   ONTModel normalizeToONT(Map<String, dynamic> data) {
     return ONTModel(
-      id: (data['id'] ?? '').toString(),
+      id: 'ont_${data['id'] ?? ''}',
       name: data['name']?.toString() ?? 'Unknown ONT',
       status: determineStatus(data),
       pmsRoomId: extractPmsRoomId(data),
@@ -70,7 +70,7 @@ class DeviceNormalizer {
   /// Normalize raw JSON to SwitchModel
   SwitchModel normalizeToSwitch(Map<String, dynamic> data) {
     return SwitchModel(
-      id: (data['id'] ?? '').toString(),
+      id: 'sw_${data['id'] ?? ''}',
       name: data['name']?.toString() ?? 'Unknown Switch',
       status: determineStatus(data),
       pmsRoomId: extractPmsRoomId(data),
@@ -94,7 +94,7 @@ class DeviceNormalizer {
   /// Normalize raw JSON to WLANModel
   WLANModel normalizeToWLAN(Map<String, dynamic> data) {
     return WLANModel(
-      id: (data['id'] ?? '').toString(),
+      id: 'wlan_${data['id'] ?? ''}',
       name: data['name']?.toString() ?? 'Unknown WLAN',
       status: determineStatus(data),
       pmsRoomId: extractPmsRoomId(data),
