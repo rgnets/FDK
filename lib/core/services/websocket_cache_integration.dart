@@ -53,22 +53,16 @@ class WebSocketCacheIntegration {
   /// Room resource type.
   static const String _roomResourceType = 'pms_rooms';
 
-  /// Switch ports resource — primary source for switch→room associations.
-  /// SwitchDevice has no pms_room_id; the link is only through switch_ports
-  /// (infrastructure_device_id → pms_room_id).
-  static const String _switchPortResourceType = 'switch_ports';
-
   /// Speed test resource types.
   static const String _speedTestConfigResourceType = 'speed_tests';
   static const String _speedTestResultResourceType = 'speed_test_results';
 
-  /// All resource types (devices + rooms + switch_ports + speed tests).
+  /// All resource types (devices + rooms + speed tests).
   static const List<String> _resourceTypes = [
     'access_points',
     'switch_devices',
     'media_converters',
     'pms_rooms',
-    'switch_ports',
     'speed_tests',
     'speed_test_results',
   ];
@@ -102,8 +96,9 @@ class WebSocketCacheIntegration {
   /// Cached room data.
   final List<Map<String, dynamic>> _roomCache = [];
 
-  /// Cached switch_ports data for building switch→room index.
-  final List<Map<String, dynamic>> _switchPortCache = [];
+  /// Port ID → switch raw int ID, built from switch devices' embedded ports.
+  /// Used to correlate room-embedded port IDs back to their parent switch.
+  final Map<int, int> _portToSwitchIndex = {};
 
   /// Callbacks for when room data is received.
   final List<void Function(List<Map<String, dynamic>>)> _roomDataCallbacks = [];
@@ -1287,38 +1282,15 @@ class WebSocketCacheIntegration {
     return null;
   }
 
-  /// Build switch device ID → room ID index.
+  /// Build switch device ID → room ID index using port ID overlap.
   ///
-  /// Primary source: `_switchPortCache` — each record has
-  /// `infrastructure_device_id` (switch) and `pms_room_id` (room).
-  /// Fallback: embedded `switch_ports`/`switch_devices` in room data.
+  /// Rooms embed switch_ports as [{id, name}] — only the port's own ID.
+  /// Switch devices embed the same ports with the same IDs.
+  /// [_portToSwitchIndex] (portId → switchId) bridges the two.
   Map<int, int> _buildSwitchToRoomIndex() {
     final index = <int, int>{};
     final sampleSwitchIds = <int>[];
 
-    // Primary: build from dedicated switch_ports snapshot
-    if (_switchPortCache.isNotEmpty) {
-      for (final port in _switchPortCache) {
-        final swId = _parseIntId(
-          port['infrastructure_device_id'] ?? port['switch_device_id'],
-        );
-        final roomId = _parseIntId(port['pms_room_id']);
-        if (swId != null && roomId != null) {
-          index[swId] = roomId;
-          if (sampleSwitchIds.length < 5) {
-            sampleSwitchIds.add(swId);
-          }
-        }
-      }
-      _logger.i(
-        'WebSocketCacheIntegration: switch→room index built from switch_ports '
-        '(ports=${_switchPortCache.length}, mappings=${index.length}, '
-        'sample=${sampleSwitchIds.join(', ')})',
-      );
-      return index;
-    }
-
-    // Fallback: extract from room data (if server embeds switch_ports in rooms)
     var switchPortEntries = 0;
     var switchDeviceEntries = 0;
     for (final room in _roomCache) {
@@ -1331,16 +1303,27 @@ class WebSocketCacheIntegration {
       if (switchPorts is List && switchPorts.isNotEmpty) {
         for (final entry in switchPorts) {
           if (entry is! Map<String, dynamic>) continue;
+
+          // Try direct FK first (future-proof if server ever embeds it)
           final sw = entry['switch_device'];
-          final swIdRaw = sw is Map<String, dynamic>
-              ? sw['id']
-              : entry['switch_device_id'] ?? entry['id'];
-          final swId = _parseIntId(swIdRaw);
-          if (swId != null) {
-            index[swId] = roomId;
+          final directId = _parseIntId(
+            sw is Map<String, dynamic> ? sw['id'] : entry['switch_device_id'],
+          );
+          if (directId != null) {
+            index[directId] = roomId;
             switchPortEntries++;
-            if (sampleSwitchIds.length < 5) {
-              sampleSwitchIds.add(swId);
+            if (sampleSwitchIds.length < 5) sampleSwitchIds.add(directId);
+            continue;
+          }
+
+          // Primary: look up port ID in port→switch index
+          final portId = _parseIntId(entry['id']);
+          if (portId != null) {
+            final swId = _portToSwitchIndex[portId];
+            if (swId != null) {
+              index[swId] = roomId;
+              switchPortEntries++;
+              if (sampleSwitchIds.length < 5) sampleSwitchIds.add(swId);
             }
           }
         }
@@ -1353,17 +1336,16 @@ class WebSocketCacheIntegration {
             if (swId != null) {
               index[swId] = roomId;
               switchDeviceEntries++;
-              if (sampleSwitchIds.length < 5) {
-                sampleSwitchIds.add(swId);
-              }
+              if (sampleSwitchIds.length < 5) sampleSwitchIds.add(swId);
             }
           }
         }
       }
     }
     _logger.i(
-      'WebSocketCacheIntegration: switch→room index built from rooms (fallback) '
+      'WebSocketCacheIntegration: switch→room index built '
       '(rooms=${_roomCache.length}, index=${index.length}, '
+      'portIndex=${_portToSwitchIndex.length}, '
       'switch_ports=$switchPortEntries, switch_devices=$switchDeviceEntries, '
       'sample=${sampleSwitchIds.join(', ')})',
     );
@@ -1380,9 +1362,9 @@ class WebSocketCacheIntegration {
       );
       return 0;
     }
-    if (_switchPortCache.isEmpty && _roomCache.isEmpty) {
+    if (_roomCache.isEmpty) {
       _logger.i(
-        'WebSocketCacheIntegration: Back-populate skipped (no switch_ports or room cache)',
+        'WebSocketCacheIntegration: Back-populate skipped (no room cache)',
       );
       return 0;
     }
@@ -1458,29 +1440,6 @@ class WebSocketCacheIntegration {
           }
         }
       }
-    } else if (resourceType == _switchPortResourceType) {
-      // Handle switch_ports — build switch→room index directly from port records.
-      // SwitchDevice has no pms_room_id; the association is only through
-      // switch_ports (infrastructure_device_id → pms_room_id).
-      _logger.i(
-        'WebSocketCacheIntegration: switch_ports snapshot - ${items.length} items',
-      );
-      _switchPortCache
-        ..clear()
-        ..addAll(items);
-      _bumpLastUpdate();
-
-      // Back-populate switches using the new switch_ports data
-      final spStamped = _backPopulateSwitchRoomIds();
-      if (spStamped > 0) {
-        _bumpDeviceUpdate();
-        final switchCache = _deviceCache['switch_devices'];
-        if (switchCache != null) {
-          for (final callback in _deviceDataCallbacks) {
-            callback('switch_devices', switchCache);
-          }
-        }
-      }
     } else if (resourceType == _speedTestConfigResourceType) {
       // Handle speed test config data
       _speedTestConfigCache
@@ -1517,6 +1476,30 @@ class WebSocketCacheIntegration {
 
       // Back-populate pms_room_id onto switch devices from room data
       if (resourceType == 'switch_devices') {
+        // Build portId → switchId index from each switch device's embedded ports.
+        // Room snapshots only embed port {id, name} — this index lets us look up
+        // the owning switch from that port ID.
+        _portToSwitchIndex.clear();
+        var switchesWithPorts = 0;
+        for (final sw in items) {
+          final swRawId = _parseIntId(sw['id']);
+          if (swRawId == null) continue;
+          final ports = sw['switch_ports'];
+          if (ports is List && ports.isNotEmpty) {
+            switchesWithPorts++;
+            for (final port in ports) {
+              if (port is! Map<String, dynamic>) continue;
+              final portId = _parseIntId(port['id']);
+              if (portId != null) _portToSwitchIndex[portId] = swRawId;
+            }
+          }
+        }
+        LoggerService.info(
+          '🔌 [SWITCH-PORT] CacheIntegration switch_devices snapshot — '
+          '${items.length} items, switchesWithPorts=$switchesWithPorts, '
+          'portIndexSize=${_portToSwitchIndex.length}',
+          tag: 'SwitchPort',
+        );
         _backPopulateSwitchRoomIds();
       }
 
@@ -1848,10 +1831,10 @@ class WebSocketCacheIntegration {
   void clearDataAndRefresh() {
     _logger.i('WebSocketCacheIntegration: Clearing data caches and requesting refresh');
 
-    // Clear device, room, switch_ports, and speed test caches
+    // Clear device, room, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
-    _switchPortCache.clear();
+    _portToSwitchIndex.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
 
@@ -1871,10 +1854,10 @@ class WebSocketCacheIntegration {
   void clearCaches() {
     _logger.i('WebSocketCacheIntegration: Clearing all caches');
 
-    // Clear device, room, switch_ports, and speed test caches
+    // Clear device, room, and speed test caches
     _deviceCache.clear();
     _roomCache.clear();
-    _switchPortCache.clear();
+    _portToSwitchIndex.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
 
@@ -1919,7 +1902,7 @@ class WebSocketCacheIntegration {
     _speedTestResultCallbacks.clear();
     _deviceCache.clear();
     _roomCache.clear();
-    _switchPortCache.clear();
+    _portToSwitchIndex.clear();
     _speedTestConfigCache.clear();
     _speedTestResultCache.clear();
   }

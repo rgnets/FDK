@@ -22,6 +22,7 @@ class DeviceFieldSets {
     'scratch', // Switches store MAC in 'scratch'
     'pms_room', // Full nested object
     'pms_room_id', // Flat field (switches may not have nested pms_room)
+    'switch_ports', // Switch port list — used to correlate switches to PMS rooms
     'location',
     'last_seen',
     'signal_strength',

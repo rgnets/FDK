@@ -5,6 +5,7 @@ import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/device_normalizer.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/room_data_processor.dart';
 import 'package:rgnets_fdk/core/services/snapshot_request_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
@@ -489,20 +490,50 @@ class WebSocketDataSyncService {
   }
 
   void _cacheSwitchDevices(List<Map<String, dynamic>> items) {
+    LoggerService.info(
+      '🔌 [SWITCH-PORT] _cacheSwitchDevices called — ${items.length} items',
+      tag: 'SwitchPort',
+    );
+    if (items.isNotEmpty) {
+      LoggerService.info(
+        '🔌 [SWITCH-PORT] First switch raw keys: ${items.first.keys.toList()}',
+        tag: 'SwitchPort',
+      );
+      final rawPorts = items.first['switch_ports'];
+      LoggerService.info(
+        '🔌 [SWITCH-PORT] First switch embedded switch_ports: '
+        '${rawPorts == null ? "NULL" : (rawPorts is List ? "${rawPorts.length} ports → $rawPorts" : rawPorts.runtimeType)}',
+        tag: 'SwitchPort',
+      );
+    }
+
     // Build portId → switchRawId from each switch device's embedded ports.
     // Room snapshots only embed port {id, name} — this index lets us look up
     // the owning switch from that port ID.
+    var switchesWithPorts = 0;
     for (final item in items) {
       final swRawId = _parseIntId(item['id']);
       if (swRawId == null) continue;
       final ports = item['switch_ports'];
-      if (ports is List) {
+      if (ports is List && ports.isNotEmpty) {
+        switchesWithPorts++;
         for (final port in ports) {
           if (port is! Map<String, dynamic>) continue;
           final portId = _parseIntId(port['id']);
           if (portId != null) _portToSwitchIndex[portId] = swRawId;
         }
       }
+    }
+
+    // Diagnostic: show whether switch devices embed their ports
+    if (items.isNotEmpty) {
+      final firstItem = items.first;
+      _logger.i(
+        'WebSocketDataSync: Switch devices snapshot diagnostics '
+        '(total=${items.length}, withEmbeddedPorts=$switchesWithPorts, '
+        'portIndexSize=${_portToSwitchIndex.length}, '
+        'firstItemKeys=${firstItem.keys.toList()})',
+      );
     }
 
     // If rooms arrived before switches, the switchToRoom index was built with
