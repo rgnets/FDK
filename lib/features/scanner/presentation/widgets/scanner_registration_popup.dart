@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_category.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
-import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/services/device_classifier.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/device_registration_provider.dart';
@@ -77,7 +75,7 @@ class _ScannerRegistrationPopupState
     await ref.read(deviceRegistrationNotifierProvider.notifier).checkDeviceMatch(
           mac: scanData.mac,
           serial: scanData.serialNumber,
-          deviceType: _toDeviceType(scannerState.scanMode),
+          deviceType: ScannerUtils.toDeviceType(scannerState.scanMode),
         );
 
     if (mounted) {
@@ -96,18 +94,11 @@ class _ScannerRegistrationPopupState
   }
 
   /// Get status color based on match status.
-  Color _getStatusColor(DeviceMatchStatus status) {
-    switch (status) {
-      case DeviceMatchStatus.noMatch:
-      case DeviceMatchStatus.unchecked:
-        return Colors.green;
-      case DeviceMatchStatus.fullMatch:
-        return Colors.orange;
-      case DeviceMatchStatus.mismatch:
-      case DeviceMatchStatus.multipleMatch:
-        return Colors.red;
-    }
-  }
+  Color _getStatusColor(DeviceMatchStatus status) => switch (status) {
+    DeviceMatchStatus.noMatch || DeviceMatchStatus.unchecked => Colors.green,
+    DeviceMatchStatus.fullMatch => Colors.orange,
+    DeviceMatchStatus.mismatch || DeviceMatchStatus.multipleMatch => Colors.red,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -280,10 +271,10 @@ class _ScannerRegistrationPopupState
       titleText = 'Data Mismatch Detected';
     } else if (isExisting) {
       actionIcon = Icons.swap_horiz;
-      titleText = 'Existing ${_getDeviceTypeName(state.scanMode)} Found';
+      titleText = 'Existing ${ScannerUtils.getFullDeviceTypeName(state.scanMode)} Found';
     } else {
       actionIcon = Icons.add_circle_outline;
-      titleText = 'New ${_getDeviceTypeName(state.scanMode)}';
+      titleText = 'New ${ScannerUtils.getFullDeviceTypeName(state.scanMode)}';
     }
 
     return Row(
@@ -349,7 +340,7 @@ class _ScannerRegistrationPopupState
             _buildDataRow(context, 'Part Number', data.partNumber),
           if (data.model.isNotEmpty)
             _buildDataRow(context, 'Model', data.model),
-          _buildDataRow(context, 'Device Type', _getDeviceTypeName(mode)),
+          _buildDataRow(context, 'Device Type', ScannerUtils.getFullDeviceTypeName(mode)),
         ],
       ),
     );
@@ -553,13 +544,13 @@ class _ScannerRegistrationPopupState
     final theme = Theme.of(context);
     final roomId = state.selectedRoomId?.toString() ?? '';
     final deviceState = ref.watch(roomDeviceNotifierProvider(roomId));
-    final deviceTypeFilter = _getDeviceTypeForMode(state.scanMode);
+    final deviceTypeFilter = ScannerUtils.getDeviceTypeForMode(state.scanMode);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select Designed ${_getDeviceTypeName(state.scanMode)} or Create New',
+          'Select Designed ${ScannerUtils.getFullDeviceTypeName(state.scanMode)} or Create New',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -655,7 +646,7 @@ class _ScannerRegistrationPopupState
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Create New ${_getDeviceTypeName(scanMode)}',
+                'Create New ${ScannerUtils.getFullDeviceTypeName(scanMode)}',
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -788,7 +779,7 @@ class _ScannerRegistrationPopupState
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Create New ${_getDeviceTypeName(scanMode)}',
+                    'Create New ${ScannerUtils.getFullDeviceTypeName(scanMode)}',
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -987,7 +978,7 @@ class _ScannerRegistrationPopupState
           .registerDevice(
             mac: scannerState.scanData.mac,
             serial: scannerState.scanData.serialNumber,
-            deviceType: _toDeviceType(scannerState.scanMode),
+            deviceType: ScannerUtils.toDeviceType(scannerState.scanMode),
             pmsRoomId: scannerState.selectedRoomId!,
             partNumber: scannerState.scanData.partNumber.isNotEmpty
                 ? scannerState.scanData.partNumber
@@ -1051,47 +1042,6 @@ class _ScannerRegistrationPopupState
     }
   }
 
-  String _getDeviceTypeName(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return 'Access Point';
-      case ScanMode.ont:
-        return 'ONT';
-      case ScanMode.switchDevice:
-        return 'Switch';
-      case ScanMode.auto:
-      case ScanMode.rxg:
-        return 'Device';
-    }
-  }
-
-  String? _getDeviceTypeForMode(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return DeviceTypes.accessPoint;
-      case ScanMode.ont:
-        return DeviceTypes.ont;
-      case ScanMode.switchDevice:
-        return DeviceTypes.networkSwitch;
-      case ScanMode.auto:
-      case ScanMode.rxg:
-        return null;
-    }
-  }
-
-  DeviceType _toDeviceType(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return DeviceType.accessPoint;
-      case ScanMode.ont:
-        return DeviceType.ont;
-      case ScanMode.switchDevice:
-        return DeviceType.switchDevice;
-      case ScanMode.auto:
-      case ScanMode.rxg:
-        return DeviceType.accessPoint;
-    }
-  }
 }
 
 extension on RegistrationResult {

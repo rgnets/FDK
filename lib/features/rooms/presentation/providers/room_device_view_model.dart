@@ -253,50 +253,29 @@ enum DeviceTypeFilter {
   wlanControllers;
 
   /// Get the device type string for filtering
-  String? get deviceType {
-    switch (this) {
-      case DeviceTypeFilter.all:
-        return null; // Show all
-      case DeviceTypeFilter.accessPoints:
-        return DeviceTypes.accessPoint;
-      case DeviceTypeFilter.switches:
-        return DeviceTypes.networkSwitch;
-      case DeviceTypeFilter.onts:
-        return DeviceTypes.ont;
-      case DeviceTypeFilter.wlanControllers:
-        return DeviceTypes.wlanController;
-    }
-  }
+  String? get deviceType => switch (this) {
+    DeviceTypeFilter.all => null,
+    DeviceTypeFilter.accessPoints => DeviceTypes.accessPoint,
+    DeviceTypeFilter.switches => DeviceTypes.networkSwitch,
+    DeviceTypeFilter.onts => DeviceTypes.ont,
+    DeviceTypeFilter.wlanControllers => DeviceTypes.wlanController,
+  };
 
   /// Get display name for UI
-  String get displayName {
-    switch (this) {
-      case DeviceTypeFilter.all:
-        return 'All';
-      case DeviceTypeFilter.accessPoints:
-        return 'Access Points';
-      case DeviceTypeFilter.switches:
-        return 'Switches';
-      case DeviceTypeFilter.onts:
-        return 'ONTs';
-      case DeviceTypeFilter.wlanControllers:
-        return 'WLAN Controllers';
-    }
-  }
+  String get displayName => switch (this) {
+    DeviceTypeFilter.all => 'All',
+    DeviceTypeFilter.accessPoints => 'Access Points',
+    DeviceTypeFilter.switches => 'Switches',
+    DeviceTypeFilter.onts => 'ONTs',
+    DeviceTypeFilter.wlanControllers => 'WLAN Controllers',
+  };
 
   /// Get icon identifier for UI
-  String get iconIdentifier {
-    switch (this) {
-      case DeviceTypeFilter.all:
-        return 'devices';
-      case DeviceTypeFilter.accessPoints:
-        return DeviceTypes.getIconIdentifier(DeviceTypes.accessPoint);
-      case DeviceTypeFilter.switches:
-        return DeviceTypes.getIconIdentifier(DeviceTypes.networkSwitch);
-      case DeviceTypeFilter.onts:
-        return DeviceTypes.getIconIdentifier(DeviceTypes.ont);
-      case DeviceTypeFilter.wlanControllers:
-        return DeviceTypes.getIconIdentifier(DeviceTypes.wlanController);
-    }
-  }
+  String get iconIdentifier => switch (this) {
+    DeviceTypeFilter.all => 'devices',
+    DeviceTypeFilter.accessPoints => DeviceTypes.getIconIdentifier(DeviceTypes.accessPoint),
+    DeviceTypeFilter.switches => DeviceTypes.getIconIdentifier(DeviceTypes.networkSwitch),
+    DeviceTypeFilter.onts => DeviceTypes.getIconIdentifier(DeviceTypes.ont),
+    DeviceTypeFilter.wlanControllers => DeviceTypes.getIconIdentifier(DeviceTypes.wlanController),
+  };
 }
