@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement a device onboarding state tracking system for the fdk_websocket project, mirroring the architecture from ATT-FE-Tool. The system will track onboarding progress for ONT (5 stages) and AP (6 stages) devices, detect overdue stages, and provide UI-ready display data.
+Implement a device onboarding state tracking system for the fdk_websocket project, mirroring the architecture from ATT-FE-Tool. The system will track onboarding progress for ONT (6 stages) and AP (6 stages) devices, detect overdue stages, and provide UI-ready display data.
 
 ## Current State
 
@@ -39,8 +39,8 @@ The `ont_onboarding_status` / `ap_onboarding_status` maps to OnboardingState as 
 
 | API Field | Type | OnboardingState Field | Notes |
 |-----------|------|----------------------|-------|
-| `stage` | int | `currentStage` | 1-5 (ONT) or 1-6 (AP), 0 = not started |
-| `max_stages` | int | `maxStages` | 5 (ONT) or 6 (AP) |
+| `stage` | int | `currentStage` | 1-6 (ONT) or 1-6 (AP), 0 = not started |
+| `max_stages` | int | `maxStages` | 6 (ONT) or 6 (AP) |
 | `status` | string | `statusText` | Human-readable status |
 | `stage_display` | string | `stageDisplay` | Display text for current stage |
 | `next_action` | string | `nextAction` | Suggested next action |
@@ -110,7 +110,7 @@ Example: `onboarding_stage_ONT_123`
 ```json
 {
   "stage": 3,
-  "max_stages": 5,
+  "max_stages": 6,
   "entered_at": "2024-01-15T10:30:00Z",
   "last_updated": "2024-01-15T10:35:00Z"
 }
