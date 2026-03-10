@@ -56,7 +56,7 @@ class RestImageUploadService {
     required String deviceId,
   }) async {
     final url =
-        'https://$_siteUrl/api/$resourceType/$deviceId.json?api_key=$_apiKey';
+        'https://$_siteUrl/api/$resourceType/$deviceId.json';
 
     LoggerService.debug(
       'Fetching current signed IDs for $resourceType/$deviceId',
@@ -64,7 +64,10 @@ class RestImageUploadService {
     );
 
     try {
-      final response = await _dio.get<Map<String, dynamic>>(url);
+      final response = await _dio.get<Map<String, dynamic>>(
+        url,
+        options: Options(headers: {'X-API-Key': _apiKey}),
+      );
 
       if (response.statusCode == 200 && response.data != null) {
         final images = response.data!['images'];
@@ -107,7 +110,7 @@ class RestImageUploadService {
     required String deviceId,
   }) async {
     final url =
-        'https://$_siteUrl/api/$resourceType/$deviceId.json?api_key=$_apiKey';
+        'https://$_siteUrl/api/$resourceType/$deviceId.json';
 
     LoggerService.debug(
       'Fetching device data for $resourceType/$deviceId',
@@ -115,7 +118,10 @@ class RestImageUploadService {
     );
 
     try {
-      final response = await _dio.get<Map<String, dynamic>>(url);
+      final response = await _dio.get<Map<String, dynamic>>(
+        url,
+        options: Options(headers: {'X-API-Key': _apiKey}),
+      );
 
       if (response.statusCode == 200 && response.data != null) {
         LoggerService.debug(
@@ -184,13 +190,12 @@ class RestImageUploadService {
     required List<String> images,
   }) async {
     final url =
-        'https://$_siteUrl/api/$resourceType/$deviceId.json?api_key=$_apiKey';
+        'https://$_siteUrl/api/$resourceType/$deviceId.json';
 
     LoggerService.debug(
       'REST Upload: PUT $resourceType/$deviceId with ${images.length} images',
       tag: 'RestImageUploadService',
     );
-    // Note: Not logging URL as it contains api_key
 
     try {
       final dio = _dio;
@@ -214,6 +219,7 @@ class RestImageUploadService {
         options: Options(
           contentType: 'application/json',
           responseType: ResponseType.json,
+          headers: {'X-API-Key': _apiKey},
         ),
         onSendProgress: (sent, total) {
           if (total > 0) {

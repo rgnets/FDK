@@ -80,13 +80,16 @@ class SecureHttpClient {
   static Future<bool> validateConnection(String siteUrl, String apiKey) async {
     try {
       final client = getClient();
-      final uri = Uri.parse('https://$siteUrl/api/whoami.json?api_key=$apiKey');
+      final uri = Uri.parse('https://$siteUrl/api/whoami.json');
       LoggerService.debug(
         'Validating HTTP connection to $siteUrl',
         tag: 'SecureHttpClient',
       );
 
-      final response = await client.get(uri).timeout(
+      final response = await client.get(
+        uri,
+        headers: {'X-API-Key': apiKey, 'Accept': 'application/json'},
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () =>
             throw TimeoutException('Connection validation timeout'),

@@ -118,6 +118,18 @@ final authenticatedImageUrlsProvider = Provider<List<String> Function(List<Strin
   return (List<String> imageUrls) => authenticateImageUrls(imageUrls, apiKey);
 });
 
+/// Provider for image authentication headers.
+///
+/// Returns a map containing the X-API-Key header for authenticating image
+/// requests via CachedNetworkImage's httpHeaders parameter, instead of
+/// appending api_key to URL query strings.
+final imageAuthHeadersProvider = Provider<Map<String, String>>((ref) {
+  final apiKeyAsync = ref.watch(apiKeyProvider);
+  final apiKey = apiKeyAsync.valueOrNull;
+  if (apiKey == null || apiKey.isEmpty) return const {};
+  return {'X-API-Key': apiKey};
+});
+
 /// Initialize providers that need async initialization
 Future<ProviderContainer> initializeProviders() async {
   final sharedPreferences = await SharedPreferences.getInstance();
