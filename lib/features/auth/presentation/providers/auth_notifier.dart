@@ -782,9 +782,9 @@ Uri _buildActionCableUri({
       );
 
   final queryParameters = Map<String, String>.from(uri.queryParameters);
-  // Keep api_key in query params only for web platform (browser WebSocket API
-  // does not support custom headers)
-  if (kIsWeb && token.isNotEmpty) {
+  // ActionCable authenticates via params[:api_key] from the query string,
+  // so include it on all platforms.
+  if (token.isNotEmpty) {
     queryParameters['api_key'] = token;
   }
 
