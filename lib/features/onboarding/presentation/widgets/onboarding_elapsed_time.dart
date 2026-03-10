@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 
 /// Widget displaying elapsed time since entering current stage.
 /// Shows overdue warning styling when applicable.

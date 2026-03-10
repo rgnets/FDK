@@ -13,8 +13,6 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
-import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
-import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
@@ -55,9 +53,16 @@ class Auth extends _$Auth {
     final storage = ref.read(storageServiceProvider);
     await storage.migrateToSecureStorageIfNeeded();
 
+    // Capture the generation at the start of build(). If authenticate() is
+    // called while build() is running, it increments _authGeneration. We
+    // check at the end — if the generation changed, authenticate() has taken
+    // over and we must NOT overwrite its state with our return value.
+    final buildGeneration = _authGeneration;
+
     _logger
       ..i('🔐 AUTH_NOTIFIER: build() called - initializing auth state')
-      ..d('AUTH_NOTIFIER: Provider hash: $hashCode');
+      ..d('AUTH_NOTIFIER: Provider hash: $hashCode')
+      ..d('AUTH_NOTIFIER: build generation: $buildGeneration');
 
     // Listen for API key revocation events from WebSocket
     _setupRevocationListener();
@@ -79,7 +84,7 @@ class Auth extends _$Auth {
       final getCurrentUser = _getCurrentUser;
       final result = await getCurrentUser();
 
-      return await result.fold(
+      final recoveryResult = await result.fold(
         (failure) async {
           _logger
             ..w(
@@ -104,8 +109,30 @@ class Auth extends _$Auth {
           }
         },
       );
+
+      // Generation guard: if authenticate() was called while build() was
+      // running, it has already set the state. Return the current state
+      // value instead of overwriting it with our (now stale) result.
+      if (_authGeneration != buildGeneration) {
+        _logger.i(
+          'AUTH_NOTIFIER: build() generation stale ($buildGeneration → $_authGeneration), '
+          'yielding to authenticate(). Current state: ${state.valueOrNull}',
+        );
+        return state.valueOrNull ?? recoveryResult;
+      }
+
+      return recoveryResult;
     } on Exception catch (e) {
       _logger.e('AUTH_NOTIFIER: Error checking for existing session: $e');
+
+      // Generation guard on error path too
+      if (_authGeneration != buildGeneration) {
+        _logger.i(
+          'AUTH_NOTIFIER: build() generation stale on error path, yielding to authenticate()',
+        );
+        return state.valueOrNull ?? const AuthStatus.unauthenticated();
+      }
+
       return _attemptCredentialRecovery();
     }
   }
@@ -622,13 +649,12 @@ class Auth extends _$Auth {
       await localDataSource.clearSession();
       await storage.setAuthenticated(value: true);
 
-      final userModel = UserModel(
-        username: login,
-        siteUrl: 'https://$fqdn',
-        displayName: resolvedSite.isEmpty ? login : resolvedSite,
-        email: null,
+      final repository = ref.read(authRepositoryProvider);
+      final user = await repository.createAndSaveUser(
+        login: login,
+        fqdn: fqdn,
+        siteName: resolvedSite,
       );
-      await localDataSource.saveUser(userModel);
 
       await _recordAuthAttempt(
         fqdn: fqdn,
@@ -638,7 +664,7 @@ class Auth extends _$Auth {
         message: 'action_cable.confirm_subscription',
       );
 
-      return userModel.toEntity();
+      return user;
     } on Exception catch (e) {
       if (!failureHandled) {
         await storage.setAuthenticated(value: false);
@@ -667,16 +693,14 @@ class Auth extends _$Auth {
     String? message,
   }) async {
     try {
-      final storage = ref.read(storageServiceProvider);
-      final attempt = AuthAttempt(
+      final repository = ref.read(authRepositoryProvider);
+      await repository.recordAuthAttempt(
         fqdn: fqdn,
         login: login,
-        siteName: siteName,
         success: success,
+        siteName: siteName,
         message: message,
-        timestamp: DateTime.now().toUtc(),
       );
-      await storage.logAuthAttempt(attempt);
     } on Exception catch (e) {
       _logger.w('AUTH_NOTIFIER: Failed to record auth attempt: $e');
     }

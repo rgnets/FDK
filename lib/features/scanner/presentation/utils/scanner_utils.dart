@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
+import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 
 /// Shared utility functions for scanner UI components.
@@ -18,35 +20,47 @@ class ScannerUtils {
   }
 
   /// Returns the appropriate icon for a scan mode.
-  static IconData getModeIcon(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return Icons.wifi;
-      case ScanMode.ont:
-        return Icons.router;
-      case ScanMode.switchDevice:
-        return Icons.lan;
-      case ScanMode.rxg:
-        return Icons.qr_code;
-      case ScanMode.auto:
-        return Icons.auto_awesome;
-    }
-  }
+  static IconData getModeIcon(ScanMode mode) => switch (mode) {
+    ScanMode.accessPoint => Icons.wifi,
+    ScanMode.ont => Icons.router,
+    ScanMode.switchDevice => Icons.lan,
+    ScanMode.rxg => Icons.qr_code,
+    ScanMode.auto => Icons.auto_awesome,
+  };
 
-  /// Returns display-friendly device type name for a scan mode.
-  static String getDeviceTypeName(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.accessPoint:
-        return 'AP';
-      case ScanMode.ont:
-        return 'ONT';
-      case ScanMode.switchDevice:
-        return 'Switch';
-      case ScanMode.auto:
-      case ScanMode.rxg:
-        return 'Device';
-    }
-  }
+  /// Returns abbreviated device type name (e.g. "AP", "ONT").
+  static String getDeviceTypeName(ScanMode mode) => switch (mode) {
+    ScanMode.accessPoint => 'AP',
+    ScanMode.ont => 'ONT',
+    ScanMode.switchDevice => 'Switch',
+    ScanMode.auto || ScanMode.rxg => 'Device',
+  };
+
+  /// Returns full device type name for registration context
+  /// (e.g. "Access Point" instead of "AP").
+  static String getFullDeviceTypeName(ScanMode mode) => switch (mode) {
+    ScanMode.accessPoint => 'Access Point',
+    ScanMode.ont => 'ONT',
+    ScanMode.switchDevice => 'Switch',
+    ScanMode.auto || ScanMode.rxg => 'Device',
+  };
+
+  /// Returns the DeviceTypes constant string for a scan mode, or null for
+  /// auto/rxg.
+  static String? getDeviceTypeForMode(ScanMode mode) => switch (mode) {
+    ScanMode.accessPoint => DeviceTypes.accessPoint,
+    ScanMode.ont => DeviceTypes.ont,
+    ScanMode.switchDevice => DeviceTypes.networkSwitch,
+    ScanMode.auto || ScanMode.rxg => null,
+  };
+
+  /// Converts ScanMode to the DeviceType entity enum.
+  static DeviceType toDeviceType(ScanMode mode) => switch (mode) {
+    ScanMode.accessPoint => DeviceType.accessPoint,
+    ScanMode.ont => DeviceType.ont,
+    ScanMode.switchDevice => DeviceType.switchDevice,
+    ScanMode.auto || ScanMode.rxg => DeviceType.accessPoint,
+  };
 
   /// Truncates a string for logging purposes.
   static String truncateForLog(String value, {int maxLength = 20}) {

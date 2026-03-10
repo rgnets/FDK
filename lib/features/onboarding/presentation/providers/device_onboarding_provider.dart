@@ -2,7 +2,7 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/onboarding/data/resolvers/message_resolver.dart';
 import 'package:rgnets_fdk/features/onboarding/data/services/stage_timestamp_tracker.dart';

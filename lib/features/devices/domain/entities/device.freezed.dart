@@ -53,6 +53,12 @@ mixin _$Device {
   /// Signed IDs for images - used for API operations (upload/delete).
   /// When updating images, the server expects signed IDs for existing images.
   List<String>? get imageSignedIds => throw _privateConstructorUsedError;
+
+  /// Health notices associated with this device
+  List<HealthNotice>? get healthNotices => throw _privateConstructorUsedError;
+
+  /// Aggregated health notice counts
+  HealthCounts? get hnCounts => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -89,7 +95,9 @@ mixin _$Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -129,7 +137,9 @@ mixin _$Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)?
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -169,7 +179,9 @@ mixin _$Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)?
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -234,9 +246,12 @@ abstract class $DeviceCopyWith<$Res> {
       int? maxClients,
       String? note,
       List<String>? images,
-      List<String>? imageSignedIds});
+      List<String>? imageSignedIds,
+      List<HealthNotice>? healthNotices,
+      HealthCounts? hnCounts});
 
   $RoomCopyWith<$Res>? get pmsRoom;
+  $HealthCountsCopyWith<$Res>? get hnCounts;
 }
 
 /// @nodoc
@@ -286,6 +301,8 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
     Object? note = freezed,
     Object? images = freezed,
     Object? imageSignedIds = freezed,
+    Object? healthNotices = freezed,
+    Object? hnCounts = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -424,6 +441,14 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
           ? _value.imageSignedIds
           : imageSignedIds // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      healthNotices: freezed == healthNotices
+          ? _value.healthNotices
+          : healthNotices // ignore: cast_nullable_to_non_nullable
+              as List<HealthNotice>?,
+      hnCounts: freezed == hnCounts
+          ? _value.hnCounts
+          : hnCounts // ignore: cast_nullable_to_non_nullable
+              as HealthCounts?,
     ) as $Val);
   }
 
@@ -436,6 +461,18 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
 
     return $RoomCopyWith<$Res>(_value.pmsRoom!, (value) {
       return _then(_value.copyWith(pmsRoom: value) as $Val);
+    });
+  }
+
+  @override
+  @pragma('vm:prefer-inline')
+  $HealthCountsCopyWith<$Res>? get hnCounts {
+    if (_value.hnCounts == null) {
+      return null;
+    }
+
+    return $HealthCountsCopyWith<$Res>(_value.hnCounts!, (value) {
+      return _then(_value.copyWith(hnCounts: value) as $Val);
     });
   }
 }
@@ -481,10 +518,14 @@ abstract class _$$DeviceImplCopyWith<$Res> implements $DeviceCopyWith<$Res> {
       int? maxClients,
       String? note,
       List<String>? images,
-      List<String>? imageSignedIds});
+      List<String>? imageSignedIds,
+      List<HealthNotice>? healthNotices,
+      HealthCounts? hnCounts});
 
   @override
   $RoomCopyWith<$Res>? get pmsRoom;
+  @override
+  $HealthCountsCopyWith<$Res>? get hnCounts;
 }
 
 /// @nodoc
@@ -532,6 +573,8 @@ class __$$DeviceImplCopyWithImpl<$Res>
     Object? note = freezed,
     Object? images = freezed,
     Object? imageSignedIds = freezed,
+    Object? healthNotices = freezed,
+    Object? hnCounts = freezed,
   }) {
     return _then(_$DeviceImpl(
       id: null == id
@@ -670,6 +713,14 @@ class __$$DeviceImplCopyWithImpl<$Res>
           ? _value._imageSignedIds
           : imageSignedIds // ignore: cast_nullable_to_non_nullable
               as List<String>?,
+      healthNotices: freezed == healthNotices
+          ? _value._healthNotices
+          : healthNotices // ignore: cast_nullable_to_non_nullable
+              as List<HealthNotice>?,
+      hnCounts: freezed == hnCounts
+          ? _value.hnCounts
+          : hnCounts // ignore: cast_nullable_to_non_nullable
+              as HealthCounts?,
     ));
   }
 }
@@ -711,10 +762,13 @@ class _$DeviceImpl extends _Device {
       this.maxClients,
       this.note,
       final List<String>? images,
-      final List<String>? imageSignedIds})
+      final List<String>? imageSignedIds,
+      final List<HealthNotice>? healthNotices,
+      this.hnCounts})
       : _metadata = metadata,
         _images = images,
         _imageSignedIds = imageSignedIds,
+        _healthNotices = healthNotices,
         super._();
 
   @override
@@ -814,9 +868,26 @@ class _$DeviceImpl extends _Device {
     return EqualUnmodifiableListView(value);
   }
 
+  /// Health notices associated with this device
+  final List<HealthNotice>? _healthNotices;
+
+  /// Health notices associated with this device
+  @override
+  List<HealthNotice>? get healthNotices {
+    final value = _healthNotices;
+    if (value == null) return null;
+    if (_healthNotices is EqualUnmodifiableListView) return _healthNotices;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
+  /// Aggregated health notice counts
+  @override
+  final HealthCounts? hnCounts;
+
   @override
   String toString() {
-    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds)';
+    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts)';
   }
 
   @override
@@ -877,7 +948,11 @@ class _$DeviceImpl extends _Device {
             (identical(other.note, note) || other.note == note) &&
             const DeepCollectionEquality().equals(other._images, _images) &&
             const DeepCollectionEquality()
-                .equals(other._imageSignedIds, _imageSignedIds));
+                .equals(other._imageSignedIds, _imageSignedIds) &&
+            const DeepCollectionEquality()
+                .equals(other._healthNotices, _healthNotices) &&
+            (identical(other.hnCounts, hnCounts) ||
+                other.hnCounts == hnCounts));
   }
 
   @override
@@ -916,7 +991,9 @@ class _$DeviceImpl extends _Device {
         maxClients,
         note,
         const DeepCollectionEquality().hash(_images),
-        const DeepCollectionEquality().hash(_imageSignedIds)
+        const DeepCollectionEquality().hash(_imageSignedIds),
+        const DeepCollectionEquality().hash(_healthNotices),
+        hnCounts
       ]);
 
   @JsonKey(ignore: true)
@@ -962,7 +1039,9 @@ class _$DeviceImpl extends _Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)
         $default,
   ) {
     return $default(
@@ -999,7 +1078,9 @@ class _$DeviceImpl extends _Device {
         maxClients,
         note,
         images,
-        imageSignedIds);
+        imageSignedIds,
+        healthNotices,
+        hnCounts);
   }
 
   @override
@@ -1039,7 +1120,9 @@ class _$DeviceImpl extends _Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)?
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)?
         $default,
   ) {
     return $default?.call(
@@ -1076,7 +1159,9 @@ class _$DeviceImpl extends _Device {
         maxClients,
         note,
         images,
-        imageSignedIds);
+        imageSignedIds,
+        healthNotices,
+        hnCounts);
   }
 
   @override
@@ -1116,7 +1201,9 @@ class _$DeviceImpl extends _Device {
             int? maxClients,
             String? note,
             List<String>? images,
-            List<String>? imageSignedIds)?
+            List<String>? imageSignedIds,
+            List<HealthNotice>? healthNotices,
+            HealthCounts? hnCounts)?
         $default, {
     required TResult orElse(),
   }) {
@@ -1155,7 +1242,9 @@ class _$DeviceImpl extends _Device {
           maxClients,
           note,
           images,
-          imageSignedIds);
+          imageSignedIds,
+          healthNotices,
+          hnCounts);
     }
     return orElse();
   }
@@ -1224,7 +1313,9 @@ abstract class _Device extends Device {
       final int? maxClients,
       final String? note,
       final List<String>? images,
-      final List<String>? imageSignedIds}) = _$DeviceImpl;
+      final List<String>? imageSignedIds,
+      final List<HealthNotice>? healthNotices,
+      final HealthCounts? hnCounts}) = _$DeviceImpl;
   const _Device._() : super._();
 
   @override
@@ -1298,6 +1389,14 @@ abstract class _Device extends Device {
   /// Signed IDs for images - used for API operations (upload/delete).
   /// When updating images, the server expects signed IDs for existing images.
   List<String>? get imageSignedIds;
+  @override
+
+  /// Health notices associated with this device
+  List<HealthNotice>? get healthNotices;
+  @override
+
+  /// Aggregated health notice counts
+  HealthCounts? get hnCounts;
   @override
   @JsonKey(ignore: true)
   _$$DeviceImplCopyWith<_$DeviceImpl> get copyWith =>

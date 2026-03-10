@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
-import 'package:rgnets_fdk/core/theme/app_theme.dart';
+import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
+import 'package:rgnets_fdk/main.dart' show FDKApp;
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
@@ -23,6 +23,13 @@ void main() async {
     return;
   }
 
+  // Initialize onboarding configuration
+  try {
+    await OnboardingConfig.initialize();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize OnboardingConfig: $e');
+  }
+
   runApp(
     ProviderScope(
       overrides: [
@@ -31,21 +38,4 @@ void main() async {
       child: const FDKApp(),
     ),
   );
-}
-
-class FDKApp extends StatelessWidget {
-  const FDKApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'RG Nets FDK',
-      debugShowCheckedModeBanner:
-          false, // Never show debug banner in production
-      theme: AppTheme.darkTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
-      routerConfig: AppRouter.router,
-    );
-  }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 
 /// Visual progress bar showing onboarding stage progress.
 class OnboardingProgressIndicator extends StatelessWidget {

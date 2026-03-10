@@ -7,106 +7,77 @@ class ListItemHelpers {
   ListItemHelpers._();
 
   /// Get icon for device type
-  static IconData getDeviceIcon(String type) {
-    switch (type) {
-      case 'access_point':
-        return Icons.wifi;
-      case 'switch':
-        return Icons.hub;
-      case 'ont':
-        return Icons.fiber_manual_record;
-      case 'wlan_controller':
-        return Icons.router;
-      default:
-        return Icons.devices_other;
-    }
-  }
+  static IconData getDeviceIcon(String type) => switch (type) {
+    'access_point' => Icons.wifi,
+    'switch' => Icons.hub,
+    'ont' => Icons.fiber_manual_record,
+    'wlan_controller' => Icons.router,
+    _ => Icons.devices_other,
+  };
 
   /// Map device status to unified status
-  static UnifiedItemStatus mapDeviceStatus(String status) {
-    switch (status.toLowerCase()) {
-      case 'online':
-        return UnifiedItemStatus.online;
-      case 'offline':
-        return UnifiedItemStatus.offline;
-      case 'warning':
-        return UnifiedItemStatus.warning;
-      case 'error':
-        return UnifiedItemStatus.error;
-      default:
-        return UnifiedItemStatus.unknown;
-    }
-  }
+  static UnifiedItemStatus mapDeviceStatus(String status) => switch (status.toLowerCase()) {
+    'online' => UnifiedItemStatus.online,
+    'offline' => UnifiedItemStatus.offline,
+    'warning' => UnifiedItemStatus.warning,
+    'error' => UnifiedItemStatus.error,
+    _ => UnifiedItemStatus.unknown,
+  };
 
-  /// Get color for status
-  static Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'online':
-        return Colors.green;
-      case 'offline':
-        return Colors.red;
-      case 'warning':
-        return Colors.orange;
-      case 'error':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
+  /// Get color for status (list items: offline = red for visibility)
+  static Color getStatusColor(String status) => switch (status.toLowerCase()) {
+    'online' => Colors.green,
+    'offline' => Colors.red,
+    'warning' => Colors.orange,
+    'error' => Colors.red,
+    _ => Colors.grey,
+  };
+
+  /// Get color for status in filter buttons (offline = grey for inactive look)
+  static Color getFilterStatusColor(String status) => switch (status.toLowerCase()) {
+    'online' => Colors.green,
+    'offline' => Colors.grey,
+    'warning' => Colors.orange,
+    'error' => Colors.red,
+    _ => Colors.grey,
+  };
+
+  /// Get icon for device status
+  static IconData getStatusIcon(String status) => switch (status.toLowerCase()) {
+    'online' => Icons.check_circle,
+    'offline' => Icons.cancel,
+    'warning' => Icons.warning,
+    'error' => Icons.error,
+    _ => Icons.help,
+  };
 
   /// Get icon for notification type
-  static IconData getNotificationIcon(String type) {
-    switch (type) {
-      case 'deviceOffline':
-        return Icons.wifi_off;
-      case 'deviceNote':
-        return Icons.note_outlined;
-      case 'missingImage':
-        return Icons.image_not_supported_outlined;
-      case 'deviceOnline':
-        return Icons.check_circle_outline;
-      case 'error':
-        return Icons.error_outline;
-      case 'warning':
-        return Icons.warning_amber;
-      case 'info':
-        return Icons.info_outline;
-      default:
-        return Icons.notifications;
-    }
-  }
+  static IconData getNotificationIcon(String type) => switch (type) {
+    'deviceOffline' => Icons.wifi_off,
+    'deviceNote' => Icons.note_outlined,
+    'missingImage' => Icons.image_not_supported_outlined,
+    'deviceOnline' => Icons.check_circle_outline,
+    'error' => Icons.error_outline,
+    'warning' => Icons.warning_amber,
+    'info' => Icons.info_outline,
+    _ => Icons.notifications,
+  };
 
   /// Get color for notification type
-  static Color getNotificationColor(String type) {
-    // Unified colors: Red for critical, Orange for warnings, Blue for info
-    switch (type) {
-      case 'deviceOffline':
-      case 'error':
-        return Colors.red;
-      case 'deviceNote':
-      case 'warning':
-        return Colors.orange;
-      case 'missingImage':
-      case 'info':
-        return Colors.blue;
-      case 'deviceOnline':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
+  static Color getNotificationColor(String type) => switch (type) {
+    'deviceOffline' || 'error' => Colors.red,
+    'deviceNote' || 'warning' => Colors.orange,
+    'missingImage' || 'info' => Colors.blue,
+    'deviceOnline' => Colors.green,
+    _ => Colors.grey,
+  };
 
   /// Map notification priority to unified status
-  static UnifiedItemStatus mapNotificationStatus(NotificationPriority priority) {
-    switch (priority) {
-      case NotificationPriority.urgent:
-        return UnifiedItemStatus.error;
-      case NotificationPriority.medium:
-        return UnifiedItemStatus.warning;
-      case NotificationPriority.low:
-        return UnifiedItemStatus.info;
-    }
-  }
+  static UnifiedItemStatus mapNotificationStatus(NotificationPriority priority) => switch (priority) {
+    NotificationPriority.urgent => UnifiedItemStatus.error,
+    NotificationPriority.medium => UnifiedItemStatus.warning,
+    NotificationPriority.low => UnifiedItemStatus.info,
+  };
 
   /// Format timestamp for display
   static String formatTimestamp(DateTime timestamp) {

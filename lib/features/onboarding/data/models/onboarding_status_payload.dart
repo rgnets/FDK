@@ -12,10 +12,10 @@ part 'onboarding_status_payload.g.dart';
 @freezed
 class OnboardingStatusPayload with _$OnboardingStatusPayload {
   const factory OnboardingStatusPayload({
-    /// Current onboarding stage (1-5 for ONT, 1-6 for AP, 0 = not started)
+    /// Current onboarding stage (1-6 for ONT, 1-6 for AP, 0 = not started)
     int? stage,
 
-    /// Maximum number of stages (5 for ONT, 6 for AP)
+    /// Maximum number of stages (6 for ONT, 6 for AP)
     @JsonKey(name: 'max_stages') int? maxStages,
 
     /// Human-readable status text

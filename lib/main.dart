@@ -15,6 +15,7 @@ import 'package:rgnets_fdk/core/services/error_reporter.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
+import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
@@ -36,114 +37,117 @@ void _configureImageCache() {
   cache.maximumSize = maxCount;
 }
 
-void main() async {
+void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await _initializeApp();
+  }, (error, stackTrace) async {
+    await ErrorReporter.report(error, stackTrace: stackTrace);
+  });
+}
 
-    // Lock orientation to portrait mode
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+/// App initialization extracted from main() so the retry path does not
+/// re-enter runZonedGuarded or re-call ensureInitialized.
+Future<void> _initializeApp() async {
+  // Lock orientation to portrait mode
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-    // Set environment from dart-define
-    const envString = String.fromEnvironment(
-      'ENVIRONMENT',
-      defaultValue: 'development',
-    );
-    // Starting app - environment info available via EnvironmentConfig
+  // Set environment from dart-define
+  const envString = String.fromEnvironment(
+    'ENVIRONMENT',
+    defaultValue: 'development',
+  );
 
-    Environment env;
-    switch (envString.toLowerCase()) {
-      case 'staging':
-        env = Environment.staging;
-        break;
-      case 'production':
-        env = Environment.production;
-        break;
-      case 'development':
-      default:
-        env = Environment.development;
-        break;
+  Environment env;
+  switch (envString.toLowerCase()) {
+    case 'staging':
+      env = Environment.staging;
+      break;
+    case 'production':
+      env = Environment.production;
+      break;
+    case 'development':
+    default:
+      env = Environment.development;
+      break;
+  }
+
+  EnvironmentConfig.setEnvironment(env);
+  await AppInitializer.initializeSentry();
+  final enableCrashReporting = EnvironmentConfig.sentryDsn.isNotEmpty;
+  LoggerService.configure(enableCrashReporting: enableCrashReporting);
+  _configureImageCache();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    if (ErrorReporter.isEnabled) {
+      unawaited(
+        Sentry.captureException(
+          details.exception,
+          stackTrace: details.stack,
+        ),
+      );
     }
+  };
 
-    EnvironmentConfig.setEnvironment(env);
-    await AppInitializer.initializeSentry();
-    final enableCrashReporting = EnvironmentConfig.sentryDsn.isNotEmpty;
-    LoggerService.configure(enableCrashReporting: enableCrashReporting);
-    _configureImageCache();
-    // Environment configuration complete - details available via EnvironmentConfig getters
-
-    FlutterError.onError = (details) {
-      FlutterError.presentError(details);
-      if (ErrorReporter.isEnabled) {
-        unawaited(
-          Sentry.captureException(
-            details.exception,
-            stackTrace: details.stack,
-          ),
-        );
-      }
-    };
-
-    // Initialize providers with error handling
-    late final SharedPreferences sharedPreferences;
-    try {
-      sharedPreferences = await SharedPreferences.getInstance();
-    } on Exception catch (e) {
-      debugPrint('Failed to initialize SharedPreferences: $e');
-      // Show error UI instead of silent exit
-      runApp(
-        MaterialApp(
-          home: Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Storage Initialization Failed',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Error: $e', textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => main(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
+  // Initialize providers with error handling
+  late final SharedPreferences sharedPreferences;
+  try {
+    sharedPreferences = await SharedPreferences.getInstance();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize SharedPreferences: $e');
+    // Show error UI instead of silent exit
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Storage Initialization Failed',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Error: $e', textAlign: TextAlign.center),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => _initializeApp(),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      );
-      return;
-    }
-
-    // Initialize onboarding configuration
-    try {
-      await OnboardingConfig.initialize();
-    } on Exception catch (e) {
-      debugPrint('Failed to initialize OnboardingConfig: $e');
-      // Non-fatal - app can continue without onboarding UI
-    }
-
-    runApp(
-      ProviderScope(
-        overrides: [
-          sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-        ],
-        child: const FDKApp(),
       ),
     );
-  }, (error, stackTrace) async {
-    await ErrorReporter.report(error, stackTrace: stackTrace);
-  });
+    return;
+  }
+
+  // Initialize onboarding configuration
+  try {
+    await OnboardingConfig.initialize();
+  } on Exception catch (e) {
+    debugPrint('Failed to initialize OnboardingConfig: $e');
+    // Non-fatal - app can continue without onboarding UI
+  }
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const FDKApp(),
+    ),
+  );
 }
 
 class FDKApp extends ConsumerStatefulWidget {
@@ -203,6 +207,9 @@ class _FDKAppState extends ConsumerState<FDKApp> {
       onSuccess: () => AppRouter.router.go('/home'),
       onCancel: () => AppRouter.router.go('/auth'),
       onError: () => AppRouter.router.go('/auth'),
+      // Skip getInitialLink() when the router already captured the deeplink —
+      // the SplashScreen handles it directly to avoid a duplicate dialog.
+      skipInitialLink: AppRouter.deeplinkCapturedByRouter,
     );
   }
 
@@ -238,7 +245,9 @@ class _FDKAppState extends ConsumerState<FDKApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for auth state changes in build (required by Riverpod)
+    // ref.listen in build() is Riverpod's recommended pattern for ConsumerStatefulWidget.
+    // The framework automatically removes the previous listener on rebuild,
+    // preventing duplicate side-effects.
     ref.listen<bool>(isAuthenticatedProvider, (previous, isAuthenticated) {
       final wasAuthenticated = previous ?? false;
       if (isAuthenticated && !wasAuthenticated) {
@@ -247,56 +256,76 @@ class _FDKAppState extends ConsumerState<FDKApp> {
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).initialize();
-      } else if (!isAuthenticated && wasAuthenticated) {
+      } else if (!isNowAuthenticated && wasAuthenticated) {
+        // Only treat as a real sign-out if the new state is unauthenticated
+        // or failure. The "authenticating" state is an intermediate step
+        // during deeplink re-auth and should NOT trigger sign-out navigation.
+        final isRealSignOut = nextStatus?.maybeWhen(
+              unauthenticated: () => true,
+              failure: (_) => true,
+              orElse: () => false,
+            ) ??
+            false;
+
+        if (!isRealSignOut) {
+          LoggerService.info(
+            'Auth state changed to $nextStatus (not a sign-out, ignoring)',
+            tag: 'Init',
+          );
+          return;
+        }
+
         LoggerService.info(
           'User signed out, navigating to auth screen',
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).reset();
 
-        // Check if there's a sign-out reason to display
+        // Navigate to auth screen FIRST — this must happen regardless of
+        // whether a sign-out reason dialog is shown. Previously the dialog
+        // used `return` to defer navigation to the dialog's button, but
+        // concurrent data-provider invalidation (from authSignOutCleanupProvider)
+        // could cause rebuilds that dismissed the dialog, leaving the user
+        // stuck on an empty home screen.
+        AppRouter.router.go('/auth');
+
+        // If there's a sign-out reason, show it as a dialog on top of /auth
         final signOutReason = ref.read(signOutReasonProvider);
         if (signOutReason != null) {
-          // Clear the reason so it doesn't show again
           ref.read(signOutReasonProvider.notifier).state = null;
 
-          // Show dialog explaining why the user was signed out
-          final navigatorContext =
-              AppRouter.router.routerDelegate.navigatorKey.currentContext;
-          if (navigatorContext != null) {
-            LoggerService.info(
-              'Showing sign-out reason dialog',
-              tag: 'Auth',
-            );
-            showDialog<void>(
-              context: navigatorContext,
-              barrierDismissible: false,
-              builder: (context) => AlertDialog(
-                title: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.orange),
-                    SizedBox(width: 12),
-                    Expanded(child: Text('Session Ended')),
+          // Schedule dialog after the navigation frame completes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final navigatorContext =
+                AppRouter.router.routerDelegate.navigatorKey.currentContext;
+            if (navigatorContext != null) {
+              LoggerService.info(
+                'Showing sign-out reason dialog',
+                tag: 'Auth',
+              );
+              showDialog<void>(
+                context: navigatorContext,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange),
+                      SizedBox(width: 12),
+                      Expanded(child: Text('Session Ended')),
+                    ],
+                  ),
+                  content: Text(signOutReason),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
                   ],
                 ),
-                content: Text(signOutReason),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      AppRouter.router.go('/auth');
-                    },
-                    child: const Text('Sign In'),
-                  ),
-                ],
-              ),
-            );
-            return; // Don't navigate yet - dialog will handle it
-          }
+              );
+            }
+          });
         }
-
-        // Navigate to auth screen so user can sign back in
-        AppRouter.router.go('/auth');
       }
     });
 

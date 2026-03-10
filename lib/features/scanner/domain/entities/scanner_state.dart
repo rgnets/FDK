@@ -81,25 +81,18 @@ class AccumulatedScanData with _$AccumulatedScanData {
   const AccumulatedScanData._();
 
   /// Check if data is complete based on device type.
-  bool isCompleteFor(ScanMode mode) {
-    switch (mode) {
-      case ScanMode.ont:
-        // ONT requires: MAC + ALCL Serial + Part Number
-        return mac.isNotEmpty &&
-            serialNumber.isNotEmpty &&
-            partNumber.isNotEmpty &&
-            hasValidSerial;
-      case ScanMode.accessPoint:
-        // AP requires: MAC + AP Serial (1K9/1M3/1HN)
-        return mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial;
-      case ScanMode.switchDevice:
-        // Switch requires: MAC + LL/EC Serial
-        return mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial;
-      case ScanMode.rxg:
-      case ScanMode.auto:
-        return false;
-    }
-  }
+  bool isCompleteFor(ScanMode mode) => switch (mode) {
+    // ONT requires: MAC + ALCL Serial + Part Number
+    ScanMode.ont => mac.isNotEmpty &&
+        serialNumber.isNotEmpty &&
+        partNumber.isNotEmpty &&
+        hasValidSerial,
+    // AP requires: MAC + AP Serial (1K9/1M3/1HN)
+    ScanMode.accessPoint => mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial,
+    // Switch requires: MAC + LL/EC Serial
+    ScanMode.switchDevice => mac.isNotEmpty && serialNumber.isNotEmpty && hasValidSerial,
+    ScanMode.rxg || ScanMode.auto => false,
+  };
 
   /// Get list of missing fields for display.
   List<String> getMissingFields(ScanMode mode) {
@@ -275,35 +268,21 @@ class ScannerState with _$ScannerState {
 }
 
 extension ScanModeX on ScanMode {
-  String get displayName {
-    switch (this) {
-      case ScanMode.auto:
-        return 'Auto Detect';
-      case ScanMode.rxg:
-        return 'RxG Credentials';
-      case ScanMode.accessPoint:
-        return 'Access Point';
-      case ScanMode.ont:
-        return 'ONT';
-      case ScanMode.switchDevice:
-        return 'Switch';
-    }
-  }
+  String get displayName => switch (this) {
+    ScanMode.auto => 'Auto Detect',
+    ScanMode.rxg => 'RxG Credentials',
+    ScanMode.accessPoint => 'Access Point',
+    ScanMode.ont => 'ONT',
+    ScanMode.switchDevice => 'Switch',
+  };
 
-  String get abbreviation {
-    switch (this) {
-      case ScanMode.auto:
-        return 'AUTO';
-      case ScanMode.rxg:
-        return 'RXG';
-      case ScanMode.accessPoint:
-        return 'AP';
-      case ScanMode.ont:
-        return 'ONT';
-      case ScanMode.switchDevice:
-        return 'SW';
-    }
-  }
+  String get abbreviation => switch (this) {
+    ScanMode.auto => 'AUTO',
+    ScanMode.rxg => 'RXG',
+    ScanMode.accessPoint => 'AP',
+    ScanMode.ont => 'ONT',
+    ScanMode.switchDevice => 'SW',
+  };
 
   /// Whether this mode requires serial validation.
   bool get requiresSerial =>
@@ -312,61 +291,38 @@ extension ScanModeX on ScanMode {
       this == ScanMode.switchDevice;
 
   /// Get the required fields for this mode.
-  List<String> get requiredFields {
-    switch (this) {
-      case ScanMode.ont:
-        return ['MAC Address', 'Serial Number (ALCL)', 'Part Number'];
-      case ScanMode.accessPoint:
-        return ['MAC Address', 'Serial Number (1K9/1M3/1HN)'];
-      case ScanMode.switchDevice:
-        return ['MAC Address', 'Serial Number (LL/EC)'];
-      case ScanMode.rxg:
-        return ['QR Code'];
-      case ScanMode.auto:
-        return [];
-    }
-  }
+  List<String> get requiredFields => switch (this) {
+    ScanMode.ont => ['MAC Address', 'Serial Number (ALCL)', 'Part Number'],
+    ScanMode.accessPoint => ['MAC Address', 'Serial Number (1K9/1M3/1HN)'],
+    ScanMode.switchDevice => ['MAC Address', 'Serial Number (LL/EC)'],
+    ScanMode.rxg => ['QR Code'],
+    ScanMode.auto => [],
+  };
 }
 
 extension ScannerUIStateX on ScannerUIState {
-  String get displayName {
-    switch (this) {
-      case ScannerUIState.idle:
-        return 'Ready';
-      case ScannerUIState.scanning:
-        return 'Scanning';
-      case ScannerUIState.processing:
-        return 'Processing';
-      case ScannerUIState.validating:
-        return 'Validating';
-      case ScannerUIState.success:
-        return 'Complete';
-      case ScannerUIState.error:
-        return 'Error';
-      case ScannerUIState.popup:
-        return 'Registration';
-    }
-  }
+  String get displayName => switch (this) {
+    ScannerUIState.idle => 'Ready',
+    ScannerUIState.scanning => 'Scanning',
+    ScannerUIState.processing => 'Processing',
+    ScannerUIState.validating => 'Validating',
+    ScannerUIState.success => 'Complete',
+    ScannerUIState.error => 'Error',
+    ScannerUIState.popup => 'Registration',
+  };
 
   bool get isActive =>
       this == ScannerUIState.scanning || this == ScannerUIState.processing;
 }
 
 extension DeviceMatchStatusX on DeviceMatchStatus {
-  String get displayName {
-    switch (this) {
-      case DeviceMatchStatus.unchecked:
-        return 'Not Checked';
-      case DeviceMatchStatus.fullMatch:
-        return 'Device Found';
-      case DeviceMatchStatus.mismatch:
-        return 'Mismatch';
-      case DeviceMatchStatus.multipleMatch:
-        return 'Multiple Matches';
-      case DeviceMatchStatus.noMatch:
-        return 'New Device';
-    }
-  }
+  String get displayName => switch (this) {
+    DeviceMatchStatus.unchecked => 'Not Checked',
+    DeviceMatchStatus.fullMatch => 'Device Found',
+    DeviceMatchStatus.mismatch => 'Mismatch',
+    DeviceMatchStatus.multipleMatch => 'Multiple Matches',
+    DeviceMatchStatus.noMatch => 'New Device',
+  };
 
   bool get isConflict =>
       this == DeviceMatchStatus.mismatch ||

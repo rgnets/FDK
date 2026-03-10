@@ -30,16 +30,10 @@ extension DeviceCategoryX on DeviceCategory {
   bool get isPlaceholder => this == DeviceCategory.designed;
 
   /// Returns a human-readable label for UI display.
-  String get displayLabel {
-    switch (this) {
-      case DeviceCategory.designed:
-        return 'Designed';
-      case DeviceCategory.assigned:
-        return 'Assigned';
-      case DeviceCategory.ephemeral:
-        return 'Ephemeral';
-      case DeviceCategory.invalid:
-        return 'Invalid';
-    }
-  }
+  String get displayLabel => switch (this) {
+    DeviceCategory.designed => 'Designed',
+    DeviceCategory.assigned => 'Assigned',
+    DeviceCategory.ephemeral => 'Ephemeral',
+    DeviceCategory.invalid => 'Invalid',
+  };
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 import 'package:rgnets_fdk/features/onboarding/presentation/providers/device_onboarding_provider.dart';
 
 /// Card widget displaying full onboarding status matching the design:
@@ -61,15 +61,13 @@ class OnboardingStatusCardContent extends StatelessWidget {
     final isComplete = state.isComplete;
     final isStageOne = state.currentStage == 1;
 
-
-    
-    final titleColor = isComplete
-        ? Colors.black87
-        : isStageOne
-            ? Colors.orange
-            : Colors.white;
+    final titleColor = isStageOne ? Colors.orange : Colors.white;
     final stageColor = isComplete ? Colors.green : Colors.orange;
-    final titleBgColor = isComplete || isStageOne ? null : Colors.orange;
+    final titleBgColor = isComplete
+        ? Colors.green
+        : isStageOne
+            ? null
+            : Colors.orange;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +79,7 @@ class OnboardingStatusCardContent extends StatelessWidget {
             height: 1,
           ),
 
-        if (!isComplete && !isStageOne)
+        if (!isStageOne)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -96,7 +94,7 @@ class OnboardingStatusCardContent extends StatelessWidget {
             ),
           ),
 
-        if (!isComplete && isStageOne)
+        if (isStageOne)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Text(
@@ -118,18 +116,6 @@ class OnboardingStatusCardContent extends StatelessWidget {
                 _buildErrorBox(context),
                 const SizedBox(height: 12),
               ],
-
-              if (isComplete)
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: titleColor,
-                  ),
-                ),
-
-              if (isComplete) const SizedBox(height: 4),
 
               Text(
                 'Stage ${state.currentStage}/${state.maxStages}',
