@@ -4,6 +4,7 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/mock_data_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
+import 'package:rgnets_fdk/features/auth/data/models/auth_attempt.dart';
 import 'package:rgnets_fdk/features/auth/data/models/user_model.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/repositories/auth_repository.dart';
@@ -128,5 +129,40 @@ class AuthRepositoryImpl implements AuthRepository {
     } on Exception catch (e) {
       return Left(AuthFailure(message: 'Failed to check auth status: $e'));
     }
+  }
+
+  @override
+  Future<void> recordAuthAttempt({
+    required String fqdn,
+    required String login,
+    required bool success,
+    String? siteName,
+    String? message,
+  }) async {
+    final attempt = AuthAttempt(
+      fqdn: fqdn,
+      login: login,
+      siteName: siteName,
+      success: success,
+      message: message,
+      timestamp: DateTime.now().toUtc(),
+    );
+    await localDataSource.logAuthAttempt(attempt);
+  }
+
+  @override
+  Future<User> createAndSaveUser({
+    required String login,
+    required String fqdn,
+    required String siteName,
+  }) async {
+    final userModel = UserModel(
+      username: login,
+      siteUrl: 'https://$fqdn',
+      displayName: siteName.isEmpty ? login : siteName,
+      email: null,
+    );
+    await localDataSource.saveUser(userModel);
+    return userModel.toEntity();
   }
 }

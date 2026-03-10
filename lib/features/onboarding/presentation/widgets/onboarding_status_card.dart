@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_state.dart';
+import 'package:rgnets_fdk/features/onboarding/domain/entities/onboarding_state.dart';
 import 'package:rgnets_fdk/features/onboarding/presentation/providers/device_onboarding_provider.dart';
 
 /// Card widget displaying full onboarding status matching the design:

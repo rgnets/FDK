@@ -79,7 +79,7 @@ final filteredHealthNoticesProvider = Provider<List<HealthNotice>>.internal(
 
 typedef FilteredHealthNoticesRef = ProviderRef<List<HealthNotice>>;
 String _$aggregateHealthCountsNotifierHash() =>
-    r'e1d885c165222c124385a2712b28eab681a03fd8';
+    r'2e1167f11c93ca6cf1170aaf2652007fa332b0c4';
 
 /// Provider that aggregates health counts from cached device data
 /// This uses device data that's already received via WebSocket
@@ -99,7 +99,7 @@ final aggregateHealthCountsNotifierProvider =
 
 typedef _$AggregateHealthCountsNotifier = AsyncNotifier<HealthCounts>;
 String _$healthNoticesNotifierHash() =>
-    r'28a2b80865d7fad788574fe58801892ef2496b80';
+    r'59b2761fab987a7a27ccba21bbbe003e5e2368df';
 
 /// Provider that extracts health notices from cached device data
 ///
