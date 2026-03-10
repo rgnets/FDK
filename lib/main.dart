@@ -15,7 +15,6 @@ import 'package:rgnets_fdk/core/services/error_reporter.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
-import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
@@ -256,25 +255,7 @@ class _FDKAppState extends ConsumerState<FDKApp> {
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).initialize();
-      } else if (!isNowAuthenticated && wasAuthenticated) {
-        // Only treat as a real sign-out if the new state is unauthenticated
-        // or failure. The "authenticating" state is an intermediate step
-        // during deeplink re-auth and should NOT trigger sign-out navigation.
-        final isRealSignOut = nextStatus?.maybeWhen(
-              unauthenticated: () => true,
-              failure: (_) => true,
-              orElse: () => false,
-            ) ??
-            false;
-
-        if (!isRealSignOut) {
-          LoggerService.info(
-            'Auth state changed to $nextStatus (not a sign-out, ignoring)',
-            tag: 'Init',
-          );
-          return;
-        }
-
+      } else if (!isAuthenticated && wasAuthenticated) {
         LoggerService.info(
           'User signed out, navigating to auth screen',
           tag: 'Init',
