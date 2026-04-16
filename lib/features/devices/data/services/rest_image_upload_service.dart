@@ -95,6 +95,73 @@ class RestImageUploadService {
     }
   }
 
+  /// Strict variant of [fetchCurrentSignedIds] that throws
+  /// [ImageFetchException] on any failure instead of silently returning an
+  /// empty list. Use this at the pre-upload fetch site so the caller can
+  /// abort rather than PUT an empty `images` array — the backend treats
+  /// that as a full replacement and would purge every existing attachment.
+  Future<List<String>> fetchCurrentSignedIdsStrict({
+    required String resourceType,
+    required String deviceId,
+  }) async {
+    final url =
+        'https://$_siteUrl/api/$resourceType/$deviceId.json?api_key=$_apiKey';
+
+    LoggerService.debug(
+      'Strict fetch of current signed IDs for $resourceType/$deviceId',
+      tag: 'RestImageUploadService',
+    );
+
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(url);
+
+      if (response.statusCode != 200) {
+        throw ImageFetchException(
+            'Server returned HTTP ${response.statusCode}');
+      }
+      if (response.data == null) {
+        throw ImageFetchException('Empty response body');
+      }
+
+      final images = response.data!['images'];
+      if (images == null) {
+        // Legitimate case: device exists but has no images field. Treat as
+        // an empty list — this is distinct from a silent failure.
+        return const <String>[];
+      }
+      if (images is! List) {
+        throw ImageFetchException(
+            'Unexpected images field type: ${images.runtimeType}');
+      }
+
+      final signedIds = <String>[];
+      for (final img in images) {
+        if (img is! Map) {
+          throw ImageFetchException(
+              'Unexpected image entry type: ${img.runtimeType}');
+        }
+        final signedId = img['signed_id'];
+        if (signedId is! String || signedId.isEmpty) {
+          throw ImageFetchException(
+              'Image entry missing signed_id');
+        }
+        signedIds.add(signedId);
+      }
+
+      LoggerService.debug(
+        'Strict fetch returned ${signedIds.length} signed IDs',
+        tag: 'RestImageUploadService',
+      );
+      return signedIds;
+    } on ImageFetchException {
+      rethrow;
+    } on DioException catch (e) {
+      throw ImageFetchException('${e.type}: ${e.message ?? 'network error'}');
+    } catch (e) {
+      throw ImageFetchException('$e');
+    }
+  }
+
   /// Fetches the full device data from REST API.
   ///
   /// This is used after image upload to get the latest device state
@@ -366,4 +433,15 @@ class _FailedRestImageUploadResult extends RestImageUploadResult {
           success: false,
           errorMessage: errorMessage,
         );
+}
+
+/// Thrown by [RestImageUploadService.fetchCurrentSignedIdsStrict] when the
+/// pre-upload fetch of existing signed IDs fails for any reason. Callers
+/// must catch this and abort the upload — proceeding with an empty list
+/// causes the backend to purge every existing attachment.
+class ImageFetchException implements Exception {
+  final String message;
+  ImageFetchException(this.message);
+  @override
+  String toString() => 'ImageFetchException: $message';
 }

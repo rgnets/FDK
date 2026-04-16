@@ -99,10 +99,33 @@ class ImageUploadService {
         'Fetching current signed IDs via HTTP (WebSocket only has URLs)',
         tag: 'ImageUploadService',
       );
-      currentSignedIds = await _restUploadService.fetchCurrentSignedIds(
-        resourceType: resourceType,
-        deviceId: rawId,
-      );
+      try {
+        currentSignedIds = await _restUploadService.fetchCurrentSignedIdsStrict(
+          resourceType: resourceType,
+          deviceId: rawId,
+        );
+      } on ImageFetchException catch (e) {
+        // Abort rather than PUT an empty images array — the backend treats
+        // that as a full replacement and would purge every existing
+        // attachment. See ATT-FE-Tool fix for background.
+        LoggerService.error(
+          'Aborting image upload — failed to fetch existing signed IDs: ${e.message}',
+          tag: 'ImageUploadService',
+        );
+        _eventBus.notifyUploadProgress(
+          deviceId: deviceId,
+          current: 0,
+          total: images.length,
+          status: UploadStatus.failed,
+        );
+        return ImageUploadResult(
+          success: false,
+          verificationResult: VerificationResult.failed,
+          uploadedCount: 0,
+          message:
+              "Couldn't sync existing photos. Please check your connection and try again.",
+        );
+      }
       LoggerService.debug(
         'Fetched ${currentSignedIds.length} signed IDs from server',
         tag: 'ImageUploadService',
