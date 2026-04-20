@@ -54,10 +54,11 @@ Future<void> _initializeApp() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Set environment from dart-define
+  // Set environment from dart-define. main.dart is the production entry point;
+  // dev and staging have dedicated main_development.dart / main_staging.dart.
   const envString = String.fromEnvironment(
     'ENVIRONMENT',
-    defaultValue: 'development',
+    defaultValue: 'production',
   );
 
   Environment env;
