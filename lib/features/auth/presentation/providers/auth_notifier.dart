@@ -38,6 +38,7 @@ part 'auth_notifier.g.dart';
 class Auth extends _$Auth {
   late final Logger _logger;
   int _authGeneration = 0;
+  bool _isAuthenticating = false;
   StreamSubscription<ApiKeyRevocationEvent>? _revocationSubscription;
   StreamSubscription<int>? _authFailureSubscription;
 
@@ -217,6 +218,12 @@ class Auth extends _$Auth {
       ..d('AUTH_NOTIFIER: Auth generation: $_authGeneration')
       ..d('AUTH_NOTIFIER: Current state before auth: ${state.value}');
 
+    if (_isAuthenticating) {
+      _logger.w('AUTH_NOTIFIER: ⚠️ authenticate() already in progress, ignoring duplicate call');
+      return;
+    }
+    _isAuthenticating = true;
+
     if (kIsWeb) {
       // Authentication starting - details available in logger
     }
@@ -308,6 +315,8 @@ class Auth extends _$Auth {
       );
       // Exception handled by logger
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
+    } finally {
+      _isAuthenticating = false;
     }
   }
 

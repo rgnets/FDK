@@ -12,9 +12,13 @@ WebSocketChannel createWebSocketChannel(
   Uri uri, {
   Map<String, dynamic>? headers,
 }) {
-  // Create a custom HttpClient with certificate validation
+  // Create a custom HttpClient with certificate validation.
+  // Bypass system proxy settings so the connection goes directly to the
+  // target host instead of being routed through a local proxy (which
+  // causes "Connection refused" on ephemeral proxy ports).
   final httpClient = HttpClient()
-    ..badCertificateCallback = CertificateValidator().validateCertificate;
+    ..badCertificateCallback = CertificateValidator().validateCertificate
+    ..findProxy = (uri) => 'DIRECT';
 
   return IOWebSocketChannel.connect(
     uri,

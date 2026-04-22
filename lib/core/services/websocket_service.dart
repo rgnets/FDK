@@ -261,6 +261,13 @@ class WebSocketService {
       final channel = _channelFactory(params.uri, headers: params.headers);
 
       _channel = channel;
+
+      // Wait for the actual TCP + WebSocket upgrade to complete before
+      // declaring the connection open.  Without this, the state flips to
+      // "connected" immediately (IOWebSocketChannel.connect is lazy) and
+      // callers start sending messages into a channel that isn't ready yet.
+      await channel.ready;
+
       _subscription = channel.stream.listen(
         _handleMessage,
         onDone: _handleDone,
