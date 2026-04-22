@@ -107,14 +107,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // Handle different environments
     if (EnvironmentConfig.isDevelopment) {
-      logger
-        ..i('🔧 SPLASH_SCREEN: Development mode detected')
-        ..d('SPLASH_SCREEN: Skipping auth, navigating directly to /home');
-      // Development mode: skip auth and go directly to home with synthetic data
+      logger.i('🔧 SPLASH_SCREEN: Development mode detected');
+      // Development mode: check if already authenticated, otherwise show login
+      final isAuthenticated = ref.read(isAuthenticatedProvider);
+      final destination = isAuthenticated ? '/home' : '/auth';
+      logger.d('SPLASH_SCREEN: isAuthenticated=$isAuthenticated, navigating to $destination');
       if (mounted) {
-        logger.d('SPLASH_SCREEN: Widget is mounted, navigating...');
-        context.go('/home');
-        logger.i('SPLASH_SCREEN: ✅ Navigation to /home completed');
+        context.go(destination);
+        logger.i('SPLASH_SCREEN: ✅ Navigation to $destination completed');
       } else {
         logger.w('SPLASH_SCREEN: ⚠️ Widget not mounted, skipping navigation');
       }
