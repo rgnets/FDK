@@ -81,66 +81,20 @@ String? _normalizeImageUrl(String raw, Uri? baseUri) {
   return baseUri.resolve(trimmed).toString();
 }
 
-/// Appends api_key query parameter to an image URL for authenticated access.
+/// Returns the image URL as-is. Authentication is now handled via
+/// HTTP headers (X-API-Key) passed to CachedNetworkImage's httpHeaders
+/// parameter, rather than appending api_key to the URL query string.
 ///
-/// The RXG backend requires api_key authentication for ActiveStorage images.
-/// This function adds the api_key to the URL's query parameters without
-/// duplicating it if already present.
-///
-/// Returns the original URL if:
-/// - The URL is null or empty
-/// - The apiKey is null or empty
-/// - The URL is a data: URL
-/// - The URL is not a valid HTTP/HTTPS URL
+/// The [apiKey] parameter is retained for API compatibility but is no
+/// longer used. Use [imageAuthHeadersProvider] to get the auth headers map.
 String? authenticateImageUrl(String? imageUrl, String? apiKey) {
-  if (imageUrl == null || imageUrl.isEmpty) {
-    return imageUrl;
-  }
-  if (apiKey == null || apiKey.isEmpty) {
-    return imageUrl;
-  }
-
-  final trimmed = imageUrl.trim();
-  final lower = trimmed.toLowerCase();
-
-  // Don't modify data URLs
-  if (lower.startsWith('data:')) {
-    return trimmed;
-  }
-
-  // Only process HTTP/HTTPS URLs
-  if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
-    return trimmed;
-  }
-
-  try {
-    final uri = Uri.parse(trimmed);
-
-    // Check if api_key is already present
-    if (uri.queryParameters.containsKey('api_key')) {
-      return trimmed;
-    }
-
-    // Add api_key to query parameters
-    final newParams = Map<String, String>.from(uri.queryParameters);
-    newParams['api_key'] = apiKey;
-
-    return uri.replace(queryParameters: newParams).toString();
-  } on FormatException {
-    // If URL parsing fails, return original
-    return trimmed;
-  }
+  return imageUrl;
 }
 
-/// Authenticates a list of image URLs by appending api_key to each.
+/// Returns the image URLs as-is. Authentication is now handled via
+/// HTTP headers (X-API-Key) rather than URL query parameters.
 List<String> authenticateImageUrls(List<String> imageUrls, String? apiKey) {
-  if (apiKey == null || apiKey.isEmpty) {
-    return imageUrls;
-  }
-  return imageUrls
-      .map((url) => authenticateImageUrl(url, apiKey))
-      .whereType<String>()
-      .toList();
+  return imageUrls;
 }
 
 /// Strips the api_key query parameter from a URL.
