@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,34 +50,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       // Navigation starting - environment info available in logger
     }
 
-    // Check if the router captured a deeplink URI. GoRouter consumes the
-    // platform route event so app_links / DeeplinkService never see it.
-    // Handle it directly here to avoid all timing issues.
-    Uri? deeplinkUri = AppRouter.pendingDeeplinkUri;
+    // GoRouter's redirect captures any deeplink URI into pendingDeeplinkUri
+    // before we get here. If that didn't happen, DeeplinkService.initialize()
+    // calls getInitialLink() itself and processes the URI through its own
+    // pipeline; the isProcessing/hasPendingInitialLink check below defers to
+    // it. There's no third path to cover.
+    final deeplinkUri = AppRouter.pendingDeeplinkUri;
     if (deeplinkUri != null) {
       AppRouter.pendingDeeplinkUri = null;
       logger.i('SPLASH_SCREEN: Found router-captured deeplink');
-    } else {
-      // On cold boot, GoRouter may NOT see the deeplink (app_links intercepts
-      // the intent separately). Check app_links directly as a fallback.
-      try {
-        final initialLink = await AppLinks().getInitialLink();
-        if (initialLink != null && initialLink.scheme == 'fdk') {
-          deeplinkUri = initialLink;
-          logger.i('SPLASH_SCREEN: Found deeplink from app_links getInitialLink');
-        }
-      } on Exception catch (e) {
-        logger.e('SPLASH_SCREEN: Error checking app_links initial link: $e');
-      }
-    }
 
-    if (deeplinkUri != null) {
+      // On warm-start the DeeplinkService stream listener (attached at
+      // cold-start) can fire before this callback runs and start showing
+      // its own approval sheet. If that's happened, defer — the service's
+      // onSuccess/onCancel callbacks navigate when the user approves or
+      // declines.
+      final deeplinkService = ref.read(deeplinkServiceProvider);
+      if (deeplinkService.isProcessing ||
+          deeplinkService.hasPendingInitialLink) {
+        logger.i(
+          'SPLASH_SCREEN: DeeplinkService already processing '
+          '(isProcessing=${deeplinkService.isProcessing}, '
+          'hasPendingInitialLink=${deeplinkService.hasPendingInitialLink}) — '
+          'deferring to it to avoid duplicate approval sheet',
+        );
+        return;
+      }
+
       logger.i('SPLASH_SCREEN: Processing deeplink directly');
 
       // Tell DeeplinkService to skip both getInitialLink() and the next
       // stream event — we're handling it here.
       AppRouter.deeplinkCapturedByRouter = true;
-      ref.read(deeplinkServiceProvider).markNextDeeplinkHandled();
+      deeplinkService.markNextDeeplinkHandled();
 
       await _handleDeeplinkDirectly(deeplinkUri, logger);
       return;
