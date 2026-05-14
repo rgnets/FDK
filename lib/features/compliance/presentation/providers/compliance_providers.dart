@@ -272,6 +272,20 @@ class TriggerRetryScheduler {
   bool _disposed = false;
 
   Future<TriggerOutcome> fire(String ruleName) async {
+    // The rxg enforces a 30s per-rule rate limit
+    // (`ComplianceCheckService.rate_limit_check_now!`) and silently
+    // no-ops any POST inside that window — the wrapper script rescues
+    // `CheckNowRateLimited` and returns a "Warning: rate-limited" string
+    // that the HTTP layer reports as a normal 200. So firing again
+    // inside 30s wastes a POST, generates rxg log noise, and produces no
+    // new ComplianceCheckResult. If a retry is already pending for this
+    // rule we KNOW we fired within the last 30s (the retry schedule
+    // matches the rate-limit window), so let that pending retry land
+    // the next POST when the rxg's window clears.
+    if (_pending.containsKey(ruleName)) {
+      return TriggerOutcome.queued;
+    }
+
     final repo =
         await _ref.read(complianceRepositoryProvider(ruleName).future);
     if (repo == null) return TriggerOutcome.notFound;

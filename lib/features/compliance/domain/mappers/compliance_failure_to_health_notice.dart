@@ -9,10 +9,26 @@ HealthNotice complianceFailureToHealthNotice(ComplianceFailure failure) {
     shortMessage: failure.reason,
     longMessage: '${failure.ruleName}: ${failure.reason}',
     createdAt: failure.checkedAt,
-    deviceId: failure.deviceId.toString(),
+    deviceId: _fdkDeviceId(failure),
     deviceName: failure.deviceName,
     deviceType: failure.deviceType,
   );
+}
+
+/// Maps the rxg's `device_type` + raw integer id to the FDK's prefixed
+/// device id form (`ap_<n>`, `ont_<n>`, `sw_<n>`, `wlan_<n>`) that the
+/// `/devices/:id` route and device cache use as the lookup key. Without
+/// this, tapping a synthetic compliance notice routes to a bare integer
+/// path and the device detail screen reports "device not found".
+String _fdkDeviceId(ComplianceFailure failure) {
+  final prefix = switch (failure.deviceType) {
+    'access_point' => 'ap_',
+    'media_converter' => 'ont_',
+    'switch' || 'switch_device' => 'sw_',
+    'wlan_controller' || 'wlan_device' => 'wlan_',
+    _ => '',
+  };
+  return '$prefix${failure.deviceId}';
 }
 
 List<HealthNotice> complianceFailuresToHealthNotices(

@@ -175,22 +175,26 @@ class ComplianceRepositoryImpl implements ComplianceRepository {
   }
 
   @override
-  Future<TriggerOutcome> triggerRecheck() {
-    return _rest.triggerNotificationAction(actionId);
+  Future<TriggerOutcome> triggerRecheck() async {
+    final outcome = await _rest.triggerNotificationAction(actionId);
+    if (outcome == TriggerOutcome.queued) {
+      // WS broadcast for compliance_check_results isn't always delivered
+      // (observed on real rxgs: trigger lands, DelayedJob runs the script,
+      // result row gets written, but no WS push reaches the FDK). Fall
+      // back to a delayed REST refetch so the newly-created row gets
+      // picked up. 8s gives the DelayedJob runner time to execute the
+      // recheck script and write the result.
+      Timer(const Duration(seconds: 8), _refetchAfterTrigger);
+    }
+    return outcome;
   }
 
   Future<void> _fireInitialTrigger() async {
-    final outcome = await _rest.triggerNotificationAction(actionId);
+    final outcome = await triggerRecheck();
     LoggerService.debug(
       'initial trigger for $ruleName → $outcome',
       tag: 'ComplianceRepository',
     );
-    if (outcome != TriggerOutcome.queued) return;
-    // WS broadcast for compliance_check_results isn't reliably wired on the
-    // rxg side; fall back to a delayed REST refetch so the newly-created
-    // row gets picked up. 8s gives the DelayedJob runner time to execute
-    // the recheck script and write the result.
-    Timer(const Duration(seconds: 8), _refetchAfterTrigger);
   }
 
   Future<void> _refetchAfterTrigger() async {
