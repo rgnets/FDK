@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:rgnets_fdk/core/security/certificate_validator.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 
 /// REST-based service for uploading device images.
 ///
@@ -88,7 +89,7 @@ class RestImageUploadService {
       return [];
     } catch (e) {
       LoggerService.warning(
-        'Failed to fetch signed IDs: $e',
+        'Failed to fetch signed IDs: ${scrubErrorForLog(e)}',
         tag: 'RestImageUploadService',
       );
       return [];
@@ -127,7 +128,7 @@ class RestImageUploadService {
       return null;
     } catch (e) {
       LoggerService.warning(
-        'Failed to fetch device data: $e',
+        'Failed to fetch device data: ${scrubErrorForLog(e)}',
         tag: 'RestImageUploadService',
       );
       return null;
@@ -239,7 +240,7 @@ class RestImageUploadService {
         } catch (e) {
           // Response may not include images in body
           LoggerService.warning(
-            'Could not parse response body: $e',
+            'Could not parse response body: ${scrubErrorForLog(e)}',
             tag: 'RestImageUploadService',
           );
         }
@@ -265,10 +266,14 @@ class RestImageUploadService {
         );
       }
     } on DioException catch (e) {
+      // FM-8: DioException.toString() and `e.message` may embed the
+      // request URI (with api_key) on connection failures. Scrub both
+      // before logging. We deliberately do NOT pass the raw `e` via the
+      // `error:` channel — the logger formatter would call toString() and
+      // bypass our scrub.
       LoggerService.error(
-        'REST Upload Dio exception: ${e.type} - ${e.message}',
+        'REST Upload Dio exception: ${e.type} - ${scrubErrorForLog(e.message)}',
         tag: 'RestImageUploadService',
-        error: e,
       );
 
       final statusCode = e.response?.statusCode ?? 0;
@@ -296,10 +301,12 @@ class RestImageUploadService {
         errorMessage: errorMessage,
       );
     } catch (e) {
+      // FM-8: catch-all path can wrap a DioException whose toString embeds
+      // the request URI. Scrub before logging; never pass via `error:` (the
+      // printer would call toString and bypass our scrub).
       LoggerService.error(
-        'REST Upload exception: $e',
+        'REST Upload exception: ${scrubErrorForLog(e)}',
         tag: 'RestImageUploadService',
-        error: e,
       );
 
       return RestImageUploadResult.failure(

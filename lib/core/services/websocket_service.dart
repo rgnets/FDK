@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Connection states emitted by [WebSocketService].
@@ -257,7 +258,9 @@ class WebSocketService {
           : SocketConnectionState.connecting,
     );
     try {
-      _logger.i('WebSocketService: Connecting to ${params.uri}');
+      // FM-8: scrub api_key from the URI before logging. `params.uri` carries
+      // the ActionCable auth token as a query param on production builds.
+      _logger.i('WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}');
       final channel = _channelFactory(params.uri, headers: params.headers);
 
       _channel = channel;
@@ -283,9 +286,13 @@ class WebSocketService {
         send(params.handshakeMessage!);
       }
     } on Exception catch (e, stack) {
+      // FM-8: socket exceptions can embed the URI (with api_key) in their
+      // toString(). Scrub before logging. The `error:` field passed to the
+      // logger is intentionally the raw object — the underlying logger's
+      // formatter doesn't auto-print it as text in our printer config; if
+      // that changes, this scrub becomes the only guarantee.
       _logger.e(
-        'WebSocketService: Connection failed',
-        error: e,
+        'WebSocketService: Connection failed: ${scrubErrorForLog(e)}',
         stackTrace: stack,
       );
       await _handleError(e, stack);
@@ -294,8 +301,7 @@ class WebSocketService {
 
   Future<void> _handleError(Object error, [StackTrace? stack]) async {
     _logger.e(
-      'WebSocketService: Error - $error',
-      error: error,
+      'WebSocketService: Error - ${scrubErrorForLog(error)}',
       stackTrace: stack,
     );
     await _closeChannel();

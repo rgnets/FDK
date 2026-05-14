@@ -13,12 +13,19 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/get_current_user.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_failures_aggregate_provider.dart'
+    as compliance_aggregate;
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart'
+    as compliance_providers;
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart'
     as devices_providers;
+import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart'
+    as health_notices;
 import 'package:rgnets_fdk/features/home/presentation/providers/dashboard_provider.dart'
     as dashboard_providers;
 import 'package:rgnets_fdk/features/notifications/presentation/providers/device_notification_provider.dart'
@@ -310,8 +317,9 @@ class Auth extends _$Auth {
         },
       );
     } on Exception catch (e, stack) {
+      // FM-8: the http/Dio toString() can embed `api_key=...` from the request URI.
       _logger.e(
-        'AUTH_NOTIFIER: ⚠️ Exception during authentication: $e\n$stack',
+        'AUTH_NOTIFIER: ⚠️ Exception during authentication: ${scrubErrorForLog(e)}\n$stack',
       );
       // Exception handled by logger
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
@@ -369,7 +377,10 @@ class Auth extends _$Auth {
 
       _logger.i('AUTH_NOTIFIER: ✅ Sign out initiated');
     } on Exception catch (e, stack) {
-      _logger.e('AUTH_NOTIFIER: ⚠️ Exception during sign out: $e\n$stack');
+      // FM-8: scrub api_key from any URI embedded in the exception toString().
+      _logger.e(
+        'AUTH_NOTIFIER: ⚠️ Exception during sign out: ${scrubErrorForLog(e)}\n$stack',
+      );
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
     }
   }
@@ -611,7 +622,9 @@ class Auth extends _$Auth {
 
     _logger
       ..i('AUTH_NOTIFIER: Initiating WebSocket handshake')
-      ..d('AUTH_NOTIFIER: WebSocket URI: $uri')
+      // FM-8: the ActionCable URI carries `api_key=$token` as a query
+      // parameter. Scrub before logging.
+      ..d('AUTH_NOTIFIER: WebSocket URI: ${scrubUrlForLog(uri)}')
       ..d('AUTH_NOTIFIER: Subscription identifier: $identifier');
 
     try {
@@ -758,7 +771,31 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
 
   ref.listen<AuthStatus?>(authStatusProvider, (AuthStatus? previous, AuthStatus? next) {
     final wasAuthenticated = previous?.isAuthenticated ?? false;
+    final wasUnauthenticated = previous?.isUnauthenticated ?? false;
+    final isNowAuthenticated = next?.isAuthenticated ?? false;
     final isNowUnauthenticated = next?.isUnauthenticated ?? false;
+
+    if (wasUnauthenticated && isNowAuthenticated) {
+      logger.i('AUTH_CLEANUP: Detected sign-in, requesting fresh WS snapshots');
+      // After sign-out, the WS device/room caches are wiped. The WS
+      // subscription persists across sign-in (same connection), so the
+      // rxg only sends live upsert deltas going forward — never a
+      // full snapshot — and the cache only ever accumulates the
+      // handful of devices that happen to update within the window.
+      // Force a snapshot request so the cache repopulates from the new
+      // site's authoritative state.
+      //
+      // We delay slightly to let the auth state settle and any in-flight
+      // WS handshake complete before firing snapshot requests.
+      Future<void>.delayed(const Duration(seconds: 1), () {
+        try {
+          ref.read(webSocketCacheIntegrationProvider).requestFullSnapshots();
+          logger.d('AUTH_CLEANUP: ✅ Sign-in snapshot request fired');
+        } on Object catch (e) {
+          logger.w('AUTH_CLEANUP: Failed to request snapshots on sign-in: $e');
+        }
+      });
+    }
 
     if (wasAuthenticated && isNowUnauthenticated) {
       logger.i('AUTH_CLEANUP: Detected sign-out, clearing caches and invalidating providers');
@@ -790,6 +827,21 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         ref.invalidate(notifications_domain.notificationsDomainNotifierProvider);
         ref.invalidate(dashboard_providers.dashboardStatsProvider);
         ref.invalidate(rooms_providers.roomsNotifierProvider);
+        // Compliance pipeline holds the prior site's siteUrl, api_key, and
+        // rule_id cache. Invalidate so the next sign-in resolves fresh
+        // against the new rxg.
+        ref.invalidate(compliance_providers.complianceRestDataSourceProvider);
+        ref.invalidate(compliance_providers.localFleetNodeProvider);
+        ref.invalidate(compliance_providers.complianceLookupProvider);
+        ref.invalidate(compliance_providers.complianceRepositoryProvider);
+        ref.invalidate(compliance_providers.complianceFeedProvider);
+        ref.invalidate(compliance_providers.complianceTriggerWiringProvider);
+        ref.invalidate(compliance_aggregate.complianceFailuresAggregateProvider);
+        // health_notices is keepAlive=true so it holds the prior site's
+        // notices until explicitly invalidated.
+        ref.invalidate(health_notices.healthNoticesNotifierProvider);
+        ref.invalidate(health_notices.aggregateHealthCountsNotifierProvider);
+        ref.invalidate(health_notices.healthNoticesRemoteDataSourceProvider);
         logger.d('AUTH_CLEANUP: Data providers invalidated');
       } on Exception catch (e) {
         logger.w('AUTH_CLEANUP: Failed to invalidate data providers: $e');

@@ -19,6 +19,10 @@ _$RoomReadinessMetricsImpl _$$RoomReadinessMetricsImplFromJson(
           .map((e) => Issue.fromJson(e as Map<String, dynamic>))
           .toList(),
       lastUpdated: DateTime.parse(json['last_updated'] as String),
+      accessPointIds: (json['access_point_ids'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const <int>[],
     );
 
 Map<String, dynamic> _$$RoomReadinessMetricsImplToJson(
@@ -32,6 +36,7 @@ Map<String, dynamic> _$$RoomReadinessMetricsImplToJson(
       'offline_devices': instance.offlineDevices,
       'issues': instance.issues.map((e) => e.toJson()).toList(),
       'last_updated': instance.lastUpdated.toIso8601String(),
+      'access_point_ids': instance.accessPointIds,
     };
 
 const _$RoomStatusEnumMap = {

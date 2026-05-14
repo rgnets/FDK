@@ -27,7 +27,13 @@ mixin _$RoomReadinessMetrics {
   int get onlineDevices => throw _privateConstructorUsedError;
   int get offlineDevices => throw _privateConstructorUsedError;
   List<Issue> get issues => throw _privateConstructorUsedError;
-  DateTime get lastUpdated => throw _privateConstructorUsedError;
+  DateTime get lastUpdated =>
+      throw _privateConstructorUsedError; // AP device ids in this room (rxg primary keys). Populated by the real
+// data source so the room-readiness notifier can attach per-AP
+// `Issue.missingImages` / `Issue.missingSpeedTest` from compliance
+// failures without re-walking room data. Defaults to empty so existing
+// construction sites (tests, mock rows) don't need to change.
+  List<int> get accessPointIds => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -38,7 +44,8 @@ mixin _$RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)
+            DateTime lastUpdated,
+            List<int> accessPointIds)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -52,7 +59,8 @@ mixin _$RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)?
+            DateTime lastUpdated,
+            List<int> accessPointIds)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -66,7 +74,8 @@ mixin _$RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)?
+            DateTime lastUpdated,
+            List<int> accessPointIds)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -107,7 +116,8 @@ abstract class $RoomReadinessMetricsCopyWith<$Res> {
       int onlineDevices,
       int offlineDevices,
       List<Issue> issues,
-      DateTime lastUpdated});
+      DateTime lastUpdated,
+      List<int> accessPointIds});
 }
 
 /// @nodoc
@@ -132,6 +142,7 @@ class _$RoomReadinessMetricsCopyWithImpl<$Res,
     Object? offlineDevices = null,
     Object? issues = null,
     Object? lastUpdated = null,
+    Object? accessPointIds = null,
   }) {
     return _then(_value.copyWith(
       roomId: null == roomId
@@ -166,6 +177,10 @@ class _$RoomReadinessMetricsCopyWithImpl<$Res,
           ? _value.lastUpdated
           : lastUpdated // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      accessPointIds: null == accessPointIds
+          ? _value.accessPointIds
+          : accessPointIds // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ) as $Val);
   }
 }
@@ -186,7 +201,8 @@ abstract class _$$RoomReadinessMetricsImplCopyWith<$Res>
       int onlineDevices,
       int offlineDevices,
       List<Issue> issues,
-      DateTime lastUpdated});
+      DateTime lastUpdated,
+      List<int> accessPointIds});
 }
 
 /// @nodoc
@@ -208,6 +224,7 @@ class __$$RoomReadinessMetricsImplCopyWithImpl<$Res>
     Object? offlineDevices = null,
     Object? issues = null,
     Object? lastUpdated = null,
+    Object? accessPointIds = null,
   }) {
     return _then(_$RoomReadinessMetricsImpl(
       roomId: null == roomId
@@ -242,6 +259,10 @@ class __$$RoomReadinessMetricsImplCopyWithImpl<$Res>
           ? _value.lastUpdated
           : lastUpdated // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      accessPointIds: null == accessPointIds
+          ? _value._accessPointIds
+          : accessPointIds // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ));
   }
 }
@@ -257,8 +278,10 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
       required this.onlineDevices,
       required this.offlineDevices,
       required final List<Issue> issues,
-      required this.lastUpdated})
+      required this.lastUpdated,
+      final List<int> accessPointIds = const <int>[]})
       : _issues = issues,
+        _accessPointIds = accessPointIds,
         super._();
 
   factory _$RoomReadinessMetricsImpl.fromJson(Map<String, dynamic> json) =>
@@ -286,10 +309,28 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
 
   @override
   final DateTime lastUpdated;
+// AP device ids in this room (rxg primary keys). Populated by the real
+// data source so the room-readiness notifier can attach per-AP
+// `Issue.missingImages` / `Issue.missingSpeedTest` from compliance
+// failures without re-walking room data. Defaults to empty so existing
+// construction sites (tests, mock rows) don't need to change.
+  final List<int> _accessPointIds;
+// AP device ids in this room (rxg primary keys). Populated by the real
+// data source so the room-readiness notifier can attach per-AP
+// `Issue.missingImages` / `Issue.missingSpeedTest` from compliance
+// failures without re-walking room data. Defaults to empty so existing
+// construction sites (tests, mock rows) don't need to change.
+  @override
+  @JsonKey()
+  List<int> get accessPointIds {
+    if (_accessPointIds is EqualUnmodifiableListView) return _accessPointIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_accessPointIds);
+  }
 
   @override
   String toString() {
-    return 'RoomReadinessMetrics(roomId: $roomId, roomName: $roomName, status: $status, totalDevices: $totalDevices, onlineDevices: $onlineDevices, offlineDevices: $offlineDevices, issues: $issues, lastUpdated: $lastUpdated)';
+    return 'RoomReadinessMetrics(roomId: $roomId, roomName: $roomName, status: $status, totalDevices: $totalDevices, onlineDevices: $onlineDevices, offlineDevices: $offlineDevices, issues: $issues, lastUpdated: $lastUpdated, accessPointIds: $accessPointIds)';
   }
 
   @override
@@ -309,7 +350,9 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
                 other.offlineDevices == offlineDevices) &&
             const DeepCollectionEquality().equals(other._issues, _issues) &&
             (identical(other.lastUpdated, lastUpdated) ||
-                other.lastUpdated == lastUpdated));
+                other.lastUpdated == lastUpdated) &&
+            const DeepCollectionEquality()
+                .equals(other._accessPointIds, _accessPointIds));
   }
 
   @JsonKey(ignore: true)
@@ -323,7 +366,8 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
       onlineDevices,
       offlineDevices,
       const DeepCollectionEquality().hash(_issues),
-      lastUpdated);
+      lastUpdated,
+      const DeepCollectionEquality().hash(_accessPointIds));
 
   @JsonKey(ignore: true)
   @override
@@ -344,11 +388,12 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)
+            DateTime lastUpdated,
+            List<int> accessPointIds)
         $default,
   ) {
     return $default(roomId, roomName, status, totalDevices, onlineDevices,
-        offlineDevices, issues, lastUpdated);
+        offlineDevices, issues, lastUpdated, accessPointIds);
   }
 
   @override
@@ -362,11 +407,12 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)?
+            DateTime lastUpdated,
+            List<int> accessPointIds)?
         $default,
   ) {
     return $default?.call(roomId, roomName, status, totalDevices, onlineDevices,
-        offlineDevices, issues, lastUpdated);
+        offlineDevices, issues, lastUpdated, accessPointIds);
   }
 
   @override
@@ -380,13 +426,14 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int onlineDevices,
             int offlineDevices,
             List<Issue> issues,
-            DateTime lastUpdated)?
+            DateTime lastUpdated,
+            List<int> accessPointIds)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
       return $default(roomId, roomName, status, totalDevices, onlineDevices,
-          offlineDevices, issues, lastUpdated);
+          offlineDevices, issues, lastUpdated, accessPointIds);
     }
     return orElse();
   }
@@ -436,7 +483,8 @@ abstract class _RoomReadinessMetrics extends RoomReadinessMetrics {
       required final int onlineDevices,
       required final int offlineDevices,
       required final List<Issue> issues,
-      required final DateTime lastUpdated}) = _$RoomReadinessMetricsImpl;
+      required final DateTime lastUpdated,
+      final List<int> accessPointIds}) = _$RoomReadinessMetricsImpl;
   const _RoomReadinessMetrics._() : super._();
 
   factory _RoomReadinessMetrics.fromJson(Map<String, dynamic> json) =
@@ -458,6 +506,12 @@ abstract class _RoomReadinessMetrics extends RoomReadinessMetrics {
   List<Issue> get issues;
   @override
   DateTime get lastUpdated;
+  @override // AP device ids in this room (rxg primary keys). Populated by the real
+// data source so the room-readiness notifier can attach per-AP
+// `Issue.missingImages` / `Issue.missingSpeedTest` from compliance
+// failures without re-walking room data. Defaults to empty so existing
+// construction sites (tests, mock rows) don't need to change.
+  List<int> get accessPointIds;
   @override
   @JsonKey(ignore: true)
   _$$RoomReadinessMetricsImplCopyWith<_$RoomReadinessMetricsImpl>

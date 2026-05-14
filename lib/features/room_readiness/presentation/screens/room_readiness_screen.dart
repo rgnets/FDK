@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/hud_tab_bar.dart';
 import 'package:rgnets_fdk/core/widgets/unified_list/unified_list_item.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/presentation/providers/room_readiness_provider.dart';
 
@@ -78,7 +79,20 @@ class _RoomReadinessScreenState extends ConsumerState<RoomReadinessScreen> {
               final filteredMetrics = _filterMetrics(metrics, statusFilter);
 
               return RefreshIndicator(
-                onRefresh: () => ref.read(roomReadinessNotifierProvider.notifier).refresh(),
+                onRefresh: () async {
+                  // Pull-to-refresh refreshes the room/device state AND fires
+                  // both compliance rechecks (spec TR-3: pull-to-refresh is
+                  // one of the three user-initiated trigger surfaces).
+                  // The compliance fires are awaited but their TriggerOutcome
+                  // is surfaced through the feed state by the scheduler /
+                  // repository wiring, not consumed here.
+                  final scheduler = ref.read(triggerRetrySchedulerProvider);
+                  await Future.wait<void>([
+                    ref.read(roomReadinessNotifierProvider.notifier).refresh(),
+                    scheduler.fire(ComplianceNames.imagesRule),
+                    scheduler.fire(ComplianceNames.speedTestRule),
+                  ]);
+                },
                 child: Column(
                   children: [
                     // HUD Tab Bar with status counts

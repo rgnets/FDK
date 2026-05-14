@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:rgnets_fdk/core/security/certificate_validator.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 
 /// Singleton HTTP client with SSL certificate validation.
 ///
@@ -98,8 +99,10 @@ class SecureHttpClient {
       );
       return response.statusCode == 200;
     } catch (e) {
+      // FM-8: the exception's toString() can embed the request URI (with
+      // `api_key=...`) on some socket failures. Scrub before logging.
       LoggerService.error(
-        'HTTP validation failed: $e',
+        'HTTP validation failed: ${scrubErrorForLog(e)}',
         tag: 'SecureHttpClient',
       );
       return false;
