@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/room.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
 import 'package:rgnets_fdk/features/issues/presentation/providers/health_notices_provider.dart';
@@ -174,25 +175,37 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
 
           // Notices list
           Expanded(
-            child: notices.isEmpty
-                ? _buildEmptyState(context)
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: notices.length,
-                    itemBuilder: (context, index) {
-                      final notice = notices[index];
-                      final hasNavigationTarget = _hasNavigationTarget(notice, rooms, roomsAsync.isLoading);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: HealthNoticeCard(
-                          notice: notice,
-                          onTap: hasNavigationTarget
-                              ? () => _handleNoticeTap(context, notice, rooms, roomsAsync.isLoading)
-                              : null,
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: notices.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.6,
+                          child: _buildEmptyState(context),
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: notices.length,
+                      itemBuilder: (context, index) {
+                        final notice = notices[index];
+                        final hasNavigationTarget = _hasNavigationTarget(notice, rooms, roomsAsync.isLoading);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: HealthNoticeCard(
+                            notice: notice,
+                            onTap: hasNavigationTarget
+                                ? () => _handleNoticeTap(context, notice, rooms, roomsAsync.isLoading)
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ),
         ],
       ),
@@ -268,6 +281,24 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
         ),
       ),
     );
+  }
+
+  /// Pull-to-refresh handler. Fires the rxg-side compliance rechecks (images
+  /// + speed tests) so any stale ComplianceCheckResult rows get rewritten
+  /// against current state, and invalidates both the HealthNoticesNotifier
+  /// and the underlying HealthNoticesRemoteDataSource so the next build
+  /// re-fetches /api/health_notices/summary fresh — bypassing the data
+  /// source's 30s TTL cache that would otherwise hide just-cured notices.
+  /// The trigger scheduler dedupes concurrent fires per rule and schedules
+  /// its own 30s retry, so this is safe to invoke repeatedly.
+  Future<void> _handleRefresh() async {
+    final scheduler = ref.read(triggerRetrySchedulerProvider);
+    await Future.wait<void>([
+      scheduler.fire(ComplianceNames.imagesRule),
+      scheduler.fire(ComplianceNames.speedTestRule),
+    ]);
+    ref.invalidate(healthNoticesRemoteDataSourceProvider);
+    ref.invalidate(healthNoticesNotifierProvider);
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -368,11 +399,34 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
     );
   }
 
+  /// Extracts a device id (`ap_<n>`, `ont_<n>`, `sw_<n>`, `wlan_<n>`) from the
+  /// notice. Prefers the explicit `deviceId` field; falls back to parsing the
+  /// rxg's HealthNotice name convention `monitor_infrastructure_<type>_<id>…`
+  /// (defined on AccessPoint, MediaConverter, InfrastructureDevice models).
+  /// The rxg's `/api/health_notices/summary` doesn't include `device_id` in
+  /// its serialization, so this fallback is what makes table-fetched notices
+  /// tappable.
+  String? _resolveDeviceId(HealthNotice notice) {
+    final explicit = notice.deviceId?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final match =
+        RegExp(r'monitor_infrastructure_(access_point|media_converter|device)_(\d+)')
+            .firstMatch(notice.name);
+    if (match == null) return null;
+    final prefix = switch (match.group(1)) {
+      'access_point' => 'ap_',
+      'media_converter' => 'ont_',
+      'device' => 'sw_',
+      _ => null,
+    };
+    if (prefix == null) return null;
+    return '$prefix${match.group(2)}';
+  }
+
   /// Checks if a health notice has a valid navigation target
   bool _hasNavigationTarget(HealthNotice notice, List<Room> rooms, bool roomsLoading) {
-    // Has device ID - can navigate
-    final deviceId = notice.deviceId?.trim();
-    if (deviceId != null && deviceId.isNotEmpty) {
+    // Has device ID (explicit or derivable from name) - can navigate
+    if (_resolveDeviceId(notice) != null) {
       return true;
     }
 
@@ -391,9 +445,10 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
 
   /// Handles tap on a health notice card - navigates to device or room detail
   void _handleNoticeTap(BuildContext context, HealthNotice notice, List<Room> rooms, bool roomsLoading) {
-    // Priority 1: Navigate to device if deviceId is available
-    final deviceId = notice.deviceId?.trim();
-    if (deviceId != null && deviceId.isNotEmpty) {
+    // Priority 1: Navigate to device if deviceId is available (explicit or
+    // derivable from the rxg's monitor_infrastructure_* name convention).
+    final deviceId = _resolveDeviceId(notice);
+    if (deviceId != null) {
       context.push('/devices/${Uri.encodeComponent(deviceId)}');
       return;
     }

@@ -354,7 +354,7 @@ final roomReadinessUpdatesProvider =
 typedef RoomReadinessUpdatesRef
     = AutoDisposeStreamProviderRef<RoomReadinessUpdate>;
 String _$roomReadinessNotifierHash() =>
-    r'5bc874ddf3a21200f731e387e9908bfed3430612';
+    r'017bbf60e0e98146bd271a80b30d9f1ebc182acd';
 
 /// Provider for room readiness metrics.
 ///

@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_room_cache_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_compliance_cache_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_speed_test_cache_service.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
@@ -46,6 +47,9 @@ class WebSocketCacheIntegration {
     _roomCacheService = WebSocketRoomCacheService(
       onDataChanged: _bumpLastUpdate,
     );
+    _complianceCacheService = WebSocketComplianceCacheService(
+      onDataChanged: _bumpLastUpdate,
+    );
   }
 
   final WebSocketService _webSocketService;
@@ -54,6 +58,7 @@ class WebSocketCacheIntegration {
   late final WebSocketSpeedTestCacheService _speedTestCacheService;
   late final WebSocketDeviceCacheService _deviceCacheService;
   late final WebSocketRoomCacheService _roomCacheService;
+  late final WebSocketComplianceCacheService _complianceCacheService;
 
   // ---------------------------------------------------------------------------
   // Sub-service accessors
@@ -63,6 +68,8 @@ class WebSocketCacheIntegration {
       _speedTestCacheService;
   WebSocketDeviceCacheService get deviceCacheService => _deviceCacheService;
   WebSocketRoomCacheService get roomCacheService => _roomCacheService;
+  WebSocketComplianceCacheService get complianceCacheService =>
+      _complianceCacheService;
 
   // ---------------------------------------------------------------------------
   // Resource type constants
@@ -71,8 +78,10 @@ class WebSocketCacheIntegration {
   static const String _roomResourceType = 'pms_rooms';
   static const String _speedTestConfigResourceType = 'speed_tests';
   static const String _speedTestResultResourceType = 'speed_test_results';
+  static const String _complianceResultResourceType =
+      'compliance_check_results';
 
-  /// All resource types (devices + rooms + speed tests).
+  /// All resource types (devices + rooms + speed tests + compliance).
   static const List<String> _resourceTypes = [
     'access_points',
     'switch_devices',
@@ -80,6 +89,16 @@ class WebSocketCacheIntegration {
     'pms_rooms',
     'speed_tests',
     'speed_test_results',
+    // Subscribe to `compliance_check_results` (history feed), NOT
+    // `compliance_check_result_snapshots`. Deliberate spec deviation:
+    // the snapshot table delegates `fleet_node_id` through its parent
+    // `compliance_check_result` row, so the auto-routed snapshot JSON has
+    // no `fleet_node_id` column to filter on. Results expose it directly,
+    // letting FDK key its dedupe on `(compliance_rule_id, fleet_node_id)`
+    // with `checked_at` as a tie-breaker without joining. See
+    // `WebSocketComplianceCacheService` for the cache details and
+    // `ComplianceRepositoryImpl._handleWsDelta` for the dedupe.
+    'compliance_check_results',
   ];
 
   // ---------------------------------------------------------------------------
@@ -821,6 +840,8 @@ class WebSocketCacheIntegration {
       return _speedTestCacheService.hasCachedItems(isConfig: false);
     } else if (resourceType == _roomResourceType) {
       return _roomCacheService.hasRoomCache;
+    } else if (resourceType == _complianceResultResourceType) {
+      return _complianceCacheService.hasCache;
     } else {
       return _deviceCacheService.hasCachedItems(resourceType);
     }
@@ -861,6 +882,8 @@ class WebSocketCacheIntegration {
       _speedTestCacheService.applySnapshot(items, isConfig: false);
     } else if (resourceType == _roomResourceType) {
       _roomCacheService.applySnapshot(items);
+    } else if (resourceType == _complianceResultResourceType) {
+      _complianceCacheService.applySnapshot(items);
     } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
       _deviceCacheService.applySnapshot(resourceType, items);
     }
@@ -883,6 +906,8 @@ class WebSocketCacheIntegration {
           isConfig: false, action: action);
     } else if (resourceType == _roomResourceType) {
       _roomCacheService.applyUpsert(data);
+    } else if (resourceType == _complianceResultResourceType) {
+      _complianceCacheService.applyUpsert(data);
     } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
       _deviceCacheService.applyUpsert(resourceType, data, action: action);
     }
@@ -899,6 +924,8 @@ class WebSocketCacheIntegration {
       _speedTestCacheService.applyDelete(data, isConfig: false);
     } else if (resourceType == _roomResourceType) {
       _roomCacheService.applyDelete(data);
+    } else if (resourceType == _complianceResultResourceType) {
+      _complianceCacheService.applyDelete(data);
     } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
       _deviceCacheService.applyDelete(resourceType, data);
     }
@@ -930,6 +957,7 @@ class WebSocketCacheIntegration {
     _deviceCacheService.clearCaches();
     _roomCacheService.clearCaches();
     _speedTestCacheService.clearCaches();
+    _complianceCacheService.clearCaches();
 
     if (_webSocketService.isConnected && _channelConfirmed) {
       _needsSnapshot = true;
@@ -948,6 +976,7 @@ class WebSocketCacheIntegration {
     _deviceCacheService.clearCaches();
     _roomCacheService.clearCaches();
     _speedTestCacheService.clearCaches();
+    _complianceCacheService.clearCaches();
 
     for (final timer in _snapshotFlushTimers.values) {
       timer.cancel();
@@ -983,6 +1012,7 @@ class WebSocketCacheIntegration {
     _speedTestCacheService.dispose();
     _deviceCacheService.dispose();
     _roomCacheService.dispose();
+    _complianceCacheService.dispose();
   }
 
   /// Expose the WebSocket service for direct requests.

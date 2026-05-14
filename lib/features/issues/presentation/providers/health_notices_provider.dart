@@ -1,13 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/features/compliance/domain/mappers/compliance_failure_to_health_notice.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_failures_aggregate_provider.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
+import 'package:rgnets_fdk/features/issues/data/datasources/health_notices_remote_data_source.dart';
 import 'package:rgnets_fdk/features/issues/data/models/health_notice_model.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_counts.dart';
 import 'package:rgnets_fdk/features/issues/domain/entities/health_notice.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'health_notices_provider.g.dart';
+
+/// Data source for fetching health notices directly from the rxg's
+/// `/api/health_notices` table via WebSocket. Created on first read; the
+/// `WebSocketService` it depends on is a singleton, so no dispose is needed
+/// (the data source's `dispose` is a no-op).
+final healthNoticesRemoteDataSourceProvider =
+    Provider<HealthNoticesRemoteDataSource>((ref) {
+  return HealthNoticesRemoteDataSource(
+    socketService: ref.watch(webSocketServiceProvider),
+  );
+});
 
 /// Device type filter options for health notices
 enum DeviceTypeFilter {
@@ -33,6 +48,14 @@ enum DeviceTypeFilter {
 
 void _watchDeviceCacheUpdates(Ref ref) {
   ref.watch(webSocketDeviceLastUpdateProvider);
+}
+
+/// Tracks WS connection state so a rebuild fires the moment WS comes up.
+/// Without this, `HealthNoticesRemoteDataSource.fetchSummary` early-returns
+/// empty on first build (before WS handshakes), and the alerts view stays
+/// stale until something else triggers a rebuild.
+void _watchWebSocketConnection(Ref ref) {
+  ref.watch(webSocketConnectionStateProvider);
 }
 
 /// Provider that aggregates health counts from cached device data
@@ -113,7 +136,20 @@ int criticalIssueCount(CriticalIssueCountRef ref) {
 class HealthNoticesNotifier extends _$HealthNoticesNotifier {
   @override
   Future<List<HealthNotice>> build() async {
+    // Three refresh signals:
+    //   - Device cache updates: catches the snapshot arrival after WS
+    //     connect (otherwise the view stays blank for ~5s until the next
+    //     rebuild trigger fires) and picks up `device.healthNotices` on
+    //     legacy rxgs (<16.621). Each rebuild is bounded by the in-flight
+    //     memoization on `fetchSummary` and the cached compliance lookups,
+    //     so even on 767-device sites the cascade no longer triggers the
+    //     rxg's rate limiter.
+    //   - WS connection state: fetchSummary needs WS up; rebuild when it
+    //     transitions so the summary retry fires the moment WS is alive.
+    //   - Compliance feed changes: synthetic notices change as failures
+    //     come and go (watched via complianceFailuresAggregateProvider).
     _watchDeviceCacheUpdates(ref);
+    _watchWebSocketConnection(ref);
     final cacheIntegration = ref.watch(webSocketCacheIntegrationProvider);
 
     // Get cached devices with health notice data from in-memory WebSocket cache
@@ -128,11 +164,13 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     final notices = <HealthNotice>[];
     var devicesWithNotices = 0;
 
+    final seenIds = <int>{};
     for (final device in devices) {
       final deviceNotices = device.healthNotices;
       if (deviceNotices != null && deviceNotices.isNotEmpty) {
         devicesWithNotices++;
         for (final notice in deviceNotices) {
+          if (!seenIds.add(notice.id)) continue;
           notices.add(notice.toEntity().copyWith(
             deviceId: device.id,
             deviceName: device.name,
@@ -142,8 +180,49 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       }
     }
 
+    // Pull from the dedicated `health_notices` table too. After rxg commit
+    // 44e3bedd2e (May 2026) stripped `:health_notices` from the device
+    // serializers, device payloads stopped carrying notices — but the
+    // notices themselves still live in the table (e.g. `access_point_offline`
+    // CRITICAL notices). Reading the table directly keeps the alerts view
+    // populated regardless of which device-controller serializer happens to
+    // include the association.
+    final remote = ref.watch(healthNoticesRemoteDataSourceProvider);
+    var tableNoticesAdded = 0;
+    try {
+      final summary = await remote.fetchSummary();
+      LoggerService.debug(
+        'health_notices table summary returned ${summary.notices.length} '
+        'entries: ${summary.notices.map((n) => "id=${n.id} sev=${n.severity} "
+            "name=${n.name} msg=${n.shortMessage}").join(" | ")}',
+        tag: 'HealthNotices',
+      );
+      for (final entity in summary.toNoticeEntities()) {
+        if (!seenIds.add(entity.id)) continue;
+        notices.add(entity);
+        tableNoticesAdded++;
+      }
+    } on Exception catch (e) {
+      LoggerService.warning(
+        'health_notices table fetch failed: $e',
+        tag: 'HealthNotices',
+      );
+    }
+
+    // Compliance failures land in the alerts view as per-AP synthetic
+    // notices so users see specific reasons ("missing installation images",
+    // "speed test failed") instead of an empty list. The same failures also
+    // feed the room readiness Issues via complianceFailuresAggregateProvider —
+    // both surfaces share one source. Synthetic ids are negative (see the
+    // mapper), so they can't collide with rxg-side ids in `seenIds`.
+    final complianceFailures = ref.watch(complianceFailuresAggregateProvider);
+    notices.addAll(complianceFailuresToHealthNotices(complianceFailures));
+
     LoggerService.debug(
-      'HEALTH: Extracted ${notices.length} total notices from $devicesWithNotices devices with notices',
+      'HEALTH: Extracted ${notices.length} notices '
+      '($devicesWithNotices devices with notices, '
+      '$tableNoticesAdded from health_notices table, '
+      '${complianceFailures.length} compliance failures)',
       tag: 'HealthNotices',
     );
 

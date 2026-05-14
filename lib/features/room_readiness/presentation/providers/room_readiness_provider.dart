@@ -1,8 +1,12 @@
 import 'package:logger/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/features/compliance/domain/entities/compliance_failure.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_failures_aggregate_provider.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart';
+import 'package:rgnets_fdk/features/room_readiness/domain/entities/issue.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/usecases/get_all_room_readiness.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/usecases/get_overall_readiness.dart';
@@ -22,6 +26,22 @@ class RoomReadinessNotifier extends _$RoomReadinessNotifier {
   Future<List<RoomReadinessMetrics>> build() async {
     _logger.i('RoomReadinessNotifier: build() called');
 
+    // Spec B5 / TR-7: compliance failures plumb into per-AP room_readiness
+    // issues using widgets that already exist. No new "Compliance" screen.
+    // When the rxg has failure rows for an AP (e.g. "FDK Missing Installation
+    // Images"), we attach `Issue.missingImages` / `Issue.missingSpeedTest`
+    // to the room containing that AP, matched by AP id.
+    //
+    // User override (slice 5, 2026-05-14): per-rule `unknown` / `indeterminate`
+    // / `loading` / `error` / `compliant` states intentionally render NOTHING
+    // visually here. The earlier synthetic-HealthNotice meta-banners ("Installation
+    // status not yet captured") were reverted at the user's direction — they
+    // were confusing alongside the actual failure rows the rxg admin view shows.
+    // Only the `failures([list])` variant of `ComplianceFeedState` contributes
+    // issues; everything else is a no-op. This is contrary to spec §5 lines
+    // 255–256's banner copy and is a deliberate deviation.
+    final complianceFailures = ref.watch(complianceFailuresAggregateProvider);
+
     try {
       final result = await _getAllRoomReadiness();
       return result.fold(
@@ -31,13 +51,94 @@ class RoomReadinessNotifier extends _$RoomReadinessNotifier {
         },
         (metrics) {
           _logger.i('RoomReadinessNotifier: Got ${metrics.length} metrics');
-          return metrics;
+          return _attachComplianceIssues(metrics, complianceFailures);
         },
       );
     } catch (e, stack) {
       _logger.e('RoomReadinessNotifier: Exception', error: e, stackTrace: stack);
       rethrow;
     }
+  }
+
+  /// Walks each room's device list and, for each AP id matching a
+  /// `ComplianceFailure`, appends the corresponding `Issue.missingImages`
+  /// or `Issue.missingSpeedTest` to that room's issues. Room status is
+  /// recomputed if the new issues add up to non-empty.
+  ///
+  /// Matching is by AP `deviceId` (the integer rxg PK). The data source's
+  /// device-issue list already names devices by their numeric id under the
+  /// `metadata['deviceId']` key on existing `Issue` rows, so the same id
+  /// space lines up cleanly here. Rooms whose `metadata['deviceId']` is
+  /// missing (corner-case empty rooms or unbuilt entries) simply receive no
+  /// compliance issue.
+  List<RoomReadinessMetrics> _attachComplianceIssues(
+    List<RoomReadinessMetrics> metrics,
+    List<ComplianceFailure> failures,
+  ) {
+    if (failures.isEmpty) {
+      return metrics;
+    }
+
+    // Group failures by AP id for O(rooms * apsInRoom) injection rather
+    // than O(rooms * apsInRoom * failures).
+    final byApId = <int, List<ComplianceFailure>>{};
+    for (final f in failures) {
+      if (f.deviceType != 'access_point') {
+        continue;
+      }
+      byApId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
+    }
+    if (byApId.isEmpty) {
+      return metrics;
+    }
+
+    return metrics
+        .map((m) => _injectIssuesForRoom(m, byApId))
+        .toList(growable: false);
+  }
+
+  RoomReadinessMetrics _injectIssuesForRoom(
+    RoomReadinessMetrics room,
+    Map<int, List<ComplianceFailure>> byApId,
+  ) {
+    if (room.accessPointIds.isEmpty) {
+      return room;
+    }
+    final extras = <Issue>[];
+    for (final id in room.accessPointIds) {
+      final apFailures = byApId[id];
+      if (apFailures == null) {
+        continue;
+      }
+      for (final f in apFailures) {
+        if (f.ruleName == ComplianceNames.imagesRule) {
+          extras.add(Issue.missingImages(
+            deviceId: f.deviceId,
+            deviceName: f.deviceName,
+            deviceType: 'AP',
+            detectedAt: f.checkedAt,
+          ));
+        } else if (f.ruleName == ComplianceNames.speedTestRule) {
+          extras.add(Issue.missingSpeedTest(
+            deviceId: f.deviceId,
+            deviceName: f.deviceName,
+            detectedAt: f.checkedAt,
+          ));
+        }
+      }
+    }
+    if (extras.isEmpty) {
+      return room;
+    }
+    final newIssues = [...room.issues, ...extras];
+    // If the room was `ready` and now has issues, it transitions to
+    // `partial`. `down` / `empty` remain unchanged: critical issues or
+    // zero-device rooms aren't downgraded by an informational compliance
+    // issue.
+    final newStatus = (room.status == RoomStatus.ready)
+        ? RoomStatus.partial
+        : room.status;
+    return room.copyWith(issues: newIssues, status: newStatus);
   }
 
   /// Refresh room readiness data.

@@ -17,6 +17,7 @@ import 'package:rgnets_fdk/core/theme/app_theme.dart';
 import 'package:rgnets_fdk/core/utils/text_overflow_utils.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
+import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart';
 import 'package:rgnets_fdk/features/initialization/initialization.dart';
 import 'package:rgnets_fdk/features/onboarding/data/config/onboarding_config.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -194,6 +195,7 @@ class _FDKAppState extends ConsumerState<FDKApp> {
         tag: 'Init',
       );
       ref.read(initializationNotifierProvider.notifier).initialize();
+      ref.read(complianceTriggerWiringProvider);
     }
   }
 
@@ -256,6 +258,7 @@ class _FDKAppState extends ConsumerState<FDKApp> {
           tag: 'Init',
         );
         ref.read(initializationNotifierProvider.notifier).initialize();
+        ref.read(complianceTriggerWiringProvider);
       } else if (!isAuthenticated && wasAuthenticated) {
         LoggerService.info(
           'User signed out, navigating to auth screen',

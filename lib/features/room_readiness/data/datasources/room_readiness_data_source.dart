@@ -252,8 +252,19 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     var onlineDevices = 0;
     var offlineDevices = 0;
     final issues = <Issue>[];
+    // AP rxg primary keys present in this room. Used by the room-readiness
+    // notifier to attach compliance failures (Issue.missingImages /
+    // Issue.missingSpeedTest) per spec B5 / TR-7 — no UI surface change,
+    // we just thread the AP id space through so the notifier can match.
+    final accessPointIds = <int>[];
 
     for (final ref in deviceRefs) {
+      if (ref['type'] == 'AP') {
+        final apId = _parseDeviceId(ref['data'] ?? {'id': ref['id']});
+        if (apId != 0) {
+          accessPointIds.add(apId);
+        }
+      }
       final device = _findDevice(ref, deviceLookup);
       _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
       if (device == null) {
@@ -314,6 +325,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       offlineDevices: offlineDevices,
       issues: issues,
       lastUpdated: DateTime.now(),
+      accessPointIds: accessPointIds,
     );
   }
 

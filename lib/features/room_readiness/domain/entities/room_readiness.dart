@@ -26,6 +26,12 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
     required int offlineDevices,
     required List<Issue> issues,
     required DateTime lastUpdated,
+    // AP device ids in this room (rxg primary keys). Populated by the real
+    // data source so the room-readiness notifier can attach per-AP
+    // `Issue.missingImages` / `Issue.missingSpeedTest` from compliance
+    // failures without re-walking room data. Defaults to empty so existing
+    // construction sites (tests, mock rows) don't need to change.
+    @Default(<int>[]) List<int> accessPointIds,
   }) = _RoomReadinessMetrics;
 
   const RoomReadinessMetrics._();
