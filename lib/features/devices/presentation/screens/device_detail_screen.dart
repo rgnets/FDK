@@ -41,7 +41,7 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     
     // Load device details
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -110,12 +110,11 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
                 tabs: const [
                   Tab(text: 'Overview'),
                   Tab(text: 'Network'),
-                  Tab(text: 'Statistics'),
                   Tab(text: 'Logs'),
                 ],
                 labelColor: Theme.of(context).colorScheme.primary,
               ),
-              
+
               // Tab content
               Expanded(
                 child: TabBarView(
@@ -123,7 +122,6 @@ class _DeviceDetailScreenState extends ConsumerState<DeviceDetailScreen>
                   children: [
                     _OverviewTab(device: device),
                     _NetworkTab(device: device),
-                    _StatisticsTab(device: device),
                     _LogsTab(device: device),
                   ],
                 ),
@@ -535,6 +533,13 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         ),
         const SizedBox(height: 16),
 
+        // Speed Test Section (for APs and ONTs)
+        if (widget.device.type == DeviceTypes.accessPoint ||
+            widget.device.type == DeviceTypes.ont) ...[
+          DeviceSpeedTestSection(device: widget.device),
+          const SizedBox(height: 16),
+        ],
+
         // Device detail sections
         DeviceDetailSections(
           device: widget.device,
@@ -597,23 +602,7 @@ class _NetworkTabState extends State<_NetworkTab>
             ],
           ),
           const SizedBox(height: 16),
-          
-          // WiFi Settings (for Access Points)
-          if (device.type == DeviceTypes.accessPoint) ...[
-            SectionCard(
-              title: 'WiFi Settings',
-              children: [
-                _InfoRow('SSID', device.ssid ?? 'RGNets-Guest'),
-                _InfoRow('Channel', device.channel?.toString() ?? 'Auto'),
-                const _InfoRow('Band', '2.4 GHz / 5 GHz'),
-                const _InfoRow('Security', 'WPA2-PSK'),
-                _InfoRow('Signal Strength', '${device.signalStrength ?? -50} dBm'),
-                _InfoRow('Connected Clients', '${device.connectedClients ?? 0}'),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-          
+
           // Port Status (for Switches)
           if (device.type == DeviceTypes.networkSwitch) ...[
             const SectionCard(
@@ -633,99 +622,6 @@ class _NetworkTabState extends State<_NetworkTab>
         ],
       ),
     );
-  }
-}
-
-class _StatisticsTab extends StatefulWidget {
-  const _StatisticsTab({required this.device});
-
-  final Device device;
-
-  @override
-  State<_StatisticsTab> createState() => _StatisticsTabState();
-}
-
-class _StatisticsTabState extends State<_StatisticsTab>
-    with AutomaticKeepAliveClientMixin<_StatisticsTab> {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final device = widget.device;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Speed Test Section (for APs and ONTs)
-          if (device.type == DeviceTypes.accessPoint ||
-              device.type == DeviceTypes.ont) ...[
-            DeviceSpeedTestSection(device: device),
-            const SizedBox(height: 16),
-          ],
-
-          // Traffic Statistics
-          SectionCard(
-            title: 'Traffic Statistics',
-            children: [
-              _InfoRow('Total Upload', '${device.totalUpload ?? 1024} GB'),
-              _InfoRow('Total Download', '${device.totalDownload ?? 2048} GB'),
-              _InfoRow('Current Upload', '${device.currentUpload ?? 10} Mbps'),
-              _InfoRow('Current Download', '${device.currentDownload ?? 50} Mbps'),
-              _InfoRow('Packet Loss', '${device.packetLoss ?? 0.1}%'),
-              _InfoRow('Latency', '${device.latency ?? 5} ms'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Performance Metrics
-          SectionCard(
-            title: 'Performance Metrics',
-            children: [
-              _InfoRow('CPU Usage', '${device.cpuUsage ?? 25}%'),
-              _InfoRow('Memory Usage', '${device.memoryUsage ?? 60}%'),
-              _InfoRow('Temperature', '${device.temperature ?? 45}°C'),
-              _InfoRow('Uptime', _formatUptime(device.uptime ?? 86400)),
-              _InfoRow('Restarts (30d)', '${device.restartCount ?? 0}'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Client Statistics (for Access Points)
-          if (device.type == DeviceTypes.accessPoint) ...[
-            SectionCard(
-              title: 'Client Statistics',
-              children: [
-                _InfoRow('Current Clients', '${device.connectedClients ?? 0}'),
-                _InfoRow('Max Clients (24h)', '${device.maxClients ?? 25}'),
-                const _InfoRow('Avg Session Time', '45 minutes'),
-                const _InfoRow('Total Sessions (24h)', '156'),
-                const _InfoRow('Failed Auth (24h)', '3'),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-
-          const SizedBox(height: 80), // Space for bottom bar
-        ],
-      ),
-    );
-  }
-
-  String _formatUptime(int seconds) {
-    final days = seconds ~/ 86400;
-    final hours = (seconds % 86400) ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-
-    if (days > 0) {
-      return '${days}d ${hours}h ${minutes}m';
-    } else if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    } else {
-      return '${minutes}m';
-    }
   }
 }
 
