@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/iperf3_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/network_gateway_service.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/iperf_error.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,6 +36,7 @@ class SpeedTestService {
   bool _isDownloadPhase = true; // Track which phase we're in
   bool _isRetryingFallback =
       false; // Track if we're in fallback retry mode
+  IperfErrorCategory? _lastErrorCategory; // Classified failure of last attempt
   double _completedDownloadSpeed =
       0.0; // Store completed download speed for upload phase
   double _completedUploadSpeed =
@@ -143,10 +145,15 @@ class SpeedTestService {
         // Don't set progress to 100% here either - that happens after the full test
         break;
       case 'cancelled':
-        _updateStatus(SpeedTestStatus.idle);
-        _statusMessageController.add(getMessage());
-        _progress = 0.0;
-        _progressController.add(_progress);
+        // During fallback retry, a failed server emits 'cancelled' between
+        // attempts. Stay in running state so the UI keeps showing the
+        // running controls instead of flashing the start/cancel buttons.
+        if (!_isRetryingFallback) {
+          _updateStatus(SpeedTestStatus.idle);
+          _statusMessageController.add(getMessage());
+          _progress = 0.0;
+          _progressController.add(_progress);
+        }
         break;
       case 'error':
         // Don't show errors during fallback retry - let the retry loop handle messaging
@@ -160,8 +167,10 @@ class SpeedTestService {
         }
         break;
       case 'idle':
-        // Don't reset to idle if we just completed - preserve completed status for UI
-        if (_status != SpeedTestStatus.completed) {
+        // Don't reset to idle if we just completed - preserve completed status for UI.
+        // Also don't reset while retrying fallback servers - the test is still
+        // running, it's just switching from the gateway to the next target.
+        if (_status != SpeedTestStatus.completed && !_isRetryingFallback) {
           _updateStatus(SpeedTestStatus.idle);
           _statusMessageController.add(getMessage());
         }
@@ -245,6 +254,7 @@ class SpeedTestService {
     // Reset completed speeds from previous test
     _completedDownloadSpeed = 0.0;
     _completedUploadSpeed = 0.0;
+    _lastErrorCategory = null;
 
     // Get local IP address
     final localIp = await _getLocalIpAddress();
@@ -317,13 +327,14 @@ class SpeedTestService {
         await Future.delayed(
             const Duration(seconds: 1)); // Brief pause between retries
       } else {
-        // All servers failed - show simple user-friendly message
+        // All servers failed - show a message specific to the failure type
         _isRetryingFallback =
             false; // Disable fallback mode before showing final error
-        const errorMsg =
-            'Unable to connect to server. Please check your internet connection.';
+        final category = _lastErrorCategory ?? IperfErrorCategory.unknown;
+        final errorMsg = category.userMessage;
         LoggerService.error(
-            'All servers failed: ${fallbackServers.map((s) => "${s["label"]} (${s["host"]})").join(", ")}',
+            'All servers failed (${category.debugLabel}): '
+            '${fallbackServers.map((s) => "${s["label"]} (${s["host"]})").join(", ")}',
             tag: 'SpeedTestService');
         _setErrorResult(errorMsg);
       }
@@ -382,7 +393,12 @@ class SpeedTestService {
 
       if (downloadResult['success'] != true) {
         final error = downloadResult['error'] ?? 'Download test failed';
-        LoggerService.warning('Download failed on $serverHost: $error',
+        final code = (downloadResult['errorCode'] as num?)?.toInt();
+        final category = classifyIperfError(code);
+        _lastErrorCategory = category;
+        LoggerService.warning(
+            'Download failed on $serverHost: $error '
+            '[${category.debugLabel}, code=$code]',
             tag: 'SpeedTestService');
         return null;
       }
@@ -413,7 +429,12 @@ class SpeedTestService {
 
       if (uploadResult['success'] != true) {
         final error = uploadResult['error'] ?? 'Upload test failed';
-        LoggerService.warning('Upload failed on $serverHost: $error',
+        final code = (uploadResult['errorCode'] as num?)?.toInt();
+        final category = classifyIperfError(code);
+        _lastErrorCategory = category;
+        LoggerService.warning(
+            'Upload failed on $serverHost: $error '
+            '[${category.debugLabel}, code=$code]',
             tag: 'SpeedTestService');
         return null;
       }
@@ -434,6 +455,7 @@ class SpeedTestService {
         serverHost: serverHost,
       );
     } catch (e) {
+      _lastErrorCategory = IperfErrorCategory.unknown;
       LoggerService.error('Test error with $serverHost: $e',
           tag: 'SpeedTestService');
       return null;

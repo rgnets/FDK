@@ -760,7 +760,8 @@ iperf_run_client(struct iperf_test * test)
                     if (sp->sender) {
                         int rc;
                         sp->done = 1;
-                        if (sp->thread_created == 1) {
+                        if (sp->thread_created == 1 &&
+                            memcmp(&sp->thr, &(pthread_t){0}, sizeof(pthread_t)) != 0) {
                             rc = pthread_cancel(sp->thr);
                             if (rc != 0 && rc != ESRCH) {
                                 i_errno = IEPTHREADCANCEL;
@@ -779,6 +780,7 @@ iperf_run_client(struct iperf_test * test)
                                 iperf_printf(test, "Thread FD %d stopped\n", sp->socket);
                             }
                             sp->thread_created = 0;
+                            memset(&sp->thr, 0, sizeof(sp->thr));
                         }
                     }
                 }
@@ -801,7 +803,8 @@ iperf_run_client(struct iperf_test * test)
         if (!sp->sender) {
             int rc;
             sp->done = 1;
-            if (sp->thread_created == 1) {
+            if (sp->thread_created == 1 &&
+                memcmp(&sp->thr, &(pthread_t){0}, sizeof(pthread_t)) != 0) {
                 rc = pthread_cancel(sp->thr);
                 if (rc != 0 && rc != ESRCH) {
                     i_errno = IEPTHREADCANCEL;
@@ -820,6 +823,7 @@ iperf_run_client(struct iperf_test * test)
                     iperf_printf(test, "Thread FD %d stopped\n", sp->socket);
                 }
                 sp->thread_created = 0;
+                memset(&sp->thr, 0, sizeof(sp->thr));
             }
         }
     }
@@ -848,14 +852,15 @@ iperf_run_client(struct iperf_test * test)
         }
         sp->done = 1;
         int rc;
-        if (sp->thread_created == 1) {
+        if (sp->thread_created == 1 &&
+            memcmp(&sp->thr, &(pthread_t){0}, sizeof(pthread_t)) != 0) {
             rc = pthread_cancel(sp->thr);
             if (rc != 0 && rc != ESRCH) {
                 i_errno = IEPTHREADCANCEL;
                 errno = rc;
                 iperf_err(test, "cleanup_and_fail in pthread_cancel - %s", iperf_strerror(i_errno));
             }
-            rc = pthread_join(sp->thr, NULL); 
+            rc = pthread_join(sp->thr, NULL);
             if (rc != 0 && rc != ESRCH) {
                 i_errno = IEPTHREADJOIN;
                 errno = rc;
@@ -865,6 +870,7 @@ iperf_run_client(struct iperf_test * test)
                 iperf_printf(test, "Thread FD %d stopped\n", sp->socket);
             }
             sp->thread_created = 0;
+            memset(&sp->thr, 0, sizeof(sp->thr));
         }
     }
     if (test->debug_level >= DEBUG_LEVEL_INFO) {
