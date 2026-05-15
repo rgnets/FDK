@@ -771,11 +771,16 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
 
   ref.listen<AuthStatus?>(authStatusProvider, (AuthStatus? previous, AuthStatus? next) {
     final wasAuthenticated = previous?.isAuthenticated ?? false;
-    final wasUnauthenticated = previous?.isUnauthenticated ?? false;
     final isNowAuthenticated = next?.isAuthenticated ?? false;
     final isNowUnauthenticated = next?.isUnauthenticated ?? false;
 
-    if (wasUnauthenticated && isNowAuthenticated) {
+    // Fires on any non-authenticated → authenticated transition (including
+    // the `authenticating` intermediate state). The previous logic only
+    // matched `unauthenticated → authenticated`, but the real sign-in
+    // sequence is `unauthenticated → authenticating → authenticated`, so
+    // the cleanup never fired after a sign-out, leaving the compliance
+    // providers stuck with the prior site's siteUrl + api_key.
+    if (!wasAuthenticated && isNowAuthenticated) {
       logger.i('AUTH_CLEANUP: Detected sign-in, requesting fresh WS snapshots');
       // After sign-out, the WS device/room caches are wiped. The WS
       // subscription persists across sign-in (same connection), so the
