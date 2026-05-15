@@ -252,16 +252,14 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
   }
 }
 
-/// Provider that returns health notices list (sync version for UI)
+/// Provider that returns health notices list (sync version for UI).
+/// Uses `valueOrNull` so AsyncLoading rebuilds (which fire on every WS
+/// device update) preserve the last good list — without this the Alerts
+/// badge flickers between 0 and the real count on busy sites.
 @Riverpod(keepAlive: true)
 List<HealthNotice> healthNoticesList(HealthNoticesListRef ref) {
-  final noticesAsync = ref.watch(healthNoticesNotifierProvider);
-
-  return noticesAsync.when(
-    data: (notices) => notices,
-    loading: () => [],
-    error: (_, __) => [],
-  );
+  return ref.watch(healthNoticesNotifierProvider).valueOrNull ??
+      const <HealthNotice>[];
 }
 
 /// Filter for health notices

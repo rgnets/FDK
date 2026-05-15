@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
-import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
@@ -125,6 +124,15 @@ class WebSocketCacheIntegration {
   bool _initialized = false;
   bool _snapshotInFlight = false;
   bool _needsSnapshot = true;
+  /// Wall-clock of the last time `requestFullSnapshots()` actually fired
+  /// the WS requests. Multiple consumers (auth notifier, device WS data
+  /// source, room readiness data source) each call `requestFullSnapshots()`
+  /// independently right after sign-in. Without a coalesce window, that
+  /// triples the snapshot traffic (21 WS requests instead of 7) and the
+  /// rxg's `compliance_check_results` channel can also briefly hit its
+  /// rate limit during the burst.
+  DateTime? _lastSnapshotFiredAt;
+  static const Duration _snapshotCoalesceWindow = Duration(seconds: 5);
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
@@ -451,6 +459,14 @@ class WebSocketCacheIntegration {
   // ---------------------------------------------------------------------------
 
   void requestFullSnapshots() {
+    final lastFired = _lastSnapshotFiredAt;
+    if (lastFired != null &&
+        DateTime.now().difference(lastFired) < _snapshotCoalesceWindow) {
+      _logger.d(
+        'WebSocketCacheIntegration: Manual sync coalesced (last fire ${DateTime.now().difference(lastFired).inMilliseconds}ms ago)',
+      );
+      return;
+    }
     _logger.i('WebSocketCacheIntegration: Manual sync requested');
     _needsSnapshot = true;
     _snapshotInFlight = false;
@@ -467,7 +483,7 @@ class WebSocketCacheIntegration {
           'WebSocketCacheIntegration: Delaying snapshot request until channel is ready');
       return;
     }
-
+    _lastSnapshotFiredAt = DateTime.now();
     _logger.i(
         'WebSocketCacheIntegration: Requesting snapshots for: $_resourceTypes');
 
@@ -480,10 +496,7 @@ class WebSocketCacheIntegration {
 
     var allSent = true;
     for (final resource in _resourceTypes) {
-      final fields = WebSocketDeviceCacheService.isDeviceResourceType(resource)
-          ? DeviceFieldSets.listFields
-          : null;
-      final sent = _requestSnapshot(resource, fields: fields);
+      final sent = _requestSnapshot(resource);
       if (!sent) {
         allSent = false;
       }
@@ -496,16 +509,22 @@ class WebSocketCacheIntegration {
     }
   }
 
-  bool _requestSnapshot(String resourceType, {List<String>? fields}) {
+  bool _requestSnapshot(String resourceType) {
     if (_requestedSnapshots.contains(resourceType)) return true;
     if (!_webSocketService.isConnected || !_channelConfirmed) {
       return false;
     }
 
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType'
-        '${fields != null ? " with ${fields.length} fields" : ""}');
+    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
     _requestedSnapshots.add(resourceType);
 
+    // Deliberately no `only:` field filter. The rxg's WS index handler
+    // takes a slow/incomplete path when `only:` is set on device-typed
+    // resources (access_points, switch_devices, media_converters): instead
+    // of returning a single snapshot response it streams individual
+    // `action=updated` upserts and stops well before delivering the full
+    // inventory. Without the filter, the snapshot returns cleanly with
+    // every row in one batch. Trade-off: heavier payload per row.
     final payload = <String, dynamic>{
       'action': 'resource_action',
       'resource_type': resourceType,
@@ -515,10 +534,6 @@ class WebSocketCacheIntegration {
       'request_id':
           'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
     };
-
-    if (fields != null && fields.isNotEmpty) {
-      payload['only'] = fields.join(',');
-    }
 
     final sent = _sendActionCableMessage(payload);
     if (!sent) {
