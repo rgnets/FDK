@@ -12,6 +12,7 @@ import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/inventory_rest_seeder_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
@@ -806,7 +807,7 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
       }
       // We delay slightly to let the auth state settle and any in-flight
       // WS handshake complete before firing snapshot requests.
-      Future<void>.delayed(const Duration(seconds: 1), () {
+      Future<void>.delayed(const Duration(seconds: 1), () async {
         try {
           // `clearDataAndRefresh` (not `requestFullSnapshots`) on sign-in
           // because: (a) any WS upserts that arrived from the prior site
@@ -821,6 +822,18 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         } on Object catch (e) {
           logger.w('AUTH_CLEANUP: Failed to request snapshots on sign-in: $e');
         }
+        // Fire REST inventory seed in parallel with the WS path. REST is the
+        // authoritative source for full inventory (including offline devices),
+        // because rxg's WS `resource_action index` is rate-limited per user
+        // (RxgChannel#check_rate_limit, 100 req/60s) AND on large sites can
+        // degrade into a streaming-upserts codepath that only broadcasts
+        // polled-online devices. WS continues to deliver live
+        // `action=updated` deltas; see the doc on `_seedInventoryFromRest`
+        // for the snapshot-vs-upsert race tradeoff (`applySnapshot` replaces
+        // the resource list, so WS upserts in flight during the seed window
+        // can be overwritten — accepted because WS will correct individual
+        // entries within the next poll cycle).
+        unawaited(_seedInventoryFromRest(ref, logger));
       });
     }
 
@@ -935,4 +948,97 @@ class _ActionCableAuthResult {
 
   final bool success;
   final String message;
+}
+
+/// Reads current siteUrl + api_key from storage, builds an
+/// [InventoryRestSeederService], and dispatches the fetched lists into the
+/// existing device/room WS cache services. Tolerates per-resource failures.
+/// Called from the sign-in cleanup listener with `unawaited`.
+///
+/// Stale-seed guard: the seed takes up to ~30s (timeout) per resource. A
+/// late response from a now-superseded auth context must NOT overwrite
+/// the new context's cache. We capture (siteUrl, apiKey) at seed-start
+/// and re-validate them plus the live auth status at apply-time:
+///   - signed out: dropped (most common case during rapid sign-out/in)
+///   - same site, different api_key (user switch): dropped
+///   - different site (cross-site sign-in): dropped
+/// Storage clearing on sign-out happens after the auth status flip, so
+/// `authStatus.isUnauthenticated` is the earliest signal we can use.
+///
+/// Snapshot vs upsert race: `applySnapshot` on the device/room cache
+/// services REPLACES that resource's list. WS upserts that arrive
+/// between cache clear and seed completion are overwritten. Accepted
+/// tradeoff — the seed is the post-sign-in baseline; subsequent WS
+/// upserts correct individual entries within the next poll cycle.
+Future<void> _seedInventoryFromRest(Ref ref, Logger logger) async {
+  try {
+    final storage = ref.read(storageServiceProvider);
+    final secure = ref.read(secureStorageServiceProvider);
+    final expectedSiteUrl = storage.siteUrl;
+    if (expectedSiteUrl == null || expectedSiteUrl.isEmpty) {
+      logger.d('AUTH_CLEANUP: REST seed skipped — no siteUrl yet');
+      return;
+    }
+    final expectedApiKey = await secure.getToken();
+    if (expectedApiKey == null || expectedApiKey.isEmpty) {
+      logger.d('AUTH_CLEANUP: REST seed skipped — no api_key yet');
+      return;
+    }
+    final wsci = ref.read(webSocketCacheIntegrationProvider);
+    final seeder = InventoryRestSeederService(
+      siteUrl: expectedSiteUrl,
+      apiKey: expectedApiKey,
+    );
+
+    Future<String?> staleReason() async {
+      // Do the only async read FIRST so the subsequent sync checks form
+      // an atomic verdict with respect to the event loop. If any check is
+      // interleaved with the await, a sign-out + sign-in landing during
+      // that window could flip auth state between checks and we'd apply a
+      // stale snapshot. After the await resolves, the comparisons below
+      // run in a single sync slice and the caller's `applySnapshot` runs
+      // before the next event-loop turn.
+      final currentKey =
+          await ref.read(secureStorageServiceProvider).getToken();
+      final currentStatus = ref.read(authStatusProvider);
+      if (currentStatus?.isAuthenticated != true) return 'unauthenticated';
+      final currentSiteUrl = ref.read(storageServiceProvider).siteUrl;
+      if (currentSiteUrl != expectedSiteUrl) {
+        return 'site changed ($expectedSiteUrl → $currentSiteUrl)';
+      }
+      if (currentKey != expectedApiKey) {
+        return 'api_key changed (same site, different credential)';
+      }
+      return null;
+    }
+
+    final result = await seeder.seedAll(
+      onDevices: (resourceType, items) async {
+        final reason = await staleReason();
+        if (reason != null) {
+          logger.w(
+            'AUTH_CLEANUP: dropping stale REST seed for $resourceType — $reason',
+          );
+          return;
+        }
+        wsci.deviceCacheService.applySnapshot(resourceType, items);
+      },
+      onRooms: (items) async {
+        final reason = await staleReason();
+        if (reason != null) {
+          logger.w(
+            'AUTH_CLEANUP: dropping stale REST seed for pms_rooms — $reason',
+          );
+          return;
+        }
+        wsci.roomCacheService.applySnapshot(items);
+      },
+    );
+    logger.i(
+      'AUTH_CLEANUP: REST seed finished — ${result.outcomes.where((o) => o.success).length}/'
+      '${result.outcomes.length} resources, ${result.totalItems} items total',
+    );
+  } on Object catch (e) {
+    logger.w('AUTH_CLEANUP: REST seed failed: $e');
+  }
 }
