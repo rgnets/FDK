@@ -227,11 +227,40 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     final complianceFailures = ref.watch(complianceFailuresAggregateProvider);
     notices.addAll(complianceFailuresToHealthNotices(complianceFailures));
 
+    // Synthesize CRITICAL notices for offline devices in the WS cache.
+    // The rxg's `health_notices` table no longer carries per-device offline
+    // rows on current rxg versions, and `device.healthNotices` is empty
+    // since commit 44e3bedd2e. The home overview's offline count comes
+    // from the same `device.status == 'offline'` check, so this keeps the
+    // Alerts badge consistent with the home counter on sites with offline
+    // devices.
+    var offlineNoticesAdded = 0;
+    for (final device in devices) {
+      if (device.status.toLowerCase() != 'offline') continue;
+      final fdkId = device.id;
+      final syntheticId = _offlineSyntheticId(fdkId);
+      if (!seenIds.add(syntheticId)) continue;
+      final label = _deviceTypeLabel(device.deviceType);
+      notices.add(HealthNotice(
+        id: syntheticId,
+        name: 'fdk_device_offline_$fdkId',
+        severity: HealthNoticeSeverity.critical,
+        shortMessage: '$label OFFLINE: ${device.name}',
+        longMessage: 'Device "${device.name}" is offline.',
+        createdAt: DateTime.now(),
+        deviceId: fdkId,
+        deviceName: device.name,
+        deviceType: device.deviceType,
+      ));
+      offlineNoticesAdded++;
+    }
+
     LoggerService.debug(
       'HEALTH: Extracted ${notices.length} notices '
       '($devicesWithNotices devices with notices, '
       '$tableNoticesAdded from health_notices table, '
-      '${complianceFailures.length} compliance failures)',
+      '${complianceFailures.length} compliance failures, '
+      '$offlineNoticesAdded synthesized offline)',
       tag: 'HealthNotices',
     );
 
@@ -392,4 +421,28 @@ List<HealthNotice> filteredHealthNotices(FilteredHealthNoticesRef ref) {
   }
 
   return filtered;
+}
+
+/// Stable negative id for synthetic device-offline notices, derived from
+/// the FDK device id string so the same device produces the same id
+/// across rebuilds (otherwise the `seenIds` dedupe and any consumer-side
+/// keying would churn). Hashes are confined to 31 bits then negated.
+int _offlineSyntheticId(String fdkDeviceId) {
+  final hash = ('offline:$fdkDeviceId').hashCode & 0x7FFFFFFF;
+  return -hash - 1;
+}
+
+String _deviceTypeLabel(String deviceType) {
+  switch (deviceType) {
+    case 'access_point':
+      return 'AP';
+    case 'ont':
+      return 'ONT';
+    case 'switch':
+      return 'Switch';
+    case 'wlan_controller':
+      return 'WLAN';
+    default:
+      return 'Device';
+  }
 }

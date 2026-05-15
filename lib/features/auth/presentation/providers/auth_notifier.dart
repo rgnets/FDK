@@ -838,10 +838,19 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
         ref.invalidate(compliance_providers.complianceTriggerWiringProvider);
         ref.invalidate(compliance_aggregate.complianceFailuresAggregateProvider);
         // health_notices is keepAlive=true so it holds the prior site's
-        // notices until explicitly invalidated.
+        // notices until explicitly invalidated. The list/count providers
+        // read the notifier via `valueOrNull` (preserves previous data
+        // across AsyncLoading rebuilds to stop badge flicker) — that
+        // preservation also keeps the prior site's value alive across an
+        // `invalidate(notifier)`, so we have to invalidate the downstream
+        // readers too on sign-out.
         ref.invalidate(health_notices.healthNoticesNotifierProvider);
         ref.invalidate(health_notices.aggregateHealthCountsNotifierProvider);
         ref.invalidate(health_notices.healthNoticesRemoteDataSourceProvider);
+        ref.invalidate(health_notices.healthNoticesListProvider);
+        ref.invalidate(health_notices.criticalIssueCountProvider);
+        ref.invalidate(health_notices.totalIssueCountProvider);
+        ref.invalidate(health_notices.filteredHealthNoticesProvider);
         logger.d('AUTH_CLEANUP: Data providers invalidated');
       } on Exception catch (e) {
         logger.w('AUTH_CLEANUP: Failed to invalidate data providers: $e');
