@@ -53,13 +53,29 @@ class HealthNoticesRemoteDataSource {
         DateTime.now().difference(cachedAt) < _cacheTtl) {
       return cached;
     }
+    return _fetchAndCache(fallbackToCacheOnEmpty: false);
+  }
+
+  /// Pull-to-refresh entry point. Bypasses the TTL but preserves the
+  /// previously-cached payload as a fallback if the rxg returns an empty
+  /// or error response (typically rate-limited concurrent traffic). Without
+  /// this, a 2nd pull-to-refresh inside the rxg's rate-limit window wipes
+  /// the alerts view to empty instead of leaving the last-known notices
+  /// visible until the rxg recovers.
+  Future<HealthNoticesSummaryModel> refreshNow() {
+    return _fetchAndCache(fallbackToCacheOnEmpty: true);
+  }
+
+  Future<HealthNoticesSummaryModel> _fetchAndCache({
+    required bool fallbackToCacheOnEmpty,
+  }) async {
     final cooldown = _cooldownUntil;
     if (cooldown != null && DateTime.now().isBefore(cooldown)) {
-      return cached ?? const HealthNoticesSummaryModel();
+      return _cached ?? const HealthNoticesSummaryModel();
     }
     if (!_socketService.isConnected) {
       LoggerService.debug('WebSocket not connected, returning empty', tag: _tag);
-      return const HealthNoticesSummaryModel();
+      return _cached ?? const HealthNoticesSummaryModel();
     }
     final existing = _inFlight;
     if (existing != null) return existing;
@@ -71,12 +87,12 @@ class HealthNoticesRemoteDataSource {
         _cached = result;
         _cachedAt = DateTime.now();
         _cooldownUntil = null;
-      } else {
-        // Empty payload from error/timeout/rate-limit. Back off so we
-        // don't re-fire the request inside the rxg's rate-limit window.
-        _cooldownUntil = DateTime.now().add(_errorCooldown);
+        return result;
       }
-      return result;
+      _cooldownUntil = DateTime.now().add(_errorCooldown);
+      return fallbackToCacheOnEmpty
+          ? (_cached ?? result)
+          : result;
     } finally {
       _inFlight = null;
     }

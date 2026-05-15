@@ -43,6 +43,26 @@ final criticalIssueCountProvider = Provider<int>.internal(
 );
 
 typedef CriticalIssueCountRef = ProviderRef<int>;
+String _$totalIssueCountHash() => r'ba6456e2a9ca21476928f8dfabfebdb8ed222474';
+
+/// Provider that returns the total notice count regardless of severity.
+/// Drives the secondary (blue) badge on the Alerts tab when no critical
+/// notices are present — keeps the bottom-nav count consistent with the
+/// "Health Notices (N)" header on the alerts screen.
+///
+/// Copied from [totalIssueCount].
+@ProviderFor(totalIssueCount)
+final totalIssueCountProvider = Provider<int>.internal(
+  totalIssueCount,
+  name: r'totalIssueCountProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$totalIssueCountHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef TotalIssueCountRef = ProviderRef<int>;
 String _$healthNoticesListHash() => r'57d5737283a3e099d3471058cdfbd4417f6e5992';
 
 /// Provider that returns health notices list (sync version for UI)
@@ -99,7 +119,7 @@ final aggregateHealthCountsNotifierProvider =
 
 typedef _$AggregateHealthCountsNotifier = AsyncNotifier<HealthCounts>;
 String _$healthNoticesNotifierHash() =>
-    r'0bac99a2ea30bb8d01e5a57f86b48ed0e5d4facb';
+    r'3a68dac8d31c85580246602afc16a0f44d7a494b';
 
 /// Provider that extracts health notices from cached device data
 ///

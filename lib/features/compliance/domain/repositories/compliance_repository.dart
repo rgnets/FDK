@@ -7,11 +7,11 @@ import 'package:rgnets_fdk/features/compliance/domain/entities/compliance_feed_s
 /// - Bootstrap initial state from the REST snapshot endpoint.
 /// - Subscribe to the WS snapshot cache and emit fresh state on each delta
 ///   that matches `(ruleId, fleetNodeId)`. Newer `checked_at` wins.
-/// - Trigger the matching manual notification action and return the outcome.
+/// - Trigger a per-rule "Check Now" on the rxg and return the outcome.
 ///
-/// IDs (ruleId, actionId, fleetNodeId) come from the provider layer rather
-/// than from inside the repository — keeps the repository pure with respect
-/// to its identity rather than coupling it to the lookup REST endpoint.
+/// IDs (ruleId, fleetNodeId) come from the provider layer rather than from
+/// inside the repository — keeps the repository pure with respect to its
+/// identity rather than coupling it to the lookup REST endpoint.
 abstract class ComplianceRepository {
   /// Loads the current snapshot once. Emits `unknown` if RXG hasn't been
   /// seeded yet or the check has never run.

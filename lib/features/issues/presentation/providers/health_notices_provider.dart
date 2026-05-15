@@ -131,6 +131,15 @@ int criticalIssueCount(CriticalIssueCountRef ref) {
   return notices.criticalCount;
 }
 
+/// Provider that returns the total notice count regardless of severity.
+/// Drives the secondary (blue) badge on the Alerts tab when no critical
+/// notices are present — keeps the bottom-nav count consistent with the
+/// "Health Notices (N)" header on the alerts screen.
+@Riverpod(keepAlive: true)
+int totalIssueCount(TotalIssueCountRef ref) {
+  return ref.watch(healthNoticesListProvider).length;
+}
+
 /// Provider that extracts health notices from cached device data
 @Riverpod(keepAlive: true)
 class HealthNoticesNotifier extends _$HealthNoticesNotifier {

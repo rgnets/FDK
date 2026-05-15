@@ -285,19 +285,20 @@ class _HealthNoticesScreenState extends ConsumerState<HealthNoticesScreen> {
 
   /// Pull-to-refresh handler. Fires the rxg-side compliance rechecks (images
   /// + speed tests) so any stale ComplianceCheckResult rows get rewritten
-  /// against current state, and invalidates both the HealthNoticesNotifier
-  /// and the underlying HealthNoticesRemoteDataSource so the next build
-  /// re-fetches /api/health_notices/summary fresh — bypassing the data
-  /// source's 30s TTL cache that would otherwise hide just-cured notices.
-  /// The trigger scheduler dedupes concurrent fires per rule and schedules
-  /// its own 30s retry, so this is safe to invoke repeatedly.
+  /// against current state, and calls refreshNow() on the existing data
+  /// source so the next build bypasses its 30s TTL cache. We deliberately
+  /// do NOT invalidate `healthNoticesRemoteDataSourceProvider` — that would
+  /// spawn a fresh instance with empty cache + empty cooldown, and a 2nd
+  /// pull-to-refresh inside the rxg's WS rate-limit window would then wipe
+  /// the alerts view to empty instead of preserving the last-known notices.
   Future<void> _handleRefresh() async {
     final scheduler = ref.read(triggerRetrySchedulerProvider);
+    final remote = ref.read(healthNoticesRemoteDataSourceProvider);
     await Future.wait<void>([
       scheduler.fire(ComplianceNames.imagesRule),
       scheduler.fire(ComplianceNames.speedTestRule),
+      remote.refreshNow(),
     ]);
-    ref.invalidate(healthNoticesRemoteDataSourceProvider);
     ref.invalidate(healthNoticesNotifierProvider);
   }
 
