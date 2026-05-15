@@ -11,25 +11,29 @@ void main() {
         apiKey: 'secret',
         client: MockClient((_) async => http.Response('{}', 200)),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.queued);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.queued);
     });
 
-    test('403 → TriggerOutcome.notFound (admin scaffold uses 403 for both missing and non-triggerable)', () async {
+    test('422 → TriggerOutcome.notFound (rxg wraps RecordNotFound as 422)', () async {
       final ds = ComplianceRestDataSource(
         siteUrl: 'example.test',
         apiKey: 'secret',
-        client: MockClient((_) async => http.Response('', 403)),
+        client: MockClient((_) async => http.Response(
+            "Compliance check failed: Couldn't find ComplianceRule with 'id'=99",
+            422)),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.notFound);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.notFound);
     });
 
-    test('404 → TriggerOutcome.notFound', () async {
+    test('429 → TriggerOutcome.queued (in-flight check produces the row we want anyway)', () async {
       final ds = ComplianceRestDataSource(
         siteUrl: 'example.test',
         apiKey: 'secret',
-        client: MockClient((_) async => http.Response('', 404)),
+        client: MockClient((_) async => http.Response(
+            "A compliance check for '<name>' is already running",
+            429)),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.notFound);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.queued);
     });
 
     test('401 → TriggerOutcome.unauthorized', () async {
@@ -38,7 +42,7 @@ void main() {
         apiKey: 'secret',
         client: MockClient((_) async => http.Response('', 401)),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.unauthorized);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.unauthorized);
     });
 
     test('500 → TriggerOutcome.networkError', () async {
@@ -47,7 +51,7 @@ void main() {
         apiKey: 'secret',
         client: MockClient((_) async => http.Response('', 500)),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.networkError);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.networkError);
     });
 
     test('network exception → TriggerOutcome.networkError', () async {
@@ -58,7 +62,7 @@ void main() {
           throw Exception('connection refused');
         }),
       );
-      expect(await ds.triggerNotificationAction(99), TriggerOutcome.networkError);
+      expect(await ds.triggerCheckNow(99), TriggerOutcome.networkError);
     });
   });
 
@@ -343,7 +347,7 @@ void main() {
   group('FM-8 / api_key URL scrubbing', () {
     test('api_key is replaced with [redacted] in scrubbed URLs', () {
       final uri = Uri.parse(
-        'https://example.test/admin/notification_actions/9/trigger.json?api_key=SECRET_SENTINEL',
+        'https://example.test/admin/scaffolds/compliance_rules/check_now/9.json?api_key=SECRET_SENTINEL',
       );
       final scrubbed = ComplianceRestDataSource.scrubUrlForLog(uri);
       expect(scrubbed, contains('[redacted]'));

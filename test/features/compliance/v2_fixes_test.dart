@@ -145,7 +145,6 @@ void main() {
       final repo = ComplianceRepositoryImpl(
         ruleName: 'r',
         ruleId: 1,
-        actionId: 9,
         fleetNode: const LocalFleetNodeResult(LocalFleetNodeStatus.known, 7),
         rest: ComplianceRestDataSource(
           siteUrl: 'x',
@@ -184,7 +183,6 @@ void main() {
       final repo = ComplianceRepositoryImpl(
         ruleName: 'r',
         ruleId: 1,
-        actionId: 9,
         fleetNode: const LocalFleetNodeResult(LocalFleetNodeStatus.known, 7),
         rest: ComplianceRestDataSource(
           siteUrl: 'x',
@@ -217,7 +215,6 @@ void main() {
       final repo = ComplianceRepositoryImpl(
         ruleName: 'r',
         ruleId: 1,
-        actionId: 9,
         fleetNode:
             const LocalFleetNodeResult(LocalFleetNodeStatus.standalone, 7),
         rest: ComplianceRestDataSource(

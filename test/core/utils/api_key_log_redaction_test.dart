@@ -118,7 +118,7 @@ void main() {
           apiKey: _sentinel,
           client: MockClient((_) async => http.Response('{}', 200)),
         );
-        await ds.triggerNotificationAction(99);
+        await ds.triggerCheckNow(99);
       });
       expect(output, isNot(contains(_sentinel)));
     });

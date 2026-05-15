@@ -89,17 +89,16 @@ class LookupNetworkError extends LookupResult {
   final String message;
 }
 
-/// Outcome of a manual notification-action trigger.
+/// Outcome of a manual compliance-rule check-now trigger.
 ///
-/// The HTTP 200 from `/admin/notification_actions/:id/trigger.json` means the
-/// `NotificationEvent` was queued, not that the underlying compliance check
-/// completed. The provider layer is responsible for watching for a fresher
-/// snapshot to actually flip UI state. See spec FM-9 / TR-9.
+/// The 200 from `/admin/scaffolds/compliance_rules/check_now/:id.json` means
+/// the rule's check_now has been queued (the rxg uses `local_check_now!` here
+/// — in-flight gating only, no 30s cooldown). The provider layer still has
+/// to watch for a fresher snapshot to flip UI state. See spec FM-9 / TR-9.
 enum TriggerOutcome {
   queued,
-  /// Either the action ID isn't valid for the connected RXG or the action's
-  /// `event_type` is not in `API_TRIGGERABLE` (`%w[manual periodic]`). The
-  /// admin scaffold returns 403 for both cases; FDK treats them identically.
+  /// Unknown rule id. The rxg returns 422 with an ActiveRecord::RecordNotFound
+  /// message; consumers invalidate the lookup so the next attempt re-resolves.
   notFound,
   unauthorized,
   networkError,
@@ -178,12 +177,6 @@ class ComplianceRestDataSource {
   /// can distinguish "seed not applied" from "401 / network" (FM-7).
   Future<LookupResult> lookupRuleId(String name) async {
     final uri = _api('compliance_rules.json');
-    return _lookupIdByName(uri: uri, name: name);
-  }
-
-  /// Looks up a `NotificationAction` by its `name`.
-  Future<LookupResult> lookupNotificationActionId(String name) async {
-    final uri = _api('notification_actions.json');
     return _lookupIdByName(uri: uri, name: name);
   }
 
@@ -412,41 +405,45 @@ class ComplianceRestDataSource {
     return BootstrapResult(BootstrapStatus.found, best);
   }
 
-  /// Fires a manual notification_action. Returns a [TriggerOutcome] so the
-  /// provider layer can map distinct errors to distinct UI states (FM-7).
+  /// Fires the rxg's per-rule "Check Now" — the same path the admin GUI's
+  /// Check Now button calls. The URL is ActiveScaffold's member-action form
+  /// (`/check_now/:id` not `/:id/check_now`); api_key auth is accepted.
+  /// On non-fleet-manager rxgs this invokes `local_check_now!` which uses
+  /// only an in-flight marker (no 30s cooldown).
   ///
-  /// 200 → [TriggerOutcome.queued] (NotificationEvent created; DelayedJob
-  /// will run the recheck script, which itself rate-limits at 30s).
-  /// 403 / 404 → [TriggerOutcome.notFound] (admin scaffold returns 403 when
-  /// the action is missing OR its event_type isn't in `API_TRIGGERABLE`;
-  /// 404 can come from missing route).
-  /// 401 → [TriggerOutcome.unauthorized].
-  /// Network/timeout → [TriggerOutcome.networkError].
-  Future<TriggerOutcome> triggerNotificationAction(int actionId) async {
-    final uri = _admin('notification_actions/$actionId/trigger.json');
+  /// 200 → [TriggerOutcome.queued]
+  /// 429 → [TriggerOutcome.queued] (a check is already running for this
+  ///   rule; the result it produces is the one we want anyway, so the
+  ///   8s refetch will pick it up).
+  /// 401 → [TriggerOutcome.unauthorized]
+  /// 422 → [TriggerOutcome.notFound] (rxg wraps RecordNotFound as 422)
+  /// Network/timeout / other → [TriggerOutcome.networkError]
+  Future<TriggerOutcome> triggerCheckNow(int ruleId) async {
+    final uri =
+        _admin('scaffolds/compliance_rules/check_now/$ruleId.json');
     LoggerService.debug('POST ${scrubUrlForLog(uri)}', tag: _tag);
     try {
       final response = await _client.post(uri).timeout(_timeout);
       switch (response.statusCode) {
         case 200:
+        case 429:
           return TriggerOutcome.queued;
         case 401:
           return TriggerOutcome.unauthorized;
-        case 403:
-        case 404:
+        case 422:
           return TriggerOutcome.notFound;
         default:
           LoggerService.warning(
-            'unexpected trigger response status ${response.statusCode}',
+            'unexpected check_now response status ${response.statusCode}',
             tag: _tag,
           );
           return TriggerOutcome.networkError;
       }
     } on TimeoutException {
-      LoggerService.warning('trigger timed out', tag: _tag);
+      LoggerService.warning('check_now timed out', tag: _tag);
       return TriggerOutcome.networkError;
     } catch (e) {
-      LoggerService.error('trigger failed (scrubbed): ${_safeError(e)}',
+      LoggerService.error('check_now failed (scrubbed): ${_safeError(e)}',
           tag: _tag);
       return TriggerOutcome.networkError;
     }

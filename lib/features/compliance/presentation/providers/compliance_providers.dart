@@ -18,43 +18,26 @@ class ComplianceNames {
 
   static const String imagesRule = 'FDK Missing Installation Images';
   static const String speedTestRule = 'FDK APs Failed Speed Test';
-  static const String imagesAction = 'FDK Recheck Images';
-  static const String speedTestAction = 'FDK Recheck Speed Tests';
 }
 
-/// Per-rule lookup state. Carries the *typed* discriminated results from the
-/// datasource so the feed provider can map each failure mode to the right
+/// Per-rule lookup state. Carries the typed discriminated rule lookup so
+/// the feed provider can map each failure mode to the right
 /// `ComplianceFeedState` (FM-7 / B3):
-///   - both `LookupFound` → proceed (`isResolved == true`).
-///   - any `LookupUnauthorized` → feed `error("authentication failed")`.
-///   - any `LookupNetworkError` → feed `error("network unreachable")`,
+///   - `LookupFound` → proceed (`isResolved == true`).
+///   - `LookupUnauthorized` → feed `error("authentication failed")`.
+///   - `LookupNetworkError` → feed `error("network unreachable")`,
 ///     retain last good state.
-///   - any `LookupMissing` with no auth/network failure → feed `unknown`
-///     (after one cache-invalidate-and-retry attempt).
+///   - `LookupMissing` → feed `unknown`.
 class ComplianceLookup {
-  const ComplianceLookup({
-    this.rule = const LookupMissing(),
-    this.action = const LookupMissing(),
-  });
+  const ComplianceLookup({this.rule = const LookupMissing()});
   final LookupResult rule;
-  final LookupResult action;
 
   int? get ruleId => rule is LookupFound ? (rule as LookupFound).id : null;
-  int? get actionId =>
-      action is LookupFound ? (action as LookupFound).id : null;
 
-  bool get isResolved => rule is LookupFound && action is LookupFound;
-
-  /// True when at least one component reported an auth failure. Auth wins
-  /// over network/missing because it's the most actionable signal.
-  bool get isUnauthorized =>
-      rule is LookupUnauthorized || action is LookupUnauthorized;
-
-  /// True when no auth failure but at least one network failure. Caller
-  /// retains last good state in this case.
+  bool get isResolved => rule is LookupFound;
+  bool get isUnauthorized => rule is LookupUnauthorized;
   bool get isNetworkError =>
-      !isUnauthorized &&
-      (rule is LookupNetworkError || action is LookupNetworkError);
+      !isUnauthorized && rule is LookupNetworkError;
 }
 
 /// Builds a configured [ComplianceRestDataSource] from current site URL +
@@ -87,7 +70,7 @@ final localFleetNodeProvider =
 });
 
 /// Per-rule lookup. Keyed by [ruleName] so the two rules don't share state.
-/// Invalidate this provider on trigger 403 to force a fresh lookup (FM-7).
+/// Invalidate this provider on trigger 422 to force a fresh lookup (FM-7).
 final complianceLookupProvider =
     FutureProvider.family<ComplianceLookup, String>((ref, ruleName) async {
   final rest = await ref.watch(complianceRestDataSourceProvider.future);
@@ -98,28 +81,13 @@ final complianceLookupProvider =
     );
     return const ComplianceLookup();
   }
-  final actionName = _actionNameForRule(ruleName);
-  final results = await Future.wait<LookupResult>([
-    rest.lookupRuleId(ruleName),
-    rest.lookupNotificationActionId(actionName),
-  ]);
+  final result = await rest.lookupRuleId(ruleName);
   LoggerService.debug(
-    'lookup[$ruleName]: rule=${results[0].runtimeType} action=${results[1].runtimeType} (actionName="$actionName")',
+    'lookup[$ruleName]: rule=${result.runtimeType}',
     tag: 'ComplianceLookup',
   );
-  return ComplianceLookup(rule: results[0], action: results[1]);
+  return ComplianceLookup(rule: result);
 });
-
-String _actionNameForRule(String ruleName) {
-  switch (ruleName) {
-    case ComplianceNames.imagesRule:
-      return ComplianceNames.imagesAction;
-    case ComplianceNames.speedTestRule:
-      return ComplianceNames.speedTestAction;
-    default:
-      throw ArgumentError('Unknown compliance rule name: $ruleName');
-  }
-}
 
 /// Builds a [ComplianceRepository] bound to one rule. Returns null while
 /// dependencies are unresolved (lookup pending / failed). autoDispose keeps
@@ -144,7 +112,6 @@ final complianceRepositoryProvider =
   final repo = ComplianceRepositoryImpl(
     ruleName: ruleName,
     ruleId: lookup.ruleId!,
-    actionId: lookup.actionId!,
     fleetNode: fleetNode,
     rest: rest,
     cache: cache,
@@ -272,20 +239,6 @@ class TriggerRetryScheduler {
   bool _disposed = false;
 
   Future<TriggerOutcome> fire(String ruleName) async {
-    // The rxg enforces a 30s per-rule rate limit
-    // (`ComplianceCheckService.rate_limit_check_now!`) and silently
-    // no-ops any POST inside that window — the wrapper script rescues
-    // `CheckNowRateLimited` and returns a "Warning: rate-limited" string
-    // that the HTTP layer reports as a normal 200. So firing again
-    // inside 30s wastes a POST, generates rxg log noise, and produces no
-    // new ComplianceCheckResult. If a retry is already pending for this
-    // rule we KNOW we fired within the last 30s (the retry schedule
-    // matches the rate-limit window), so let that pending retry land
-    // the next POST when the rxg's window clears.
-    if (_pending.containsKey(ruleName)) {
-      return TriggerOutcome.queued;
-    }
-
     final repo =
         await _ref.read(complianceRepositoryProvider(ruleName).future);
     if (repo == null) return TriggerOutcome.notFound;

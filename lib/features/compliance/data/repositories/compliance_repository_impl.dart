@@ -7,14 +7,13 @@ import 'package:rgnets_fdk/features/compliance/data/models/compliance_check_resu
 import 'package:rgnets_fdk/features/compliance/domain/entities/compliance_feed_state.dart';
 import 'package:rgnets_fdk/features/compliance/domain/repositories/compliance_repository.dart';
 
-/// Concrete repository tied to a single `(ruleId, actionId, fleetNodeId)`
-/// triple. Spec refs: TR-4 (state merge), TR-9 (trigger semantics), FM-9
+/// Concrete repository tied to a single `(ruleId, fleetNodeId)` pair.
+/// Spec refs: TR-4 (state merge), TR-9 (trigger semantics), FM-9
 /// (200 doesn't mean check-done — provider polls snapshot via [watch]).
 class ComplianceRepositoryImpl implements ComplianceRepository {
   ComplianceRepositoryImpl({
     required this.ruleName,
     required this.ruleId,
-    required this.actionId,
     required this.fleetNode,
     required ComplianceRestDataSource rest,
     required WebSocketComplianceCacheService cache,
@@ -24,7 +23,6 @@ class ComplianceRepositoryImpl implements ComplianceRepository {
   /// Display name of the compliance rule, used to stamp parsed failures.
   final String ruleName;
   final int ruleId;
-  final int actionId;
   /// Status-bearing local node identity. Only `standalone` enables the
   /// "accept missing fleet_node_id in payload" fallback (TR-4 / FM-7 fix).
   final LocalFleetNodeResult fleetNode;
@@ -176,7 +174,7 @@ class ComplianceRepositoryImpl implements ComplianceRepository {
 
   @override
   Future<TriggerOutcome> triggerRecheck() async {
-    final outcome = await _rest.triggerNotificationAction(actionId);
+    final outcome = await _rest.triggerCheckNow(ruleId);
     if (outcome == TriggerOutcome.queued) {
       // WS broadcast for compliance_check_results isn't always delivered
       // (observed on real rxgs: trigger lands, DelayedJob runs the script,

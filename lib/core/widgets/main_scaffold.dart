@@ -48,6 +48,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
   Widget build(BuildContext context) {
     final currentIndex = _calculateSelectedIndex(context);
     final criticalCount = ref.watch(criticalIssueCountProvider);
+    final totalCount = ref.watch(totalIssueCountProvider);
 
     // Update app bar state when route changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -108,6 +109,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
               3,
               currentIndex,
               criticalCount,
+              totalCount,
             ),
             _buildNavItem(Icons.meeting_room_rounded, 'Locations', 4, currentIndex),
             _buildNavItem(Icons.settings_rounded, 'Settings', 5, currentIndex),
@@ -151,9 +153,17 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
     String label,
     int index,
     int currentIndex,
-    int badgeCount,
+    int criticalCount,
+    int totalCount,
   ) {
     final isSelected = index == currentIndex;
+    // Two-tier badge: red+pulse when any critical/fatal notice is present,
+    // blue otherwise. Count is the total notices in either case so the
+    // badge matches the alerts screen's `Health Notices (N)` header.
+    final hasCritical = criticalCount > 0;
+    final badgeCount = totalCount;
+    final showBadge = badgeCount > 0;
+    final badgeColor = hasCritical ? Colors.red : Colors.lightBlue;
 
     return BottomNavigationBarItem(
       icon: AnimatedContainer(
@@ -171,30 +181,32 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> with TickerProvider
               duration: const Duration(milliseconds: 200),
               child: Icon(icon, size: isSelected ? 26 : 24),
             ),
-            if (badgeCount > 0)
+            if (showBadge)
               Positioned(
                 right: -6,
                 top: -4,
                 child: AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
-                    return Transform.scale(
-                      scale: 1.0 + (_pulseController.value * 0.3),
-                      child: child,
-                    );
+                    final scale = hasCritical
+                        ? 1.0 + (_pulseController.value * 0.3)
+                        : 1.0;
+                    return Transform.scale(scale: scale, child: child);
                   },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: Colors.red,
+                      color: badgeColor,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withValues(alpha: 0.5),
-                          blurRadius: 4,
-                          spreadRadius: 1,
-                        ),
-                      ],
+                      boxShadow: hasCritical
+                          ? [
+                              BoxShadow(
+                                color: Colors.red.withValues(alpha: 0.5),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
                     ),
                     constraints: const BoxConstraints(
                       minWidth: 16,

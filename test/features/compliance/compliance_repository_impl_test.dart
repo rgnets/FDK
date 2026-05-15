@@ -9,7 +9,6 @@ import 'package:rgnets_fdk/features/compliance/domain/entities/compliance_feed_s
 
 const _ruleName = 'FDK Missing Installation Images';
 const _ruleId = 1;
-const _actionId = 9;
 const _fleetNodeId = 7;
 
 ComplianceRepositoryImpl _build({
@@ -22,7 +21,6 @@ ComplianceRepositoryImpl _build({
   return ComplianceRepositoryImpl(
     ruleName: _ruleName,
     ruleId: _ruleId,
-    actionId: _actionId,
     fleetNode: fleetNode,
     rest: ComplianceRestDataSource(
       siteUrl: 'example.test',
@@ -219,9 +217,11 @@ void main() {
       expect(await repo.triggerRecheck(), TriggerOutcome.queued);
     });
 
-    test('returns notFound on 403', () async {
+    test('returns notFound on 422 (rxg wraps RecordNotFound)', () async {
       final repo = _build(
-        client: MockClient((_) async => http.Response('', 403)),
+        client: MockClient((_) async => http.Response(
+            "Compliance check failed: Couldn't find ComplianceRule with 'id'=1",
+            422)),
       );
       expect(await repo.triggerRecheck(), TriggerOutcome.notFound);
     });
