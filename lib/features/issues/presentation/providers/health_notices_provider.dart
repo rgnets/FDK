@@ -198,6 +198,10 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     // include the association.
     final remote = ref.watch(healthNoticesRemoteDataSourceProvider);
     var tableNoticesAdded = 0;
+    // FDK device ids (`ap_42`, `ont_42`, etc.) whose offline state is
+    // already covered by a real `health_notices` table entry. Used to
+    // skip duplicate synthetic offline cards in the loop below.
+    final devicesWithTableOfflineNotice = <String>{};
     try {
       final summary = await remote.fetchSummary();
       LoggerService.debug(
@@ -210,6 +214,10 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
         if (!seenIds.add(entity.id)) continue;
         notices.add(entity);
         tableNoticesAdded++;
+        final coveredDeviceId = _deviceIdFromMonitorName(entity.name);
+        if (coveredDeviceId != null) {
+          devicesWithTableOfflineNotice.add(coveredDeviceId);
+        }
       }
     } on Exception catch (e) {
       LoggerService.warning(
@@ -227,11 +235,45 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     final complianceFailures = ref.watch(complianceFailuresAggregateProvider);
     notices.addAll(complianceFailuresToHealthNotices(complianceFailures));
 
+    // Synthesize CRITICAL notices for offline devices in the WS cache.
+    // The rxg's `health_notices` table no longer carries per-device offline
+    // rows on current rxg versions, and `device.healthNotices` is empty
+    // since commit 44e3bedd2e. The home overview's offline count comes
+    // from the same `device.status == 'offline'` check, so this keeps the
+    // Alerts badge consistent with the home counter on sites with offline
+    // devices.
+    var offlineNoticesAdded = 0;
+    for (final device in devices) {
+      if (device.status.toLowerCase() != 'offline') continue;
+      final fdkId = device.id;
+      // If the rxg's health_notices table already has a CRITICAL row
+      // covering this device (e.g. `monitor_infrastructure_access_point_<id>`),
+      // skip synthesizing — otherwise the user sees the same offline AP
+      // twice (one rxg-sourced card + one synthesized).
+      if (devicesWithTableOfflineNotice.contains(fdkId)) continue;
+      final syntheticId = _offlineSyntheticId(fdkId);
+      if (!seenIds.add(syntheticId)) continue;
+      final label = _deviceTypeLabel(device.deviceType);
+      notices.add(HealthNotice(
+        id: syntheticId,
+        name: 'fdk_device_offline_$fdkId',
+        severity: HealthNoticeSeverity.critical,
+        shortMessage: '$label OFFLINE: ${device.name}',
+        longMessage: 'Device "${device.name}" is offline.',
+        createdAt: DateTime.now(),
+        deviceId: fdkId,
+        deviceName: device.name,
+        deviceType: device.deviceType,
+      ));
+      offlineNoticesAdded++;
+    }
+
     LoggerService.debug(
       'HEALTH: Extracted ${notices.length} notices '
       '($devicesWithNotices devices with notices, '
       '$tableNoticesAdded from health_notices table, '
-      '${complianceFailures.length} compliance failures)',
+      '${complianceFailures.length} compliance failures, '
+      '$offlineNoticesAdded synthesized offline)',
       tag: 'HealthNotices',
     );
 
@@ -252,16 +294,14 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
   }
 }
 
-/// Provider that returns health notices list (sync version for UI)
+/// Provider that returns health notices list (sync version for UI).
+/// Uses `valueOrNull` so AsyncLoading rebuilds (which fire on every WS
+/// device update) preserve the last good list — without this the Alerts
+/// badge flickers between 0 and the real count on busy sites.
 @Riverpod(keepAlive: true)
 List<HealthNotice> healthNoticesList(HealthNoticesListRef ref) {
-  final noticesAsync = ref.watch(healthNoticesNotifierProvider);
-
-  return noticesAsync.when(
-    data: (notices) => notices,
-    loading: () => [],
-    error: (_, __) => [],
-  );
+  return ref.watch(healthNoticesNotifierProvider).valueOrNull ??
+      const <HealthNotice>[];
 }
 
 /// Filter for health notices
@@ -394,4 +434,48 @@ List<HealthNotice> filteredHealthNotices(FilteredHealthNoticesRef ref) {
   }
 
   return filtered;
+}
+
+/// Stable negative id for synthetic device-offline notices, derived from
+/// the FDK device id string so the same device produces the same id
+/// across rebuilds (otherwise the `seenIds` dedupe and any consumer-side
+/// keying would churn). Hashes are confined to 31 bits then negated.
+int _offlineSyntheticId(String fdkDeviceId) {
+  final hash = ('offline:$fdkDeviceId').hashCode & 0x7FFFFFFF;
+  return -hash - 1;
+}
+
+/// Parses the rxg's `health_notices` name convention
+/// `monitor_infrastructure_<type>_<id>[...]` into the FDK-prefixed device
+/// id used by the cache (`ap_<id>`, `ont_<id>`, `sw_<id>`). Used to dedup
+/// table notices against synthetic offline cards. Returns null if the name
+/// doesn't match the pattern.
+String? _deviceIdFromMonitorName(String name) {
+  final match = RegExp(
+          r'monitor_infrastructure_(access_point|media_converter|device)_(\d+)')
+      .firstMatch(name);
+  if (match == null) return null;
+  final prefix = switch (match.group(1)) {
+    'access_point' => 'ap_',
+    'media_converter' => 'ont_',
+    'device' => 'sw_',
+    _ => null,
+  };
+  if (prefix == null) return null;
+  return '$prefix${match.group(2)}';
+}
+
+String _deviceTypeLabel(String deviceType) {
+  switch (deviceType) {
+    case 'access_point':
+      return 'AP';
+    case 'ont':
+      return 'ONT';
+    case 'switch':
+      return 'Switch';
+    case 'wlan_controller':
+      return 'WLAN';
+    default:
+      return 'Device';
+  }
 }

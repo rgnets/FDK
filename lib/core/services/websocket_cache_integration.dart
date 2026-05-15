@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
-import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/models/api_key_revocation_event.dart';
 import 'package:rgnets_fdk/core/services/device_update_event_bus.dart';
 import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
@@ -125,6 +124,29 @@ class WebSocketCacheIntegration {
   bool _initialized = false;
   bool _snapshotInFlight = false;
   bool _needsSnapshot = true;
+  /// Wall-clock of the last time `requestFullSnapshots()` actually fired
+  /// the WS requests. Multiple consumers (auth notifier, device WS data
+  /// source, room readiness data source) each call `requestFullSnapshots()`
+  /// independently right after sign-in. Without a coalesce window, that
+  /// triples the snapshot traffic (21 WS requests instead of 7) and the
+  /// rxg's `compliance_check_results` channel can also briefly hit its
+  /// rate limit during the burst.
+  DateTime? _lastSnapshotFiredAt;
+  static const Duration _snapshotCoalesceWindow = Duration(seconds: 5);
+
+  /// Per-resource retry timer. The rxg's WS `index` handler sometimes
+  /// returns the inventory as a stream of `action=updated` upserts
+  /// instead of a single `action=index` snapshot (observed on the
+  /// large-site sign-in path). When that happens, the cache fills
+  /// only with devices the rxg happens to poll while WS is up — the
+  /// offline ones never arrive because their state isn't poll-driven.
+  /// If the snapshot for a resource hasn't been marked handled within
+  /// this window, re-fire its `index` request once. Limited per-resource
+  /// to `_maxSnapshotRetries` to avoid amplifying any rate-limit issue.
+  static const Duration _snapshotRetryDelay = Duration(seconds: 30);
+  static const int _maxSnapshotRetries = 2;
+  final Map<String, int> _snapshotRetryCount = {};
+  Timer? _snapshotRetryTimer;
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
@@ -451,6 +473,14 @@ class WebSocketCacheIntegration {
   // ---------------------------------------------------------------------------
 
   void requestFullSnapshots() {
+    final lastFired = _lastSnapshotFiredAt;
+    if (lastFired != null &&
+        DateTime.now().difference(lastFired) < _snapshotCoalesceWindow) {
+      _logger.d(
+        'WebSocketCacheIntegration: Manual sync coalesced (last fire ${DateTime.now().difference(lastFired).inMilliseconds}ms ago)',
+      );
+      return;
+    }
     _logger.i('WebSocketCacheIntegration: Manual sync requested');
     _needsSnapshot = true;
     _snapshotInFlight = false;
@@ -467,7 +497,7 @@ class WebSocketCacheIntegration {
           'WebSocketCacheIntegration: Delaying snapshot request until channel is ready');
       return;
     }
-
+    _lastSnapshotFiredAt = DateTime.now();
     _logger.i(
         'WebSocketCacheIntegration: Requesting snapshots for: $_resourceTypes');
 
@@ -477,17 +507,16 @@ class WebSocketCacheIntegration {
       ..clear()
       ..addAll(_resourceTypes);
     _requestedSnapshots.clear();
+    _snapshotRetryCount.clear();
 
     var allSent = true;
     for (final resource in _resourceTypes) {
-      final fields = WebSocketDeviceCacheService.isDeviceResourceType(resource)
-          ? DeviceFieldSets.listFields
-          : null;
-      final sent = _requestSnapshot(resource, fields: fields);
+      final sent = _requestSnapshot(resource);
       if (!sent) {
         allSent = false;
       }
     }
+    _scheduleSnapshotRetry();
     if (!allSent) {
       _logger.w(
           'WebSocketCacheIntegration: Snapshot requests deferred, will retry');
@@ -496,16 +525,22 @@ class WebSocketCacheIntegration {
     }
   }
 
-  bool _requestSnapshot(String resourceType, {List<String>? fields}) {
+  bool _requestSnapshot(String resourceType) {
     if (_requestedSnapshots.contains(resourceType)) return true;
     if (!_webSocketService.isConnected || !_channelConfirmed) {
       return false;
     }
 
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType'
-        '${fields != null ? " with ${fields.length} fields" : ""}');
+    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
     _requestedSnapshots.add(resourceType);
 
+    // Deliberately no `only:` field filter. The rxg's WS index handler
+    // takes a slow/incomplete path when `only:` is set on device-typed
+    // resources (access_points, switch_devices, media_converters): instead
+    // of returning a single snapshot response it streams individual
+    // `action=updated` upserts and stops well before delivering the full
+    // inventory. Without the filter, the snapshot returns cleanly with
+    // every row in one batch. Trade-off: heavier payload per row.
     final payload = <String, dynamic>{
       'action': 'resource_action',
       'resource_type': resourceType,
@@ -515,10 +550,6 @@ class WebSocketCacheIntegration {
       'request_id':
           'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
     };
-
-    if (fields != null && fields.isNotEmpty) {
-      payload['only'] = fields.join(',');
-    }
 
     final sent = _sendActionCableMessage(payload);
     if (!sent) {
@@ -938,8 +969,44 @@ class WebSocketCacheIntegration {
 
     if (_pendingSnapshots.isEmpty) {
       _snapshotInFlight = false;
+      _snapshotRetryTimer?.cancel();
+      _snapshotRetryTimer = null;
       _logger.i('WebSocketCacheIntegration: All snapshots received');
     }
+  }
+
+  /// Schedule a one-shot retry after `_snapshotRetryDelay`. Resources still
+  /// in `_pendingSnapshots` when the timer fires get their `index` request
+  /// re-sent (up to `_maxSnapshotRetries` per resource). This recovers from
+  /// the rxg's intermittent "stream upserts instead of snapshot" behavior.
+  void _scheduleSnapshotRetry() {
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = Timer(_snapshotRetryDelay, _retryStaleSnapshots);
+  }
+
+  void _retryStaleSnapshots() {
+    _snapshotRetryTimer = null;
+    if (_pendingSnapshots.isEmpty) return;
+    if (!_webSocketService.isConnected || !_channelConfirmed) {
+      _scheduleSnapshotRetry();
+      return;
+    }
+    final stale = _pendingSnapshots.toList();
+    var anySent = false;
+    for (final resource in stale) {
+      final attempts = _snapshotRetryCount[resource] ?? 0;
+      if (attempts >= _maxSnapshotRetries) {
+        _logger.w(
+            'WebSocketCacheIntegration: Giving up snapshot retry for $resource (already retried $attempts times)');
+        continue;
+      }
+      _snapshotRetryCount[resource] = attempts + 1;
+      _requestedSnapshots.remove(resource);
+      _logger.i(
+          'WebSocketCacheIntegration: Retrying snapshot for $resource (attempt ${attempts + 1}/$_maxSnapshotRetries)');
+      if (_requestSnapshot(resource)) anySent = true;
+    }
+    if (anySent) _scheduleSnapshotRetry();
   }
 
   void _bumpLastUpdate() {
@@ -985,6 +1052,9 @@ class WebSocketCacheIntegration {
     _snapshotAccumulators.clear();
     _pendingSnapshots.clear();
     _requestedSnapshots.clear();
+    _snapshotRetryCount.clear();
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = null;
 
     _needsSnapshot = true;
     _snapshotInFlight = false;
@@ -1007,6 +1077,8 @@ class WebSocketCacheIntegration {
     }
     _snapshotFlushTimers.clear();
     _snapshotAccumulators.clear();
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = null;
     lastUpdate.dispose();
 
     _speedTestCacheService.dispose();
