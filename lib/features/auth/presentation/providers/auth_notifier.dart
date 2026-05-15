@@ -785,12 +785,34 @@ final authSignOutCleanupProvider = Provider<void>((ref) {
       // Force a snapshot request so the cache repopulates from the new
       // site's authoritative state.
       //
+      // Invalidate the compliance providers too: they cached `null`
+      // during sign-out (no api_key) and don't rebuild on their own
+      // when the api_key reappears, so the lookup stays stuck at
+      // "rest datasource is null" forever. Re-invalidating here forces
+      // a fresh resolve against the new site's api_key.
+      try {
+        ref.invalidate(compliance_providers.complianceRestDataSourceProvider);
+        ref.invalidate(compliance_providers.localFleetNodeProvider);
+        ref.invalidate(compliance_providers.complianceLookupProvider);
+        ref.invalidate(health_notices.healthNoticesRemoteDataSourceProvider);
+        logger.d('AUTH_CLEANUP: compliance providers re-invalidated on sign-in');
+      } on Exception catch (e) {
+        logger.w('AUTH_CLEANUP: Failed to invalidate compliance providers on sign-in: $e');
+      }
       // We delay slightly to let the auth state settle and any in-flight
       // WS handshake complete before firing snapshot requests.
       Future<void>.delayed(const Duration(seconds: 1), () {
         try {
-          ref.read(webSocketCacheIntegrationProvider).requestFullSnapshots();
-          logger.d('AUTH_CLEANUP: ✅ Sign-in snapshot request fired');
+          // `clearDataAndRefresh` (not `requestFullSnapshots`) on sign-in
+          // because: (a) any WS upserts that arrived from the prior site
+          // between sign-out's `clearCaches()` and this point have
+          // partially repopulated the cache with stale data — we re-clear
+          // here and then re-request from scratch; (b) `clearDataAndRefresh`
+          // resets `_snapshotInFlight` and `_needsSnapshot`, bypassing the
+          // 5s coalesce window so the sign-in fire isn't suppressed by a
+          // recent prior-site fire still inside the window.
+          ref.read(webSocketCacheIntegrationProvider).clearDataAndRefresh();
+          logger.d('AUTH_CLEANUP: ✅ Sign-in clear + snapshot request fired');
         } on Object catch (e) {
           logger.w('AUTH_CLEANUP: Failed to request snapshots on sign-in: $e');
         }

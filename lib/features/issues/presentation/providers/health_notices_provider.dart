@@ -198,6 +198,10 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     // include the association.
     final remote = ref.watch(healthNoticesRemoteDataSourceProvider);
     var tableNoticesAdded = 0;
+    // FDK device ids (`ap_42`, `ont_42`, etc.) whose offline state is
+    // already covered by a real `health_notices` table entry. Used to
+    // skip duplicate synthetic offline cards in the loop below.
+    final devicesWithTableOfflineNotice = <String>{};
     try {
       final summary = await remote.fetchSummary();
       LoggerService.debug(
@@ -210,6 +214,10 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
         if (!seenIds.add(entity.id)) continue;
         notices.add(entity);
         tableNoticesAdded++;
+        final coveredDeviceId = _deviceIdFromMonitorName(entity.name);
+        if (coveredDeviceId != null) {
+          devicesWithTableOfflineNotice.add(coveredDeviceId);
+        }
       }
     } on Exception catch (e) {
       LoggerService.warning(
@@ -238,6 +246,11 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
     for (final device in devices) {
       if (device.status.toLowerCase() != 'offline') continue;
       final fdkId = device.id;
+      // If the rxg's health_notices table already has a CRITICAL row
+      // covering this device (e.g. `monitor_infrastructure_access_point_<id>`),
+      // skip synthesizing — otherwise the user sees the same offline AP
+      // twice (one rxg-sourced card + one synthesized).
+      if (devicesWithTableOfflineNotice.contains(fdkId)) continue;
       final syntheticId = _offlineSyntheticId(fdkId);
       if (!seenIds.add(syntheticId)) continue;
       final label = _deviceTypeLabel(device.deviceType);
@@ -430,6 +443,26 @@ List<HealthNotice> filteredHealthNotices(FilteredHealthNoticesRef ref) {
 int _offlineSyntheticId(String fdkDeviceId) {
   final hash = ('offline:$fdkDeviceId').hashCode & 0x7FFFFFFF;
   return -hash - 1;
+}
+
+/// Parses the rxg's `health_notices` name convention
+/// `monitor_infrastructure_<type>_<id>[...]` into the FDK-prefixed device
+/// id used by the cache (`ap_<id>`, `ont_<id>`, `sw_<id>`). Used to dedup
+/// table notices against synthetic offline cards. Returns null if the name
+/// doesn't match the pattern.
+String? _deviceIdFromMonitorName(String name) {
+  final match = RegExp(
+          r'monitor_infrastructure_(access_point|media_converter|device)_(\d+)')
+      .firstMatch(name);
+  if (match == null) return null;
+  final prefix = switch (match.group(1)) {
+    'access_point' => 'ap_',
+    'media_converter' => 'ont_',
+    'device' => 'sw_',
+    _ => null,
+  };
+  if (prefix == null) return null;
+  return '$prefix${match.group(2)}';
 }
 
 String _deviceTypeLabel(String deviceType) {

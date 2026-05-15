@@ -133,6 +133,20 @@ class WebSocketCacheIntegration {
   /// rate limit during the burst.
   DateTime? _lastSnapshotFiredAt;
   static const Duration _snapshotCoalesceWindow = Duration(seconds: 5);
+
+  /// Per-resource retry timer. The rxg's WS `index` handler sometimes
+  /// returns the inventory as a stream of `action=updated` upserts
+  /// instead of a single `action=index` snapshot (observed on the
+  /// large-site sign-in path). When that happens, the cache fills
+  /// only with devices the rxg happens to poll while WS is up — the
+  /// offline ones never arrive because their state isn't poll-driven.
+  /// If the snapshot for a resource hasn't been marked handled within
+  /// this window, re-fire its `index` request once. Limited per-resource
+  /// to `_maxSnapshotRetries` to avoid amplifying any rate-limit issue.
+  static const Duration _snapshotRetryDelay = Duration(seconds: 30);
+  static const int _maxSnapshotRetries = 2;
+  final Map<String, int> _snapshotRetryCount = {};
+  Timer? _snapshotRetryTimer;
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
@@ -493,6 +507,7 @@ class WebSocketCacheIntegration {
       ..clear()
       ..addAll(_resourceTypes);
     _requestedSnapshots.clear();
+    _snapshotRetryCount.clear();
 
     var allSent = true;
     for (final resource in _resourceTypes) {
@@ -501,6 +516,7 @@ class WebSocketCacheIntegration {
         allSent = false;
       }
     }
+    _scheduleSnapshotRetry();
     if (!allSent) {
       _logger.w(
           'WebSocketCacheIntegration: Snapshot requests deferred, will retry');
@@ -953,8 +969,44 @@ class WebSocketCacheIntegration {
 
     if (_pendingSnapshots.isEmpty) {
       _snapshotInFlight = false;
+      _snapshotRetryTimer?.cancel();
+      _snapshotRetryTimer = null;
       _logger.i('WebSocketCacheIntegration: All snapshots received');
     }
+  }
+
+  /// Schedule a one-shot retry after `_snapshotRetryDelay`. Resources still
+  /// in `_pendingSnapshots` when the timer fires get their `index` request
+  /// re-sent (up to `_maxSnapshotRetries` per resource). This recovers from
+  /// the rxg's intermittent "stream upserts instead of snapshot" behavior.
+  void _scheduleSnapshotRetry() {
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = Timer(_snapshotRetryDelay, _retryStaleSnapshots);
+  }
+
+  void _retryStaleSnapshots() {
+    _snapshotRetryTimer = null;
+    if (_pendingSnapshots.isEmpty) return;
+    if (!_webSocketService.isConnected || !_channelConfirmed) {
+      _scheduleSnapshotRetry();
+      return;
+    }
+    final stale = _pendingSnapshots.toList();
+    var anySent = false;
+    for (final resource in stale) {
+      final attempts = _snapshotRetryCount[resource] ?? 0;
+      if (attempts >= _maxSnapshotRetries) {
+        _logger.w(
+            'WebSocketCacheIntegration: Giving up snapshot retry for $resource (already retried $attempts times)');
+        continue;
+      }
+      _snapshotRetryCount[resource] = attempts + 1;
+      _requestedSnapshots.remove(resource);
+      _logger.i(
+          'WebSocketCacheIntegration: Retrying snapshot for $resource (attempt ${attempts + 1}/$_maxSnapshotRetries)');
+      if (_requestSnapshot(resource)) anySent = true;
+    }
+    if (anySent) _scheduleSnapshotRetry();
   }
 
   void _bumpLastUpdate() {
@@ -1000,6 +1052,9 @@ class WebSocketCacheIntegration {
     _snapshotAccumulators.clear();
     _pendingSnapshots.clear();
     _requestedSnapshots.clear();
+    _snapshotRetryCount.clear();
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = null;
 
     _needsSnapshot = true;
     _snapshotInFlight = false;
@@ -1022,6 +1077,8 @@ class WebSocketCacheIntegration {
     }
     _snapshotFlushTimers.clear();
     _snapshotAccumulators.clear();
+    _snapshotRetryTimer?.cancel();
+    _snapshotRetryTimer = null;
     lastUpdate.dispose();
 
     _speedTestCacheService.dispose();
