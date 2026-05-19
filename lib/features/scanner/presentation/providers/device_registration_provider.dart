@@ -696,6 +696,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         registeredAt: DateTime.now(),
       );
 
+      // Optimistically insert the device into the local cache so the room
+      // view picks it up immediately. The authoritative record will overwrite
+      // this entry when the WebSocket pushes the server-side state back.
+      _addOptimisticDevice(
+        mac: mac,
+        serial: serial,
+        deviceType: deviceType,
+        pmsRoomId: pmsRoomId,
+        existingDeviceId: existingDeviceId,
+      );
+
       // Force-refresh the relevant resource snapshot so the new device appears immediately
       _refreshResourceForDeviceType(deviceType);
 
@@ -718,6 +729,50 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       );
 
       return RegistrationResult.failure(message: error);
+    }
+  }
+
+  /// Build a lightweight Device record from registration params and inject
+  /// it into the local devices cache. The next WebSocket-pushed update will
+  /// overwrite this with the server's authoritative record.
+  void _addOptimisticDevice({
+    required String mac,
+    required String serial,
+    required DeviceType deviceType,
+    required int pmsRoomId,
+    int? existingDeviceId,
+  }) {
+    final typeString = switch (deviceType) {
+      DeviceType.accessPoint => 'access_point',
+      DeviceType.switchDevice => 'switch',
+      DeviceType.ont => 'ont',
+    };
+
+    final normalizedMac = _normalizeMac(mac);
+    final id = existingDeviceId?.toString() ?? 'pending-$normalizedMac';
+
+    final optimistic = Device(
+      id: id,
+      name: serial.isNotEmpty ? serial : normalizedMac,
+      type: typeString,
+      status: 'unknown',
+      macAddress: normalizedMac,
+      serialNumber: serial,
+      pmsRoomId: pmsRoomId,
+    );
+
+    try {
+      ref.read(devicesNotifierProvider.notifier).addOptimistic(optimistic);
+      LoggerService.debug(
+        'DeviceRegistration: Optimistically inserted $typeString $id into local cache',
+        tag: 'DeviceRegistration',
+      );
+    } on Object catch (e) {
+      // Non-fatal: WebSocket refresh below is the safety net.
+      LoggerService.warning(
+        'DeviceRegistration: Optimistic insert skipped: $e',
+        tag: 'DeviceRegistration',
+      );
     }
   }
 

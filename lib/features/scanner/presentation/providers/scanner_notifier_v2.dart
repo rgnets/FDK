@@ -394,6 +394,10 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       wasAutoReverted: false,
       lastSerialSeenAt: null,
       scanMode: ScanMode.auto,
+      // Defensive: clear the popup flag too so a previously orphaned popup
+      // state can't lock out future Register Device taps.
+      isPopupShowing: false,
+      isRegistrationInProgress: false,
     );
   }
 

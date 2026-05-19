@@ -8,7 +8,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/utils/foldable_camera_wrapper.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
-import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_auth_qr.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier_v2.dart';
@@ -49,11 +48,6 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     super.initState();
     _initializeScanner();
     _initializeAnimations();
-    // Warm the rooms cache so the registration popup opens with rooms ready
-    // instead of triggering its own fetch on first open.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(roomsNotifierProvider);
-    });
   }
 
   void _initializeAnimations() {
@@ -292,14 +286,20 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     LoggerService.debug('Showing registration popup', tag: _tag);
 
     ScannerRegistrationPopup.show(context).then((result) {
+      // Always clear the popup flag so the Register Device button stays
+      // responsive even if the user dismisses (swipe / back / cancel)
+      // without completing registration.
+      ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
       if (result == true) {
         // Registration successful - reset for next scan
         ref.read(scannerNotifierV2Provider.notifier).clearScanData();
       }
       // Always reset lastScannedCode so same barcode can be re-scanned if needed
-      setState(() {
-        _lastScannedCode = null;
-      });
+      if (mounted) {
+        setState(() {
+          _lastScannedCode = null;
+        });
+      }
     });
   }
 
