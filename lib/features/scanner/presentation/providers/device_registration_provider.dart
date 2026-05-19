@@ -7,6 +7,7 @@ import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
+import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_service.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
@@ -510,9 +511,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     );
 
     try {
-      // Validate serial pattern
+      // Validate serial pattern. AT&T-style serials carry a discriminating
+      // prefix (1K9/1M3/1HN/ALCL/LL/EC); other vendors like Ruckus do not, so
+      // when the MAC's OUI identifies a known vendor we trust the scanned
+      // serial as-is and let the rXg side do final validation.
       final detectedType = SerialPatterns.detectDeviceType(serial);
-      if (detectedType == null) {
+      final macIsKnownVendor =
+          ScannerValidationService.isKnownManufacturer(mac);
+      if (detectedType == null && !macIsKnownVendor) {
         final error = 'Invalid serial number format for ${deviceType.displayName}';
         state = state.copyWith(
           status: RegistrationStatus.error,

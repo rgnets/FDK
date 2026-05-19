@@ -112,7 +112,7 @@ class AccumulatedScanData with _$AccumulatedScanData {
         }
       case ScanMode.accessPoint:
         if (serialNumber.isEmpty || !hasValidSerial) {
-          missing.add('Serial Number (1K9/1M3/1HN)');
+          missing.add('Serial Number');
         }
       case ScanMode.switchDevice:
         if (serialNumber.isEmpty || !hasValidSerial) {
@@ -293,7 +293,7 @@ extension ScanModeX on ScanMode {
   /// Get the required fields for this mode.
   List<String> get requiredFields => switch (this) {
     ScanMode.ont => ['MAC Address', 'Serial Number (ALCL)', 'Part Number'],
-    ScanMode.accessPoint => ['MAC Address', 'Serial Number (1K9/1M3/1HN)'],
+    ScanMode.accessPoint => ['MAC Address', 'Serial Number'],
     ScanMode.switchDevice => ['MAC Address', 'Serial Number (LL/EC)'],
     ScanMode.rxg => ['QR Code'],
     ScanMode.auto => [],

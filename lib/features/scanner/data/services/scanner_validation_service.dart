@@ -180,7 +180,8 @@ class ScannerValidationService {
   }
 
   /// Parses AP barcodes from multiple scanned values.
-  /// STRICT MODE: Requires AP serial (1K9/1M3/1HN) and valid MAC.
+  /// Accepts AT&T-style serials (1K9/1M3/1HN) and, when the MAC's OUI
+  /// resolves to Ruckus, any alphanumeric serial >=10 chars.
   static ParsedDeviceData parseAPBarcodes(List<String> barcodes) {
     LoggerService.debug(
       'Parsing AP barcodes from ${barcodes.length} values',
@@ -191,35 +192,91 @@ class ScannerValidationService {
     String serialNumber = '';
     bool hasAPSerial = false;
 
-    for (String barcode in barcodes) {
+    // First pass: split into 12-hex candidates (potential MAC, or a numeric
+    // Ruckus serial that happens to parse as hex) and other values.
+    final hexCandidates = <String>[];
+    final otherValues = <String>[];
+    for (final barcode in barcodes) {
       if (barcode.isEmpty) continue;
-
-      String value = barcode.trim();
-
-      // Check for MAC address (12 hex chars)
-      if (value.length == 12 && _isValidMacAddress(value) && mac.isEmpty) {
-        mac = value.toUpperCase();
-        LoggerService.debug('Found MAC: $mac', tag: _tag);
-        continue;
+      final value = barcode.trim();
+      if (value.length == 12 && _isValidMacAddress(value)) {
+        final upper = value.toUpperCase();
+        if (!hexCandidates.contains(upper)) hexCandidates.add(upper);
+      } else if (value.isNotEmpty) {
+        otherValues.add(value);
       }
+    }
 
-      // AP-SPECIFIC: Only accept approved prefixes (strict)
+    // Strict AT&T-style serial (1K9/1M3/1HN) in non-hex values.
+    for (final value in otherValues) {
       if (SerialPatterns.isAPSerial(value)) {
         serialNumber = value.toUpperCase();
         hasAPSerial = true;
         LoggerService.debug('Found AP serial (1K9/1M3/1HN): $serialNumber', tag: _tag);
-        continue;
-      }
-
-      // Log ignored non-AP serials
-      if (serialNumber.isEmpty &&
-          value.length >= 10 &&
-          !SerialPatterns.apPrefixes.any((p) => value.toUpperCase().startsWith(p))) {
-        LoggerService.warning('Ignored non-AP serial format in AP mode: $value', tag: _tag);
+        break;
       }
     }
 
-    // STRICT validation: Both required for AP
+    // Resolve MAC from hex candidates. With multiple candidates, prefer the
+    // one whose OUI is known so a Ruckus MAC wins over an all-numeric Ruckus
+    // serial that incidentally parses as hex.
+    if (hexCandidates.length == 1) {
+      mac = hexCandidates.first;
+    } else if (hexCandidates.length >= 2) {
+      String? vendorMac;
+      String? leftover;
+      for (final c in hexCandidates) {
+        if (macDatabase.isLoaded && macDatabase.isKnownMAC(c)) {
+          vendorMac ??= c;
+        } else {
+          leftover ??= c;
+        }
+      }
+      mac = vendorMac ?? hexCandidates.first;
+      // Treat any unclaimed 12-hex value as the numeric Ruckus serial.
+      if (!hasAPSerial && leftover != null && leftover != mac) {
+        serialNumber = leftover;
+        hasAPSerial = true;
+        LoggerService.debug(
+          'Found Ruckus serial (numeric, vendor-disambiguated): $serialNumber',
+          tag: _tag,
+        );
+      }
+    }
+    if (mac.isNotEmpty) {
+      LoggerService.debug('Found MAC: $mac', tag: _tag);
+    }
+
+    // Vendor-aware relaxation: if MAC resolves to Ruckus and we still don't
+    // have a serial, accept any non-MAC alphanumeric value >=10 chars.
+    if (mac.isNotEmpty && !hasAPSerial && _isRuckusMac(mac)) {
+      final lenient = RegExp(r'^[A-Z0-9]+$');
+      for (final value in otherValues) {
+        final upper = value.toUpperCase();
+        if (upper.length >= 10 && lenient.hasMatch(upper)) {
+          serialNumber = upper;
+          hasAPSerial = true;
+          LoggerService.debug(
+            'Found Ruckus serial (vendor-relaxed): $serialNumber',
+            tag: _tag,
+          );
+          break;
+        }
+      }
+    }
+
+    // Log leftover non-serial values to help diagnose unsupported labels.
+    if (!hasAPSerial) {
+      for (final value in otherValues) {
+        if (value.length >= 10) {
+          LoggerService.warning(
+            'Ignored non-AP serial format in AP mode: $value',
+            tag: _tag,
+          );
+        }
+      }
+    }
+
     final isComplete = mac.isNotEmpty && hasAPSerial;
 
     if (!isComplete) {
@@ -236,9 +293,15 @@ class ScannerValidationService {
       detectedType: DeviceTypeFromSerial.accessPoint,
       missingFields: [
         if (mac.isEmpty) 'MAC Address',
-        if (!hasAPSerial) 'Serial Number (1K9/1M3/1HN)',
+        if (!hasAPSerial) 'Serial Number',
       ],
     );
+  }
+
+  /// Whether the OUI of the given MAC resolves to Ruckus Wireless.
+  static bool _isRuckusMac(String mac) {
+    if (!macDatabase.isLoaded) return false;
+    return macDatabase.getManufacturer(mac).toLowerCase().contains('ruckus');
   }
 
   /// Parses Switch barcodes from multiple scanned values.

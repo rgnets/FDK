@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_service.dart';
+import 'package:rgnets_fdk/features/scanner/data/utils/mac_database.dart';
 import 'package:rgnets_fdk/features/scanner/data/utils/mac_normalizer.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
@@ -19,6 +20,12 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   @override
   ScannerState build() {
     LoggerService.debug('Building initial scanner state', tag: _tag);
+    // Kick off the OUI database load so vendor-aware scanning (e.g. Ruckus)
+    // can identify the MAC's manufacturer. Idempotent via internal completer.
+    // Errors are tolerated (e.g. in unit tests where ServicesBinding isn't up).
+    loadMACDatabase().catchError((Object e) {
+      LoggerService.warning('MAC database load skipped: $e', tag: _tag);
+    });
     return const ScannerState();
   }
 
@@ -116,7 +123,79 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
+    // Vendor-aware fallback: Ruckus AP serials don't share the AT&T
+    // 1K9/1M3/1HN prefix scheme. If we already have a Ruckus MAC and the
+    // value looks like a generic AP serial, accept it.
+    if ((state.scanMode == ScanMode.accessPoint ||
+            state.scanMode == ScanMode.auto) &&
+        state.scanData.mac.isNotEmpty &&
+        _isRuckusMac(state.scanData.mac) &&
+        _looksLikeGenericApSerial(value)) {
+      _acceptVendorApSerial(value);
+      return;
+    }
+
     LoggerService.debug('Barcode did not match any known pattern: $value', tag: _tag);
+  }
+
+  /// Accept a vendor-relaxed AP serial (e.g. Ruckus, which doesn't use
+  /// 1K9/1M3/1HN prefixes). Mirrors the auto-lock behavior of [_processSerial].
+  void _acceptVendorApSerial(String serial) {
+    final upper = serial.toUpperCase();
+    LoggerService.debug('Accepting vendor-relaxed AP serial: $upper', tag: _tag);
+
+    final history = [
+      ...state.scanData.scanHistory,
+      ScanRecord(value: upper, scannedAt: DateTime.now(), fieldType: 'serial'),
+    ];
+
+    if (state.scanMode == ScanMode.auto) {
+      state = state.copyWith(
+        scanMode: ScanMode.accessPoint,
+        isAutoLocked: true,
+        lastSerialSeenAt: DateTime.now(),
+        scanData: state.scanData.copyWith(
+          serialNumber: upper,
+          hasValidSerial: true,
+          scanHistory: history,
+        ),
+      );
+    } else {
+      state = state.copyWith(
+        lastSerialSeenAt: DateTime.now(),
+        scanData: state.scanData.copyWith(
+          serialNumber: upper,
+          hasValidSerial: true,
+          scanHistory: history,
+        ),
+      );
+    }
+
+    _checkCompletion();
+  }
+
+  /// Whether the given MAC's OUI resolves to Ruckus Wireless.
+  bool _isRuckusMac(String mac) {
+    return ScannerValidationService.getManufacturer(mac)
+        .toLowerCase()
+        .contains('ruckus');
+  }
+
+  /// Whether a value looks like a generic AP serial: alphanumeric, 10-16
+  /// chars, and not a 12-hex MAC (those go through the MAC path and are
+  /// disambiguated in [_processMacAddress]).
+  bool _looksLikeGenericApSerial(String value) {
+    final upper = value.toUpperCase();
+    if (upper.length < 10 || upper.length > 16) {
+      return false;
+    }
+    if (!RegExp(r'^[A-Z0-9]+$').hasMatch(upper)) {
+      return false;
+    }
+    if (upper.length == 12 && _isMacAddress(value)) {
+      return false;
+    }
+    return true;
   }
 
   /// Process a serial number barcode.
@@ -176,6 +255,23 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     final normalized = MACNormalizer.tryNormalize(mac);
     if (normalized == null) {
       LoggerService.warning('Failed to normalize MAC: $mac', tag: _tag);
+      return;
+    }
+
+    // Vendor-aware disambiguation: a 12-digit numeric Ruckus serial parses
+    // as valid hex and otherwise looks like a MAC. If we already have a
+    // Ruckus MAC and this incoming "MAC" has an unknown OUI, treat it as
+    // the Ruckus serial instead of overwriting the valid MAC.
+    if ((state.scanMode == ScanMode.accessPoint ||
+            state.scanMode == ScanMode.auto) &&
+        state.scanData.mac.isNotEmpty &&
+        _isRuckusMac(state.scanData.mac) &&
+        !ScannerValidationService.isKnownManufacturer(normalized)) {
+      LoggerService.debug(
+        'Routing $normalized to serial slot (existing MAC is Ruckus, this OUI unknown)',
+        tag: _tag,
+      );
+      _acceptVendorApSerial(normalized);
       return;
     }
 
@@ -389,6 +485,13 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   bool _isValidSerialForMode(String serial, ScanMode mode) {
     switch (mode) {
       case ScanMode.accessPoint:
+        // Ruckus serials don't carry an AT&T-style prefix, so relax when
+        // the captured MAC's OUI identifies Ruckus.
+        if (state.scanData.mac.isNotEmpty &&
+            _isRuckusMac(state.scanData.mac) &&
+            _looksLikeGenericApSerial(serial)) {
+          return true;
+        }
         return SerialPatterns.isAPSerial(serial);
       case ScanMode.ont:
         return SerialPatterns.isONTSerial(serial);

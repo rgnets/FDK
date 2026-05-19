@@ -102,6 +102,8 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     _controller?.dispose();
     _controller = null;
     _pulseController.dispose();
+    // Reset any partial scan state so re-entering the scanner starts fresh.
+    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
     super.dispose();
   }
 
@@ -257,6 +259,11 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     LoggerService.debug('Stopping scanning...', tag: _tag);
 
     ref.read(scannerNotifierV2Provider.notifier).stopScanning();
+    // Discard any partial scan so the next session starts fresh.
+    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+    setState(() {
+      _lastScannedCode = null;
+    });
 
     try {
       await _controller?.stop();
