@@ -13,6 +13,7 @@ import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_ser
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
 
 part 'device_registration_provider.g.dart';
 
@@ -239,7 +240,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       state = state.copyWith(
         status: RegistrationStatus.idle,
         matchStatus: DeviceMatchStatus.mismatch,
-        matchedDeviceId: int.tryParse(existing.id),
+        matchedDeviceId: ScannerUtils.rawDeviceId(existing.id),
         matchedDeviceName: existing.name,
         mismatchInfo: MatchMismatchInfo(
           mismatchedFields: mismatches,
@@ -259,7 +260,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     state = state.copyWith(
       status: RegistrationStatus.idle,
       matchStatus: DeviceMatchStatus.fullMatch,
-      matchedDeviceId: int.tryParse(existing.id),
+      matchedDeviceId: ScannerUtils.rawDeviceId(existing.id),
       matchedDeviceName: existing.name,
       matchedDeviceRoomId: existing.pmsRoomId ?? existing.pmsRoom?.id,
       matchedDeviceRoomName: existing.pmsRoom?.number ?? existing.pmsRoom?.name,

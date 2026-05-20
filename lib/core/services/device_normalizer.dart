@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
 import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 
@@ -6,6 +7,9 @@ import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_pay
 /// This service handles the conversion of WebSocket/API device payloads
 /// into strongly-typed device models (AP, ONT, Switch, WLAN).
 class DeviceNormalizer {
+  // TEMP DIAGNOSTIC — remove after capturing room payload shape.
+  static int _roomDiagCount = 0;
+
   /// Normalize raw JSON to APModel
   APModel normalizeToAP(Map<String, dynamic> data) {
     return APModel(
@@ -176,6 +180,19 @@ class DeviceNormalizer {
 
   /// Extract PMS room ID from device data
   int? extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // TEMP DIAGNOSTIC — logs the raw room-related fields for the first few
+    // devices so we can see exactly what rXg returns. Remove once diagnosed.
+    if (_roomDiagCount < 8) {
+      _roomDiagCount++;
+      debugPrint(
+        'ROOMDIAG[normalizer] type=${deviceMap['type']} '
+        'pms_room=${deviceMap['pms_room']} (${deviceMap['pms_room'].runtimeType}) '
+        'pms_room_id=${deviceMap['pms_room_id']} '
+        '(${deviceMap['pms_room_id'].runtimeType}) '
+        'room_id=${deviceMap['room_id']} keys=${deviceMap.keys.toList()}',
+      );
+    }
+
     // Try direct pms_room_id field first
     final directId = deviceMap['pms_room_id'];
     if (directId != null) {

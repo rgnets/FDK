@@ -346,7 +346,23 @@ class WebSocketDeviceCacheService {
     return 'unknown';
   }
 
+  // TEMP DIAGNOSTIC — remove after capturing room payload shape.
+  static int _roomDiagCount = 0;
+
   int? _extractPmsRoomId(Map<String, dynamic> deviceMap) {
+    // TEMP DIAGNOSTIC — logs the raw room-related fields for the first few
+    // devices so we can see exactly what rXg returns. Remove once diagnosed.
+    if (_roomDiagCount < 8) {
+      _roomDiagCount++;
+      _logger.w(
+        'ROOMDIAG type=${deviceMap['type']} '
+        'pms_room=${deviceMap['pms_room']} (${deviceMap['pms_room'].runtimeType}) '
+        'pms_room_id=${deviceMap['pms_room_id']} (${deviceMap['pms_room_id'].runtimeType}) '
+        'room_id=${deviceMap['room_id']} '
+        'keys=${deviceMap.keys.toList()}',
+      );
+    }
+
     final directId = deviceMap['pms_room_id'];
     if (directId is int) return directId;
     if (directId is String) {
