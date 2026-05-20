@@ -298,6 +298,8 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       wasAutoReverted: false,
       lastSerialSeenAt: null,
       scanMode: ScanMode.auto,
+      isPopupShowing: false,
+      isRegistrationInProgress: false,
     );
   }
 

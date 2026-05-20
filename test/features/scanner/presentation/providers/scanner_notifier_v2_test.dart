@@ -285,6 +285,38 @@ void main() {
         expect(state.selectedRoomId, isNull);
         expect(state.matchStatus, DeviceMatchStatus.unchecked);
       });
+
+      test('should clear popup and registration-progress flags', () {
+        notifier.showRegistrationPopup();
+        notifier.setRegistrationInProgress(true);
+
+        final before = container.read(scannerNotifierV2Provider);
+        expect(before.isPopupShowing, true);
+        expect(before.isRegistrationInProgress, true);
+
+        notifier.clearScanData();
+
+        final after = container.read(scannerNotifierV2Provider);
+        expect(after.isPopupShowing, false);
+        expect(after.isRegistrationInProgress, false);
+      });
+
+      test('should leave Register Device tappable after orphaned popup state', () {
+        notifier.setScanMode(ScanMode.accessPoint);
+        notifier.processBarcode('AABBCCDDEEFF');
+        notifier.processBarcode('1K9ABC12345');
+        notifier.setRoomSelection(123, 'Room 101');
+        notifier.showRegistrationPopup();
+        notifier.setRegistrationInProgress(true);
+
+        notifier.clearScanData();
+
+        final state = container.read(scannerNotifierV2Provider);
+        expect(state.isRegistrationInProgress, false);
+        expect(state.isPopupShowing, false);
+        expect(state.scanData.mac, isEmpty);
+        expect(state.selectedRoomId, isNull);
+      });
     });
 
     group('startScanning', () {
