@@ -102,6 +102,8 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     _controller?.dispose();
     _controller = null;
     _pulseController.dispose();
+    // Reset any partial scan state so re-entering the scanner starts fresh.
+    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
     super.dispose();
   }
 
@@ -257,6 +259,11 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     LoggerService.debug('Stopping scanning...', tag: _tag);
 
     ref.read(scannerNotifierV2Provider.notifier).stopScanning();
+    // Discard any partial scan so the next session starts fresh.
+    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+    setState(() {
+      _lastScannedCode = null;
+    });
 
     try {
       await _controller?.stop();
@@ -279,14 +286,20 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     LoggerService.debug('Showing registration popup', tag: _tag);
 
     ScannerRegistrationPopup.show(context).then((result) {
+      // Always clear the popup flag so the Register Device button stays
+      // responsive even if the user dismisses (swipe / back / cancel)
+      // without completing registration.
+      ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
       if (result == true) {
         // Registration successful - reset for next scan
         ref.read(scannerNotifierV2Provider.notifier).clearScanData();
       }
       // Always reset lastScannedCode so same barcode can be re-scanned if needed
-      setState(() {
-        _lastScannedCode = null;
-      });
+      if (mounted) {
+        setState(() {
+          _lastScannedCode = null;
+        });
+      }
     });
   }
 

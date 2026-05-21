@@ -751,6 +751,32 @@ class _ScannerRegistrationPopupState
       currentValue = '${category}_${_selectedDevice!.id}';
     }
 
+    // Guard against DropdownButton's "exactly one item" assertion. The device
+    // list can refresh under us (a device reclassifying designed<->assigned
+    // when its serial loads, an optimistic insert, or a room switch), which
+    // can leave currentValue orphaned or produce duplicate item values.
+    // Drop duplicate non-null values, then fall back to create_new if the
+    // selected value no longer maps to exactly one item.
+    final seenValues = <String>{};
+    items.retainWhere((item) {
+      final v = item.value;
+      if (v == null) return true; // keep section header/separator items
+      return seenValues.add(v); // false (dropped) if value already seen
+    });
+    if (currentValue != 'create_new' && !seenValues.contains(currentValue)) {
+      currentValue = 'create_new';
+      // The previously-selected device is gone from the list — reset the
+      // stale selection after this frame so registration doesn't target it.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && (!_createNewDevice || _selectedDevice != null)) {
+          setState(() {
+            _createNewDevice = true;
+            _selectedDevice = null;
+          });
+        }
+      });
+    }
+
     // Build a combined list for selectedItemBuilder lookups
     // This prevents vertical overflow when a two-line item (assigned device) is selected
     final combinedDevices = [...designedDevices, ...assignedDevices];
@@ -966,10 +992,14 @@ class _ScannerRegistrationPopupState
     final isSameRoom = isExisting && scannerState.matchedDeviceRoomId == scannerState.selectedRoomId;
 
     int? existingDeviceId;
-    if (isExisting) {
+    if (!_createNewDevice && _selectedDevice != null) {
+      // An explicit dropdown pick is the user's unambiguous intent — it must
+      // win over any auto-detected full match, otherwise registration would
+      // replace the wrong device. Device ids are type-prefixed (e.g.
+      // "ap_4437"); extract the bare numeric id for the backend.
+      existingDeviceId = ScannerUtils.rawDeviceId(_selectedDevice!.id);
+    } else if (isExisting) {
       existingDeviceId = scannerState.matchedDeviceId;
-    } else if (!_createNewDevice && _selectedDevice != null) {
-      existingDeviceId = int.tryParse(_selectedDevice!.id);
     }
 
     try {

@@ -6,10 +6,14 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
+import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
+import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_service.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
 
 part 'device_registration_provider.g.dart';
 
@@ -158,6 +162,110 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       buffer.write(normalized.substring(i, i + 2).toLowerCase());
     }
     return buffer.toString();
+  }
+
+  /// Try to resolve a match against the live local device cache.
+  /// Returns true if a confident match was found and state was updated.
+  /// Returns false on cache miss (or cache not ready), so the caller can
+  /// fall back to the authoritative backend query.
+  bool _matchFromCache({
+    required String normalizedMac,
+    required String normalizedSerial,
+  }) {
+    if (normalizedMac.isEmpty && normalizedSerial.isEmpty) {
+      return false;
+    }
+
+    final cached = ref.read(devicesNotifierProvider);
+    final devices = cached.valueOrNull;
+    if (devices == null || devices.isEmpty) {
+      // Cache not populated yet — defer to backend.
+      return false;
+    }
+
+    Device? deviceByMac;
+    Device? deviceBySerial;
+    for (final device in devices) {
+      final devMac = _normalizeMac(device.macAddress ?? '');
+      final devSerial = (device.serialNumber ?? '').toUpperCase().trim();
+      if (normalizedMac.isNotEmpty &&
+          devMac.isNotEmpty &&
+          devMac == normalizedMac) {
+        deviceByMac ??= device;
+      }
+      if (normalizedSerial.isNotEmpty &&
+          devSerial.isNotEmpty &&
+          devSerial == normalizedSerial) {
+        deviceBySerial ??= device;
+      }
+      if (deviceByMac != null && deviceBySerial != null) break;
+    }
+
+    if (deviceByMac == null && deviceBySerial == null) {
+      // Cache says no match — but the cache can lag behind a brand-new
+      // registration from another device. Return false so the caller does
+      // the authoritative backend query as a safety net.
+      return false;
+    }
+
+    // Multi-device disagreement: MAC matches one device, serial matches a
+    // different one. Surface the conflict.
+    if (deviceByMac != null &&
+        deviceBySerial != null &&
+        deviceByMac.id != deviceBySerial.id) {
+      state = state.copyWith(
+        status: RegistrationStatus.idle,
+        matchStatus: DeviceMatchStatus.multipleMatch,
+        errorMessage: 'MAC and serial match different devices',
+      );
+      return true;
+    }
+
+    final existing = deviceByMac ?? deviceBySerial!;
+    final existingMac = _normalizeMac(existing.macAddress ?? '');
+    final existingSerial = (existing.serialNumber ?? '').toUpperCase().trim();
+
+    final hasMacMismatch = normalizedMac.isNotEmpty &&
+        existingMac.isNotEmpty &&
+        normalizedMac != existingMac;
+    final hasSerialMismatch = normalizedSerial.isNotEmpty &&
+        existingSerial.isNotEmpty &&
+        normalizedSerial != existingSerial;
+
+    if ((deviceByMac != null && hasSerialMismatch) ||
+        (deviceBySerial != null && hasMacMismatch)) {
+      final mismatches = <String>[];
+      if (hasMacMismatch) mismatches.add('MAC Address');
+      if (hasSerialMismatch) mismatches.add('Serial Number');
+      state = state.copyWith(
+        status: RegistrationStatus.idle,
+        matchStatus: DeviceMatchStatus.mismatch,
+        matchedDeviceId: ScannerUtils.rawDeviceId(existing.id),
+        matchedDeviceName: existing.name,
+        mismatchInfo: MatchMismatchInfo(
+          mismatchedFields: mismatches,
+          expected: {
+            'mac': existingMac,
+            'serial_number': existingSerial,
+          },
+          scanned: {
+            'mac': normalizedMac,
+            'serial_number': normalizedSerial,
+          },
+        ),
+      );
+      return true;
+    }
+
+    state = state.copyWith(
+      status: RegistrationStatus.idle,
+      matchStatus: DeviceMatchStatus.fullMatch,
+      matchedDeviceId: ScannerUtils.rawDeviceId(existing.id),
+      matchedDeviceName: existing.name,
+      matchedDeviceRoomId: existing.pmsRoomId ?? existing.pmsRoom?.id,
+      matchedDeviceRoomName: existing.pmsRoom?.number ?? existing.pmsRoom?.name,
+    );
+    return true;
   }
 
   /// Extract room ID from device payload (handles nested and flat structures).
@@ -321,6 +429,24 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     try {
       final normalizedMac = _normalizeMac(mac);
       final normalizedSerial = serial.toUpperCase().trim();
+
+      // Fast path: check the live, WebSocket-fed local device cache first.
+      // If we find a MAC match here, we can skip the round-trip to the
+      // backend entirely. The cache is kept fresh by an active stream
+      // subscription (~600ms debounce), so true-match latency stays low.
+      // We only short-circuit on a hit; a miss still falls through to the
+      // authoritative WebSocket query to guard against stream gaps.
+      final cacheHit = _matchFromCache(
+        normalizedMac: normalizedMac,
+        normalizedSerial: normalizedSerial,
+      );
+      if (cacheHit) {
+        LoggerService.debug(
+          'DeviceRegistration: Resolved match from local cache (skipped backend query)',
+          tag: 'DeviceRegistration',
+        );
+        return;
+      }
 
       LoggerService.debug(
         'DeviceRegistration: Querying backend for MAC=$normalizedMac, Serial=$normalizedSerial',
@@ -510,9 +636,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     );
 
     try {
-      // Validate serial pattern
+      // Validate serial pattern. AT&T-style serials carry a discriminating
+      // prefix (1K9/1M3/1HN/ALCL/LL/EC); other vendors like Ruckus do not, so
+      // when the MAC's OUI identifies a known vendor we trust the scanned
+      // serial as-is and let the rXg side do final validation.
       final detectedType = SerialPatterns.detectDeviceType(serial);
-      if (detectedType == null) {
+      final macIsKnownVendor =
+          ScannerValidationService.isKnownManufacturer(mac);
+      if (detectedType == null && !macIsKnownVendor) {
         final error = 'Invalid serial number format for ${deviceType.displayName}';
         state = state.copyWith(
           status: RegistrationStatus.error,
@@ -566,6 +697,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         registeredAt: DateTime.now(),
       );
 
+      // Optimistically insert the device into the local cache so the room
+      // view picks it up immediately. The authoritative record will overwrite
+      // this entry when the WebSocket pushes the server-side state back.
+      _addOptimisticDevice(
+        mac: mac,
+        serial: serial,
+        deviceType: deviceType,
+        pmsRoomId: pmsRoomId,
+        existingDeviceId: existingDeviceId,
+      );
+
       // Force-refresh the relevant resource snapshot so the new device appears immediately
       _refreshResourceForDeviceType(deviceType);
 
@@ -588,6 +730,50 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       );
 
       return RegistrationResult.failure(message: error);
+    }
+  }
+
+  /// Build a lightweight Device record from registration params and inject
+  /// it into the local devices cache. The next WebSocket-pushed update will
+  /// overwrite this with the server's authoritative record.
+  void _addOptimisticDevice({
+    required String mac,
+    required String serial,
+    required DeviceType deviceType,
+    required int pmsRoomId,
+    int? existingDeviceId,
+  }) {
+    final typeString = switch (deviceType) {
+      DeviceType.accessPoint => 'access_point',
+      DeviceType.switchDevice => 'switch',
+      DeviceType.ont => 'ont',
+    };
+
+    final normalizedMac = _normalizeMac(mac);
+    final id = existingDeviceId?.toString() ?? 'pending-$normalizedMac';
+
+    final optimistic = Device(
+      id: id,
+      name: serial.isNotEmpty ? serial : normalizedMac,
+      type: typeString,
+      status: 'unknown',
+      macAddress: normalizedMac,
+      serialNumber: serial,
+      pmsRoomId: pmsRoomId,
+    );
+
+    try {
+      ref.read(devicesNotifierProvider.notifier).addOptimistic(optimistic);
+      LoggerService.debug(
+        'DeviceRegistration: Optimistically inserted $typeString $id into local cache',
+        tag: 'DeviceRegistration',
+      );
+    } on Object catch (e) {
+      // Non-fatal: WebSocket refresh below is the safety net.
+      LoggerService.warning(
+        'DeviceRegistration: Optimistic insert skipped: $e',
+        tag: 'DeviceRegistration',
+      );
     }
   }
 

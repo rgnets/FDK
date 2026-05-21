@@ -12,6 +12,16 @@ class SerialPatterns {
   // Switch serial prefixes (LL for legacy, EC for Edge-core)
   static const List<String> switchPrefixes = ['LL', 'EC'];
 
+  // Ruckus ICX switch serial prefixes
+  static const List<String> ruckusSwitchPrefixes = [
+    'FJN',
+    'FMR',
+    'FND',
+    'FEA',
+    'FNS',
+    'CYR',
+  ];
+
   /// Check if serial is an Access Point serial number.
   /// AP serials start with 1K9, 1M3, or 1HN and are at least 10 characters.
   static bool isAPSerial(String serial) {
@@ -27,11 +37,19 @@ class SerialPatterns {
   }
 
   /// Check if serial is a Switch serial number.
-  /// Switch serials start with LL or EC and are at least 12 characters.
+  ///
+  /// Accepts AT&T / Edge-core switches (LL or EC, min 12 chars) and Ruckus
+  /// ICX switches (FJN or FMR, min 10 chars).
   static bool isSwitchSerial(String serial) {
     final s = serial.toUpperCase().trim();
-    return s.length >= 12 &&
-        switchPrefixes.any((prefix) => s.startsWith(prefix));
+    if (s.length >= 12 && switchPrefixes.any((prefix) => s.startsWith(prefix))) {
+      return true;
+    }
+    if (s.length >= 10 &&
+        ruckusSwitchPrefixes.any((prefix) => s.startsWith(prefix))) {
+      return true;
+    }
+    return false;
   }
 
   /// Detect device type from serial number.
@@ -69,7 +87,8 @@ class SerialPatterns {
       case DeviceTypeFromSerial.ont:
         return 'ONT serials start with ${ontPrefixes.join(", ")} (exactly 12 chars)';
       case DeviceTypeFromSerial.switchDevice:
-        return 'Switch serials start with ${switchPrefixes.join(", ")} (min 12 chars)';
+        return 'Switch serials start with ${switchPrefixes.join(", ")} '
+            '(min 12 chars) or ${ruckusSwitchPrefixes.join(", ")} (min 10 chars)';
     }
   }
 }

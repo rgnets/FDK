@@ -69,4 +69,22 @@ class ScannerUtils {
     }
     return '${value.substring(0, maxLength - 3)}...';
   }
+
+  /// Extracts the raw numeric backend id from a domain device id.
+  ///
+  /// Domain device ids are type-prefixed (e.g. `ap_4437`, `ont_12`,
+  /// `switch_9`). The rXg backend expects the bare integer id, so a plain
+  /// `int.tryParse('ap_4437')` returns null and silently drops the id.
+  /// Returns null only if no numeric id can be found.
+  static int? rawDeviceId(String deviceId) {
+    final direct = int.tryParse(deviceId.trim());
+    if (direct != null) {
+      return direct;
+    }
+    // Strip a leading type prefix (segment before the last underscore).
+    final tail = deviceId.contains('_')
+        ? deviceId.substring(deviceId.lastIndexOf('_') + 1)
+        : deviceId;
+    return int.tryParse(tail.trim());
+  }
 }
