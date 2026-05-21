@@ -5,6 +5,8 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/image_upload_event_bus.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart'
+    as auth;
 import 'package:rgnets_fdk/features/compliance/data/datasources/compliance_rest_data_source.dart';
 import 'package:rgnets_fdk/features/compliance/data/repositories/compliance_repository_impl.dart';
 import 'package:rgnets_fdk/features/compliance/domain/entities/compliance_feed_state.dart';
@@ -41,10 +43,19 @@ class ComplianceLookup {
 }
 
 /// Builds a configured [ComplianceRestDataSource] from current site URL +
-/// secure-stored api_key. Returns null when either is missing (logged-out
-/// state, etc). The underlying HTTP client is closed on provider dispose.
+/// secure-stored api_key. Returns null when either is missing OR when
+/// the user isn't authenticated. The auth-status gate is critical: the
+/// storage layer is updated by the auth flow but cleared lazily on
+/// sign-out, so a sign-out followed by a fast sign-in can briefly read
+/// the prior site's siteUrl + token from storage and rebuild a data
+/// source pointed at the prior rxg. Gating on `authStatusProvider`
+/// forces this provider to invalidate whenever auth state transitions,
+/// so it only ever resolves once auth has actually settled on the new
+/// site. The underlying HTTP client is closed on provider dispose.
 final complianceRestDataSourceProvider =
     FutureProvider<ComplianceRestDataSource?>((ref) async {
+  final authStatus = ref.watch(auth.authStatusProvider);
+  if (authStatus?.isAuthenticated != true) return null;
   final storage = ref.watch(storageServiceProvider);
   final secure = ref.watch(secureStorageServiceProvider);
   final siteUrl = storage.siteUrl;

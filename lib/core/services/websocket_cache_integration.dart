@@ -159,6 +159,15 @@ class WebSocketCacheIntegration {
   static const Duration _snapshotFlushDelay = Duration(milliseconds: 500);
   static const String _channelIdentifier = '{"channel":"RxgChannel"}';
 
+  /// Monotonic counter for `request_id` uniqueness. Wall-clock alone collides
+  /// when two snapshot cycles are initiated within the same millisecond,
+  /// which happens after a fast disconnect/reconnect.
+  int _requestIdSeq = 0;
+  String _newRequestId(String resourceType) {
+    final seq = (++_requestIdSeq).toString().padLeft(4, '0');
+    return 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}-$seq';
+  }
+
   // ---------------------------------------------------------------------------
   // Delegated public API: Speed Tests
   // ---------------------------------------------------------------------------
@@ -364,6 +373,12 @@ class WebSocketCacheIntegration {
       _pendingSnapshots.clear();
       _requestedSnapshots.clear();
       _confirmedResources.clear();
+      // Invalidate the snapshot-coalesce window. A disconnect ends the
+      // current snapshot cycle, so the very next `requestFullSnapshots()`
+      // after reconnect must always fire — otherwise a flaky WS that drops
+      // + reconnects within 5s would silently skip the post-reconnect
+      // snapshot and leave the cache empty.
+      _lastSnapshotFiredAt = null;
       for (final timer in _snapshotFlushTimers.values) {
         timer.cancel();
       }
@@ -547,8 +562,7 @@ class WebSocketCacheIntegration {
       'crud_action': 'index',
       'page': 1,
       'page_size': 10000,
-      'request_id':
-          'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}',
+      'request_id': _newRequestId(resourceType),
     };
 
     final sent = _sendActionCableMessage(payload);
@@ -609,6 +623,22 @@ class WebSocketCacheIntegration {
     final resourceType = payload['resource_type']?.toString() ??
         raw['resource_type']?.toString();
     final action = _extractAction(message, payload, raw);
+
+    // rxg's `send_error` (RxgChannel#send_error) emits `action=error` with a
+    // `status` and `error` field but NO `resource_type`, so it would otherwise
+    // fall through the unknown-resource early-return below and be silently
+    // dropped. Surface these explicitly so 429 / auth failures / unknown
+    // resource type rejections are visible in logs and we can correlate to
+    // pending snapshots via `request_id` if needed.
+    if (action == 'error') {
+      final status = payload['status'] ?? raw['status'];
+      final errMsg = payload['error'] ?? raw['error'];
+      final reqId = payload['request_id'] ?? raw['request_id'];
+      _logger.w(
+        'WebSocketCacheIntegration: WS error status=$status request_id=$reqId message=$errMsg',
+      );
+      return;
+    }
 
     if (resourceType == null || !_resourceTypes.contains(resourceType)) {
       if (resourceType != null) {
