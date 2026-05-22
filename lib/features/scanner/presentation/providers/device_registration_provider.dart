@@ -652,20 +652,12 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         return RegistrationResult.failure(message: error);
       }
 
-      // Get the registration service and register via WebSocket
+      // Await the backend's authoritative response — the service uses
+      // requestActionCable() under the hood so request/response is
+      // correlated by request_id and we learn the real outcome instead of
+      // assuming success on send.
       final registrationService = ref.read(deviceRegistrationServiceProvider);
-
-      // Check if WebSocket is connected before attempting registration
-      if (!registrationService.isConnected) {
-        const error = 'Cannot register device: WebSocket not connected';
-        state = state.copyWith(
-          status: RegistrationStatus.error,
-          errorMessage: error,
-        );
-        return RegistrationResult.failure(message: error);
-      }
-
-      final sent = registrationService.registerDevice(
+      final outcome = await registrationService.registerDevice(
         deviceType: deviceType,
         mac: mac,
         serialNumber: serial,
@@ -675,8 +667,12 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         existingDeviceId: existingDeviceId,
       );
 
-      if (!sent) {
-        const error = 'Failed to send registration message';
+      if (!outcome.success) {
+        final error = outcome.errorMessage ?? 'Registration failed';
+        LoggerService.warning(
+          'DeviceRegistration: Backend rejected registration ($error, status=${outcome.status})',
+          tag: 'DeviceRegistration',
+        );
         state = state.copyWith(
           status: RegistrationStatus.error,
           errorMessage: error,
@@ -685,30 +681,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       }
 
       LoggerService.info(
-        'DeviceRegistration: Sent registration via WebSocket - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
+        'DeviceRegistration: Backend confirmed registration - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
         tag: 'DeviceRegistration',
       );
 
-      // WebSocket registration is fire-and-forget
-      // The device.created event will be received via the WebSocket listener
-      // Mark as pending until we receive confirmation
       state = state.copyWith(
         status: RegistrationStatus.success,
         registeredAt: DateTime.now(),
       );
 
-      // Optimistically insert the device into the local cache so the room
-      // view picks it up immediately. The authoritative record will overwrite
-      // this entry when the WebSocket pushes the server-side state back.
-      _addOptimisticDevice(
-        mac: mac,
-        serial: serial,
-        deviceType: deviceType,
-        pmsRoomId: pmsRoomId,
-        existingDeviceId: existingDeviceId,
-      );
-
-      // Force-refresh the relevant resource snapshot so the new device appears immediately
+      // Belt-and-suspenders: the subscription stream will push the new
+      // record on its own; this explicit refresh just shortens the lag.
       _refreshResourceForDeviceType(deviceType);
 
       return RegistrationResult.success(
@@ -730,50 +713,6 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       );
 
       return RegistrationResult.failure(message: error);
-    }
-  }
-
-  /// Build a lightweight Device record from registration params and inject
-  /// it into the local devices cache. The next WebSocket-pushed update will
-  /// overwrite this with the server's authoritative record.
-  void _addOptimisticDevice({
-    required String mac,
-    required String serial,
-    required DeviceType deviceType,
-    required int pmsRoomId,
-    int? existingDeviceId,
-  }) {
-    final typeString = switch (deviceType) {
-      DeviceType.accessPoint => 'access_point',
-      DeviceType.switchDevice => 'switch',
-      DeviceType.ont => 'ont',
-    };
-
-    final normalizedMac = _normalizeMac(mac);
-    final id = existingDeviceId?.toString() ?? 'pending-$normalizedMac';
-
-    final optimistic = Device(
-      id: id,
-      name: serial.isNotEmpty ? serial : normalizedMac,
-      type: typeString,
-      status: 'unknown',
-      macAddress: normalizedMac,
-      serialNumber: serial,
-      pmsRoomId: pmsRoomId,
-    );
-
-    try {
-      ref.read(devicesNotifierProvider.notifier).addOptimistic(optimistic);
-      LoggerService.debug(
-        'DeviceRegistration: Optimistically inserted $typeString $id into local cache',
-        tag: 'DeviceRegistration',
-      );
-    } on Object catch (e) {
-      // Non-fatal: WebSocket refresh below is the safety net.
-      LoggerService.warning(
-        'DeviceRegistration: Optimistic insert skipped: $e',
-        tag: 'DeviceRegistration',
-      );
     }
   }
 

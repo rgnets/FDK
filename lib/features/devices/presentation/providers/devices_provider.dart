@@ -260,55 +260,6 @@ class DevicesNotifier extends _$DevicesNotifier {
     return userRefresh();
   }
 
-  /// Optimistically insert (or update) a device in the local cache so the
-  /// UI reflects a just-registered device immediately, without waiting for
-  /// the WebSocket round-trip to push the authoritative payload back.
-  ///
-  /// Matches existing entries by `id` (preferred) or `macAddress`. The next
-  /// stream update from the server will overwrite this entry with the real
-  /// device record, so it's safe if some fields are approximations.
-  void addOptimistic(Device device) {
-    final current = state.valueOrNull ?? _latestDevices ?? const <Device>[];
-    final macNorm = (device.macAddress ?? '').toUpperCase().replaceAll(
-          RegExp(r'[^0-9A-F]'),
-          '',
-        );
-
-    var replaced = false;
-    final updated = <Device>[];
-    for (final existing in current) {
-      final existingMacNorm = (existing.macAddress ?? '')
-          .toUpperCase()
-          .replaceAll(RegExp(r'[^0-9A-F]'), '');
-      final sameById = existing.id.isNotEmpty &&
-          device.id.isNotEmpty &&
-          existing.id == device.id;
-      final sameByMac =
-          macNorm.isNotEmpty && existingMacNorm == macNorm;
-      if (!replaced && (sameById || sameByMac)) {
-        // Merge: prefer fields the optimistic record actually carries.
-        updated.add(
-          existing.copyWith(
-            pmsRoomId: device.pmsRoomId ?? existing.pmsRoomId,
-            pmsRoom: device.pmsRoom ?? existing.pmsRoom,
-            macAddress: device.macAddress ?? existing.macAddress,
-            serialNumber: device.serialNumber ?? existing.serialNumber,
-            type: device.type.isNotEmpty ? device.type : existing.type,
-          ),
-        );
-        replaced = true;
-      } else {
-        updated.add(existing);
-      }
-    }
-    if (!replaced) {
-      updated.insert(0, device);
-    }
-
-    _latestDevices = updated;
-    state = AsyncValue.data(updated);
-  }
-
   Future<void> rebootDevice(String deviceId) async {
     if (isVerboseLoggingEnabled) {
       _logger.i('DevicesProvider: Rebooting device: $deviceId');
