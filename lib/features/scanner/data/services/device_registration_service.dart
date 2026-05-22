@@ -182,17 +182,18 @@ class DeviceRegistrationService {
         );
 
       case DeviceType.switchDevice:
-        // Generic CRUD create/update — there is no dedicated extra action
-        // for switches yet.
+        // Uses the dedicated register_switch_device extra collection action.
+        // The switch must already be pre-configured by an administrator on
+        // the rXg (with host, credentials, management VLAN, etc.); this call
+        // assigns the scanned MAC and the room.
         return (
           resourceType: 'switch_devices',
           additionalData: {
-            'crud_action': existingDeviceId != null ? 'update' : 'create',
+            'crud_action': 'register_switch_device',
             'mac': mac,
             'serial_number': serialNumber,
             'pms_room_id': pmsRoomId,
-            if (model != null) 'model': model,
-            if (existingDeviceId != null) 'id': existingDeviceId,
+            if (existingDeviceId != null) 'switch_device_id': existingDeviceId,
           },
         );
     }

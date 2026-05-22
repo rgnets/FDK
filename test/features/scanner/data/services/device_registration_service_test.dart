@@ -205,7 +205,7 @@ void main() {
       expect(outcome.status, 0);
     });
 
-    test('switch update path sets crud_action=update and passes id when existingDeviceId is provided', () async {
+    test('switch path passes switch_device_id when existingDeviceId is provided', () async {
       when(() => ws.isConnected).thenReturn(true);
       when(
         () => ws.requestActionCable(
@@ -241,9 +241,12 @@ void main() {
 
       expect(calls, hasLength(1));
       final additional = calls.single as Map;
-      expect(additional['crud_action'], 'update');
-      expect(additional['id'], 99);
-      expect(additional['model'], 'icx7150');
+      expect(additional['crud_action'], 'register_switch_device');
+      expect(additional['switch_device_id'], 99);
+      // The model param is no longer sent to the rXg by the new dedicated
+      // action; it has nothing to do with onboarding.
+      expect(additional.containsKey('model'), isFalse);
+      expect(additional.containsKey('id'), isFalse);
     });
 
     test('returns failure with the timeout message on TimeoutException', () async {
@@ -324,9 +327,9 @@ void main() {
       expect(calls[2], 'access_points');
       expect((calls[3] as Map)['crud_action'], 'register_ap_device');
 
-      // Switch (no existingDeviceId → create)
+      // Switch
       expect(calls[4], 'switch_devices');
-      expect((calls[5] as Map)['crud_action'], 'create');
+      expect((calls[5] as Map)['crud_action'], 'register_switch_device');
 
       // None of the additionalData maps should contain reserved keys.
       for (final additional in [calls[1], calls[3], calls[5]]) {
