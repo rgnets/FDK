@@ -77,7 +77,11 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
     // If we detected a device type, use batch parsing (critical for ONT)
     if (detectedType != null) {
-      final result = ScannerValidationService.parseBarcodesForType(values, detectedType);
+      final result = ScannerValidationService.parseBarcodesForType(
+        values,
+        detectedType,
+        existingSerial: state.scanData.serialNumber,
+      );
       _applyBatchResult(result, detectedType);
       return;
     }
@@ -108,6 +112,31 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
     if (detectedType != null) {
       _processSerial(value, detectedType);
+      return;
+    }
+
+    // Ruckus T-series AP serials are 12 purely-numeric digits (e.g.
+    // 422720000021) that parse as valid hex and otherwise look just like a
+    // MAC. The OUI database disambiguates: a real Ruckus MAC's OUI is
+    // registered to Ruckus, a numeric AP serial's prefix is not. In
+    // AP/auto modes any 12-char hex value with an unknown OUI must NEVER
+    // fill the MAC slot — it's a Ruckus serial (or noise). Either claim
+    // the serial slot the first time we see it or no-op on a re-scan; the
+    // batch parser uses the same OUI test (scanner_validation_service.dart:229).
+    //
+    // Gate on `macDatabase.isLoaded`: until the OUI table is in memory
+    // every value reads as "unknown OUI", which would mis-route real MACs
+    // into the serial slot during the ~500 ms DB-load window. The camera
+    // re-fires every frame, so deferring here just costs one frame.
+    if ((state.scanMode == ScanMode.accessPoint ||
+            state.scanMode == ScanMode.auto) &&
+        value.length == 12 &&
+        _isMacAddress(value) &&
+        macDatabase.isLoaded &&
+        !ScannerValidationService.isKnownManufacturer(value)) {
+      if (state.scanData.serialNumber.isEmpty) {
+        _acceptVendorApSerial(value);
+      }
       return;
     }
 

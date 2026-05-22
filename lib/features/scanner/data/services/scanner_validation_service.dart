@@ -182,7 +182,10 @@ class ScannerValidationService {
   /// Parses AP barcodes from multiple scanned values.
   /// Accepts AT&T-style serials (1K9/1M3/1HN) and, when the MAC's OUI
   /// resolves to Ruckus, any alphanumeric serial >=10 chars.
-  static ParsedDeviceData parseAPBarcodes(List<String> barcodes) {
+  static ParsedDeviceData parseAPBarcodes(
+    List<String> barcodes, {
+    String existingSerial = '',
+  }) {
     LoggerService.debug(
       'Parsing AP barcodes from ${barcodes.length} values',
       tag: _tag,
@@ -190,7 +193,12 @@ class ScannerValidationService {
 
     String mac = '';
     String serialNumber = '';
-    bool hasAPSerial = false;
+    // Seed `hasAPSerial` from the caller's accumulated state. The camera
+    // commonly emits the AP serial in one frame and the MAC in a later
+    // frame; without this seed, the second frame doesn't realise a valid
+    // AT&T-style serial is already locked in and would route the
+    // unknown-OUI MAC into the serial slot.
+    bool hasAPSerial = SerialPatterns.isAPSerial(existingSerial);
 
     // First pass: split into 12-hex candidates (potential MAC, or a numeric
     // Ruckus serial that happens to parse as hex) and other values.
@@ -217,31 +225,77 @@ class ScannerValidationService {
       }
     }
 
-    // Resolve MAC from hex candidates. With multiple candidates, prefer the
-    // one whose OUI is known so a Ruckus MAC wins over an all-numeric Ruckus
-    // serial that incidentally parses as hex.
-    if (hexCandidates.length == 1) {
-      mac = hexCandidates.first;
-    } else if (hexCandidates.length >= 2) {
-      String? vendorMac;
-      String? leftover;
-      for (final c in hexCandidates) {
-        if (macDatabase.isLoaded && macDatabase.isKnownMAC(c)) {
-          vendorMac ??= c;
+    // Resolve MAC from hex candidates using the OUI database. A real MAC
+    // has an OUI registered to a hardware vendor; a Ruckus all-numeric
+    // serial does not. If the database isn't loaded yet we DEFER — we
+    // can't tell SN from MAC, and guessing (e.g. picking `hexCandidates.first`)
+    // locks the wrong value into the MAC slot for the rest of the session.
+    // The caller (scanner_notifier_v2.processBarcodeFrame) will retry
+    // on the next camera frame; loadMACDatabase() typically resolves in
+    // <500ms so the user sees no perceptible lag.
+    if (hexCandidates.isNotEmpty && macDatabase.isLoaded) {
+      if (hexCandidates.length == 1) {
+        // Single candidate: only treat as MAC if its OUI is actually known.
+        // An unknown-OUI single hex value is almost certainly a Ruckus
+        // numeric serial scanned without the MAC sticker in view — unless
+        // we already have an AT&T-style serial from otherValues, in which
+        // case the hex must be the MAC (local OUI table is a bundled
+        // snapshot; unknown ≠ invalid).
+        if (macDatabase.isKnownMAC(hexCandidates.first)) {
+          mac = hexCandidates.first;
+        } else if (!hasAPSerial) {
+          serialNumber = hexCandidates.first;
+          hasAPSerial = true;
+          LoggerService.debug(
+            'Single hex candidate has unknown OUI — treating as Ruckus serial: $serialNumber',
+            tag: _tag,
+          );
         } else {
-          leftover ??= c;
+          mac = hexCandidates.first;
+          LoggerService.debug(
+            'Single hex candidate has unknown OUI but serial already set — '
+            'trusting as MAC (OUI table may be incomplete): $mac',
+            tag: _tag,
+          );
+        }
+      } else {
+        String? vendorMac;
+        String? leftover;
+        for (final c in hexCandidates) {
+          if (macDatabase.isKnownMAC(c)) {
+            vendorMac ??= c;
+          } else {
+            leftover ??= c;
+          }
+        }
+        // Only commit to a MAC if the OUI matched a real vendor. Otherwise
+        // both candidates are unknown — treat the first as serial and leave
+        // MAC empty until a vendor-OUI scan arrives.
+        if (vendorMac != null) {
+          mac = vendorMac;
+          if (!hasAPSerial && leftover != null && leftover != mac) {
+            serialNumber = leftover;
+            hasAPSerial = true;
+            LoggerService.debug(
+              'Found Ruckus serial (numeric, vendor-disambiguated): $serialNumber',
+              tag: _tag,
+            );
+          }
+        } else if (!hasAPSerial && leftover != null) {
+          serialNumber = leftover;
+          hasAPSerial = true;
+          LoggerService.debug(
+            'No vendor-OUI hex candidate — treating leftover as serial: $serialNumber',
+            tag: _tag,
+          );
         }
       }
-      mac = vendorMac ?? hexCandidates.first;
-      // Treat any unclaimed 12-hex value as the numeric Ruckus serial.
-      if (!hasAPSerial && leftover != null && leftover != mac) {
-        serialNumber = leftover;
-        hasAPSerial = true;
-        LoggerService.debug(
-          'Found Ruckus serial (numeric, vendor-disambiguated): $serialNumber',
-          tag: _tag,
-        );
-      }
+    } else if (hexCandidates.isNotEmpty) {
+      LoggerService.debug(
+        'OUI database not loaded yet — deferring MAC/serial routing for ${hexCandidates.length} hex candidate(s); '
+        'caller will retry next frame.',
+        tag: _tag,
+      );
     }
     if (mac.isNotEmpty) {
       LoggerService.debug('Found MAC: $mac', tag: _tag);
@@ -374,15 +428,20 @@ class ScannerValidationService {
   }
 
   /// Parse barcodes based on detected device type.
+  ///
+  /// `existingSerial` (if provided) carries the caller's accumulated state
+  /// so multi-frame scans (serial in one frame, MAC in a later frame) can
+  /// disambiguate correctly. Only the AP parser consults it today.
   static ParsedDeviceData parseBarcodesForType(
     List<String> barcodes,
-    DeviceTypeFromSerial deviceType,
-  ) {
+    DeviceTypeFromSerial deviceType, {
+    String existingSerial = '',
+  }) {
     switch (deviceType) {
       case DeviceTypeFromSerial.ont:
         return parseONTBarcodes(barcodes);
       case DeviceTypeFromSerial.accessPoint:
-        return parseAPBarcodes(barcodes);
+        return parseAPBarcodes(barcodes, existingSerial: existingSerial);
       case DeviceTypeFromSerial.switchDevice:
         return parseSwitchBarcodes(barcodes);
     }
@@ -453,9 +512,17 @@ class ScannerValidationService {
 
   /// Validates MAC address against OUI database.
   /// Returns true if the MAC has a known manufacturer.
+  ///
+  /// When the OUI database hasn't finished loading we return `false`
+  /// (i.e. "we cannot confirm this is a real vendor MAC yet"), not `true`.
+  /// The permissive-default mis-routes Ruckus AP serials (12 purely-numeric
+  /// digits that parse as valid hex) into the MAC slot during the brief
+  /// window between scanner mount and `loadMACDatabase()` completion, which
+  /// the multi-frame state machine then compounds into both slots holding
+  /// the serial value. See scanner_notifier_v2.dart vendor-aware branches.
   static bool isKnownManufacturer(String mac) {
     if (!macDatabase.isLoaded) {
-      return true; // Allow if database not loaded
+      return false;
     }
     return macDatabase.isKnownMAC(mac);
   }
