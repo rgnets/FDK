@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_service.dart';
+import 'package:rgnets_fdk/features/scanner/data/utils/mac_database.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
@@ -640,8 +641,13 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       // prefix (1K9/1M3/1HN/ALCL/LL/EC); other vendors like Ruckus do not, so
       // when the MAC's OUI identifies a known vendor we trust the scanned
       // serial as-is and let the rXg side do final validation.
+      //
+      // If the OUI database hasn't finished loading we treat the MAC as
+      // trusted rather than rejecting outright — the rXg performs its own
+      // validation, and rejecting here would block legitimate registrations
+      // during the brief startup window.
       final detectedType = SerialPatterns.detectDeviceType(serial);
-      final macIsKnownVendor =
+      final macIsKnownVendor = !macDatabase.isLoaded ||
           ScannerValidationService.isKnownManufacturer(mac);
       if (detectedType == null && !macIsKnownVendor) {
         final error = 'Invalid serial number format for ${deviceType.displayName}';
