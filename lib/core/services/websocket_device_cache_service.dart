@@ -151,7 +151,12 @@ class WebSocketDeviceCacheService {
                 'Switch-${deviceMap['id']}',
             status: _determineStatus(deviceMap),
             pmsRoomId: _extractPmsRoomId(deviceMap),
-            macAddress: deviceMap['scratch']?.toString(),
+            // SwitchDevice stores the canonical MAC in the `mac` column; the
+            // `scratch` field is an unused free-text slot that early scanner
+            // prototypes wrote to. Reading from `mac` keeps the FDK in sync
+            // with what register_switch_device persists.
+            macAddress: deviceMap['mac']?.toString() ??
+                deviceMap['scratch']?.toString(),
             ipAddress: deviceMap['host']?.toString(),
             host: deviceMap['host']?.toString(),
             model: deviceMap['model']?.toString() ??
@@ -361,6 +366,23 @@ class WebSocketDeviceCacheService {
       }
       if (idValue is String) {
         return int.tryParse(idValue);
+      }
+    }
+    // SwitchDevice (and any other has_and_belongs_to_many :pms_rooms
+    // associations on the rXg) has no pms_room_id column — the snapshot
+    // exposes the room association as a list under `pms_rooms`. Pick the
+    // first entry so the FE app can scope device dropdowns by room.
+    final pmsRoomsValue = deviceMap['pms_rooms'];
+    if (pmsRoomsValue is List && pmsRoomsValue.isNotEmpty) {
+      final first = pmsRoomsValue.first;
+      if (first is Map) {
+        final idValue = first['id'];
+        if (idValue is int) {
+          return idValue;
+        }
+        if (idValue is String) {
+          return int.tryParse(idValue);
+        }
       }
     }
     return null;

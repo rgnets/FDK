@@ -129,6 +129,7 @@ mixin _$DeviceModelSealed {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -250,6 +251,7 @@ mixin _$DeviceModelSealed {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -371,6 +373,7 @@ mixin _$DeviceModelSealed {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -1144,6 +1147,7 @@ class _$APModelImpl extends APModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -1295,6 +1299,7 @@ class _$APModelImpl extends APModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -1446,6 +1451,7 @@ class _$APModelImpl extends APModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -2182,6 +2188,7 @@ class _$ONTModelImpl extends ONTModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -2330,6 +2337,7 @@ class _$ONTModelImpl extends ONTModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -2478,6 +2486,7 @@ class _$ONTModelImpl extends ONTModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -2715,6 +2724,7 @@ abstract class _$$SwitchModelImplCopyWith<$Res>
       String status,
       @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
       @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+      @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
       @JsonKey(name: 'ip_address') String? ipAddress,
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
@@ -2759,6 +2769,7 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
     Object? status = null,
     Object? pmsRoom = freezed,
     Object? pmsRoomId = freezed,
+    Object? pmsRooms = freezed,
     Object? ipAddress = freezed,
     Object? macAddress = freezed,
     Object? location = freezed,
@@ -2801,6 +2812,10 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
           ? _value.pmsRoomId
           : pmsRoomId // ignore: cast_nullable_to_non_nullable
               as int?,
+      pmsRooms: freezed == pmsRooms
+          ? _value._pmsRooms
+          : pmsRooms // ignore: cast_nullable_to_non_nullable
+              as List<RoomModel>?,
       ipAddress: freezed == ipAddress
           ? _value.ipAddress
           : ipAddress // ignore: cast_nullable_to_non_nullable
@@ -2894,6 +2909,7 @@ class _$SwitchModelImpl extends SwitchModel {
       required this.status,
       @JsonKey(name: 'pms_room') this.pmsRoom,
       @JsonKey(name: 'pms_room_id') this.pmsRoomId,
+      @JsonKey(name: 'pms_rooms') final List<RoomModel>? pmsRooms,
       @JsonKey(name: 'ip_address') this.ipAddress,
       @JsonKey(name: 'mac_address') this.macAddress,
       this.location,
@@ -2916,7 +2932,8 @@ class _$SwitchModelImpl extends SwitchModel {
       @JsonKey(name: 'memory_usage') this.memoryUsage,
       this.temperature,
       final String? $type})
-      : _metadata = metadata,
+      : _pmsRooms = pmsRooms,
+        _metadata = metadata,
         _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
@@ -2940,6 +2957,23 @@ class _$SwitchModelImpl extends SwitchModel {
   @override
   @JsonKey(name: 'pms_room_id')
   final int? pmsRoomId;
+// SwitchDevice has has_and_belongs_to_many :pms_rooms on the rXg side
+// (no pms_room_id column). The snapshot includes a `pms_rooms` collection;
+// grab the first one for the single-room UI association.
+  final List<RoomModel>? _pmsRooms;
+// SwitchDevice has has_and_belongs_to_many :pms_rooms on the rXg side
+// (no pms_room_id column). The snapshot includes a `pms_rooms` collection;
+// grab the first one for the single-room UI association.
+  @override
+  @JsonKey(name: 'pms_rooms')
+  List<RoomModel>? get pmsRooms {
+    final value = _pmsRooms;
+    if (value == null) return null;
+    if (_pmsRooms is EqualUnmodifiableListView) return _pmsRooms;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(value);
+  }
+
   @override
   @JsonKey(name: 'ip_address')
   final String? ipAddress;
@@ -3039,7 +3073,7 @@ class _$SwitchModelImpl extends SwitchModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature)';
+    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, pmsRooms: $pmsRooms, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature)';
   }
 
   @override
@@ -3053,6 +3087,7 @@ class _$SwitchModelImpl extends SwitchModel {
             (identical(other.pmsRoom, pmsRoom) || other.pmsRoom == pmsRoom) &&
             (identical(other.pmsRoomId, pmsRoomId) ||
                 other.pmsRoomId == pmsRoomId) &&
+            const DeepCollectionEquality().equals(other._pmsRooms, _pmsRooms) &&
             (identical(other.ipAddress, ipAddress) ||
                 other.ipAddress == ipAddress) &&
             (identical(other.macAddress, macAddress) ||
@@ -3098,6 +3133,7 @@ class _$SwitchModelImpl extends SwitchModel {
         status,
         pmsRoom,
         pmsRoomId,
+        const DeepCollectionEquality().hash(_pmsRooms),
         ipAddress,
         macAddress,
         location,
@@ -3194,6 +3230,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -3253,6 +3290,7 @@ class _$SwitchModelImpl extends SwitchModel {
         status,
         pmsRoom,
         pmsRoomId,
+        pmsRooms,
         ipAddress,
         macAddress,
         location,
@@ -3343,6 +3381,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -3402,6 +3441,7 @@ class _$SwitchModelImpl extends SwitchModel {
         status,
         pmsRoom,
         pmsRoomId,
+        pmsRooms,
         ipAddress,
         macAddress,
         location,
@@ -3492,6 +3532,7 @@ class _$SwitchModelImpl extends SwitchModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -3553,6 +3594,7 @@ class _$SwitchModelImpl extends SwitchModel {
           status,
           pmsRoom,
           pmsRoomId,
+          pmsRooms,
           ipAddress,
           macAddress,
           location,
@@ -3629,6 +3671,7 @@ abstract class SwitchModel extends DeviceModelSealed {
       required final String status,
       @JsonKey(name: 'pms_room') final RoomModel? pmsRoom,
       @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
+      @JsonKey(name: 'pms_rooms') final List<RoomModel>? pmsRooms,
       @JsonKey(name: 'ip_address') final String? ipAddress,
       @JsonKey(name: 'mac_address') final String? macAddress,
       final String? location,
@@ -3667,7 +3710,12 @@ abstract class SwitchModel extends DeviceModelSealed {
   RoomModel? get pmsRoom;
   @override
   @JsonKey(name: 'pms_room_id')
-  int? get pmsRoomId;
+  int?
+      get pmsRoomId; // SwitchDevice has has_and_belongs_to_many :pms_rooms on the rXg side
+// (no pms_room_id column). The snapshot includes a `pms_rooms` collection;
+// grab the first one for the single-room UI association.
+  @JsonKey(name: 'pms_rooms')
+  List<RoomModel>? get pmsRooms;
   @override
   @JsonKey(name: 'ip_address')
   String? get ipAddress;
@@ -4215,6 +4263,7 @@ class _$WLANModelImpl extends WLANModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -4365,6 +4414,7 @@ class _$WLANModelImpl extends WLANModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
@@ -4515,6 +4565,7 @@ class _$WLANModelImpl extends WLANModel {
             String status,
             @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
             @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+            @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
             @JsonKey(name: 'ip_address') String? ipAddress,
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,

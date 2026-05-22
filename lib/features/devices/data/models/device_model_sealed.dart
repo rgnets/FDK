@@ -155,6 +155,10 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     required String status,
     @JsonKey(name: 'pms_room') RoomModel? pmsRoom,
     @JsonKey(name: 'pms_room_id') int? pmsRoomId,
+    // SwitchDevice has has_and_belongs_to_many :pms_rooms on the rXg side
+    // (no pms_room_id column). The snapshot includes a `pms_rooms` collection;
+    // grab the first one for the single-room UI association.
+    @JsonKey(name: 'pms_rooms') List<RoomModel>? pmsRooms,
     @JsonKey(name: 'ip_address') String? ipAddress,
     @JsonKey(name: 'mac_address') String? macAddress,
     String? location,
@@ -282,11 +286,15 @@ extension DeviceModelSealedX on DeviceModelSealed {
         name: sw.name,
         type: DeviceModelSealed.typeSwitch,
         status: sw.status,
-        pmsRoom: sw.pmsRoom?.toEntity(),
-        pmsRoomId: sw.pmsRoomId ?? sw.pmsRoom?.id,
+        pmsRoom: sw.pmsRoom?.toEntity() ?? sw.pmsRooms?.firstOrNull?.toEntity(),
+        pmsRoomId: sw.pmsRoomId
+            ?? sw.pmsRoom?.id
+            ?? sw.pmsRooms?.firstOrNull?.id,
         ipAddress: sw.ipAddress ?? sw.host,
         macAddress: sw.macAddress,
-        location: sw.location ?? sw.pmsRoom?.name,
+        location: sw.location
+            ?? sw.pmsRoom?.name
+            ?? sw.pmsRooms?.firstOrNull?.name,
         lastSeen: sw.lastSeen,
         metadata: sw.metadata,
         model: sw.model,

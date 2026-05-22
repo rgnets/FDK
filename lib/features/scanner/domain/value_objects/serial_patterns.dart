@@ -12,13 +12,15 @@ class SerialPatterns {
   // Switch serial prefixes (LL for legacy, EC for Edge-core)
   static const List<String> switchPrefixes = ['LL', 'EC'];
 
-  // Ruckus ICX switch serial prefixes
+  // Ruckus ICX switch serial prefixes. Add new prefixes here as we encounter
+  // newer ICX models (CYR=7450, FNK=8200, …).
   static const List<String> ruckusSwitchPrefixes = [
     'FJN',
     'FMR',
     'FND',
     'FEA',
     'FNS',
+    'FNK',
     'CYR',
   ];
 

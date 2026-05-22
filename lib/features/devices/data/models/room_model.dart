@@ -17,8 +17,19 @@ class RoomModel with _$RoomModel {
     Map<String, dynamic>? metadata,
   }) = _RoomModel;
 
-  factory RoomModel.fromJson(Map<String, dynamic> json) =>
-      _$RoomModelFromJson(json);
+  factory RoomModel.fromJson(Map<String, dynamic> json) {
+    // The rXg's PmsRoom record stores the room label in a column named `room`,
+    // not `name`. Snapshots for HABTM associations (e.g. `switch_devices`'
+    // `pms_rooms` list) come through as `{id, room}` whereas singular AP /
+    // ONT room nests come through as `{id, name}`. Normalize so both shapes
+    // parse via the same freezed-generated factory.
+    if (json['name'] == null && json['room'] != null) {
+      final normalized = Map<String, dynamic>.from(json)
+        ..['name'] = json['room'];
+      return _$RoomModelFromJson(normalized);
+    }
+    return _$RoomModelFromJson(json);
+  }
 
   const RoomModel._();
 }

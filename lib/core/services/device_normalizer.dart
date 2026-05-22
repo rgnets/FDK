@@ -202,6 +202,25 @@ class DeviceNormalizer {
       }
     }
 
+    // SwitchDevice (and any other has_and_belongs_to_many :pms_rooms
+    // associations on the rXg) has no pms_room_id column — the snapshot
+    // exposes the room association as a list under `pms_rooms`. Pick the
+    // first entry, matching WebSocketDeviceCacheService._extractPmsRoomId
+    // so cold-start (REST) and live-stream (WebSocket) paths agree.
+    final pmsRoomsValue = deviceMap['pms_rooms'];
+    if (pmsRoomsValue is List && pmsRoomsValue.isNotEmpty) {
+      final first = pmsRoomsValue.first;
+      if (first is Map) {
+        final idValue = first['id'];
+        if (idValue is int) {
+          return idValue;
+        }
+        if (idValue is String) {
+          return int.tryParse(idValue);
+        }
+      }
+    }
+
     return null;
   }
 

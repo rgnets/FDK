@@ -189,6 +189,9 @@ _$SwitchModelImpl _$$SwitchModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : RoomModel.fromJson(json['pms_room'] as Map<String, dynamic>),
       pmsRoomId: (json['pms_room_id'] as num?)?.toInt(),
+      pmsRooms: (json['pms_rooms'] as List<dynamic>?)
+          ?.map((e) => RoomModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
       ipAddress: json['ip_address'] as String?,
       macAddress: json['mac_address'] as String?,
       location: json['location'] as String?,
@@ -243,6 +246,7 @@ Map<String, dynamic> _$$SwitchModelImplToJson(_$SwitchModelImpl instance) {
 
   writeNotNull('pms_room', instance.pmsRoom?.toJson());
   writeNotNull('pms_room_id', instance.pmsRoomId);
+  writeNotNull('pms_rooms', instance.pmsRooms?.map((e) => e.toJson()).toList());
   writeNotNull('ip_address', instance.ipAddress);
   writeNotNull('mac_address', instance.macAddress);
   writeNotNull('location', instance.location);
