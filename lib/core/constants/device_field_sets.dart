@@ -18,9 +18,10 @@ class DeviceFieldSets {
     'status',
     'ip', // Access points use 'ip'
     'host', // Switches/WLAN use 'host'
-    'mac', // Access points/ONTs use 'mac'
-    'scratch', // Switches store MAC in 'scratch'
-    'pms_room', // Full nested object
+    'mac', // Canonical MAC column for AP / ONT / switch records
+    'scratch', // Legacy: early switch prototypes stored MAC here; read as fallback
+    'pms_room', // AP / ONT singular belongs_to (room nested as {id, name})
+    'pms_rooms', // SwitchDevice HABTM (rooms nested as [{id, room}, ...])
     'location',
     'last_seen',
     'signal_strength',
