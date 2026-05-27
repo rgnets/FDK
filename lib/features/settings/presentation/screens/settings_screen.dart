@@ -12,6 +12,7 @@ import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.da
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/scanner/data/utils/mac_database.dart';
 import 'package:rgnets_fdk/features/settings/presentation/providers/settings_riverpod_provider.dart';
 
 /// Settings screen
@@ -268,6 +269,12 @@ class SettingsScreen extends ConsumerWidget {
                     );
                   },
           ),
+          ListTile(
+            leading: const Icon(Icons.router),
+            title: const Text('Update MAC Vendor Database'),
+            subtitle: Text(_macDatabaseSubtitle()),
+            onTap: () => _showMacDatabaseUpdateDialog(context),
+          ),
         ],
       ),
       _SettingsSection(
@@ -471,6 +478,67 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _macDatabaseSubtitle() {
+    final last = macDatabase.lastRefreshAt;
+    if (last == null) return 'Refreshes weekly · using bundled snapshot';
+    final days = DateTime.now().difference(last).inDays;
+    final whenLabel = days == 0
+        ? 'today'
+        : days == 1
+            ? 'yesterday'
+            : '$days days ago';
+    return 'Refreshes weekly · last updated $whenLabel';
+  }
+
+  void _showMacDatabaseUpdateDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Update MAC Vendor Database'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Downloads the latest MA-L, MA-M, and MA-S registries from IEEE '
+              '(~5 MB). Use this if a freshly manufactured AP reports as '
+              '"Unknown" during scanning.',
+            ),
+            const SizedBox(height: 24),
+            HoldToConfirmButton(
+              text: 'Hold to Update Now',
+              icon: Icons.cloud_download,
+              holdDuration: const Duration(milliseconds: 1500),
+              onConfirmed: () async {
+                Navigator.of(dialogContext).pop();
+                final messenger = ScaffoldMessenger.of(context);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Updating MAC vendor database…'),
+                  ),
+                );
+                final ok = await macDatabase.refreshFromIEEE();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(ok
+                        ? 'MAC vendor database updated'
+                        : 'Update failed: ${macDatabase.lastRefreshError ?? "unknown error"}'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
           ),
         ],
       ),
