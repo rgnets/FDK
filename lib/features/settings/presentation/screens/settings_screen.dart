@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/widgets/connection_details_dialog.dart';
@@ -280,12 +281,21 @@ class SettingsScreen extends ConsumerWidget {
       _SettingsSection(
         title: 'About',
         children: [
-          ListTile(
-            leading: const Icon(Icons.info),
-            title: const Text('Version'),
-            subtitle: const Text('1.0.0 (Build 1)'),
-            onTap: () {
-              _showAboutDialog(context);
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final info = snapshot.data;
+              final subtitle = info == null
+                  ? 'Loading...'
+                  : '${info.version} (Build ${info.buildNumber})';
+              return ListTile(
+                leading: const Icon(Icons.info),
+                title: const Text('Version'),
+                subtitle: Text(subtitle),
+                onTap: () {
+                  _showAboutDialog(context);
+                },
+              );
             },
           ),
           ListTile(
@@ -426,21 +436,27 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('About RG Nets FDK'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('RG Nets Field Deployment Kit'),
-            SizedBox(height: 8),
-            Text('Version: 1.0.0'),
-            Text('Build: 1'),
-            SizedBox(height: 16),
-            Text(
-              'A comprehensive tool for managing rXg network systems in the field.',
-            ),
-            SizedBox(height: 16),
-            Text('© 2024 RG Nets'),
-          ],
+        content: FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            final info = snapshot.data;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('RG Nets Field Deployment Kit'),
+                const SizedBox(height: 8),
+                Text('Version: ${info?.version ?? '...'}'),
+                Text('Build: ${info?.buildNumber ?? '...'}'),
+                const SizedBox(height: 16),
+                const Text(
+                  'A comprehensive tool for managing rXg network systems in the field.',
+                ),
+                const SizedBox(height: 16),
+                const Text('© 2024 RG Nets'),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(

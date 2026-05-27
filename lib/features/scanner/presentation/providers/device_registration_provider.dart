@@ -295,9 +295,20 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     return (device['pms_room_name'] ?? device['room_name']) as String?;
   }
 
+  /// Maps a scanned DeviceType to the backend resource type it lives under.
+  String _resourceTypeFor(DeviceType deviceType) => switch (deviceType) {
+    DeviceType.accessPoint => 'access_points',
+    DeviceType.ont => 'media_converters',
+    DeviceType.switchDevice => 'switch_devices',
+  };
+
   /// Query the backend via WebSocket to find devices matching MAC or serial.
-  /// Returns a list of matching devices from all device types.
+  /// Only queries the resource type matching the scanned device type — the
+  /// scanner has already classified the device by this point (either from an
+  /// explicit scan mode or from serial-pattern detection in auto mode), so
+  /// querying the other two resource types is wasted round-trips.
   Future<List<Map<String, dynamic>>> _queryDevicesFromBackend({
+    required DeviceType deviceType,
     String? mac,
     String? serial,
   }) async {
@@ -310,30 +321,28 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       return [];
     }
 
+    final resourceType = _resourceTypeFor(deviceType);
     final results = <Map<String, dynamic>>[];
-    final resourceTypes = ['access_points', 'media_converters', 'switch_devices'];
 
-    for (final resourceType in resourceTypes) {
-      // Query by MAC if provided - format for backend (lowercase with colons)
-      if (mac != null && mac.isNotEmpty) {
-        final formattedMac = _formatMacForBackend(mac);
-        LoggerService.debug(
-          'DeviceRegistration: Querying $resourceType with formatted MAC: $formattedMac (original: $mac)',
-          tag: 'DeviceRegistration',
-        );
-        final byMac = await _queryResource(wsService, resourceType, {'mac': formattedMac});
-        results.addAll(byMac);
-      }
+    // Query by MAC if provided - format for backend (lowercase with colons)
+    if (mac != null && mac.isNotEmpty) {
+      final formattedMac = _formatMacForBackend(mac);
+      LoggerService.debug(
+        'DeviceRegistration: Querying $resourceType with formatted MAC: $formattedMac (original: $mac)',
+        tag: 'DeviceRegistration',
+      );
+      final byMac = await _queryResource(wsService, resourceType, {'mac': formattedMac});
+      results.addAll(byMac);
+    }
 
-      // Query by serial if provided
-      if (serial != null && serial.isNotEmpty) {
-        final bySerial = await _queryResource(wsService, resourceType, {'serial_number': serial});
-        // Avoid duplicates if already found by MAC
-        for (final device in bySerial) {
-          final deviceId = device['id'];
-          if (!results.any((d) => d['id'] == deviceId)) {
-            results.add(device);
-          }
+    // Query by serial if provided
+    if (serial != null && serial.isNotEmpty) {
+      final bySerial = await _queryResource(wsService, resourceType, {'serial_number': serial});
+      // Avoid duplicates if already found by MAC
+      for (final device in bySerial) {
+        final deviceId = device['id'];
+        if (!results.any((d) => d['id'] == deviceId)) {
+          results.add(device);
         }
       }
     }
@@ -456,6 +465,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
       // Query the backend for devices matching MAC or serial
       final matchingDevices = await _queryDevicesFromBackend(
+        deviceType: deviceType,
         mac: normalizedMac,
         serial: normalizedSerial,
       );

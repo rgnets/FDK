@@ -158,8 +158,6 @@ class _ConnectionDetailsDialogState
               null,
             ),
             const SizedBox(height: 8),
-            _buildDetailRow('Mode', 'Read-only (Test)', null),
-            const SizedBox(height: 8),
             _buildDetailRow(
               'Response Time',
               '${_responseTimeMs}ms',
