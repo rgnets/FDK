@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/utils/mac_normalizer.dart';
 
@@ -59,9 +62,21 @@ class MACDatabase {
 
   bool _isLoaded = false;
   Completer<void>? _loadCompleter;
+  Future<bool>? _refreshFuture;
+  DateTime? _lastRefreshAt;
+  String? _lastRefreshError;
 
   /// Check if database is loaded.
   bool get isLoaded => _isLoaded;
+
+  /// When the cached CSV was last refreshed from IEEE (null = never).
+  DateTime? get lastRefreshAt => _lastRefreshAt;
+
+  /// Last refresh failure reason (null if last refresh succeeded or never ran).
+  String? get lastRefreshError => _lastRefreshError;
+
+  /// Whether a refresh is currently in flight.
+  bool get isRefreshing => _refreshFuture != null;
 
   /// Get total entry count.
   int get entryCount => _mal.length + _mam.length + _mas.length;
@@ -171,7 +186,9 @@ class MACDatabase {
     return fields;
   }
 
-  /// Load unified database from assets.
+  /// Load unified database from assets, preferring the cached copy if it
+  /// exists and is newer than the bundled snapshot. Triggers a background
+  /// IEEE refresh when the cache is older than [_staleAfter].
   Future<void> loadFromAssets() async {
     // Prevent multiple simultaneous loads
     if (_loadCompleter != null) {
@@ -181,28 +198,200 @@ class MACDatabase {
     _loadCompleter = Completer<void>();
 
     try {
-      // Try to load unified database first
       String csvString;
-      try {
-        csvString = await rootBundle.loadString('assets/mac_unified.csv');
+      var loadedFromCache = false;
+
+      final cached = await _readCachedCsv();
+      if (cached != null) {
+        csvString = cached;
+        loadedFromCache = true;
         LoggerService.info(
-          'Loading unified MAC database from assets',
+          'Loading MAC database from cache (last refresh: $_lastRefreshAt)',
           tag: _tag,
         );
-      } on Exception {
-        // Fall back to legacy OUI database
-        LoggerService.warning(
-          'Unified database not found, falling back to legacy OUI',
-          tag: _tag,
-        );
-        csvString = await _loadLegacyOUI();
+      } else {
+        try {
+          csvString = await rootBundle.loadString('assets/mac_unified.csv');
+          LoggerService.info(
+            'Loading unified MAC database from bundled assets',
+            tag: _tag,
+          );
+        } on Exception {
+          LoggerService.warning(
+            'Unified database not found, falling back to legacy OUI',
+            tag: _tag,
+          );
+          csvString = await _loadLegacyOUI();
+        }
       }
 
       await loadFromCsv(csvString);
       _loadCompleter!.complete();
+
+      if (!loadedFromCache ||
+          _lastRefreshAt == null ||
+          DateTime.now().difference(_lastRefreshAt!) > _staleAfter) {
+        unawaited(refreshFromIEEE().catchError((Object e) {
+          LoggerService.warning(
+            'Background OUI refresh failed: $e',
+            tag: _tag,
+          );
+          return false;
+        }));
+      }
     } on Exception catch (e) {
       _loadCompleter!.completeError(e);
       rethrow;
+    }
+  }
+
+  static const Duration _staleAfter = Duration(days: 7);
+  static const String _cacheFileName = 'mac_unified_cache.csv';
+  static const String _cacheTimestampFileName = 'mac_unified_cache.timestamp';
+
+  static const List<_IEEESource> _ieeeSources = [
+    _IEEESource(
+      url: 'https://standards-oui.ieee.org/oui/oui.csv',
+      registry: 'MA-L',
+      bits: 24,
+    ),
+    _IEEESource(
+      url: 'https://standards-oui.ieee.org/oui28/mam.csv',
+      registry: 'MA-M',
+      bits: 28,
+    ),
+    _IEEESource(
+      url: 'https://standards-oui.ieee.org/oui36/oui36.csv',
+      registry: 'MA-S',
+      bits: 36,
+    ),
+  ];
+
+  /// Fetch the latest IEEE MA-L / MA-M / MA-S registries, merge them into
+  /// the unified CSV format, persist to the cache file, and reload the
+  /// in-memory tables. Concurrent callers share the same future.
+  Future<bool> refreshFromIEEE() {
+    final existing = _refreshFuture;
+    if (existing != null) return existing;
+    final future = _doRefresh();
+    _refreshFuture = future;
+    future.whenComplete(() => _refreshFuture = null);
+    return future;
+  }
+
+  Future<bool> _doRefresh() async {
+    LoggerService.info('Refreshing MAC database from IEEE…', tag: _tag);
+    final stopwatch = Stopwatch()..start();
+    try {
+      final merged = StringBuffer()
+        ..writeln('prefix,prefix_bits,manufacturer,registry_type,is_ieee_reserved');
+      for (final source in _ieeeSources) {
+        final body = await _fetchSource(source.url);
+        final rows = _convertIEEESource(body, source);
+        for (final row in rows) {
+          merged.writeln(row);
+        }
+      }
+
+      final csvString = merged.toString();
+      await loadFromCsv(csvString);
+      await _writeCachedCsv(csvString);
+      _lastRefreshAt = DateTime.now();
+      _lastRefreshError = null;
+      stopwatch.stop();
+      LoggerService.info(
+        'MAC database refresh complete in ${stopwatch.elapsedMilliseconds}ms ($entryCount entries)',
+        tag: _tag,
+      );
+      return true;
+    } on Exception catch (e) {
+      _lastRefreshError = e.toString();
+      LoggerService.error('MAC database refresh failed', error: e, tag: _tag);
+      return false;
+    }
+  }
+
+  Future<String> _fetchSource(String url) async {
+    final response = await http
+        .get(Uri.parse(url), headers: {'User-Agent': 'FDK-OUI/1.0'})
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw HttpException('HTTP ${response.statusCode} from $url');
+    }
+    return response.body;
+  }
+
+  /// Convert one IEEE registry CSV into pre-formatted unified rows.
+  /// IEEE columns: Registry,Assignment,Organization Name,Organization Address
+  Iterable<String> _convertIEEESource(String body, _IEEESource source) sync* {
+    final lines = body.split('\n');
+    for (var i = 1; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+      final fields = _parseCsvLine(line);
+      if (fields.length < 3) continue;
+      final assignment = fields[1]
+          .replaceAll(RegExp(r'[^0-9A-Fa-f]'), '')
+          .toUpperCase();
+      if (assignment.isEmpty) continue;
+      final manufacturer = fields[2].trim();
+      final isReserved =
+          manufacturer.toLowerCase() == 'ieee registration authority';
+      final escaped = (manufacturer.contains(',') ||
+              manufacturer.contains('"'))
+          ? '"${manufacturer.replaceAll('"', '""')}"'
+          : manufacturer;
+      yield '$assignment,${source.bits},$escaped,${source.registry},$isReserved';
+    }
+  }
+
+  Future<File?> _cacheFile() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      return File('${dir.path}/$_cacheFileName');
+    } on Exception catch (e) {
+      LoggerService.warning('Cache dir unavailable: $e', tag: _tag);
+      return null;
+    }
+  }
+
+  Future<File?> _cacheTimestampFile() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      return File('${dir.path}/$_cacheTimestampFileName');
+    } on Exception {
+      return null;
+    }
+  }
+
+  Future<String?> _readCachedCsv() async {
+    final file = await _cacheFile();
+    if (file == null || !file.existsSync()) return null;
+    try {
+      final timestampFile = await _cacheTimestampFile();
+      if (timestampFile != null && timestampFile.existsSync()) {
+        final raw = await timestampFile.readAsString();
+        _lastRefreshAt = DateTime.tryParse(raw.trim());
+      }
+      return await file.readAsString();
+    } on Exception catch (e) {
+      LoggerService.warning('Failed to read OUI cache: $e', tag: _tag);
+      return null;
+    }
+  }
+
+  Future<void> _writeCachedCsv(String csv) async {
+    final file = await _cacheFile();
+    final timestampFile = await _cacheTimestampFile();
+    if (file == null || timestampFile == null) return;
+    try {
+      await file.writeAsString(csv, flush: true);
+      await timestampFile.writeAsString(
+        DateTime.now().toIso8601String(),
+        flush: true,
+      );
+    } on Exception catch (e) {
+      LoggerService.warning('Failed to write OUI cache: $e', tag: _tag);
     }
   }
 
@@ -366,6 +555,18 @@ class MACDatabase {
     final result = lookup(macAddress);
     return result.isKnown;
   }
+}
+
+class _IEEESource {
+  const _IEEESource({
+    required this.url,
+    required this.registry,
+    required this.bits,
+  });
+
+  final String url;
+  final String registry;
+  final int bits;
 }
 
 /// Global instance of the MAC database.
