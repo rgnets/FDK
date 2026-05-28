@@ -569,33 +569,22 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Sign Out'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Are you sure you want to sign out? You will need to scan the QR code again to reconnect.',
-            ),
-            const SizedBox(height: 24),
-            HoldToConfirmButton(
-              text: 'Hold to Sign Out',
-              icon: Icons.logout,
-              holdDuration: const Duration(milliseconds: 1500),
-              onConfirmed: () {
-                // Pop dialog first
-                Navigator.of(dialogContext).pop();
-                // Navigate immediately using captured router (before provider invalidation)
-                router.go('/auth');
-                // Then sign out (this can happen in background)
-                unawaited(ref.read(authProvider.notifier).signOut());
-              },
-            ),
-          ],
+        content: const Text(
+          'Are you sure you want to sign out? You will need to scan the QR code again to reconnect.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              router.go('/auth');
+              unawaited(ref.read(authProvider.notifier).signOut());
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Sign Out'),
           ),
         ],
       ),

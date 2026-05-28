@@ -114,19 +114,20 @@ class DeviceRegistrationService {
   /// Parses a [SocketMessage] returned by `requestActionCable` for a
   /// registration into a [RegistrationServiceOutcome].
   ///
-  /// Treats `action == 'error'` or any `status >= 400` as failure. Falls
-  /// back to a synthesized message when the backend returns `error: null`
-  /// (a known rXg-side bug in `RxgWebsocketCrudService.extract_controller_response`).
+  /// Treats `action == 'error'` or any `status >= 400` as failure.
+  /// Error text is picked up from `payload.error` first, then from
+  /// `payload.data.message` (the rXg's controller-side `render
+  /// api: {message: "..."}, status: :not_found` shape, which
+  /// `RxgWebsocketCrudService.extract_controller_response` serializes
+  /// under `:data` rather than `:error`).
   RegistrationServiceOutcome _parseResponse(SocketMessage response) {
     final payload = response.payload;
     final status = (payload['status'] as num?)?.toInt() ?? 0;
     final isError = response.type == 'error' || status >= 400;
 
     if (isError) {
-      final rawError = payload['error'];
-      final errMsg = (rawError is String && rawError.isNotEmpty)
-          ? rawError
-          : 'Registration failed (status $status)';
+      final errMsg = _extractErrorMessage(payload) ??
+          'Registration failed (status $status)';
       return RegistrationServiceOutcome.failure(
         errorMessage: errMsg,
         status: status,
@@ -138,6 +139,26 @@ class DeviceRegistrationService {
       data: data is Map<String, dynamic> ? data : null,
       status: status > 0 ? status : 200,
     );
+  }
+
+  String? _extractErrorMessage(Map<String, dynamic> payload) {
+    final rawError = payload['error'];
+    if (rawError is String && rawError.isNotEmpty) {
+      return rawError;
+    }
+
+    final data = payload['data'];
+    if (data is Map) {
+      final message = data['message'];
+      if (message is String && message.isNotEmpty) {
+        return message;
+      }
+      final error = data['error'];
+      if (error is String && error.isNotEmpty) {
+        return error;
+      }
+    }
+    return null;
   }
 
   /// Builds the ActionCable inner-data payload for one device-type, minus

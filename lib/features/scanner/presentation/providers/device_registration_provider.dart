@@ -684,6 +684,29 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       );
 
       if (!outcome.success) {
+        // The rXg's Ruby controller can outlive AnyCable's gRPC deadline:
+        // the action commits server-side but AnyCable abandons the reply,
+        // so the client times out. Before reporting failure on a timeout,
+        // watch the subscription stream for the new device — if it shows
+        // up, the registration actually succeeded.
+        final isTimeout = outcome.status == 0 &&
+            (outcome.errorMessage?.toLowerCase().contains('timed out') ?? false);
+        if (isTimeout && await _waitForDeviceInCache(mac, deviceType)) {
+          LoggerService.warning(
+            'DeviceRegistration: Backend ack lost but device materialized '
+            'in cache (MAC=$mac) — treating as success',
+            tag: 'DeviceRegistration',
+          );
+          state = state.copyWith(
+            status: RegistrationStatus.success,
+            registeredAt: DateTime.now(),
+          );
+          return RegistrationResult.success(
+            deviceId: existingDeviceId ?? 0,
+            deviceType: deviceType.name,
+          );
+        }
+
         final error = outcome.errorMessage ?? 'Registration failed';
         LoggerService.warning(
           'DeviceRegistration: Backend rejected registration ($error, status=${outcome.status})',
@@ -758,6 +781,44 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       }
     });
   }
+
+  /// Polls the devices snapshot for up to ~6s looking for a device with
+  /// [mac]. Used as a soft-acknowledgment when the backend's reply was
+  /// lost but the subscription stream may still deliver the new record
+  /// (the rXg-side gRPC DeadlineExceeded case).
+  Future<bool> _waitForDeviceInCache(String mac, DeviceType deviceType) async {
+    // Kick the snapshot refresh now instead of the 2s delayed path used
+    // on the happy flow.
+    final resourceType = switch (deviceType) {
+      DeviceType.accessPoint => 'access_points',
+      DeviceType.ont => 'media_converters',
+      DeviceType.switchDevice => 'switch_devices',
+    };
+    try {
+      ref
+          .read(webSocketCacheIntegrationProvider)
+          .refreshResourceSnapshot(resourceType);
+    } on Object catch (_) {
+      // Best-effort — refresh failure shouldn't block the cache probe.
+    }
+
+    final target = _macKey(mac);
+    final deadline = DateTime.now().add(const Duration(seconds: 6));
+    while (DateTime.now().isBefore(deadline)) {
+      final devices = ref.read(devicesNotifierProvider).valueOrNull;
+      if (devices != null && devices.any((d) {
+        final candidate = d.macAddress;
+        return candidate != null && _macKey(candidate) == target;
+      })) {
+        return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    }
+    return false;
+  }
+
+  static String _macKey(String mac) =>
+      mac.replaceAll(RegExp('[^0-9A-Fa-f]'), '').toLowerCase();
 
   /// Reset registration state to idle.
   void reset() {

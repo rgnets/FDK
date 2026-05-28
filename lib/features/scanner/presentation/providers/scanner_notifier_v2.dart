@@ -380,6 +380,20 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     state = state.copyWith(isRegistrationInProgress: inProgress);
   }
 
+  /// Clear the in-progress flag and hide the popup in a single state change.
+  ///
+  /// Two separate mutations would notify listeners twice — the second
+  /// notification can land on a Consumer that was already torn down by
+  /// the first, hitting the `_lifecycleState != defunct` assertion.
+  void finishRegistration() {
+    LoggerService.debug('Finishing registration', tag: _tag);
+    state = state.copyWith(
+      isRegistrationInProgress: false,
+      isPopupShowing: false,
+      uiState: ScannerUIState.idle,
+    );
+  }
+
   /// Set room selection for registration.
   void setRoomSelection(int? roomId, String? roomNumber) {
     LoggerService.debug('Setting room selection: $roomId ($roomNumber)', tag: _tag);

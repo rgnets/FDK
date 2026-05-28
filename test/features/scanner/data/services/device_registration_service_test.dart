@@ -116,6 +116,42 @@ void main() {
       },
     );
 
+    test(
+      'surfaces controller error text from payload.data.message when payload.error is absent',
+      () async {
+        when(() => ws.isConnected).thenReturn(true);
+        when(
+          () => ws.requestActionCable(
+            action: any(named: 'action'),
+            resourceType: any(named: 'resourceType'),
+            additionalData: any(named: 'additionalData'),
+            timeout: any(named: 'timeout'),
+          ),
+        ).thenAnswer(
+          (_) async => const SocketMessage(
+            type: 'resource_response',
+            payload: {
+              'action': 'resource_response',
+              'status': 404,
+              'data': {'message': 'Existing AP not found for id 2'},
+            },
+          ),
+        );
+
+        final outcome = await service.registerDevice(
+          deviceType: DeviceType.accessPoint,
+          mac: '00E63A2D2570',
+          serialNumber: '292372002215',
+          pmsRoomId: 2,
+          existingDeviceId: 2,
+        );
+
+        expect(outcome.success, isFalse);
+        expect(outcome.errorMessage, 'Existing AP not found for id 2');
+        expect(outcome.status, 404);
+      },
+    );
+
     test('returns success on action=resource_response with status 200', () async {
       when(() => ws.isConnected).thenReturn(true);
       when(

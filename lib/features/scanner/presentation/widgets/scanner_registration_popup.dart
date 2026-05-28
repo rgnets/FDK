@@ -1017,8 +1017,7 @@ class _ScannerRegistrationPopupState
           );
 
       if (mounted) {
-        ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(false);
-        ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
+        ref.read(scannerNotifierV2Provider.notifier).finishRegistration();
 
         if (result.isSuccess) {
           String actionText;
