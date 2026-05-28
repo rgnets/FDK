@@ -147,11 +147,24 @@ class WebSocketCacheIntegration {
   static const int _maxSnapshotRetries = 2;
   final Map<String, int> _snapshotRetryCount = {};
   Timer? _snapshotRetryTimer;
+
+  /// Snapshot pagination. Each `index` page is requested with this size and
+  /// the server returns `page`/`total_pages`; we loop through pages until the
+  /// last one (see `_handleMessage`). A 10000-row single page held a DB
+  /// connection for the whole query and shipped a multi-MB payload; smaller
+  /// pages keep each query cheap and well under the rxg's 10s deadline.
+  /// `_maxSnapshotPages` is a hard backstop so a misbehaving server can't
+  /// loop forever.
+  static const int _snapshotPageSize = 1000;
+  static const int _maxSnapshotPages = 1000;
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
   final Set<String> _pendingSnapshots = {};
   final Set<String> _requestedSnapshots = {};
+  // request_id per resource for the in-progress paginated snapshot cycle.
+  // Reused across pages so the accumulator merges them instead of resetting.
+  final Map<String, String> _snapshotRequestIds = {};
   final Set<String> _confirmedResources = {};
   final Map<String, _SnapshotAccumulator> _snapshotAccumulators = {};
   final Map<String, Timer> _snapshotFlushTimers = {};
@@ -372,6 +385,7 @@ class WebSocketCacheIntegration {
       _resourcesSubscribed = false;
       _pendingSnapshots.clear();
       _requestedSnapshots.clear();
+      _snapshotRequestIds.clear();
       _confirmedResources.clear();
       // Invalidate the snapshot-coalesce window. A disconnect ends the
       // current snapshot cycle, so the very next `requestFullSnapshots()`
@@ -522,6 +536,7 @@ class WebSocketCacheIntegration {
       ..clear()
       ..addAll(_resourceTypes);
     _requestedSnapshots.clear();
+    _snapshotRequestIds.clear();
     _snapshotRetryCount.clear();
 
     // Serialize: send one resource's index at a time, waiting for its snapshot
@@ -552,14 +567,24 @@ class WebSocketCacheIntegration {
     return true; // queue drained
   }
 
-  bool _requestSnapshot(String resourceType) {
-    if (_requestedSnapshots.contains(resourceType)) return true;
+  bool _requestSnapshot(String resourceType, {int page = 1}) {
     if (!_webSocketService.isConnected || !_channelConfirmed) {
       return false;
     }
 
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
-    _requestedSnapshots.add(resourceType);
+    // Page 1 starts a fresh cycle: dedup against an in-flight cycle and mint a
+    // request_id that's reused for pages 2,3,… so the accumulator merges them
+    // instead of resetting per page. Later pages reuse the stored id.
+    if (page == 1) {
+      if (_requestedSnapshots.contains(resourceType)) return true;
+      _requestedSnapshots.add(resourceType);
+      _snapshotRequestIds[resourceType] = _newRequestId(resourceType);
+    }
+    final requestId = _snapshotRequestIds[resourceType];
+    if (requestId == null) return false;
+
+    _logger.d(
+        'WebSocketCacheIntegration: Requesting $resourceType snapshot page $page (size $_snapshotPageSize)');
 
     // Deliberately no `only:` field filter. The rxg's WS index handler
     // takes a slow/incomplete path when `only:` is set on device-typed
@@ -572,17 +597,18 @@ class WebSocketCacheIntegration {
       'action': 'resource_action',
       'resource_type': resourceType,
       'crud_action': 'index',
-      'page': 1,
-      'page_size': 10000,
-      'request_id': _newRequestId(resourceType),
+      'page': page,
+      'page_size': _snapshotPageSize,
+      'request_id': requestId,
     };
 
     final sent = _sendActionCableMessage(payload);
-    if (!sent) {
+    if (!sent && page == 1) {
       _requestedSnapshots.remove(resourceType);
+      _snapshotRequestIds.remove(resourceType);
       return false;
     }
-    return true;
+    return sent;
   }
 
   void requestResourceSnapshot(String resourceType) {
@@ -675,20 +701,36 @@ class WebSocketCacheIntegration {
     if (_isSnapshotMessage(action, payload, raw)) {
       final items = _extractSnapshotItems(payload, raw);
       if (items != null) {
+        final requestId = _extractSnapshotRequestId(payload, raw);
+        final page = _extractSnapshotInt(payload, raw, 'page') ?? 1;
+        final totalPages = _extractSnapshotInt(payload, raw, 'total_pages');
         _logger.i(
-          'WebSocketCacheIntegration: Received snapshot for $resourceType: ${items.length} items',
+          'WebSocketCacheIntegration: snapshot $resourceType page $page'
+          '${totalPages != null ? '/$totalPages' : ''} (${items.length} items)',
         );
 
-        if (items.isNotEmpty) {
-          final firstItem = items.first;
-          _logger.d(
-            'WebSocketCacheIntegration: First $resourceType item has images: ${firstItem['images']}',
-          );
-        }
+        // Merge this page into the accumulator (no flush yet) — all pages of a
+        // cycle share one request_id, so the accumulator keeps growing.
+        _accumulateSnapshotPage(resourceType, items, requestId);
 
-        final requestId = _extractSnapshotRequestId(payload, raw);
-        _applySnapshotAccumulated(resourceType, items, requestId);
-        _markSnapshotHandled(resourceType);
+        // Prefer the server's `total_pages`; fall back to a short page if it's
+        // absent. Cap pages so a misbehaving server can't loop forever.
+        final lastPage = (totalPages != null
+                ? page >= totalPages
+                : items.length < _snapshotPageSize) ||
+            page >= _maxSnapshotPages;
+
+        if (lastPage) {
+          _flushSnapshot(resourceType);
+          _markSnapshotHandled(resourceType);
+        } else {
+          // Same resource, next page, same request_id — stays in flight, so
+          // the serialized queue doesn't advance to another resource yet.
+          _requestSnapshot(resourceType, page: page + 1);
+          // A page arrived = progress; reset the stall timer so a slow-but-
+          // advancing multi-page fetch isn't restarted from page 1.
+          _scheduleSnapshotRetry();
+        }
       }
       return;
     }
@@ -846,6 +888,18 @@ class WebSocketCacheIntegration {
           .whereType<Map<String, dynamic>>()
           .toList();
     }
+    // `records` is the key the rxg's paginated `index` (apply_pagination)
+    // returns the page rows under, alongside page/total_pages/count.
+    if (payload['records'] is List) {
+      return (payload['records'] as List)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
+    if (raw['records'] is List) {
+      return (raw['records'] as List)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
     return null;
   }
 
@@ -874,11 +928,29 @@ class WebSocketCacheIntegration {
     return null;
   }
 
+  /// Reads an int field (e.g. `page`, `total_pages`) from the snapshot
+  /// response, tolerating num/String encodings, from payload then raw.
+  int? _extractSnapshotInt(
+    Map<String, dynamic> payload,
+    Map<String, dynamic> raw,
+    String key,
+  ) {
+    final value = payload[key] ?? raw[key];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Snapshot accumulation & dispatch
   // ---------------------------------------------------------------------------
 
-  void _applySnapshotAccumulated(
+  /// Merges one snapshot page into the per-resource accumulator. All pages of
+  /// a cycle share the same [requestId], so the accumulator keeps growing
+  /// (dedup by id) instead of resetting per page. Does NOT flush — the caller
+  /// flushes once, after the final page, via [_flushSnapshot].
+  void _accumulateSnapshotPage(
     String resourceType,
     List<Map<String, dynamic>> items,
     String? requestId,
@@ -887,22 +959,24 @@ class WebSocketCacheIntegration {
       resourceType,
       _SnapshotAccumulator.new,
     );
-
-    final shouldReset = _shouldResetAccumulator(accumulator, requestId);
-    if (shouldReset) {
+    if (_shouldResetAccumulator(accumulator, requestId)) {
       accumulator.reset(requestId);
     }
+    accumulator.addItems(items);
+  }
 
-    if (items.isEmpty) {
-      accumulator.touch();
-      final hasCached = _hasCachedItems(resourceType);
-      final hasAccumulated = accumulator.items.isNotEmpty;
-      if (hasAccumulated || hasCached) return;
-      _scheduleSnapshotFlush(resourceType, accumulator);
+  /// Applies the fully-accumulated snapshot for [resourceType] (all pages) to
+  /// the cache, via the existing debounced flush. Skips an empty snapshot when
+  /// the cache is already populated — the rxg occasionally returns an empty
+  /// index erroneously, and we don't want to wipe good data.
+  void _flushSnapshot(String resourceType) {
+    final accumulator = _snapshotAccumulators[resourceType];
+    if (accumulator == null) return;
+    if (accumulator.items.isEmpty && _hasCachedItems(resourceType)) {
+      _logger.w(
+          'WebSocketCacheIntegration: skipping empty $resourceType snapshot (cache already populated)');
       return;
     }
-
-    accumulator.addItems(items);
     _scheduleSnapshotFlush(resourceType, accumulator);
   }
 
@@ -1008,6 +1082,7 @@ class WebSocketCacheIntegration {
   void _markSnapshotHandled(String resourceType) {
     _pendingSnapshots.remove(resourceType);
     _requestedSnapshots.remove(resourceType);
+    _snapshotRequestIds.remove(resourceType);
 
     if (_pendingSnapshots.isEmpty) {
       _snapshotInFlight = false;
@@ -1059,6 +1134,7 @@ class WebSocketCacheIntegration {
           'WebSocketCacheIntegration: Giving up snapshot for $inFlight (retried $attempts times), advancing queue');
       _pendingSnapshots.remove(inFlight);
       _requestedSnapshots.remove(inFlight);
+      _snapshotRequestIds.remove(inFlight);
       if (_pendingSnapshots.isEmpty) {
         _snapshotInFlight = false;
         return;
@@ -1119,6 +1195,7 @@ class WebSocketCacheIntegration {
     _snapshotAccumulators.clear();
     _pendingSnapshots.clear();
     _requestedSnapshots.clear();
+    _snapshotRequestIds.clear();
     _snapshotRetryCount.clear();
     _snapshotRetryTimer?.cancel();
     _snapshotRetryTimer = null;
@@ -1169,10 +1246,6 @@ class _SnapshotAccumulator {
     requestId = newRequestId;
     lastUpdated = DateTime.now();
     _itemsById.clear();
-  }
-
-  void touch() {
-    lastUpdated = DateTime.now();
   }
 
   void addItems(List<Map<String, dynamic>> items) {
