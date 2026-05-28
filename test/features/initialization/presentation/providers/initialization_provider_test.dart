@@ -1,8 +1,12 @@
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/initialization/domain/entities/initialization_state.dart';
@@ -12,6 +16,17 @@ class MockWebSocketService extends Mock implements WebSocketService {}
 
 class MockWebSocketDataSyncService extends Mock
     implements WebSocketDataSyncService {}
+
+/// No-op so `initialize()`'s REST reseed stays isolated from the real provider
+/// graph; otherwise it calls flutter_secure_storage and throws without a
+/// test binding.
+class _NoopInventoryReseed extends InventoryReseedService {
+  _NoopInventoryReseed(Ref ref) : super(ref);
+  @override
+  Future<void> triggerReseed({required String reason, bool force = false}) async {}
+  @override
+  Future<void> triggerResourceReseed(String resourceType) async {}
+}
 
 void main() {
   setUpAll(() {
@@ -44,6 +59,7 @@ void main() {
         webSocketServiceOverrideProvider.overrideWithValue(mockWebSocketService),
         webSocketDataSyncServiceOverrideProvider
             .overrideWithValue(mockDataSyncService),
+        inventoryReseedProvider.overrideWith((ref) => _NoopInventoryReseed(ref)),
       ],
     );
   });
@@ -358,7 +374,7 @@ void main() {
 
       await container
           .read(initializationNotifierProvider.notifier)
-          .initialize();
+          .initialize(waitForSync: true);
 
       // Verify all expected states were captured
       expect(
@@ -401,7 +417,7 @@ void main() {
 
       final notifier =
           container.read(initializationNotifierProvider.notifier);
-      final initFuture = notifier.initialize();
+      final initFuture = notifier.initialize(waitForSync: true);
 
       // Wait for loading state (200ms validatingCredentials delay + buffer)
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -431,7 +447,7 @@ void main() {
 
       final notifier =
           container.read(initializationNotifierProvider.notifier);
-      final initFuture = notifier.initialize();
+      final initFuture = notifier.initialize(waitForSync: true);
 
       // Wait for loading state (200ms validatingCredentials delay + buffer)
       await Future<void>.delayed(const Duration(milliseconds: 300));
