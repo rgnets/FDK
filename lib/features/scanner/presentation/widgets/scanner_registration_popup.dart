@@ -880,7 +880,9 @@ class _ScannerRegistrationPopupState
   Widget _buildActionButtons(BuildContext context, ScannerState state, bool isMismatch) {
     final isExisting = state.matchStatus == DeviceMatchStatus.fullMatch;
     final isSameRoom = isExisting && state.matchedDeviceRoomId == state.selectedRoomId;
-    final canRegister = state.selectedRoomId != null && !isMismatch;
+    final canRegister = state.selectedRoomId != null &&
+        !isMismatch &&
+        !state.isRegistrationInProgress;
 
     // Determine button text and color
     String buttonText;
@@ -974,6 +976,15 @@ class _ScannerRegistrationPopupState
 
   Future<void> _handleRegister() async {
     final scannerState = ref.read(scannerNotifierV2Provider);
+
+    // Debounce: ignore repeat taps while a registration is already in flight.
+    // Each extra tap fires another register_*_device that competes for the
+    // rXg's limited DB connections, and the duplicates then time out. The
+    // button is also disabled below, but this guards the same-frame double-tap
+    // that can slip through before the disabled state rebuilds.
+    if (scannerState.isRegistrationInProgress) {
+      return;
+    }
 
     if (scannerState.selectedRoomId == null) {
       if (mounted) {

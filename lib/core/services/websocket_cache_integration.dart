@@ -524,20 +524,32 @@ class WebSocketCacheIntegration {
     _requestedSnapshots.clear();
     _snapshotRetryCount.clear();
 
-    var allSent = true;
-    for (final resource in _resourceTypes) {
-      final sent = _requestSnapshot(resource);
-      if (!sent) {
-        allSent = false;
-      }
-    }
-    _scheduleSnapshotRetry();
-    if (!allSent) {
+    // Serialize: send one resource's index at a time, waiting for its snapshot
+    // (via _markSnapshotHandled) or a retry timeout before sending the next.
+    // Firing all five in parallel makes the rxg hold 5+ DB connections per
+    // client at once; one-at-a-time keeps it to a single connection.
+    if (!_sendNextSnapshot()) {
       _logger.w(
-          'WebSocketCacheIntegration: Snapshot requests deferred, will retry');
+          'WebSocketCacheIntegration: First snapshot request deferred, will retry');
       _snapshotInFlight = false;
       _needsSnapshot = true;
+      return;
     }
+    _scheduleSnapshotRetry();
+  }
+
+  /// Serialized snapshot pump: sends the `index` request for the next queued
+  /// resource, but only when none is currently in flight. Returns false only
+  /// if a send was attempted and failed (e.g. the connection dropped).
+  bool _sendNextSnapshot() {
+    if (!_webSocketService.isConnected || !_channelConfirmed) return false;
+    if (_requestedSnapshots.isNotEmpty) return true; // wait for the in-flight one
+    for (final resource in _resourceTypes) {
+      if (_pendingSnapshots.contains(resource)) {
+        return _requestSnapshot(resource);
+      }
+    }
+    return true; // queue drained
   }
 
   bool _requestSnapshot(String resourceType) {
@@ -1002,6 +1014,11 @@ class WebSocketCacheIntegration {
       _snapshotRetryTimer?.cancel();
       _snapshotRetryTimer = null;
       _logger.i('WebSocketCacheIntegration: All snapshots received');
+    } else {
+      // Serialized: this one's done, so send the next queued resource and
+      // reset the retry window for it.
+      _sendNextSnapshot();
+      _scheduleSnapshotRetry();
     }
   }
 
@@ -1021,22 +1038,42 @@ class WebSocketCacheIntegration {
       _scheduleSnapshotRetry();
       return;
     }
-    final stale = _pendingSnapshots.toList();
-    var anySent = false;
-    for (final resource in stale) {
-      final attempts = _snapshotRetryCount[resource] ?? 0;
-      if (attempts >= _maxSnapshotRetries) {
-        _logger.w(
-            'WebSocketCacheIntegration: Giving up snapshot retry for $resource (already retried $attempts times)');
-        continue;
-      }
-      _snapshotRetryCount[resource] = attempts + 1;
-      _requestedSnapshots.remove(resource);
-      _logger.i(
-          'WebSocketCacheIntegration: Retrying snapshot for $resource (attempt ${attempts + 1}/$_maxSnapshotRetries)');
-      if (_requestSnapshot(resource)) anySent = true;
+
+    // Serialized: at most one resource is in flight (in _requestedSnapshots);
+    // the rest are queued and simply haven't been sent yet, so only the
+    // in-flight one can be stale.
+    final inFlight =
+        _requestedSnapshots.isNotEmpty ? _requestedSnapshots.first : null;
+    if (inFlight == null) {
+      // Nothing in flight but the queue isn't empty — pump the next one.
+      _sendNextSnapshot();
+      _scheduleSnapshotRetry();
+      return;
     }
-    if (anySent) _scheduleSnapshotRetry();
+
+    final attempts = _snapshotRetryCount[inFlight] ?? 0;
+    if (attempts >= _maxSnapshotRetries) {
+      // Give up on this resource and advance, so one slow/missing snapshot
+      // can't block the rest of the queue indefinitely.
+      _logger.w(
+          'WebSocketCacheIntegration: Giving up snapshot for $inFlight (retried $attempts times), advancing queue');
+      _pendingSnapshots.remove(inFlight);
+      _requestedSnapshots.remove(inFlight);
+      if (_pendingSnapshots.isEmpty) {
+        _snapshotInFlight = false;
+        return;
+      }
+      _sendNextSnapshot();
+      _scheduleSnapshotRetry();
+      return;
+    }
+
+    _snapshotRetryCount[inFlight] = attempts + 1;
+    _requestedSnapshots.remove(inFlight);
+    _logger.i(
+        'WebSocketCacheIntegration: Retrying snapshot for $inFlight (attempt ${attempts + 1}/$_maxSnapshotRetries)');
+    _requestSnapshot(inFlight);
+    _scheduleSnapshotRetry();
   }
 
   void _bumpLastUpdate() {
