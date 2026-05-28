@@ -7,6 +7,8 @@ import 'package:rgnets_fdk/core/config/environment.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
@@ -134,6 +136,7 @@ class NoopBackgroundRefreshService extends BackgroundRefreshService {
     required super.storageService,
     required super.webSocketService,
     required super.webSocketDataSyncService,
+    required super.inventoryReseedService,
   });
 
   @override
@@ -172,6 +175,7 @@ ProviderContainer createTestContainer({
         storageService: ref.watch(storageServiceProvider),
         webSocketService: ref.watch(webSocketServiceProvider),
         webSocketDataSyncService: ref.watch(webSocketDataSyncServiceProvider),
+        inventoryReseedService: ref.watch(inventoryReseedProvider),
       );
 
       ref.onDispose(service.dispose);

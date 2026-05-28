@@ -32,7 +32,7 @@ void main() {
         expect(uri.host, 'example.netlab.ninja');
         expect(uri.path, startsWith('/api/'));
         expect(uri.queryParameters['api_key'], 'k');
-        expect(uri.queryParameters['per_page'], '10000');
+        expect(uri.queryParameters['page_size'], '10000');
       }
     });
 
@@ -58,9 +58,10 @@ void main() {
         '/api/access_points.json',
         '/api/switch_devices.json',
         '/api/media_converters.json',
+        '/api/wlan_devices.json',
         '/api/pms_rooms.json',
       ]));
-      expect(hits.length, 4);
+      expect(hits.length, 5);
     });
 
     test('per-resource success is independent (one 500 does not block others)',
@@ -92,7 +93,7 @@ void main() {
       );
 
       expect(result.allSucceeded, isFalse);
-      expect(result.outcomes.where((o) => o.success).length, 3);
+      expect(result.outcomes.where((o) => o.success).length, 4);
       final failed = result.outcomes
           .firstWhere((o) => o.resourceType == 'switch_devices');
       expect(failed.success, isFalse);
@@ -100,6 +101,7 @@ void main() {
           reason: 'non-200 status must be propagated for diagnostics');
       expect(deviceCalls['access_points'], 1);
       expect(deviceCalls['media_converters'], 1);
+      expect(deviceCalls['wlan_devices'], 1);
       expect(deviceCalls.containsKey('switch_devices'), isFalse,
           reason: 'failed resource never invokes the apply callback');
       expect(roomCalls, 1);
@@ -216,7 +218,7 @@ void main() {
         onRooms: (_) {},
       );
 
-      expect(result.outcomes, hasLength(4));
+      expect(result.outcomes, hasLength(5));
       expect(result.outcomes.every((o) => o.success), isFalse);
       expect(result.outcomes.every((o) => o.itemCount == 0), isTrue);
     });

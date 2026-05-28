@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
@@ -163,6 +164,14 @@ class InitializationNotifier extends _$InitializationNotifier {
         await _dataSyncService.syncInitialData(
           timeout: const Duration(seconds: 45),
         );
+        // Full inventory loads over REST (the WS layer no longer sends `index`
+        // snapshots). This is the reliable boot-time seed for every authed
+        // start — including persisted-session reopen, where the auth sign-in
+        // transition that also reseeds may have already fired before its
+        // listener registered. `force` bypasses the cooldown.
+        await ref
+            .read(inventoryReseedProvider)
+            .triggerReseed(reason: 'init', force: true);
         LoggerService.debug('syncInitialData completed', tag: 'InitProvider');
 
         // Clean up event subscription - no longer needed after initial sync
@@ -190,6 +199,23 @@ class InitializationNotifier extends _$InitializationNotifier {
           }).whenComplete(() {
             _eventSubscription?.cancel();
             _eventSubscription = null;
+          }),
+        );
+
+        // Load full inventory over REST in the background (the WS layer no
+        // longer sends `index` snapshots). Reliable boot-time seed for every
+        // authed start, including persisted-session reopen.
+        unawaited(
+          ref
+              .read(inventoryReseedProvider)
+              .triggerReseed(reason: 'init', force: true)
+              .catchError((Object e, StackTrace st) {
+            LoggerService.error(
+              'Background REST reseed failed: $e',
+              tag: 'InitProvider',
+              error: e,
+              stackTrace: st,
+            );
           }),
         );
 

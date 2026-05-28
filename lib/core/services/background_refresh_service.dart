@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
@@ -25,6 +26,7 @@ class BackgroundRefreshService {
     required this.storageService,
     required this.webSocketService,
     required this.webSocketDataSyncService,
+    required this.inventoryReseedService,
   });
 
   static final _logger = LoggerService.getLogger();
@@ -39,6 +41,7 @@ class BackgroundRefreshService {
   final StorageService storageService;
   final WebSocketService webSocketService;
   final WebSocketDataSyncService webSocketDataSyncService;
+  final InventoryReseedService inventoryReseedService;
 
   /// ID-to-Type index for routing device lookups
   final Map<String, String> _idToTypeIndex = {};
@@ -97,17 +100,26 @@ class BackgroundRefreshService {
   
   /// Start background refresh
   void startBackgroundRefresh() {
-    _logger.d('BackgroundRefreshService: Starting background refresh');
     if (!_isAuthenticated()) {
       _logger.w('BackgroundRefreshService: Skipping start (not authenticated)');
       return;
     }
-    
+
+    // Idempotent: callers like DashboardStats.build() invoke this on every
+    // provider rebuild. Without this guard each call schedules another
+    // un-cancellable Future.delayed(_initialDelay, _performRefresh); they
+    // accumulate and fire back-to-back, hammering the REST reseed. If the
+    // periodic timer is already armed, this service is running — do nothing.
+    if (_refreshTimer != null) {
+      return;
+    }
+
+    _logger.d('BackgroundRefreshService: Starting background refresh');
+
     // Schedule initial refresh after a delay
     Future<void>.delayed(_initialDelay, _performRefresh);
-    
+
     // Setup periodic refresh
-    _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(_refreshInterval, (_) {
       _performRefresh();
     });
@@ -144,7 +156,15 @@ class BackgroundRefreshService {
     }
 
     try {
+      // Ensure WS is subscribed for deltas, then reload full inventory over
+      // REST via the coordinator. The 2-minute periodic cadence is well beyond
+      // the reseed cooldown, so `force: false` is correct here — and it lets
+      // the cooldown absorb any accidental rapid re-invocation instead of
+      // hammering REST. Full inventory no longer comes from WS index snapshots.
       await webSocketDataSyncService.syncInitialData();
+      await inventoryReseedService.triggerReseed(
+        reason: 'backgroundRefresh',
+      );
     } on Exception catch (e) {
       final message = 'WebSocket sync failed: $e';
       _logger.e('BackgroundRefreshService: $message');
