@@ -57,6 +57,11 @@ class _ScannerRegistrationPopupState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // A fresh popup is by definition not mid-registration. Clear any
+      // stale in-progress flag left over from a prior attempt whose popup
+      // was disposed before it could reset (the notifier is keepAlive, so
+      // a leaked `true` would otherwise permanently disable Register).
+      ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(false);
       _checkDeviceMatch();
     });
   }
@@ -880,9 +885,8 @@ class _ScannerRegistrationPopupState
   Widget _buildActionButtons(BuildContext context, ScannerState state, bool isMismatch) {
     final isExisting = state.matchStatus == DeviceMatchStatus.fullMatch;
     final isSameRoom = isExisting && state.matchedDeviceRoomId == state.selectedRoomId;
-    final canRegister = state.selectedRoomId != null &&
-        !isMismatch &&
-        !state.isRegistrationInProgress;
+    final isRegistering = state.isRegistrationInProgress;
+    final canRegister = state.selectedRoomId != null && !isMismatch && !isRegistering;
 
     // Determine button text and color
     String buttonText;
@@ -918,7 +922,7 @@ class _ScannerRegistrationPopupState
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: _handleCancel,
+            onPressed: isRegistering ? null : _handleCancel,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
@@ -938,7 +942,24 @@ class _ScannerRegistrationPopupState
                 : FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-            child: Text(buttonText),
+            child: isRegistering
+                ? const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text('Registering…'),
+                    ],
+                  )
+                : Text(buttonText),
           ),
         ),
       ],
@@ -978,10 +999,10 @@ class _ScannerRegistrationPopupState
     final scannerState = ref.read(scannerNotifierV2Provider);
 
     // Debounce: ignore repeat taps while a registration is already in flight.
-    // Each extra tap fires another register_*_device that competes for the
-    // rXg's limited DB connections, and the duplicates then time out. The
-    // button is also disabled below, but this guards the same-frame double-tap
-    // that can slip through before the disabled state rebuilds.
+    // The button is disabled below, but a same-frame double-tap can slip
+    // through before the disabled state rebuilds; each extra tap fires another
+    // register_*_device that competes for the rXg's limited DB connections and
+    // the duplicates then time out.
     if (scannerState.isRegistrationInProgress) {
       return;
     }
@@ -997,6 +1018,15 @@ class _ScannerRegistrationPopupState
       return;
     }
 
+    // Defer the provider mutation off the gesture-handler call stack.
+    // Firing listeners synchronously from inside `onTap` has historically
+    // hit `_lifecycleState != defunct` when a Consumer elsewhere in the
+    // tree was disposed in the same frame; yielding one microtask lets
+    // Riverpod's listener cleanup land first.
+    await Future<void>.microtask(() {});
+    if (!mounted) {
+      return;
+    }
     ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(true);
 
     final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
@@ -1028,9 +1058,11 @@ class _ScannerRegistrationPopupState
           );
 
       if (mounted) {
-        ref.read(scannerNotifierV2Provider.notifier).finishRegistration();
-
         if (result.isSuccess) {
+          // Success closes the popup, so collapse all the teardown state in a
+          // single notification.
+          ref.read(scannerNotifierV2Provider.notifier).finishRegistration();
+
           String actionText;
           Color snackBarColor;
 
@@ -1061,6 +1093,14 @@ class _ScannerRegistrationPopupState
           Navigator.pop(context, true);
           widget.onRegister?.call();
         } else {
+          // Failure keeps the popup open for a retry, so only re-enable the
+          // button. Defer the mutation to the next frame: mutating the shared
+          // scanner provider synchronously here can notify a Consumer
+          // elsewhere that's mid-disposal (the device list rebuilds as
+          // snapshots stream in during a slow registration), tripping the
+          // `_lifecycleState != defunct` assertion. Post-frame lets Riverpod
+          // drop the stale listener first.
+          _clearRegistrationInProgress();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(result.message ?? 'Registration failed'),
@@ -1071,7 +1111,7 @@ class _ScannerRegistrationPopupState
       }
     } on Exception catch (e) {
       if (mounted) {
-        ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(false);
+        _clearRegistrationInProgress();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -1080,6 +1120,20 @@ class _ScannerRegistrationPopupState
         );
       }
     }
+  }
+
+  /// Resets the shared in-progress flag on the next frame. Doing it
+  /// synchronously can notify a `scannerNotifierV2Provider` Consumer that's
+  /// mid-disposal and trip `_lifecycleState != defunct`; deferring lets
+  /// Riverpod drop the stale listener first.
+  void _clearRegistrationInProgress() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref
+            .read(scannerNotifierV2Provider.notifier)
+            .setRegistrationInProgress(false);
+      }
+    });
   }
 
 }

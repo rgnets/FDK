@@ -98,7 +98,17 @@ class WebSocketService {
   final _stateController = StreamController<SocketConnectionState>.broadcast();
   final _messageController = StreamController<SocketMessage>.broadcast();
   final _authFailureController = StreamController<int>.broadcast();
+  final _lateResponseController = StreamController<SocketMessage>.broadcast();
   final Map<String, _PendingRequest> _pendingRequests = {};
+
+  // ActionCable channel subscription tracking, keyed by channel name (e.g.
+  // "RxgChannel"). requestActionCable() waits on this so a register/query
+  // isn't fired into a channel the server hasn't confirmed yet — the common
+  // case is the brief window right after a reconnect re-subscribes the
+  // channel, during which sends get no reply and the caller would otherwise
+  // burn its full request timeout.
+  final Set<String> _confirmedChannels = {};
+  final Map<String, List<Completer<void>>> _channelConfirmWaiters = {};
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
   SocketMessage? _lastMessage;
@@ -124,6 +134,13 @@ class WebSocketService {
   /// Stream that emits the count of consecutive reconnect failures
   /// when multiple failures suggest a potential auth issue.
   Stream<int> get potentialAuthFailures => _authFailureController.stream;
+
+  /// Emits messages that arrived bearing a `request_id` but matched no
+  /// in-flight pending request — i.e. the client-side caller already
+  /// gave up (timed out, was cancelled, etc.) but the server eventually
+  /// replied. Useful as a backstop for slow controllers whose responses
+  /// outlive the caller's deadline.
+  Stream<SocketMessage> get lateResponses => _lateResponseController.stream;
 
   /// Latest socket message, useful for debug tooling.
   SocketMessage? get lastMessage => _lastMessage;
@@ -225,6 +242,18 @@ class WebSocketService {
     Map<String, dynamic>? additionalData,
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    // Don't fire into an unconfirmed channel (e.g. mid-reconnect). Wait for
+    // the server's confirm_subscription first, but fail open so a tracking
+    // miss can't permanently block sends — at worst we fall back to today's
+    // behaviour of relying on the request timeout below.
+    final channelName = _channelNameOf(channelIdentifier);
+    if (channelName != null && !_confirmedChannels.contains(channelName)) {
+      final waitBudget = timeout < const Duration(seconds: 10)
+          ? timeout
+          : const Duration(seconds: 10);
+      await _awaitChannelConfirmation(channelName, waitBudget);
+    }
+
     final requestId = 'req-$resourceType-${_generateRequestId()}';
 
     final data = <String, dynamic>{
@@ -242,6 +271,42 @@ class WebSocketService {
     };
 
     return request(message, timeout: timeout);
+  }
+
+  /// Marks an ActionCable [channel] confirmed and releases any callers
+  /// blocked in [_awaitChannelConfirmation].
+  void _markChannelConfirmed(String channel) {
+    _confirmedChannels.add(channel);
+    final waiters = _channelConfirmWaiters.remove(channel);
+    if (waiters != null) {
+      for (final waiter in waiters) {
+        if (!waiter.isCompleted) {
+          waiter.complete();
+        }
+      }
+    }
+  }
+
+  /// Waits until [channel] is confirmed by the server, or [timeout] elapses.
+  /// On timeout it returns normally (fail open) so the caller proceeds.
+  Future<void> _awaitChannelConfirmation(
+    String channel,
+    Duration timeout,
+  ) async {
+    if (_confirmedChannels.contains(channel)) {
+      return;
+    }
+    final completer = Completer<void>();
+    _channelConfirmWaiters.putIfAbsent(channel, () => []).add(completer);
+    try {
+      await completer.future.timeout(timeout);
+    } on TimeoutException {
+      _channelConfirmWaiters[channel]?.remove(completer);
+      _logger.w(
+        'WebSocketService: proceeding without confirmed subscription for '
+        '"$channel" (waited ${timeout.inSeconds}s)',
+      );
+    }
   }
 
   Future<void> _open(WebSocketConnectionParams params) async {
@@ -344,6 +409,20 @@ class WebSocketService {
       final type = _extractType(decoded, payload);
       final headers = _extractHeaders(decoded);
 
+      // Track ActionCable channel (un)subscription so requestActionCable()
+      // can wait for confirmation before sending into the channel.
+      if (type == 'confirm_subscription') {
+        final channel = _channelNameOf(decoded['identifier']);
+        if (channel != null) {
+          _markChannelConfirmed(channel);
+        }
+      } else if (type == 'reject_subscription') {
+        final channel = _channelNameOf(decoded['identifier']);
+        if (channel != null) {
+          _confirmedChannels.remove(channel);
+        }
+      }
+
       _lastHeartbeat = DateTime.now();
 
       final message = SocketMessage(
@@ -355,11 +434,22 @@ class WebSocketService {
 
       // Check if this is a response to a pending request
       final requestId = _extractRequestId(decoded, payload);
-      if (requestId != null && _pendingRequests.containsKey(requestId)) {
+      if (requestId != null) {
         final pending = _pendingRequests.remove(requestId);
-        if (pending != null && !pending.completer.isCompleted) {
-          pending.cancel();
-          pending.completer.complete(message);
+        if (pending != null) {
+          if (!pending.completer.isCompleted) {
+            pending.cancel();
+            pending.completer.complete(message);
+          }
+        } else {
+          // The caller already gave up (timed out / cancelled), but the
+          // server replied anyway. Surface it on the late-response stream
+          // so downstream features (e.g. registration) can reconcile.
+          _logger.w(
+            'WebSocketService: late response received (no pending request) '
+            'requestId=$requestId type=${message.type}',
+          );
+          _lateResponseController.add(message);
         }
       }
 
@@ -494,6 +584,10 @@ class WebSocketService {
     _heartbeatWatchdog?.cancel();
     _heartbeatTimer = null;
     _heartbeatWatchdog = null;
+    // The channel is gone; a reconnect must re-subscribe and be re-confirmed.
+    // Leave any in-flight confirmation waiters pending — they'll be satisfied
+    // by the post-reconnect confirm_subscription or by their own timeout.
+    _confirmedChannels.clear();
     await _subscription?.cancel();
     _subscription = null;
     await _channel?.sink.close(code, reason);
@@ -521,10 +615,23 @@ class WebSocketService {
     }
     _pendingRequests.clear();
 
+    // Release anyone blocked waiting for channel confirmation so they don't
+    // hang past disposal; they'll proceed and fail on the closed channel.
+    for (final waiters in _channelConfirmWaiters.values) {
+      for (final waiter in waiters) {
+        if (!waiter.isCompleted) {
+          waiter.complete();
+        }
+      }
+    }
+    _channelConfirmWaiters.clear();
+    _confirmedChannels.clear();
+
     await disconnect();
     await _stateController.close();
     await _messageController.close();
     await _authFailureController.close();
+    await _lateResponseController.close();
   }
 }
 
@@ -564,6 +671,24 @@ String _extractType(
     return actionValue;
   }
   return 'message';
+}
+
+/// Extracts the ActionCable channel name (e.g. "RxgChannel") from a JSON
+/// identifier string like `{"channel":"RxgChannel"}`. Returns null if the
+/// identifier is absent or not a recognizable channel envelope.
+String? _channelNameOf(Object? identifier) {
+  if (identifier is! String || identifier.isEmpty) {
+    return null;
+  }
+  try {
+    final decoded = jsonDecode(identifier);
+    if (decoded is Map && decoded['channel'] is String) {
+      return decoded['channel'] as String;
+    }
+  } on FormatException {
+    return null;
+  }
+  return null;
 }
 
 Map<String, dynamic>? _extractHeaders(Map<String, dynamic> decoded) {

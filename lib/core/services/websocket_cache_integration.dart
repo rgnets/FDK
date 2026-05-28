@@ -124,6 +124,10 @@ class WebSocketCacheIntegration {
   bool _initialized = false;
   bool _snapshotInFlight = false;
   bool _needsSnapshot = true;
+  // True once any snapshot response has arrived in the current cycle. Lets the
+  // retry path tell a dead channel (no responses at all → re-subscribe) from a
+  // single slow/missing resource (others returned → just advance).
+  bool _snapshotResponseSeen = false;
   /// Wall-clock of the last time `requestFullSnapshots()` actually fired
   /// the WS requests. Multiple consumers (auth notifier, device WS data
   /// source, room readiness data source) each call `requestFullSnapshots()`
@@ -160,6 +164,11 @@ class WebSocketCacheIntegration {
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
+  // Distinguishes the initial connect (where auth already subscribed the sid)
+  // from a reconnect (new sid, nobody re-subscribes). Only reconnects need a
+  // forced channel re-subscribe; forcing it on first connect makes the server
+  // reject a duplicate as "already subscribed".
+  bool _hasConnectedBefore = false;
   final Set<String> _pendingSnapshots = {};
   final Set<String> _requestedSnapshots = {};
   // request_id per resource for the in-progress paginated snapshot cycle.
@@ -371,6 +380,19 @@ class WebSocketCacheIntegration {
       _logger.i(
           'WebSocketCacheIntegration: Connected! Subscribing to resources...');
       _needsSnapshot = true;
+      if (_hasConnectedBefore) {
+        // Reconnect: brand-new AnyCable session (sid) with NO RxgChannel
+        // subscription. WebSocketService reconnects via reconnecting→connected
+        // and never passes through `disconnected`, so without resetting these
+        // the flags stay stale-true: we'd skip re-sending `command: subscribe`
+        // and every later `command: message` would be rejected as "unknown
+        // subscription". Auth only subscribes on the initial login, so the
+        // re-subscribe has to happen here.
+        _channelConfirmed = false;
+        _resourcesSubscribed = false;
+        _confirmedResources.clear();
+      }
+      _hasConnectedBefore = true;
       _channelSubscribeSent = false;
       _subscribeToChannel();
       return;
@@ -532,6 +554,7 @@ class WebSocketCacheIntegration {
 
     _snapshotInFlight = true;
     _needsSnapshot = false;
+    _snapshotResponseSeen = false;
     _pendingSnapshots
       ..clear()
       ..addAll(_resourceTypes);
@@ -701,6 +724,8 @@ class WebSocketCacheIntegration {
     if (_isSnapshotMessage(action, payload, raw)) {
       final items = _extractSnapshotItems(payload, raw);
       if (items != null) {
+        // A snapshot response arrived → the channel is alive this cycle.
+        _snapshotResponseSeen = true;
         final requestId = _extractSnapshotRequestId(payload, raw);
         final page = _extractSnapshotInt(payload, raw, 'page') ?? 1;
         final totalPages = _extractSnapshotInt(payload, raw, 'total_pages');
@@ -1113,7 +1138,6 @@ class WebSocketCacheIntegration {
       _scheduleSnapshotRetry();
       return;
     }
-
     // Serialized: at most one resource is in flight (in _requestedSnapshots);
     // the rest are queued and simply haven't been sent yet, so only the
     // in-flight one can be stale.
@@ -1128,8 +1152,21 @@ class WebSocketCacheIntegration {
 
     final attempts = _snapshotRetryCount[inFlight] ?? 0;
     if (attempts >= _maxSnapshotRetries) {
-      // Give up on this resource and advance, so one slow/missing snapshot
-      // can't block the rest of the queue indefinitely.
+      if (!_snapshotResponseSeen) {
+        // No snapshot response of any kind since this cycle began — the
+        // RxgChannel subscription is almost certainly stale/dead (AnyCable
+        // silently drops `command: message` on an unconfirmed channel after a
+        // reconnect left `_channelConfirmed` stale-true, with no `connected`
+        // event to recover). Re-subscribe from scratch; the confirm cascades
+        // into a fresh snapshot round. This is the critical self-heal.
+        _logger.w(
+            'WebSocketCacheIntegration: no snapshot responses this cycle — re-subscribing RxgChannel (suspected dead subscription)');
+        _resubscribeStaleChannel();
+        return;
+      }
+      // The channel is alive (other resources have returned this cycle) — just
+      // this one is slow/missing. Give up on it and advance so it can't block
+      // the rest of the queue.
       _logger.w(
           'WebSocketCacheIntegration: Giving up snapshot for $inFlight (retried $attempts times), advancing queue');
       _pendingSnapshots.remove(inFlight);
@@ -1150,6 +1187,27 @@ class WebSocketCacheIntegration {
         'WebSocketCacheIntegration: Retrying snapshot for $inFlight (attempt ${attempts + 1}/$_maxSnapshotRetries)');
     _requestSnapshot(inFlight);
     _scheduleSnapshotRetry();
+  }
+
+  /// Recovery for a stale/dead RxgChannel subscription on an otherwise healthy
+  /// socket (see [_retryStaleSnapshots]). Drops all channel/snapshot state and
+  /// re-sends `command: subscribe` from scratch.
+  void _resubscribeStaleChannel() {
+    _logger.w(
+        'WebSocketCacheIntegration: snapshots exhausted with no response — '
+        'forcing RxgChannel re-subscribe (suspected stale subscription)');
+    _channelConfirmed = false;
+    _channelSubscribeSent = false;
+    _resourcesSubscribed = false;
+    _confirmedResources.clear();
+    _snapshotInFlight = false;
+    _snapshotResponseSeen = false;
+    _snapshotRetryCount.clear();
+    _requestedSnapshots.clear();
+    _snapshotRequestIds.clear();
+    _pendingSnapshots.clear();
+    _needsSnapshot = true;
+    _subscribeToChannel();
   }
 
   void _bumpLastUpdate() {

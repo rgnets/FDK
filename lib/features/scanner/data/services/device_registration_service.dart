@@ -65,11 +65,6 @@ class DeviceRegistrationService {
       );
     }
 
-    LoggerService.info(
-      'Registering ${deviceType.displayName} via WebSocket',
-      tag: _tag,
-    );
-
     final payload = _buildExtraActionPayload(
       deviceType: deviceType,
       mac: mac,
@@ -80,6 +75,12 @@ class DeviceRegistrationService {
       existingDeviceId: existingDeviceId,
     );
 
+    LoggerService.info(
+      'Registering ${deviceType.displayName} via WebSocket '
+      '(resource=${payload.resourceType}, data=${payload.additionalData})',
+      tag: _tag,
+    );
+
     try {
       final response = await _wsService.requestActionCable(
         action: 'resource_action',
@@ -87,10 +88,17 @@ class DeviceRegistrationService {
         additionalData: payload.additionalData,
         timeout: timeout,
       );
+      LoggerService.debug(
+        'Registration response received (type=${response.type})',
+        tag: _tag,
+      );
       return _parseResponse(response);
     } on TimeoutException {
       LoggerService.warning(
-        'Registration timed out waiting for backend response',
+        'Registration timed out waiting for backend response '
+        '(${deviceType.displayName}, resource=${payload.resourceType}, '
+        'mac=$mac, serial=$serialNumber, room=$pmsRoomId, '
+        'existingId=$existingDeviceId, timeout=${timeout.inSeconds}s)',
         tag: _tag,
       );
       return const RegistrationServiceOutcome.failure(
@@ -128,6 +136,16 @@ class DeviceRegistrationService {
     if (isError) {
       final errMsg = _extractErrorMessage(payload) ??
           'Registration failed (status $status)';
+      // Log the complete backend body so intermittent 404s (and any other
+      // rejection) are diagnosable — `payload` is the unwrapped ActionCable
+      // `message`, `raw` is the full envelope as a fallback.
+      LoggerService.warning(
+        'Registration rejected by backend: status=$status, '
+        'type=${response.type}, message="$errMsg", '
+        'requestId=${payload['request_id'] ?? response.raw?['request_id']}, '
+        'payload=$payload, raw=${response.raw}',
+        tag: _tag,
+      );
       return RegistrationServiceOutcome.failure(
         errorMessage: errMsg,
         status: status,
@@ -135,6 +153,12 @@ class DeviceRegistrationService {
     }
 
     final data = payload['data'];
+    LoggerService.info(
+      'Registration accepted by backend (status=${status > 0 ? status : 200}, '
+      'deviceId=${data is Map ? data['id'] : null}, '
+      'requestId=${payload['request_id'] ?? response.raw?['request_id']})',
+      tag: _tag,
+    );
     return RegistrationServiceOutcome.success(
       data: data is Map<String, dynamic> ? data : null,
       status: status > 0 ? status : 200,

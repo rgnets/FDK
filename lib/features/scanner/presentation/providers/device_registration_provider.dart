@@ -32,6 +32,7 @@ DeviceRegistrationService deviceRegistrationService(
 @Riverpod(keepAlive: true)
 class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
   StreamSubscription<SocketMessage>? _wsSubscription;
+  StreamSubscription<SocketMessage>? _lateResponseSub;
 
   // Dual-index cache for O(1) device lookup (populated from WebSocket events)
   final Map<String, Map<String, dynamic>> _deviceIndexByMac = {};
@@ -45,6 +46,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     // Clean up on dispose
     ref.onDispose(() {
       _wsSubscription?.cancel();
+      _lateResponseSub?.cancel();
     });
 
     return const DeviceRegistrationState();
@@ -57,6 +59,9 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     _wsSubscription = wsService.messages.listen((message) {
       _handleWebSocketMessage(message);
     });
+
+    _lateResponseSub?.cancel();
+    _lateResponseSub = wsService.lateResponses.listen(_handleLateResponse);
   }
 
   void _handleWebSocketMessage(SocketMessage message) {
@@ -88,6 +93,49 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         type.contains('ont') ||
         type.contains('switch') ||
         type.contains('device');
+  }
+
+  /// Reconciles a server reply that arrived after the original caller had
+  /// already given up. The most common cause is the rXg Ruby controller
+  /// outliving AnyCable's gRPC deadline, so the FDK timed out at 30s but
+  /// Ruby eventually finished and replied.
+  ///
+  /// We don't try to retroactively flip the popup's outcome — the user
+  /// has already seen the failure UI by now — but we do log it loudly
+  /// and force a snapshot refresh so the device list reflects reality.
+  void _handleLateResponse(SocketMessage message) {
+    final payload = message.payload;
+    final requestId = payload['request_id']?.toString() ?? '';
+
+    // Registration request_ids are minted by
+    // WebSocketService.requestActionCable as `req-<resource_type>-<...>`.
+    String? resourceType;
+    if (requestId.startsWith('req-access_points-')) {
+      resourceType = 'access_points';
+    } else if (requestId.startsWith('req-media_converters-')) {
+      resourceType = 'media_converters';
+    } else if (requestId.startsWith('req-switch_devices-')) {
+      resourceType = 'switch_devices';
+    }
+    if (resourceType == null) {
+      return;
+    }
+
+    final status = (payload['status'] as num?)?.toInt();
+    LoggerService.warning(
+      'DeviceRegistration: late response for $resourceType '
+      '(requestId=$requestId, status=$status) — caller already timed out; '
+      'refreshing snapshot to reconcile UI',
+      tag: 'DeviceRegistration',
+    );
+
+    try {
+      ref
+          .read(webSocketCacheIntegrationProvider)
+          .refreshResourceSnapshot(resourceType);
+    } on Object catch (_) {
+      // Best-effort — refresh failure shouldn't propagate.
+    }
   }
 
   void _handleDeviceUpsert(Map<String, dynamic> payload) {
@@ -673,9 +721,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       // correlated by request_id and we learn the real outcome instead of
       // assuming success on send.
       final registrationService = ref.read(deviceRegistrationServiceProvider);
+      // The rXg stores and matches MACs as lowercase-with-colons (the lookup
+      // path formats them the same way). The scanner hands us uppercase
+      // compact hex, so format before registering — otherwise the
+      // register_*_device action can fail its server-side MAC match (e.g.
+      // ONT→PON device) and reject the request with a 404.
       final outcome = await registrationService.registerDevice(
         deviceType: deviceType,
-        mac: mac,
+        mac: _formatMacForBackend(mac),
         serialNumber: serial,
         pmsRoomId: pmsRoomId,
         partNumber: partNumber,
