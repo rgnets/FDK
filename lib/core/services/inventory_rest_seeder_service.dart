@@ -83,6 +83,10 @@ class InventoryRestSeederService {
     'access_points',
     'switch_devices',
     'media_converters',
+    // WLAN controllers are a first-class device type held in the typed SQLite
+    // caches (the in-memory WSCI device cache does not model them). Seed them
+    // over REST so the device repo's fallback isn't missing a device class.
+    'wlan_devices',
   ];
   static const String roomResourceType = 'pms_rooms';
 

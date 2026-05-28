@@ -76,7 +76,6 @@ class WebSocketDataSyncService {
   final RoomDataProcessor _roomProcessor;
   final SnapshotRequestService _snapshotService;
 
-  StreamSubscription<SocketMessage>? _messageSub;
   StreamSubscription<SocketConnectionState>? _stateSub;
   bool _started = false;
 
@@ -84,8 +83,6 @@ class WebSocketDataSyncService {
   final Map<String, String> _idToTypeIndex = {};
 
   final Map<String, List<RoomModel>> _roomSnapshots = {};
-  final Set<String> _pendingSnapshots = {};
-  Completer<void>? _initialSyncCompleter;
   Future<void>? _pendingRoomCache;
   final _eventController = StreamController<WebSocketDataSyncEvent>.broadcast();
 
@@ -98,7 +95,11 @@ class WebSocketDataSyncService {
     }
     _started = true;
 
-    _messageSub = _socketService.messages.listen(_handleMessage);
+    // Deliberately NOT subscribing to inbound WS messages: full inventory is
+    // loaded over REST (via InventoryReseedService), and this service does not
+    // process `action=updated` deltas. Listening here only risked an unrelated
+    // WS `index` response (e.g. the scanner's targeted 10-row device lookup)
+    // being applied as a full snapshot and clobbering the typed SQLite cache.
     _stateSub = _socketService.connectionState.listen(_handleConnectionState);
 
     if (_socketService.isConnected) {
@@ -108,13 +109,9 @@ class WebSocketDataSyncService {
 
   Future<void> stop() async {
     _started = false;
-    await _messageSub?.cancel();
     await _stateSub?.cancel();
-    _messageSub = null;
     _stateSub = null;
-    _pendingSnapshots.clear();
     _roomSnapshots.clear();
-    _initialSyncCompleter = null;
   }
 
   Future<void> dispose() async {
@@ -214,85 +211,6 @@ class WebSocketDataSyncService {
     for (final resource in _roomResources) {
       _snapshotService.sendSubscribe(resource);
     }
-  }
-
-  void _handleMessage(SocketMessage message) {
-    final resourceType = _resolveResourceType(message);
-    if (resourceType == null) {
-      return;
-    }
-
-    final snapshotItems = _extractSnapshotItems(message);
-    if (snapshotItems == null) {
-      return;
-    }
-
-    if (resourceType == 'devices.summary') {
-      _handleDeviceSnapshot(snapshotItems, resourceType: null);
-      _pendingSnapshots.removeAll(_deviceResources);
-      _markSnapshotHandled();
-      return;
-    }
-
-    if (resourceType == 'rooms.summary') {
-      _handleRoomSnapshot(snapshotItems, resourceType: null);
-      _pendingSnapshots.removeAll(_roomResources);
-      _markSnapshotHandled();
-      return;
-    }
-
-    if (_deviceResources.contains(resourceType)) {
-      _handleDeviceSnapshot(snapshotItems, resourceType: resourceType);
-      _pendingSnapshots.remove(resourceType);
-      _markSnapshotHandled();
-      return;
-    }
-
-    if (_roomResources.contains(resourceType)) {
-      _handleRoomSnapshot(snapshotItems, resourceType: resourceType);
-      _pendingSnapshots.remove(resourceType);
-      _markSnapshotHandled();
-    }
-  }
-
-  String? _resolveResourceType(SocketMessage message) {
-    final payload = message.payload;
-    final resourceType = payload['resource_type']?.toString();
-    if (resourceType != null && resourceType.isNotEmpty) {
-      return resourceType;
-    }
-    if (message.type == 'devices.summary') {
-      return 'devices.summary';
-    }
-    if (message.type == 'rooms.summary') {
-      return 'rooms.summary';
-    }
-    return null;
-  }
-
-  List<Map<String, dynamic>>? _extractSnapshotItems(SocketMessage message) {
-    final payload = message.payload;
-    if (payload['results'] is List) {
-      return (payload['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (payload['data'] is List) {
-      return (payload['data'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (payload['items'] is List) {
-      return (payload['items'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (payload['results'] is List<dynamic>) {
-      return (payload['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    return null;
   }
 
   void _handleDeviceSnapshot(
@@ -502,16 +420,6 @@ class WebSocketDataSyncService {
     _eventController.add(
       WebSocketDataSyncEvent.roomsCached(count: rooms.length),
     );
-  }
-
-  void _markSnapshotHandled() {
-    if (_pendingSnapshots.isNotEmpty) {
-      return;
-    }
-    if (_initialSyncCompleter != null &&
-        !_initialSyncCompleter!.isCompleted) {
-      _initialSyncCompleter!.complete();
-    }
   }
 }
 

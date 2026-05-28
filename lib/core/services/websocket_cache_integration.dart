@@ -329,8 +329,12 @@ class WebSocketCacheIntegration {
 
     if (_webSocketService.isConnected) {
       _logger.i(
-          'WebSocketCacheIntegration: Already connected, subscribing to resources');
-      _subscribeToChannel();
+          'WebSocketCacheIntegration: Already connected, subscribing + seeding');
+      // Route through the same path as a live `connected` event so the
+      // first-connect REST seed fires even when this integration is created
+      // after the socket is already up (connectionState is non-replaying, so
+      // the initial `connected` event would otherwise be missed).
+      _handleConnection(SocketConnectionState.connected);
     } else {
       _logger.i(
           'WebSocketCacheIntegration: Waiting for WebSocket connection...');

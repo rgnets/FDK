@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/inventory_rest_seeder_service.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 
 /// Owns full-inventory loading over REST and is the single entry point for
@@ -109,7 +110,9 @@ class InventoryReseedService {
           if (await _staleReason(creds) != null) {
             return;
           }
-          wsci.deviceCacheService.applySnapshot(type, items);
+          if (WebSocketDeviceCacheService.isDeviceResourceType(type)) {
+            wsci.deviceCacheService.applySnapshot(type, items);
+          }
           await dataSync.applyRestDeviceSnapshot(type, items);
         });
       }
@@ -148,8 +151,12 @@ class InventoryReseedService {
           }
           // Feed BOTH caches from one REST fetch: the in-memory WSCI cache
           // (primary read path) and the typed SQLite caches (offline/cold-start
-          // fallback the device repo falls back to).
-          wsci.deviceCacheService.applySnapshot(resourceType, items);
+          // fallback the device repo falls back to). Only resource types the
+          // WSCI device cache actually models go in-memory (e.g. wlan_devices
+          // is typed-cache-only); all device types go to the typed caches.
+          if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
+            wsci.deviceCacheService.applySnapshot(resourceType, items);
+          }
           await dataSync.applyRestDeviceSnapshot(resourceType, items);
         },
         onRooms: (items) async {
