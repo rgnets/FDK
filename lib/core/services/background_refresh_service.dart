@@ -100,17 +100,26 @@ class BackgroundRefreshService {
   
   /// Start background refresh
   void startBackgroundRefresh() {
-    _logger.d('BackgroundRefreshService: Starting background refresh');
     if (!_isAuthenticated()) {
       _logger.w('BackgroundRefreshService: Skipping start (not authenticated)');
       return;
     }
-    
+
+    // Idempotent: callers like DashboardStats.build() invoke this on every
+    // provider rebuild. Without this guard each call schedules another
+    // un-cancellable Future.delayed(_initialDelay, _performRefresh); they
+    // accumulate and fire back-to-back, hammering the REST reseed. If the
+    // periodic timer is already armed, this service is running — do nothing.
+    if (_refreshTimer != null) {
+      return;
+    }
+
+    _logger.d('BackgroundRefreshService: Starting background refresh');
+
     // Schedule initial refresh after a delay
     Future<void>.delayed(_initialDelay, _performRefresh);
-    
+
     // Setup periodic refresh
-    _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(_refreshInterval, (_) {
       _performRefresh();
     });
@@ -148,12 +157,13 @@ class BackgroundRefreshService {
 
     try {
       // Ensure WS is subscribed for deltas, then reload full inventory over
-      // REST via the coordinator (force: explicit periodic refresh bypasses
-      // the cooldown). Full inventory no longer comes from WS index snapshots.
+      // REST via the coordinator. The 2-minute periodic cadence is well beyond
+      // the reseed cooldown, so `force: false` is correct here — and it lets
+      // the cooldown absorb any accidental rapid re-invocation instead of
+      // hammering REST. Full inventory no longer comes from WS index snapshots.
       await webSocketDataSyncService.syncInitialData();
       await inventoryReseedService.triggerReseed(
         reason: 'backgroundRefresh',
-        force: true,
       );
     } on Exception catch (e) {
       final message = 'WebSocket sync failed: $e';

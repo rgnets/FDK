@@ -41,28 +41,4 @@ class SnapshotRequestService {
     }
   }
 
-  /// Send a snapshot request for a resource type
-  void sendSnapshotRequest(String resourceType, {int pageSize = 10000}) {
-    final requestId =
-        'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}';
-    final payload = jsonEncode({
-      'action': 'resource_action',
-      'resource_type': resourceType,
-      'crud_action': 'index',
-      'page': 1,
-      'page_size': pageSize,
-      'request_id': requestId,
-    });
-    try {
-      _webSocketService.send({
-        'command': 'message',
-        'identifier': channelIdentifier,
-        'data': payload,
-      });
-    } on StateError catch (e) {
-      _logger.w(
-        'SnapshotRequestService: Snapshot request failed (connection closed): $e',
-      );
-    }
-  }
 }

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
@@ -47,8 +46,6 @@ class InventoryReseedService {
   /// the cache was just cleared and MUST be repopulated). Automatic reconnect
   /// heals pass `force: false` so connection flaps stay throttled.
   Future<void> triggerReseed({required String reason, bool force = false}) async {
-    debugPrint('[RESEED] triggerReseed(reason=$reason, force=$force) '
-        'inFlight=$_seedInFlight last=$_lastSeedCompletedAt');
     if (_seedInFlight) {
       // A seed is already running; ensure one more runs afterward so a
       // reconnect that landed mid-seed still recovers missed deltas.
@@ -131,11 +128,9 @@ class InventoryReseedService {
   Future<void> _runFullSeed(String reason) async {
     final creds = await _credentialsIfFresh();
     if (creds == null) {
-      debugPrint('[RESEED] _runFullSeed($reason) ABORTED — no fresh credentials');
       LoggerService.debug('Reseed ($reason) skipped — no fresh credentials', tag: _tag);
       return;
     }
-    debugPrint('[RESEED] _runFullSeed($reason) starting — site=${creds.siteUrl}');
     LoggerService.info('Starting full REST reseed ($reason)', tag: _tag);
     final seeder = InventoryRestSeederService(
       siteUrl: creds.siteUrl,
@@ -176,9 +171,6 @@ class InventoryReseedService {
       );
       // Persist the typed SQLite caches once after the batch.
       await dataSync.flushTypedCaches();
-      debugPrint('[RESEED] _runFullSeed($reason) DONE — '
-          '${result.outcomes.where((o) => o.success).length}/${result.outcomes.length} '
-          'resources, ${result.totalItems} items');
       LoggerService.info(
         'Full REST reseed ($reason) complete — '
         '${result.outcomes.where((o) => o.success).length}/${result.outcomes.length} '
@@ -186,7 +178,6 @@ class InventoryReseedService {
         tag: _tag,
       );
     } on Object catch (e) {
-      debugPrint('[RESEED] _runFullSeed($reason) THREW: $e');
       LoggerService.warning('Full REST reseed ($reason) failed: $e', tag: _tag);
     }
   }
@@ -197,9 +188,6 @@ class InventoryReseedService {
     final siteUrl = _ref.read(storageServiceProvider).siteUrl;
     final authed = _ref.read(authStatusProvider)?.isAuthenticated ?? false;
     if (!authed || apiKey == null || apiKey.isEmpty || siteUrl == null || siteUrl.isEmpty) {
-      debugPrint('[RESEED] creds not fresh — authed=$authed '
-          'hasKey=${apiKey != null && apiKey.isNotEmpty} '
-          'siteUrl=${siteUrl ?? "null"}');
       return null;
     }
     return _SeedCredentials(siteUrl: siteUrl, apiKey: apiKey);

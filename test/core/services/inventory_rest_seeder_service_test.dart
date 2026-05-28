@@ -32,7 +32,7 @@ void main() {
         expect(uri.host, 'example.netlab.ninja');
         expect(uri.path, startsWith('/api/'));
         expect(uri.queryParameters['api_key'], 'k');
-        expect(uri.queryParameters['per_page'], '10000');
+        expect(uri.queryParameters['page_size'], '10000');
       }
     });
 

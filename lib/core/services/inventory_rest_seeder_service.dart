@@ -104,7 +104,7 @@ class InventoryRestSeederService {
   }
 
   Uri _api(String resourceFile) => Uri.parse(
-        'https://$siteUrl/api/$resourceFile?api_key=$apiKey&per_page=10000',
+        'https://$siteUrl/api/$resourceFile?api_key=$apiKey&page_size=10000',
       );
 
   /// Fire one parallel batch of GETs and apply each successful result to the
