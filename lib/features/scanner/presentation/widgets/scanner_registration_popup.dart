@@ -985,6 +985,12 @@ class _ScannerRegistrationPopupState
   Future<void> _handleRegister() async {
     final scannerState = ref.read(scannerNotifierV2Provider);
 
+    // Guard against a same-frame double-tap landing before the disabled-button
+    // rebuild does — without this, two registerDevice() calls could race.
+    if (scannerState.isRegistrationInProgress) {
+      return;
+    }
+
     if (scannerState.selectedRoomId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

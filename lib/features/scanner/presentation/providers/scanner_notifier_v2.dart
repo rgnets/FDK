@@ -368,8 +368,13 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   /// Hide the registration popup.
   void hideRegistrationPopup() {
     LoggerService.debug('Hiding registration popup', tag: _tag);
+    // Clear isRegistrationInProgress here too: this is the single funnel every
+    // dismissal path (cancel, barrier tap, swipe, back, success) passes
+    // through, so the flag can't get stranded true if the widget unmounts
+    // mid-registration before _handleRegister's mounted-gated resets can run.
     state = state.copyWith(
       isPopupShowing: false,
+      isRegistrationInProgress: false,
       uiState: ScannerUIState.idle,
     );
   }
