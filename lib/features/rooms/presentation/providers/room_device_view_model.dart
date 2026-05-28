@@ -42,22 +42,44 @@ class RoomDeviceStats with _$RoomDeviceStats {
 /// Follows Clean Architecture and MVVM patterns.
 @riverpod
 class RoomDeviceNotifier extends _$RoomDeviceNotifier {
+  bool _disposed = false;
+
   @override
   RoomDeviceState build(String roomId) {
-    // Set up listeners for future updates
+    ref.onDispose(() => _disposed = true);
+
+    // Set up listeners for future updates. The callbacks mutate this
+    // notifier's `state`, so they MUST be deferred off the synchronous
+    // notification frame: `devicesNotifierProvider` is also watched by
+    // `homeScreenStatisticsProvider`, and a synchronous `state =` here while
+    // that provider is building trips Riverpod's "providers are not allowed
+    // to modify other providers during their initialization" assertion.
+    // Deferring via microtask moves the write to the next event-loop tick,
+    // after the in-flight build completes. The `_disposed` guard avoids
+    // writing to a torn-down notifier.
     ref
       ..listen(devicesNotifierProvider, (previous, next) {
-        next.when(
-          data: (devices) => _updateDevices(roomId, devices),
-          loading: _setLoading,
-          error: (error, stack) => _setError(error.toString()),
-        );
+        Future.microtask(() {
+          if (_disposed) {
+            return;
+          }
+          next.when(
+            data: (devices) => _updateDevices(roomId, devices),
+            loading: _setLoading,
+            error: (error, stack) => _setError(error.toString()),
+          );
+        });
       })
       // Listen to room changes to validate room still exists
       ..listen(roomViewModelByIdProvider(roomId), (previous, next) {
-        if (next == null) {
-          _setError('Room not found: $roomId');
-        }
+        Future.microtask(() {
+          if (_disposed) {
+            return;
+          }
+          if (next == null) {
+            _setError('Room not found: $roomId');
+          }
+        });
       });
 
     // Process current state of devices provider

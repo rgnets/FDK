@@ -30,7 +30,11 @@ class WebSocketCacheIntegration {
     String? imageBaseUrl,
     Logger? logger,
     DeviceUpdateEventBus? deviceUpdateEventBus,
+    Future<void> Function({bool force})? onReconnectReseed,
+    Future<void> Function(String resourceType)? onResourceReseed,
   })  : _webSocketService = webSocketService,
+        _onReconnectReseed = onReconnectReseed,
+        _onResourceReseed = onResourceReseed,
         _logger = logger ?? Logger() {
     _speedTestCacheService = WebSocketSpeedTestCacheService(
       webSocketService: webSocketService,
@@ -53,6 +57,28 @@ class WebSocketCacheIntegration {
 
   final WebSocketService _webSocketService;
   final Logger _logger;
+
+  /// Triggers a full REST inventory reseed (devices + rooms). Full inventory
+  /// is loaded over REST, off the AnyCable gRPC path, so it never competes
+  /// with WS write actions. The WS layer only subscribes for live deltas.
+  /// `force: true` bypasses the coordinator's cooldown — used for explicit
+  /// loads (sign-in clear+reseed, manual sync) that must not be suppressed by
+  /// a recently-completed seed; automatic reconnect heals pass `force: false`.
+  final Future<void> Function({bool force})? _onReconnectReseed;
+
+  /// Triggers a targeted single-resource REST reseed (used by the repurposed
+  /// public snapshot methods that legacy callers still invoke).
+  final Future<void> Function(String resourceType)? _onResourceReseed;
+
+  /// Wall-clock when the socket last dropped, used to skip a reseed on brief
+  /// reconnect flaps (only reseed if the gap exceeded [_reseedMinGap]).
+  DateTime? _disconnectedAt;
+  static const Duration _reseedMinGap = Duration(seconds: 10);
+
+  /// Whether an initial full REST seed has been triggered since this
+  /// integration started. Ensures the first connect (app launch / persisted
+  /// session, with no prior disconnect) still seeds the caches.
+  bool _hasSeededSinceStart = false;
 
   late final WebSocketSpeedTestCacheService _speedTestCacheService;
   late final WebSocketDeviceCacheService _deviceCacheService;
@@ -122,51 +148,11 @@ class WebSocketCacheIntegration {
   StreamSubscription<SocketConnectionState>? _connectionSub;
 
   bool _initialized = false;
-  bool _snapshotInFlight = false;
-  bool _needsSnapshot = true;
-  /// Wall-clock of the last time `requestFullSnapshots()` actually fired
-  /// the WS requests. Multiple consumers (auth notifier, device WS data
-  /// source, room readiness data source) each call `requestFullSnapshots()`
-  /// independently right after sign-in. Without a coalesce window, that
-  /// triples the snapshot traffic (21 WS requests instead of 7) and the
-  /// rxg's `compliance_check_results` channel can also briefly hit its
-  /// rate limit during the burst.
-  DateTime? _lastSnapshotFiredAt;
-  static const Duration _snapshotCoalesceWindow = Duration(seconds: 5);
-
-  /// Per-resource retry timer. The rxg's WS `index` handler sometimes
-  /// returns the inventory as a stream of `action=updated` upserts
-  /// instead of a single `action=index` snapshot (observed on the
-  /// large-site sign-in path). When that happens, the cache fills
-  /// only with devices the rxg happens to poll while WS is up — the
-  /// offline ones never arrive because their state isn't poll-driven.
-  /// If the snapshot for a resource hasn't been marked handled within
-  /// this window, re-fire its `index` request once. Limited per-resource
-  /// to `_maxSnapshotRetries` to avoid amplifying any rate-limit issue.
-  static const Duration _snapshotRetryDelay = Duration(seconds: 30);
-  static const int _maxSnapshotRetries = 2;
-  final Map<String, int> _snapshotRetryCount = {};
-  Timer? _snapshotRetryTimer;
   bool _channelConfirmed = false;
   bool _channelSubscribeSent = false;
   bool _resourcesSubscribed = false;
-  final Set<String> _pendingSnapshots = {};
-  final Set<String> _requestedSnapshots = {};
   final Set<String> _confirmedResources = {};
-  final Map<String, _SnapshotAccumulator> _snapshotAccumulators = {};
-  final Map<String, Timer> _snapshotFlushTimers = {};
-  static const Duration _snapshotMergeWindow = Duration(seconds: 2);
-  static const Duration _snapshotFlushDelay = Duration(milliseconds: 500);
   static const String _channelIdentifier = '{"channel":"RxgChannel"}';
-
-  /// Monotonic counter for `request_id` uniqueness. Wall-clock alone collides
-  /// when two snapshot cycles are initiated within the same millisecond,
-  /// which happens after a fast disconnect/reconnect.
-  int _requestIdSeq = 0;
-  String _newRequestId(String resourceType) {
-    final seq = (++_requestIdSeq).toString().padLeft(4, '0');
-    return 'snapshot-$resourceType-${DateTime.now().millisecondsSinceEpoch}-$seq';
-  }
 
   // ---------------------------------------------------------------------------
   // Delegated public API: Speed Tests
@@ -357,33 +343,35 @@ class WebSocketCacheIntegration {
     if (state == SocketConnectionState.connected) {
       _logger.i(
           'WebSocketCacheIntegration: Connected! Subscribing to resources...');
-      _needsSnapshot = true;
       _channelSubscribeSent = false;
       _subscribeToChannel();
+      // Load full inventory over REST on connect. The FIRST connect (app launch
+      // / persisted-session reopen, `droppedAt == null`) must seed — there is
+      // no WS `index` snapshot anymore. Reconnects only reseed if the gap was
+      // long enough to have plausibly missed deltas (brief flaps skipped). The
+      // coordinator additionally coalesces/throttles, and REST is off the gRPC
+      // path so it never competes with WS writes like register_ap_device.
+      final droppedAt = _disconnectedAt;
+      _disconnectedAt = null;
+      final isFirstConnect = droppedAt == null && !_hasSeededSinceStart;
+      final gapWasLong = droppedAt != null &&
+          DateTime.now().difference(droppedAt) > _reseedMinGap;
+      if (_onReconnectReseed != null && (isFirstConnect || gapWasLong)) {
+        _hasSeededSinceStart = true;
+        // Initial seed forces past the cooldown; automatic reconnect heals are
+        // throttled by it.
+        unawaited(_onReconnectReseed(force: isFirstConnect));
+      }
       return;
     }
 
     if (state == SocketConnectionState.disconnected) {
       _logger.i('WebSocketCacheIntegration: Disconnected, resetting state');
-      _needsSnapshot = true;
-      _snapshotInFlight = false;
+      _disconnectedAt ??= DateTime.now();
       _channelConfirmed = false;
       _channelSubscribeSent = false;
       _resourcesSubscribed = false;
-      _pendingSnapshots.clear();
-      _requestedSnapshots.clear();
       _confirmedResources.clear();
-      // Invalidate the snapshot-coalesce window. A disconnect ends the
-      // current snapshot cycle, so the very next `requestFullSnapshots()`
-      // after reconnect must always fire — otherwise a flaky WS that drops
-      // + reconnects within 5s would silently skip the post-reconnect
-      // snapshot and leave the cache empty.
-      _lastSnapshotFiredAt = null;
-      for (final timer in _snapshotFlushTimers.values) {
-        timer.cancel();
-      }
-      _snapshotFlushTimers.clear();
-      _snapshotAccumulators.clear();
     }
   }
 
@@ -418,14 +406,9 @@ class WebSocketCacheIntegration {
       }
     }
     _resourcesSubscribed = allSubscribed;
-
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (_needsSnapshot &&
-          _webSocketService.isConnected &&
-          _channelConfirmed) {
-        _requestFullSnapshots();
-      }
-    });
+    // No WS `index` snapshot here: full inventory is loaded over REST by the
+    // reseed coordinator. The subscriptions above are sufficient to receive
+    // live `action=updated`/`destroyed` deltas into the same caches.
   }
 
   bool _subscribeToResource(String resourceType) {
@@ -484,107 +467,38 @@ class WebSocketCacheIntegration {
   }
 
   // ---------------------------------------------------------------------------
-  // Snapshot requests
+  // Full-inventory loading (delegated to REST reseed coordinator)
+  //
+  // The WS layer no longer issues `index` snapshots (page_size=10000 across
+  // every resource saturated the rXg AnyCable→Ruby gRPC pool and starved WS
+  // write actions like register_ap_device). Full inventory is fetched over
+  // REST, off the gRPC path. These methods keep their names because legacy
+  // callers (device data source, room readiness, image upload, registration)
+  // still invoke them; they now route to the REST reseed coordinator.
   // ---------------------------------------------------------------------------
 
   void requestFullSnapshots() {
-    final lastFired = _lastSnapshotFiredAt;
-    if (lastFired != null &&
-        DateTime.now().difference(lastFired) < _snapshotCoalesceWindow) {
-      _logger.d(
-        'WebSocketCacheIntegration: Manual sync coalesced (last fire ${DateTime.now().difference(lastFired).inMilliseconds}ms ago)',
-      );
+    if (_onReconnectReseed == null) {
+      _logger.w('WebSocketCacheIntegration: No reseed callback wired');
       return;
     }
-    _logger.i('WebSocketCacheIntegration: Manual sync requested');
-    _needsSnapshot = true;
-    _snapshotInFlight = false;
-    _requestFullSnapshots();
-  }
-
-  void _requestFullSnapshots() {
-    if (_snapshotInFlight) {
-      _logger.d('WebSocketCacheIntegration: Snapshot already in flight');
-      return;
-    }
-    if (!_webSocketService.isConnected || !_channelConfirmed) {
-      _logger.w(
-          'WebSocketCacheIntegration: Delaying snapshot request until channel is ready');
-      return;
-    }
-    _lastSnapshotFiredAt = DateTime.now();
-    _logger.i(
-        'WebSocketCacheIntegration: Requesting snapshots for: $_resourceTypes');
-
-    _snapshotInFlight = true;
-    _needsSnapshot = false;
-    _pendingSnapshots
-      ..clear()
-      ..addAll(_resourceTypes);
-    _requestedSnapshots.clear();
-    _snapshotRetryCount.clear();
-
-    var allSent = true;
-    for (final resource in _resourceTypes) {
-      final sent = _requestSnapshot(resource);
-      if (!sent) {
-        allSent = false;
-      }
-    }
-    _scheduleSnapshotRetry();
-    if (!allSent) {
-      _logger.w(
-          'WebSocketCacheIntegration: Snapshot requests deferred, will retry');
-      _snapshotInFlight = false;
-      _needsSnapshot = true;
-    }
-  }
-
-  bool _requestSnapshot(String resourceType) {
-    if (_requestedSnapshots.contains(resourceType)) return true;
-    if (!_webSocketService.isConnected || !_channelConfirmed) {
-      return false;
-    }
-
-    _logger.d('WebSocketCacheIntegration: Requesting snapshot for: $resourceType');
-    _requestedSnapshots.add(resourceType);
-
-    // Deliberately no `only:` field filter. The rxg's WS index handler
-    // takes a slow/incomplete path when `only:` is set on device-typed
-    // resources (access_points, switch_devices, media_converters): instead
-    // of returning a single snapshot response it streams individual
-    // `action=updated` upserts and stops well before delivering the full
-    // inventory. Without the filter, the snapshot returns cleanly with
-    // every row in one batch. Trade-off: heavier payload per row.
-    final payload = <String, dynamic>{
-      'action': 'resource_action',
-      'resource_type': resourceType,
-      'crud_action': 'index',
-      'page': 1,
-      'page_size': 10000,
-      'request_id': _newRequestId(resourceType),
-    };
-
-    final sent = _sendActionCableMessage(payload);
-    if (!sent) {
-      _requestedSnapshots.remove(resourceType);
-      return false;
-    }
-    return true;
+    _logger.i('WebSocketCacheIntegration: Full inventory reseed requested (REST)');
+    // Explicit/programmatic request (sign-in clear+reseed, manual sync) — must
+    // bypass the cooldown so a fresh sign-in's only seed is never suppressed.
+    unawaited(_onReconnectReseed(force: true));
   }
 
   void requestResourceSnapshot(String resourceType) {
-    _logger.i(
-        'WebSocketCacheIntegration: Manual snapshot request for: $resourceType');
-    _requestSnapshot(resourceType);
+    if (_onResourceReseed == null) {
+      _logger.w('WebSocketCacheIntegration: No resource reseed callback wired');
+      return;
+    }
+    _logger.i('WebSocketCacheIntegration: Resource reseed requested (REST): $resourceType');
+    unawaited(_onResourceReseed(resourceType));
   }
 
-  void refreshResourceSnapshot(String resourceType) {
-    _logger.i(
-        'WebSocketCacheIntegration: Force-refresh snapshot for: $resourceType');
-    _requestedSnapshots.remove(resourceType);
-    _requestSnapshot(resourceType);
-  }
+  void refreshResourceSnapshot(String resourceType) =>
+      requestResourceSnapshot(resourceType);
 
   // ---------------------------------------------------------------------------
   // Message handling & routing
@@ -616,7 +530,6 @@ class WebSocketCacheIntegration {
       _channelConfirmed = false;
       _channelSubscribeSent = false;
       _resourcesSubscribed = false;
-      _needsSnapshot = true;
       return;
     }
 
@@ -661,23 +574,12 @@ class WebSocketCacheIntegration {
     }
 
     if (_isSnapshotMessage(action, payload, raw)) {
-      final items = _extractSnapshotItems(payload, raw);
-      if (items != null) {
-        _logger.i(
-          'WebSocketCacheIntegration: Received snapshot for $resourceType: ${items.length} items',
-        );
-
-        if (items.isNotEmpty) {
-          final firstItem = items.first;
-          _logger.d(
-            'WebSocketCacheIntegration: First $resourceType item has images: ${firstItem['images']}',
-          );
-        }
-
-        final requestId = _extractSnapshotRequestId(payload, raw);
-        _applySnapshotAccumulated(resourceType, items, requestId);
-        _markSnapshotHandled(resourceType);
-      }
+      // WSCI no longer requests `index`/snapshots — full inventory is loaded
+      // over REST by the reseed coordinator. Ignore any snapshot/list response
+      // so an unrelated `index` reply (e.g. the scanner's targeted 10-row
+      // device-lookup during registration) can't overwrite the REST-seeded
+      // global cache. Live `action=updated`/`destroyed` deltas (handled below)
+      // remain the only WS-driven cache mutations.
       return;
     }
 
@@ -815,28 +717,6 @@ class WebSocketCacheIntegration {
   // Data extraction helpers
   // ---------------------------------------------------------------------------
 
-  List<Map<String, dynamic>>? _extractSnapshotItems(
-    Map<String, dynamic> payload,
-    Map<String, dynamic> raw,
-  ) {
-    if (payload['results'] is List) {
-      return (payload['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (raw['results'] is List) {
-      return (raw['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    if (payload['data'] is List) {
-      return (payload['data'] as List)
-          .whereType<Map<String, dynamic>>()
-          .toList();
-    }
-    return null;
-  }
-
   Map<String, dynamic>? _extractResourceData(
     Map<String, dynamic> payload,
     Map<String, dynamic> raw,
@@ -851,105 +731,9 @@ class WebSocketCacheIntegration {
     return null;
   }
 
-  String? _extractSnapshotRequestId(
-    Map<String, dynamic> payload,
-    Map<String, dynamic> raw,
-  ) {
-    final idFromPayload = payload['request_id'];
-    if (idFromPayload != null) return idFromPayload.toString();
-    final idFromRaw = raw['request_id'];
-    if (idFromRaw != null) return idFromRaw.toString();
-    return null;
-  }
-
   // ---------------------------------------------------------------------------
-  // Snapshot accumulation & dispatch
+  // Dispatch: upsert / delete → sub-services
   // ---------------------------------------------------------------------------
-
-  void _applySnapshotAccumulated(
-    String resourceType,
-    List<Map<String, dynamic>> items,
-    String? requestId,
-  ) {
-    final accumulator = _snapshotAccumulators.putIfAbsent(
-      resourceType,
-      _SnapshotAccumulator.new,
-    );
-
-    final shouldReset = _shouldResetAccumulator(accumulator, requestId);
-    if (shouldReset) {
-      accumulator.reset(requestId);
-    }
-
-    if (items.isEmpty) {
-      accumulator.touch();
-      final hasCached = _hasCachedItems(resourceType);
-      final hasAccumulated = accumulator.items.isNotEmpty;
-      if (hasAccumulated || hasCached) return;
-      _scheduleSnapshotFlush(resourceType, accumulator);
-      return;
-    }
-
-    accumulator.addItems(items);
-    _scheduleSnapshotFlush(resourceType, accumulator);
-  }
-
-  bool _hasCachedItems(String resourceType) {
-    if (resourceType == _speedTestConfigResourceType) {
-      return _speedTestCacheService.hasCachedItems(isConfig: true);
-    } else if (resourceType == _speedTestResultResourceType) {
-      return _speedTestCacheService.hasCachedItems(isConfig: false);
-    } else if (resourceType == _roomResourceType) {
-      return _roomCacheService.hasRoomCache;
-    } else if (resourceType == _complianceResultResourceType) {
-      return _complianceCacheService.hasCache;
-    } else {
-      return _deviceCacheService.hasCachedItems(resourceType);
-    }
-  }
-
-  bool _shouldResetAccumulator(
-    _SnapshotAccumulator accumulator,
-    String? requestId,
-  ) {
-    if (requestId != null && requestId != accumulator.requestId) return true;
-    if (requestId == null) {
-      final age = DateTime.now().difference(accumulator.lastUpdated);
-      if (age > _snapshotMergeWindow) return true;
-    }
-    return false;
-  }
-
-  void _scheduleSnapshotFlush(
-    String resourceType,
-    _SnapshotAccumulator accumulator,
-  ) {
-    _snapshotFlushTimers[resourceType]?.cancel();
-
-    _snapshotFlushTimers[resourceType] = Timer(_snapshotFlushDelay, () {
-      _snapshotFlushTimers.remove(resourceType);
-      _applySnapshot(resourceType, accumulator.items);
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Dispatch: snapshot / upsert / delete → sub-services
-  // ---------------------------------------------------------------------------
-
-  void _applySnapshot(String resourceType, List<Map<String, dynamic>> items) {
-    if (resourceType == _speedTestConfigResourceType) {
-      _speedTestCacheService.applySnapshot(items, isConfig: true);
-    } else if (resourceType == _speedTestResultResourceType) {
-      _speedTestCacheService.applySnapshot(items, isConfig: false);
-    } else if (resourceType == _roomResourceType) {
-      _roomCacheService.applySnapshot(items);
-    } else if (resourceType == _complianceResultResourceType) {
-      _complianceCacheService.applySnapshot(items);
-    } else if (WebSocketDeviceCacheService.isDeviceResourceType(resourceType)) {
-      _deviceCacheService.applySnapshot(resourceType, items);
-    }
-    _bumpLastUpdate();
-  }
 
   void _applyUpsert(
     String resourceType,
@@ -993,52 +777,6 @@ class WebSocketCacheIntegration {
     _bumpLastUpdate();
   }
 
-  void _markSnapshotHandled(String resourceType) {
-    _pendingSnapshots.remove(resourceType);
-    _requestedSnapshots.remove(resourceType);
-
-    if (_pendingSnapshots.isEmpty) {
-      _snapshotInFlight = false;
-      _snapshotRetryTimer?.cancel();
-      _snapshotRetryTimer = null;
-      _logger.i('WebSocketCacheIntegration: All snapshots received');
-    }
-  }
-
-  /// Schedule a one-shot retry after `_snapshotRetryDelay`. Resources still
-  /// in `_pendingSnapshots` when the timer fires get their `index` request
-  /// re-sent (up to `_maxSnapshotRetries` per resource). This recovers from
-  /// the rxg's intermittent "stream upserts instead of snapshot" behavior.
-  void _scheduleSnapshotRetry() {
-    _snapshotRetryTimer?.cancel();
-    _snapshotRetryTimer = Timer(_snapshotRetryDelay, _retryStaleSnapshots);
-  }
-
-  void _retryStaleSnapshots() {
-    _snapshotRetryTimer = null;
-    if (_pendingSnapshots.isEmpty) return;
-    if (!_webSocketService.isConnected || !_channelConfirmed) {
-      _scheduleSnapshotRetry();
-      return;
-    }
-    final stale = _pendingSnapshots.toList();
-    var anySent = false;
-    for (final resource in stale) {
-      final attempts = _snapshotRetryCount[resource] ?? 0;
-      if (attempts >= _maxSnapshotRetries) {
-        _logger.w(
-            'WebSocketCacheIntegration: Giving up snapshot retry for $resource (already retried $attempts times)');
-        continue;
-      }
-      _snapshotRetryCount[resource] = attempts + 1;
-      _requestedSnapshots.remove(resource);
-      _logger.i(
-          'WebSocketCacheIntegration: Retrying snapshot for $resource (attempt ${attempts + 1}/$_maxSnapshotRetries)');
-      if (_requestSnapshot(resource)) anySent = true;
-    }
-    if (anySent) _scheduleSnapshotRetry();
-  }
-
   void _bumpLastUpdate() {
     lastUpdate.value = DateTime.now();
   }
@@ -1056,15 +794,8 @@ class WebSocketCacheIntegration {
     _speedTestCacheService.clearCaches();
     _complianceCacheService.clearCaches();
 
-    if (_webSocketService.isConnected && _channelConfirmed) {
-      _needsSnapshot = true;
-      _snapshotInFlight = false;
-      _requestFullSnapshots();
-    } else {
-      _logger.w(
-          'WebSocketCacheIntegration: Not connected, will request data when reconnected');
-      _needsSnapshot = true;
-    }
+    // Full inventory reloads over REST (off the gRPC path), not WS index.
+    requestFullSnapshots();
   }
 
   void clearCaches() {
@@ -1074,20 +805,6 @@ class WebSocketCacheIntegration {
     _roomCacheService.clearCaches();
     _speedTestCacheService.clearCaches();
     _complianceCacheService.clearCaches();
-
-    for (final timer in _snapshotFlushTimers.values) {
-      timer.cancel();
-    }
-    _snapshotFlushTimers.clear();
-    _snapshotAccumulators.clear();
-    _pendingSnapshots.clear();
-    _requestedSnapshots.clear();
-    _snapshotRetryCount.clear();
-    _snapshotRetryTimer?.cancel();
-    _snapshotRetryTimer = null;
-
-    _needsSnapshot = true;
-    _snapshotInFlight = false;
 
     _channelSubscribeSent = false;
     _channelConfirmed = false;
@@ -1102,13 +819,6 @@ class WebSocketCacheIntegration {
     _messageSub?.cancel();
     _connectionSub?.cancel();
     _apiKeyRevocationController.close();
-    for (final timer in _snapshotFlushTimers.values) {
-      timer.cancel();
-    }
-    _snapshotFlushTimers.clear();
-    _snapshotAccumulators.clear();
-    _snapshotRetryTimer?.cancel();
-    _snapshotRetryTimer = null;
     lastUpdate.dispose();
 
     _speedTestCacheService.dispose();
@@ -1119,31 +829,4 @@ class WebSocketCacheIntegration {
 
   /// Expose the WebSocket service for direct requests.
   WebSocketService get webSocketService => _webSocketService;
-}
-
-class _SnapshotAccumulator {
-  String? requestId;
-  DateTime lastUpdated = DateTime.now();
-  final Map<String, Map<String, dynamic>> _itemsById = {};
-
-  List<Map<String, dynamic>> get items => _itemsById.values.toList();
-
-  void reset(String? newRequestId) {
-    requestId = newRequestId;
-    lastUpdated = DateTime.now();
-    _itemsById.clear();
-  }
-
-  void touch() {
-    lastUpdated = DateTime.now();
-  }
-
-  void addItems(List<Map<String, dynamic>> items) {
-    for (final item in items) {
-      final idValue = item['id'];
-      if (idValue == null) continue;
-      _itemsById[idValue.toString()] = item;
-    }
-    lastUpdated = DateTime.now();
-  }
 }

@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:rgnets_fdk/core/config/environment.dart';
-import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/widgets/connection_details_dialog.dart';
 import 'package:rgnets_fdk/core/widgets/hold_to_confirm_button.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
@@ -224,12 +223,12 @@ class SettingsScreen extends ConsumerWidget {
                       const SnackBar(content: Text('Syncing data...')),
                     );
 
-                    // If WebSockets are enabled, trigger a full resync from server
-                    if (EnvironmentConfig.useWebSockets) {
-                      final syncService =
-                          ref.read(webSocketDataSyncServiceProvider);
-                      await syncService.syncInitialData();
-                    }
+                    // Full inventory reloads over REST via the reseed
+                    // coordinator (force: bypass the cooldown for an explicit
+                    // user-initiated sync). WS stays subscribed for deltas.
+                    await ref
+                        .read(inventoryReseedProvider)
+                        .triggerReseed(reason: 'manualSync', force: true);
 
                     // Refresh providers to pick up the new data
                     await Future.wait([

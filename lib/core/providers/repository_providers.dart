@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/background_refresh_service.dart';
 import 'package:rgnets_fdk/features/auth/data/datasources/auth_local_data_source.dart';
 import 'package:rgnets_fdk/features/auth/data/repositories/auth_repository.dart'
@@ -255,6 +256,7 @@ final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>(
     final storageService = ref.watch(storageServiceProvider);
     final webSocketService = ref.watch(webSocketServiceProvider);
     final webSocketDataSyncService = ref.watch(webSocketDataSyncServiceProvider);
+    final inventoryReseedService = ref.watch(inventoryReseedProvider);
 
     // Typed device local data sources (new architecture)
     final apLocalDataSource = ref.watch(apLocalDataSourceProvider);
@@ -273,6 +275,7 @@ final backgroundRefreshServiceProvider = Provider<BackgroundRefreshService>(
       storageService: storageService,
       webSocketService: webSocketService,
       webSocketDataSyncService: webSocketDataSyncService,
+      inventoryReseedService: inventoryReseedService,
     );
   },
 );

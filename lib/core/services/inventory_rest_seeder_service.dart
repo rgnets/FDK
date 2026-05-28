@@ -115,8 +115,8 @@ class InventoryRestSeederService {
       tag: _tag,
     );
     final futures = <Future<SeedOutcome>>[
-      for (final type in deviceResourceTypes) _seedDeviceResource(type, onDevices),
-      _seedRoomResource(onRooms),
+      for (final type in deviceResourceTypes) seedDeviceResource(type, onDevices),
+      seedRoomResource(onRooms),
     ];
     final outcomes = await Future.wait(futures);
     final total = outcomes.fold<int>(0, (s, o) => s + o.itemCount);
@@ -128,7 +128,11 @@ class InventoryRestSeederService {
     return SeedResult(outcomes);
   }
 
-  Future<SeedOutcome> _seedDeviceResource(
+  /// Seed a single device resource type (access_points / switch_devices /
+  /// media_converters) via REST and apply it to the cache. Public so a
+  /// targeted reseed (e.g. after a registration write) can refresh just one
+  /// resource without re-fetching the entire inventory.
+  Future<SeedOutcome> seedDeviceResource(
     String resourceType,
     SeedDeviceApply onDevices,
   ) async {
@@ -171,7 +175,9 @@ class InventoryRestSeederService {
     );
   }
 
-  Future<SeedOutcome> _seedRoomResource(SeedRoomApply onRooms) async {
+  /// Seed the rooms resource via REST and apply it to the cache. Public for
+  /// targeted single-resource reseed (see [seedDeviceResource]).
+  Future<SeedOutcome> seedRoomResource(SeedRoomApply onRooms) async {
     final uri = _api('$roomResourceType.json');
     LoggerService.debug('GET ${_scrub(uri)}', tag: _tag);
     final fetch = await _fetchList(uri, roomResourceType);

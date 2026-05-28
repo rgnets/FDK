@@ -5,6 +5,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/notification_generation_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/device_data_source.dart';
 import 'package:rgnets_fdk/features/devices/data/datasources/typed_device_local_data_source.dart';
@@ -25,6 +26,7 @@ class BackgroundRefreshService {
     required this.storageService,
     required this.webSocketService,
     required this.webSocketDataSyncService,
+    required this.inventoryReseedService,
   });
 
   static final _logger = LoggerService.getLogger();
@@ -39,6 +41,7 @@ class BackgroundRefreshService {
   final StorageService storageService;
   final WebSocketService webSocketService;
   final WebSocketDataSyncService webSocketDataSyncService;
+  final InventoryReseedService inventoryReseedService;
 
   /// ID-to-Type index for routing device lookups
   final Map<String, String> _idToTypeIndex = {};
@@ -144,7 +147,14 @@ class BackgroundRefreshService {
     }
 
     try {
+      // Ensure WS is subscribed for deltas, then reload full inventory over
+      // REST via the coordinator (force: explicit periodic refresh bypasses
+      // the cooldown). Full inventory no longer comes from WS index snapshots.
       await webSocketDataSyncService.syncInitialData();
+      await inventoryReseedService.triggerReseed(
+        reason: 'backgroundRefresh',
+        force: true,
+      );
     } on Exception catch (e) {
       final message = 'WebSocket sync failed: $e';
       _logger.e('BackgroundRefreshService: $message');

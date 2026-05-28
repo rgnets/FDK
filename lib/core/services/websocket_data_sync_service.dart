@@ -126,41 +126,50 @@ class WebSocketDataSyncService {
     _wlanLocalDataSource.dispose();
   }
 
+  /// Ensure the service is started and subscribed for live deltas. Full
+  /// inventory is no longer pulled over WS `index` snapshots (that storm
+  /// saturated the rXg gRPC pool); the typed SQLite caches are seeded over
+  /// REST by [InventoryReseedService] via [applyRestDeviceSnapshot] /
+  /// [applyRestRoomSnapshot]. This method therefore just subscribes and
+  /// returns — callers that need a full refresh trigger the reseed coordinator.
+  ///
+  /// [timeout] is retained for API compatibility with existing callers.
   Future<void> syncInitialData({
     Duration timeout = const Duration(seconds: 45),
   }) async {
     await start();
-    _pendingSnapshots
-      ..clear()
-      ..addAll(_deviceResources)
-      ..addAll(_roomResources);
-    _pendingRoomCache = null;
+  }
 
-    _initialSyncCompleter = Completer<void>();
-    _requestSnapshots();
+  /// Apply a REST-fetched full snapshot of one device resource into the typed
+  /// SQLite caches (the device repository's offline/cold-start fallback).
+  /// Driven by [InventoryReseedService]; call [flushTypedCaches] once after a
+  /// batch to persist.
+  Future<void> applyRestDeviceSnapshot(
+    String resourceType,
+    List<Map<String, dynamic>> items,
+  ) async {
+    await start();
+    _handleDeviceSnapshot(items, resourceType: resourceType);
+  }
 
-    await _initialSyncCompleter!.future.timeout(
-      timeout,
-      onTimeout: () {
-        _logger.w('WebSocketDataSync: Initial sync timed out');
-        return;
-      },
-    );
+  /// Apply a REST-fetched full snapshot of rooms into the room SQLite cache.
+  Future<void> applyRestRoomSnapshot(List<Map<String, dynamic>> items) async {
+    await start();
+    _handleRoomSnapshot(items, resourceType: 'pms_rooms');
+  }
 
-    // Flush all typed caches to storage
+  /// Persist the typed device caches to SQLite and await any pending room
+  /// cache write. Call once after a batch of REST snapshot applies.
+  Future<void> flushTypedCaches() async {
     await _flushAllDeviceCaches();
-
-    // Wait for any pending room cache operations
-    if (_pendingRoomCache != null) {
-      _logger.i('WebSocketDataSync: Waiting for room cache to complete');
-      await _pendingRoomCache!.timeout(
+    final pendingRoom = _pendingRoomCache;
+    if (pendingRoom != null) {
+      await pendingRoom.timeout(
         const Duration(seconds: 30),
-        onTimeout: () {
-          _logger.w('WebSocketDataSync: Room cache timed out');
-        },
+        onTimeout: () =>
+            _logger.w('WebSocketDataSync: Room cache flush timed out'),
       );
     }
-    _logger.i('WebSocketDataSync: Cache operations completed');
   }
 
   /// Flush all typed device caches to storage
@@ -191,20 +200,19 @@ class WebSocketDataSyncService {
 
   void _requestSnapshots() {
     if (!_socketService.isConnected) {
-      _logger.d('WebSocketDataSync: Socket not connected, skipping snapshot');
+      _logger.d('WebSocketDataSync: Socket not connected, skipping subscribe');
       return;
     }
 
+    // Subscribe for live deltas only. Full inventory is loaded over REST by
+    // the reseed coordinator (off the gRPC path); WS `index` snapshot requests
+    // were removed because they saturated the rXg gRPC pool and starved write
+    // actions like register_ap_device.
     for (final resource in _deviceResources) {
-      _snapshotService
-        ..sendSubscribe(resource)
-        ..sendSnapshotRequest(resource);
+      _snapshotService.sendSubscribe(resource);
     }
-
     for (final resource in _roomResources) {
-      _snapshotService
-        ..sendSubscribe(resource)
-        ..sendSnapshotRequest(resource);
+      _snapshotService.sendSubscribe(resource);
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/services/cache_manager.dart';
+import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
@@ -103,6 +104,15 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
     imageBaseUrl: storageService.siteUrl,
     logger: logger,
     deviceUpdateEventBus: deviceUpdateEventBus,
+    // Full inventory loads over REST (off the gRPC path); the WS layer only
+    // subscribes for live deltas. These callbacks let the WS layer ask the
+    // reseed coordinator for a full or targeted REST reload on reconnect or
+    // when a legacy caller invokes the (repurposed) snapshot methods.
+    onReconnectReseed: ({bool force = false}) => ref
+        .read(inventoryReseedProvider)
+        .triggerReseed(reason: 'reconnect', force: force),
+    onResourceReseed: (resourceType) =>
+        ref.read(inventoryReseedProvider).triggerResourceReseed(resourceType),
   );
 
   // Initialize the integration
