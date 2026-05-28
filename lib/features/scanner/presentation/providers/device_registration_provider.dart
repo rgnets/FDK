@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
@@ -673,6 +674,16 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       // correlated by request_id and we learn the real outcome instead of
       // assuming success on send.
       final registrationService = ref.read(deviceRegistrationServiceProvider);
+
+      // Access Points register over REST, which needs the live site URL and
+      // API token; ONTs/switches still go over the authenticated WebSocket.
+      String? siteUrl;
+      String? apiKey;
+      if (deviceType == DeviceType.accessPoint) {
+        siteUrl = ref.read(storageServiceProvider).siteUrl;
+        apiKey = await ref.read(secureStorageServiceProvider).getToken();
+      }
+
       final outcome = await registrationService.registerDevice(
         deviceType: deviceType,
         mac: mac,
@@ -681,6 +692,8 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         partNumber: partNumber,
         model: model,
         existingDeviceId: existingDeviceId,
+        siteUrl: siteUrl,
+        apiKey: apiKey,
       );
 
       if (!outcome.success) {
