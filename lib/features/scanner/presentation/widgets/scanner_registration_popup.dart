@@ -880,7 +880,8 @@ class _ScannerRegistrationPopupState
   Widget _buildActionButtons(BuildContext context, ScannerState state, bool isMismatch) {
     final isExisting = state.matchStatus == DeviceMatchStatus.fullMatch;
     final isSameRoom = isExisting && state.matchedDeviceRoomId == state.selectedRoomId;
-    final canRegister = state.selectedRoomId != null && !isMismatch;
+    final isLoading = state.isRegistrationInProgress;
+    final canRegister = state.selectedRoomId != null && !isMismatch && !isLoading;
 
     // Determine button text and color
     String buttonText;
@@ -916,7 +917,7 @@ class _ScannerRegistrationPopupState
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: _handleCancel,
+            onPressed: isLoading ? null : _handleCancel,
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
@@ -936,7 +937,16 @@ class _ScannerRegistrationPopupState
                 : FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-            child: Text(buttonText),
+            child: isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(buttonText),
           ),
         ),
       ],
