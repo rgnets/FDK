@@ -11,6 +11,19 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// Connection states emitted by [WebSocketService].
 enum SocketConnectionState { disconnected, connecting, connected, reconnecting }
 
+/// Thrown to in-flight requests when the socket closes (drop, reconnect, or an
+/// app-lifecycle suspend). It is an [Exception], not an [Error], so existing
+/// `on Exception` handlers catch it instead of it surfacing as a raw
+/// "Bad state" failure in the UI.
+class WebSocketConnectionClosed implements Exception {
+  const WebSocketConnectionClosed([this.message = 'WebSocket connection closed']);
+
+  final String message;
+
+  @override
+  String toString() => 'WebSocketConnectionClosed: $message';
+}
+
 /// Represents a pending request waiting for a response.
 class _PendingRequest {
   _PendingRequest({
@@ -107,10 +120,29 @@ class WebSocketService {
   StreamSubscription<dynamic>? _subscription;
   Timer? _heartbeatTimer;
   Timer? _heartbeatWatchdog;
+  Timer? _reconnectTimer;
   DateTime? _lastHeartbeat;
   int _reconnectAttempts = 0;
   int _consecutiveReconnectFailures = 0;
   bool _manuallyClosed = false;
+
+  // Suspended by the OS app-lifecycle (background), as opposed to a manual
+  // disconnect/sign-out. Resume reconnects only what lifecycle suspended.
+  bool _lifecycleSuspended = false;
+
+  // Serializes connect/disconnect/suspend/resume so unawaited lifecycle calls
+  // can't interleave and dead-end the socket.
+  Future<void> _lifecycleQueue = Future<void>.value();
+
+  // Once disposed, queued lifecycle ops must not open a socket or touch the
+  // (closing) stream controllers.
+  bool _disposed = false;
+
+  // Bumped on every open and every close. Stream callbacks (message/done/error)
+  // and the in-progress _open() capture the generation they belong to and no-op
+  // if it is stale — so a socket killed during sleep can never tear down or
+  // mark "connected" a socket opened by a later reconnect.
+  int _connectionGeneration = 0;
 
   /// Maximum consecutive reconnect failures before emitting auth failure signal.
   static const int _maxReconnectBeforeAuthCheck = 3;
@@ -135,8 +167,18 @@ class WebSocketService {
   bool get isConnected => _state == SocketConnectionState.connected;
 
   /// Connects to the given socket endpoint using [params].
-  Future<void> connect(WebSocketConnectionParams params) async {
+  ///
+  /// Serialized through the same queue as suspend/resume so a connect can't
+  /// interleave with an in-flight lifecycle close and dead-end (connect wants
+  /// "connected", so it must not be clobbered by a suspend finishing late).
+  Future<void> connect(WebSocketConnectionParams params) =>
+      _enqueueLifecycle(() => _connect(params));
+
+  Future<void> _connect(WebSocketConnectionParams params) async {
     _manuallyClosed = false;
+    _lifecycleSuspended = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _currentParams = params;
     _reconnectAttempts = 0;
     _consecutiveReconnectFailures = 0;
@@ -144,16 +186,70 @@ class WebSocketService {
   }
 
   /// Disconnects from the socket and prevents automatic reconnection.
-  Future<void> disconnect({int? code, String? reason}) async {
+  ///
+  /// Serialized through the same queue as connect/suspend/resume so it can't be
+  /// reordered against a queued connect (which would otherwise clear
+  /// `_manuallyClosed` and reconnect after a sign-out).
+  Future<void> disconnect({int? code, String? reason}) =>
+      _enqueueLifecycle(() => _disconnect(code: code, reason: reason));
+
+  Future<void> _disconnect({int? code, String? reason}) async {
     _manuallyClosed = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _reconnectAttempts = 0;
     await _closeChannel(code: code, reason: reason);
     _updateState(SocketConnectionState.disconnected);
   }
 
+  /// Suspends the socket for an OS app-lifecycle pause (screen off /
+  /// backgrounded). Closes the channel, fails in-flight requests, and cancels
+  /// any pending reconnect so no work runs while backgrounded. Does NOT mark a
+  /// manual close, so [resumeForLifecycle] can bring it back. Idempotent.
+  Future<void> suspendForLifecycle() => _enqueueLifecycle(_suspendForLifecycle);
+
+  /// Resumes the socket after an app-lifecycle resume. Reconnects exactly once
+  /// — but only if the socket was lifecycle-suspended and not manually closed
+  /// (e.g. signed out). Idempotent / safe to call when not suspended.
+  Future<void> resumeForLifecycle() => _enqueueLifecycle(_resumeForLifecycle);
+
+  // Serialize suspend/resume. The app-scope observer fires these fire-and-forget
+  // (unawaited), so a rapid pause→resume could otherwise interleave a resume's
+  // _open() with the suspend's still-awaiting _closeChannel() and dead-end the
+  // socket. Queuing guarantees resume runs only after suspend fully completes.
+  Future<void> _enqueueLifecycle(Future<void> Function() op) {
+    final result = _lifecycleQueue.then((_) => op());
+    _lifecycleQueue = result.catchError((Object _) {});
+    return result;
+  }
+
+  Future<void> _suspendForLifecycle() async {
+    if (_lifecycleSuspended) {
+      return;
+    }
+    _lifecycleSuspended = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    await _closeChannel();
+    _updateState(SocketConnectionState.disconnected);
+  }
+
+  Future<void> _resumeForLifecycle() async {
+    if (!_lifecycleSuspended) {
+      return;
+    }
+    _lifecycleSuspended = false;
+    if (_manuallyClosed || _currentParams == null) {
+      return;
+    }
+    _reconnectAttempts = 0;
+    _consecutiveReconnectFailures = 0;
+    await _open(_currentParams!);
+  }
+
   /// Sends a raw payload. The message will be JSON-encoded before dispatch.
   void send(Map<String, dynamic> message) {
-    if (_channel == null) {
+    if (_state != SocketConnectionState.connected || _channel == null) {
       throw StateError('WebSocket not connected');
     }
     final encoded = jsonEncode(message);
@@ -184,7 +280,7 @@ class WebSocketService {
     Map<String, dynamic> message, {
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    if (_channel == null) {
+    if (_state != SocketConnectionState.connected || _channel == null) {
       throw StateError('WebSocket not connected');
     }
 
@@ -245,6 +341,9 @@ class WebSocketService {
   }
 
   Future<void> _open(WebSocketConnectionParams params) async {
+    if (_disposed) {
+      return;
+    }
     if (_state == SocketConnectionState.connected ||
         _state == SocketConnectionState.connecting) {
       _logger.w(
@@ -257,13 +356,12 @@ class WebSocketService {
           ? SocketConnectionState.reconnecting
           : SocketConnectionState.connecting,
     );
+    final generation = ++_connectionGeneration;
     try {
       // FM-8: scrub api_key from the URI before logging. `params.uri` carries
       // the ActionCable auth token as a query param on production builds.
       _logger.i('WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}');
       final channel = _channelFactory(params.uri, headers: params.headers);
-
-      _channel = channel;
 
       // Wait for the actual TCP + WebSocket upgrade to complete before
       // declaring the connection open.  Without this, the state flips to
@@ -271,15 +369,26 @@ class WebSocketService {
       // callers start sending messages into a channel that isn't ready yet.
       await channel.ready;
 
+      // A suspend/disconnect/newer-open/dispose happened while we awaited
+      // `ready` — abandon this socket instead of marking the service connected
+      // on it (or wiring callbacks after disposal).
+      if (_disposed || generation != _connectionGeneration) {
+        _logger.d('WebSocketService: Abandoning stale connection attempt');
+        unawaited(channel.sink.close());
+        return;
+      }
+
+      _channel = channel;
       _subscription = channel.stream.listen(
-        _handleMessage,
-        onDone: _handleDone,
-        onError: _handleError,
+        (data) => _handleMessage(generation, data),
+        onDone: () => _handleDone(generation),
+        onError: (Object error, StackTrace stack) =>
+            _handleError(generation, error, stack),
         cancelOnError: true,
       );
 
       _updateState(SocketConnectionState.connected);
-      _startHeartbeat();
+      _startHeartbeat(generation);
 
       if (params.handshakeMessage != null) {
         _logger.d('WebSocketService: Sending handshake message');
@@ -295,34 +404,43 @@ class WebSocketService {
         'WebSocketService: Connection failed: ${scrubErrorForLog(e)}',
         stackTrace: stack,
       );
-      await _handleError(e, stack);
+      await _handleError(generation, e, stack);
     }
   }
 
-  Future<void> _handleError(Object error, [StackTrace? stack]) async {
+  Future<void> _handleError(int generation, Object error, [StackTrace? stack]) async {
+    if (generation != _connectionGeneration) {
+      return;
+    }
     _logger.e(
       'WebSocketService: Error - ${scrubErrorForLog(error)}',
       stackTrace: stack,
     );
     await _closeChannel();
-    if (_config.autoReconnect && !_manuallyClosed) {
-      await _scheduleReconnect();
+    if (_config.autoReconnect && !_manuallyClosed && !_lifecycleSuspended) {
+      _scheduleReconnect();
     } else {
       _updateState(SocketConnectionState.disconnected);
     }
   }
 
-  Future<void> _handleDone() async {
+  Future<void> _handleDone(int generation) async {
+    if (generation != _connectionGeneration) {
+      return;
+    }
     _logger.w('WebSocketService: Connection closed by server');
     await _closeChannel();
-    if (_config.autoReconnect && !_manuallyClosed) {
-      await _scheduleReconnect();
+    if (_config.autoReconnect && !_manuallyClosed && !_lifecycleSuspended) {
+      _scheduleReconnect();
     } else {
       _updateState(SocketConnectionState.disconnected);
     }
   }
 
-  void _handleMessage(dynamic data) {
+  void _handleMessage(int generation, dynamic data) {
+    if (generation != _connectionGeneration) {
+      return;
+    }
     try {
       Map<String, dynamic>? decoded;
       if (data is String) {
@@ -395,45 +513,62 @@ class WebSocketService {
     return null;
   }
 
-  Future<void> _scheduleReconnect() async {
+  void _scheduleReconnect() {
     if (_currentParams == null) {
       _logger.w('WebSocketService: No connection params for reconnect');
       return;
     }
+    // Reentrancy guard: a single reconnect chain at a time. The watchdog
+    // timeout and the socket's own onDone/onError can both land on resume —
+    // but the connection-generation token already collapses those to one
+    // _handleError, and an active reconnect timer means one is already pending.
+    // We deliberately do NOT gate on connecting/reconnecting state here: a
+    // failed attempt calls _closeChannel() (which leaves the state untouched)
+    // and then needs to schedule the NEXT retry, so a state gate would
+    // dead-end the loop.
+    if (_disposed ||
+        _manuallyClosed ||
+        _lifecycleSuspended ||
+        (_reconnectTimer?.isActive ?? false)) {
+      return;
+    }
+
     _reconnectAttempts += 1;
     final delay = _computeBackoffDelay(_reconnectAttempts);
     _logger.i('WebSocketService: Reconnecting in ${delay.inMilliseconds}ms');
     _updateState(SocketConnectionState.reconnecting);
-    await Future<void>.delayed(delay);
-    if (_manuallyClosed) {
-      _logger.d('WebSocketService: Reconnect aborted (manually closed)');
-      return;
-    }
 
-    // Store state before reconnect attempt
-    final wasConnected = _state == SocketConnectionState.connected;
-
-    await _open(_currentParams!);
-
-    // Track reconnection success/failure
-    if (_state == SocketConnectionState.connected) {
-      // Reconnect succeeded - reset failure counter
-      _consecutiveReconnectFailures = 0;
-    } else if (!wasConnected) {
-      // Reconnect failed
-      _consecutiveReconnectFailures++;
-      _logger.w(
-        'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
-      );
-
-      if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
-        _logger.w(
-          'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
-          'may indicate auth issue',
-        );
-        _authFailureController.add(_consecutiveReconnectFailures);
+    _reconnectTimer = Timer(delay, () async {
+      _reconnectTimer = null;
+      if (_disposed || _manuallyClosed || _lifecycleSuspended) {
+        _logger.d('WebSocketService: Reconnect aborted (closed/suspended)');
+        return;
       }
-    }
+
+      await _open(_currentParams!);
+
+      // Disposal can land while _open() awaits — don't touch counters or the
+      // (closed) auth-failure controller afterward.
+      if (_disposed) {
+        return;
+      }
+
+      if (_state == SocketConnectionState.connected) {
+        _consecutiveReconnectFailures = 0;
+      } else {
+        _consecutiveReconnectFailures++;
+        _logger.w(
+          'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
+        );
+        if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
+          _logger.w(
+            'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
+            'may indicate auth issue',
+          );
+          _authFailureController.add(_consecutiveReconnectFailures);
+        }
+      }
+    });
   }
 
   Duration _computeBackoffDelay(int attempt) {
@@ -443,7 +578,7 @@ class WebSocketService {
     return Duration(milliseconds: min(delayMs.toInt(), maxMs));
   }
 
-  void _startHeartbeat() {
+  void _startHeartbeat(int generation) {
     _lastHeartbeat = DateTime.now();
     _heartbeatTimer?.cancel();
     _heartbeatWatchdog?.cancel();
@@ -482,6 +617,7 @@ class WebSocketService {
         );
         unawaited(
           _handleError(
+            generation,
             TimeoutException('Heartbeat timeout (${diff.inSeconds}s)'),
           ),
         );
@@ -490,18 +626,41 @@ class WebSocketService {
   }
 
   Future<void> _closeChannel({int? code, String? reason}) async {
+    // Invalidate the current generation so any in-flight stream callback or
+    // _open() awaiting `ready` becomes a no-op and can't touch a newer socket.
+    _connectionGeneration++;
+
     _heartbeatTimer?.cancel();
     _heartbeatWatchdog?.cancel();
     _heartbeatTimer = null;
     _heartbeatWatchdog = null;
-    await _subscription?.cancel();
+
+    // Fail in-flight requests immediately instead of letting them hang to their
+    // 30s timeout — on a sleep/resume the socket is gone, so callers should
+    // learn now rather than the UI freezing.
+    if (_pendingRequests.isNotEmpty) {
+      final pending = List<_PendingRequest>.of(_pendingRequests.values);
+      _pendingRequests.clear();
+      for (final request in pending) {
+        request.cancel();
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(const WebSocketConnectionClosed());
+        }
+      }
+    }
+
+    // Null the fields first, then close the captured locals — overlapping
+    // close/open work must never close or null a newer socket.
+    final subscription = _subscription;
+    final channel = _channel;
     _subscription = null;
-    await _channel?.sink.close(code, reason);
     _channel = null;
+    await subscription?.cancel();
+    await channel?.sink.close(code, reason);
   }
 
   void _updateState(SocketConnectionState newState) {
-    if (_state == newState) {
+    if (_disposed || _state == newState) {
       return;
     }
     _state = newState;
@@ -510,6 +669,14 @@ class WebSocketService {
 
   /// Releases resources. Call when the service is no longer needed.
   Future<void> dispose() async {
+    // Mark disposed first so any queued lifecycle op (a pending connect/resume)
+    // becomes a no-op instead of reopening a socket or writing to a closing
+    // controller.
+    _disposed = true;
+    _manuallyClosed = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
     // Cancel all pending requests
     for (final pending in _pendingRequests.values) {
       pending.cancel();
@@ -521,7 +688,10 @@ class WebSocketService {
     }
     _pendingRequests.clear();
 
-    await disconnect();
+    // Let any already-queued lifecycle work drain (it no-ops now), then tear
+    // the channel down and close the controllers.
+    await _lifecycleQueue;
+    await _closeChannel();
     await _stateController.close();
     await _messageController.close();
     await _authFailureController.close();
