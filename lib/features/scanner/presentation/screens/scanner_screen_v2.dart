@@ -30,7 +30,7 @@ class ScannerScreenV2 extends ConsumerStatefulWidget {
 }
 
 class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const String _tag = 'ScannerScreenV2';
 
   MobileScannerController? _controller;
@@ -43,11 +43,70 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
   bool _isFlashOn = false;
   CameraFacing _currentCameraFacing = CameraFacing.back;
 
+  // Whether the camera was live when the app was backgrounded, so we know to
+  // restore it on resume. Latched across the multi-stage background sequence.
+  bool _wasRunningBeforePause = false;
+
+  // Serializes camera start/stop so a fast lock/unlock cannot overlap them.
+  Future<void> _cameraLifecycleOp = Future<void>.value();
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeScanner();
     _initializeAnimations();
+  }
+
+  /// mobile_scanner v7 does not auto-manage the OS camera lifecycle for an
+  /// externally-owned controller. When the phone sleeps the OS revokes the
+  /// camera, so on resume the preview stays frozen unless we restart it. Stop
+  /// on background, and restart on resume only if the camera was live before —
+  /// which covers active scanning, auth-scan mode, and the result popup shown
+  /// over a still-live camera. The barcode stream survives stop/start, so it is
+  /// not re-subscribed here.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final controller = _controller;
+    if (controller == null) {
+      return;
+    }
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        // The OS often delivers inactive -> paused; stop() flips isRunning to
+        // false, so latch on the first transition and never overwrite the
+        // intent back to false here.
+        if (!_wasRunningBeforePause && controller.value.isRunning) {
+          _wasRunningBeforePause = true;
+          _enqueueCameraOp(controller.stop, 'stop');
+        }
+      case AppLifecycleState.resumed:
+        if (_wasRunningBeforePause) {
+          _wasRunningBeforePause = false;
+          if (mounted) {
+            _enqueueCameraOp(controller.start, 'restart');
+          }
+        }
+    }
+  }
+
+  void _enqueueCameraOp(Future<void> Function() op, String label) {
+    _cameraLifecycleOp = _cameraLifecycleOp.then((_) async {
+      // The queue can outlive the widget; never touch a disposed controller.
+      if (!mounted || _controller == null) {
+        return;
+      }
+      try {
+        await op();
+        LoggerService.debug('Camera $label complete', tag: _tag);
+      } on Exception catch (e) {
+        LoggerService.error('Camera $label failed', error: e, tag: _tag);
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -93,6 +152,7 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _barcodeSubscription?.cancel();
     _barcodeSubscription = null;
     // Turn off flash if it's on before disposing
