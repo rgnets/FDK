@@ -410,6 +410,50 @@ void main() {
         }
       });
     });
+
+    group('free-creation policy', () {
+      test('hasDesignedDevice is true when a designed slot is present', () {
+        final devices = [
+          _createDevice(name: 'AABBCCDDEEFF', macAddress: 'AA:BB:CC:DD:EE:FF'),
+          _createDevice(name: 'Planned AP 101', macAddress: null, serialNumber: null),
+        ];
+        expect(DeviceClassifier.hasDesignedDevice(devices), isTrue);
+      });
+
+      test('hasDesignedDevice is false without any designed slot', () {
+        final devices = [
+          _createDevice(
+            name: 'Deployed AP',
+            macAddress: 'AA:BB:CC:DD:EE:FF',
+            serialNumber: 'SN12345',
+          ),
+          _createDevice(name: 'AABBCCDDEEFF', macAddress: 'AA:BB:CC:DD:EE:FF'),
+        ];
+        expect(DeviceClassifier.hasDesignedDevice(devices), isFalse);
+      });
+
+      test('allowFreeCreation is false when a designed slot exists', () {
+        final devices = [
+          _createDevice(name: 'Planned AP 101', macAddress: null),
+        ];
+        expect(DeviceClassifier.allowFreeCreation(devices), isFalse);
+      });
+
+      test('allowFreeCreation is true with only assigned devices', () {
+        final devices = [
+          _createDevice(
+            name: 'Deployed AP',
+            macAddress: 'AA:BB:CC:DD:EE:FF',
+            serialNumber: 'SN12345',
+          ),
+        ];
+        expect(DeviceClassifier.allowFreeCreation(devices), isTrue);
+      });
+
+      test('allowFreeCreation is true for an empty list', () {
+        expect(DeviceClassifier.allowFreeCreation(const []), isTrue);
+      });
+    });
   });
 }
 

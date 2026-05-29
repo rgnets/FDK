@@ -151,6 +151,20 @@ class DeviceClassifier {
     }).toList();
   }
 
+  /// Whether any device in the list is a "designed" BOM placeholder slot.
+  static bool hasDesignedDevice(List<Device> devices) {
+    return devices.any(isDesignedDevice);
+  }
+
+  /// Whether free creation of a new device should be offered for this list.
+  ///
+  /// Techs must bind a scan to an existing designed slot whenever one is
+  /// available; free creation is only an escape hatch for a room that has no
+  /// designed devices of the relevant type.
+  static bool allowFreeCreation(List<Device> devices) {
+    return !hasDesignedDevice(devices);
+  }
+
   /// Categorize a list of devices into groups by category.
   ///
   /// Returns a map where keys are [DeviceCategory] values and values are
