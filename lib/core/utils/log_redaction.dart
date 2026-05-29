@@ -21,12 +21,30 @@
 ///   URI which is where api_key typically leaks from exceptions.
 library;
 
+import 'dart:convert';
+
 /// Pre-compiled scrubber. Matches `api_key=…` in both trailing and mid-query
 /// positions. `[^&\s"]*` stops at the next param delimiter, whitespace, or
 /// a closing quote (Dio's `toString()` embeds the URI in quotes).
 final RegExp _apiKeyScrubRegex = RegExp(r'api_key=[^&\s"]*');
 
 const String _redactedReplacement = 'api_key=[redacted]';
+const String _redactedValue = '[redacted]';
+
+const Set<String> _sensitiveLogKeys = {
+  'api_key',
+  'apikey',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'password',
+  'passwd',
+  'secret',
+  'token',
+  'access_token',
+  'refresh_token',
+  'auth_token',
+};
 
 /// Strips the `api_key` query parameter from a URI for safe logging.
 ///
@@ -54,4 +72,45 @@ String scrubErrorForLog(Object? error) {
     return '';
   }
   return error.toString().replaceAll(_apiKeyScrubRegex, _redactedReplacement);
+}
+
+/// Redacts sensitive keys and `api_key=<value>` substrings from structured
+/// values before they are stringified for logs.
+Object? redactForLog(Object? value) {
+  if (value == null || value is num || value is bool) {
+    return value;
+  }
+  if (value is String) {
+    return scrubUrlForLog(value);
+  }
+  if (value is Map) {
+    return value.map((key, child) {
+      final keyString = key.toString();
+      final normalizedKey = keyString.toLowerCase().replaceAll('-', '_');
+      if (_sensitiveLogKeys.contains(normalizedKey) ||
+          _sensitiveLogKeys.contains(keyString.toLowerCase())) {
+        return MapEntry(keyString, _redactedValue);
+      }
+      return MapEntry(keyString, redactForLog(child));
+    });
+  }
+  if (value is Iterable) {
+    return value.map(redactForLog).toList();
+  }
+  return scrubErrorForLog(value);
+}
+
+/// Formats a redacted value for compact structured logging.
+String formatForLog(Object? value, {int maxLength = 2000}) {
+  final redacted = redactForLog(value);
+  String formatted;
+  try {
+    formatted = jsonEncode(redacted);
+  } on Object {
+    formatted = redacted.toString();
+  }
+  if (formatted.length <= maxLength) {
+    return formatted;
+  }
+  return '${formatted.substring(0, maxLength)}... [truncated]';
 }

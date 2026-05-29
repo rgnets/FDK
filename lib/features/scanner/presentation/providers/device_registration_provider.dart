@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
@@ -15,6 +15,7 @@ import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'device_registration_provider.g.dart';
 
@@ -31,6 +32,8 @@ DeviceRegistrationService deviceRegistrationService(
 /// Handles checking existing devices and registering new ones.
 @Riverpod(keepAlive: true)
 class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
+  static const String _tag = 'DeviceRegistration';
+
   StreamSubscription<SocketMessage>? _wsSubscription;
 
   // Dual-index cache for O(1) device lookup (populated from WebSocket events)
@@ -66,7 +69,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     if (_isDeviceEvent(type)) {
       LoggerService.debug(
         'DeviceRegistration: Received device event: $type',
-        tag: 'DeviceRegistration',
+        tag: _tag,
       );
 
       // Handle specific event types
@@ -94,9 +97,12 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     final device = payload['data'] ?? payload;
     if (device is! Map<String, dynamic>) return;
 
-    final mac = _normalizeMac((device['mac'] ?? device['mac_address'] ?? '').toString());
-    final serial =
-        (device['serial_number'] ?? device['sn'] ?? '').toString().toUpperCase();
+    final mac = _normalizeMac(
+      (device['mac'] ?? device['mac_address'] ?? '').toString(),
+    );
+    final serial = (device['serial_number'] ?? device['sn'] ?? '')
+        .toString()
+        .toUpperCase();
 
     if (mac.isNotEmpty) {
       _deviceIndexByMac[mac] = device;
@@ -107,7 +113,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
     LoggerService.debug(
       'DeviceRegistration: Upserted device MAC=$mac, SN=$serial',
-      tag: 'DeviceRegistration',
+      tag: _tag,
     );
   }
 
@@ -119,10 +125,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     _deviceIndexByMac.removeWhere((_, device) => device['id'] == id);
     _deviceIndexBySerial.removeWhere((_, device) => device['id'] == id);
 
-    LoggerService.debug(
-      'DeviceRegistration: Removed device ID=$id',
-      tag: 'DeviceRegistration',
-    );
+    LoggerService.debug('DeviceRegistration: Removed device ID=$id', tag: _tag);
   }
 
   void _handleDeviceSnapshot(Map<String, dynamic> payload) {
@@ -141,7 +144,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
     LoggerService.debug(
       'DeviceRegistration: Rebuilt indexes from snapshot (${items.length} devices)',
-      tag: 'DeviceRegistration',
+      tag: _tag,
     );
   }
 
@@ -226,10 +229,12 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     final existingMac = _normalizeMac(existing.macAddress ?? '');
     final existingSerial = (existing.serialNumber ?? '').toUpperCase().trim();
 
-    final hasMacMismatch = normalizedMac.isNotEmpty &&
+    final hasMacMismatch =
+        normalizedMac.isNotEmpty &&
         existingMac.isNotEmpty &&
         normalizedMac != existingMac;
-    final hasSerialMismatch = normalizedSerial.isNotEmpty &&
+    final hasSerialMismatch =
+        normalizedSerial.isNotEmpty &&
         existingSerial.isNotEmpty &&
         normalizedSerial != existingSerial;
 
@@ -245,14 +250,8 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         matchedDeviceName: existing.name,
         mismatchInfo: MatchMismatchInfo(
           mismatchedFields: mismatches,
-          expected: {
-            'mac': existingMac,
-            'serial_number': existingSerial,
-          },
-          scanned: {
-            'mac': normalizedMac,
-            'serial_number': normalizedSerial,
-          },
+          expected: {'mac': existingMac, 'serial_number': existingSerial},
+          scanned: {'mac': normalizedMac, 'serial_number': normalizedSerial},
         ),
       );
       return true;
@@ -323,6 +322,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
     final resourceType = _resourceTypeFor(deviceType);
     final results = <Map<String, dynamic>>[];
+    _debugRegistration('lookup_start', {
+      'device_type': deviceType.name,
+      'resource_type': resourceType,
+      'identifiers': {
+        if (mac != null && mac.isNotEmpty) 'mac': mac,
+        if (serial != null && serial.isNotEmpty) 'serial_number': serial,
+      },
+    });
 
     // Query by MAC if provided - format for backend (lowercase with colons)
     if (mac != null && mac.isNotEmpty) {
@@ -331,13 +338,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         'DeviceRegistration: Querying $resourceType with formatted MAC: $formattedMac (original: $mac)',
         tag: 'DeviceRegistration',
       );
-      final byMac = await _queryResource(wsService, resourceType, {'mac': formattedMac});
+      final byMac = await _queryResource(wsService, resourceType, {
+        'mac': formattedMac,
+      });
       results.addAll(byMac);
     }
 
     // Query by serial if provided
     if (serial != null && serial.isNotEmpty) {
-      final bySerial = await _queryResource(wsService, resourceType, {'serial_number': serial});
+      final bySerial = await _queryResource(wsService, resourceType, {
+        'serial_number': serial,
+      });
       // Avoid duplicates if already found by MAC
       for (final device in bySerial) {
         final deviceId = device['id'];
@@ -365,13 +376,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       final payload = message.payload;
       if (payload['request_id'] == requestId) {
         subscription?.cancel();
+        _debugRegistration('lookup_response', {
+          'request_id': requestId,
+          'resource_type': resourceType,
+          'status': (payload['status'] as num?)?.toInt(),
+          'body': message.raw ?? payload,
+        });
 
         // Extract results from response
         final data = payload['data'];
         if (data is List) {
-          completer.complete(
-            data.whereType<Map<String, dynamic>>().toList(),
-          );
+          completer.complete(data.whereType<Map<String, dynamic>>().toList());
         } else {
           completer.complete([]);
         }
@@ -388,6 +403,15 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       'page_size': 10,
       ...filters,
     });
+    _debugRegistration('lookup_request', {
+      'request_id': requestId,
+      'endpoint': 'ActionCable RxgChannel/resource_action/$resourceType',
+      'payload': {
+        'command': 'message',
+        'identifier': channelIdentifier,
+        'data': jsonDecode(queryPayload),
+      },
+    });
 
     wsService.send({
       'command': 'message',
@@ -403,18 +427,31 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
           subscription?.cancel();
           LoggerService.warning(
             'DeviceRegistration: Query timeout for $resourceType',
-            tag: 'DeviceRegistration',
+            tag: _tag,
           );
+          _debugRegistration('lookup_failure', {
+            'request_id': requestId,
+            'resource_type': resourceType,
+            'reason': 'timeout',
+            'filters': filters,
+          });
           return [];
         },
       );
     } on Exception catch (e) {
       unawaited(subscription.cancel());
       LoggerService.error(
-        'DeviceRegistration: Query failed for $resourceType',
-        error: e,
-        tag: 'DeviceRegistration',
+        'DeviceRegistration: Query failed for $resourceType: '
+        '${scrubErrorForLog(e)}',
+        error: scrubErrorForLog(e),
+        tag: _tag,
       );
+      _debugRegistration('lookup_failure', {
+        'request_id': requestId,
+        'resource_type': resourceType,
+        'reason': scrubErrorForLog(e),
+        'filters': filters,
+      });
       return [];
     }
   }
@@ -489,9 +526,11 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       Map<String, dynamic>? deviceBySerial;
 
       for (final device in matchingDevices) {
-        final rawMac = (device['mac'] ?? device['mac_address'] ?? '').toString();
+        final rawMac = (device['mac'] ?? device['mac_address'] ?? '')
+            .toString();
         final devMac = _normalizeMac(rawMac);
-        final rawSerial = (device['serial_number'] ?? device['sn'] ?? '').toString();
+        final rawSerial = (device['serial_number'] ?? device['sn'] ?? '')
+            .toString();
         final devSerial = rawSerial.toUpperCase().trim();
 
         LoggerService.debug(
@@ -502,12 +541,22 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         );
 
         // Compare normalized values - if scanned value is empty, don't set match
-        if (normalizedMac.isNotEmpty && devMac.isNotEmpty && devMac == normalizedMac) {
-          LoggerService.debug('DeviceRegistration: MAC match found!', tag: 'DeviceRegistration');
+        if (normalizedMac.isNotEmpty &&
+            devMac.isNotEmpty &&
+            devMac == normalizedMac) {
+          LoggerService.debug(
+            'DeviceRegistration: MAC match found!',
+            tag: 'DeviceRegistration',
+          );
           deviceByMac = device;
         }
-        if (normalizedSerial.isNotEmpty && devSerial.isNotEmpty && devSerial == normalizedSerial) {
-          LoggerService.debug('DeviceRegistration: Serial match found!', tag: 'DeviceRegistration');
+        if (normalizedSerial.isNotEmpty &&
+            devSerial.isNotEmpty &&
+            devSerial == normalizedSerial) {
+          LoggerService.debug(
+            'DeviceRegistration: Serial match found!',
+            tag: 'DeviceRegistration',
+          );
           deviceBySerial = device;
         }
       }
@@ -523,19 +572,23 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       if (matchingDevices.isNotEmpty) {
         final existingDevice = matchingDevices.first;
         final existingMac = _normalizeMac(
-          (existingDevice['mac'] ?? existingDevice['mac_address'] ?? '').toString(),
+          (existingDevice['mac'] ?? existingDevice['mac_address'] ?? '')
+              .toString(),
         );
-        final existingSerial = (existingDevice['serial_number'] ?? existingDevice['sn'] ?? '')
-            .toString()
-            .toUpperCase()
-            .trim();
+        final existingSerial =
+            (existingDevice['serial_number'] ?? existingDevice['sn'] ?? '')
+                .toString()
+                .toUpperCase()
+                .trim();
 
         // Check if BOTH fields were scanned AND the device has BOTH fields AND they DIFFER
         // This is the only true mismatch case
-        final hasMacMismatch = normalizedMac.isNotEmpty &&
+        final hasMacMismatch =
+            normalizedMac.isNotEmpty &&
             existingMac.isNotEmpty &&
             normalizedMac != existingMac;
-        final hasSerialMismatch = normalizedSerial.isNotEmpty &&
+        final hasSerialMismatch =
+            normalizedSerial.isNotEmpty &&
             existingSerial.isNotEmpty &&
             normalizedSerial != existingSerial;
 
@@ -546,7 +599,9 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
         // Only flag as mismatch if we have conflicting data
         // (e.g., scanned MAC matches device A, but scanned serial matches device B)
-        if (deviceByMac != null && deviceBySerial != null && deviceByMac['id'] != deviceBySerial['id']) {
+        if (deviceByMac != null &&
+            deviceBySerial != null &&
+            deviceByMac['id'] != deviceBySerial['id']) {
           LoggerService.debug(
             'DeviceRegistration: Multiple devices match - MAC matches ${deviceByMac['id']}, serial matches ${deviceBySerial['id']}',
             tag: 'DeviceRegistration',
@@ -561,7 +616,8 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
         // If we found a device by one field, but the OTHER scanned field doesn't match
         // that device's stored value, it's a true mismatch
-        if ((deviceByMac != null && hasSerialMismatch) || (deviceBySerial != null && hasMacMismatch)) {
+        if ((deviceByMac != null && hasSerialMismatch) ||
+            (deviceBySerial != null && hasMacMismatch)) {
           final mismatches = <String>[];
           if (hasMacMismatch) mismatches.add('MAC Address');
           if (hasSerialMismatch) mismatches.add('Serial Number');
@@ -578,10 +634,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
             matchedDeviceName: existingDevice['name'] as String?,
             mismatchInfo: MatchMismatchInfo(
               mismatchedFields: mismatches,
-              expected: {
-                'mac': existingMac,
-                'serial_number': existingSerial,
-              },
+              expected: {'mac': existingMac, 'serial_number': existingSerial},
               scanned: {
                 'mac': normalizedMac,
                 'serial_number': normalizedSerial,
@@ -612,21 +665,24 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       }
 
       // No devices found at all
-      LoggerService.debug('DeviceRegistration: No matching devices found', tag: 'DeviceRegistration');
+      LoggerService.debug(
+        'DeviceRegistration: No matching devices found',
+        tag: 'DeviceRegistration',
+      );
       state = state.copyWith(
         status: RegistrationStatus.idle,
         matchStatus: DeviceMatchStatus.noMatch,
       );
-    } catch (e, stack) {
+    } on Object catch (e, stack) {
       LoggerService.error(
-        'DeviceRegistration: Check match failed',
-        error: e,
+        'DeviceRegistration: Check match failed: ${scrubErrorForLog(e)}',
+        error: scrubErrorForLog(e),
         stackTrace: stack,
-        tag: 'DeviceRegistration',
+        tag: _tag,
       );
       state = state.copyWith(
         status: RegistrationStatus.error,
-        errorMessage: 'Failed to check device: $e',
+        errorMessage: 'Failed to check device: ${scrubErrorForLog(e)}',
       );
     }
   }
@@ -641,10 +697,25 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     String? model,
     int? existingDeviceId,
   }) async {
+    final attemptId =
+        'reg-${deviceType.name}-${DateTime.now().millisecondsSinceEpoch}';
     state = state.copyWith(
       status: RegistrationStatus.registering,
       errorMessage: null,
     );
+    _debugRegistration('provider_start', {
+      'attempt_id': attemptId,
+      'device_type': deviceType.name,
+      'device_display_name': deviceType.displayName,
+      'identifiers': {
+        'mac': mac,
+        'serial_number': serial,
+        if (partNumber != null) 'part_number': partNumber,
+        if (model != null) 'model': model,
+        if (existingDeviceId != null) 'existing_device_id': existingDeviceId,
+        'pms_room_id': pmsRoomId,
+      },
+    });
 
     try {
       // Validate serial pattern. AT&T-style serials carry a discriminating
@@ -657,10 +728,17 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
       // validation, and rejecting here would block legitimate registrations
       // during the brief startup window.
       final detectedType = SerialPatterns.detectDeviceType(serial);
-      final macIsKnownVendor = !macDatabase.isLoaded ||
+      final macIsKnownVendor =
+          !macDatabase.isLoaded ||
           ScannerValidationService.isKnownManufacturer(mac);
       if (detectedType == null && !macIsKnownVendor) {
-        final error = 'Invalid serial number format for ${deviceType.displayName}';
+        final error =
+            'Invalid serial number format for ${deviceType.displayName}';
+        _debugRegistration('provider_failure', {
+          'attempt_id': attemptId,
+          'device_type': deviceType.name,
+          'reason': error,
+        });
         state = state.copyWith(
           status: RegistrationStatus.error,
           errorMessage: error,
@@ -681,6 +759,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         partNumber: partNumber,
         model: model,
         existingDeviceId: existingDeviceId,
+        attemptId: attemptId,
       );
 
       if (!outcome.success) {
@@ -689,14 +768,21 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         // so the client times out. Before reporting failure on a timeout,
         // watch the subscription stream for the new device — if it shows
         // up, the registration actually succeeded.
-        final isTimeout = outcome.status == 0 &&
-            (outcome.errorMessage?.toLowerCase().contains('timed out') ?? false);
+        final isTimeout =
+            outcome.status == 0 &&
+            (outcome.errorMessage?.toLowerCase().contains('timed out') ??
+                false);
         if (isTimeout && await _waitForDeviceInCache(mac, deviceType)) {
           LoggerService.warning(
             'DeviceRegistration: Backend ack lost but device materialized '
             'in cache (MAC=$mac) — treating as success',
-            tag: 'DeviceRegistration',
+            tag: _tag,
           );
+          _debugRegistration('provider_success_soft_ack', {
+            'attempt_id': attemptId,
+            'device_type': deviceType.name,
+            'reason': 'Backend ack timed out but device appeared in cache',
+          });
           state = state.copyWith(
             status: RegistrationStatus.success,
             registeredAt: DateTime.now(),
@@ -710,8 +796,14 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         final error = outcome.errorMessage ?? 'Registration failed';
         LoggerService.warning(
           'DeviceRegistration: Backend rejected registration ($error, status=${outcome.status})',
-          tag: 'DeviceRegistration',
+          tag: _tag,
         );
+        _debugRegistration('provider_failure', {
+          'attempt_id': attemptId,
+          'device_type': deviceType.name,
+          'status': outcome.status,
+          'reason': error,
+        });
         state = state.copyWith(
           status: RegistrationStatus.error,
           errorMessage: error,
@@ -721,8 +813,20 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
       LoggerService.info(
         'DeviceRegistration: Backend confirmed registration - $deviceType MAC=$mac, SN=$serial, Room=$pmsRoomId',
-        tag: 'DeviceRegistration',
+        tag: _tag,
       );
+      _debugRegistration('provider_success', {
+        'attempt_id': attemptId,
+        'device_type': deviceType.name,
+        'status': outcome.status,
+        'identifiers': {
+          'mac': mac,
+          'serial_number': serial,
+          if (partNumber != null) 'part_number': partNumber,
+          if (existingDeviceId != null) 'existing_device_id': existingDeviceId,
+          'pms_room_id': pmsRoomId,
+        },
+      });
 
       state = state.copyWith(
         status: RegistrationStatus.success,
@@ -737,15 +841,20 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         deviceId: existingDeviceId ?? 0,
         deviceType: deviceType.name,
       );
-    } catch (e, stack) {
+    } on Object catch (e, stack) {
       LoggerService.error(
-        'DeviceRegistration: Registration failed',
-        error: e,
+        'DeviceRegistration: Registration failed: ${scrubErrorForLog(e)}',
+        error: scrubErrorForLog(e),
         stackTrace: stack,
-        tag: 'DeviceRegistration',
+        tag: _tag,
       );
 
-      final error = 'Registration failed: $e';
+      final error = 'Registration failed: ${scrubErrorForLog(e)}';
+      _debugRegistration('provider_failure', {
+        'attempt_id': attemptId,
+        'device_type': deviceType.name,
+        'reason': scrubErrorForLog(e),
+      });
       state = state.copyWith(
         status: RegistrationStatus.error,
         errorMessage: error,
@@ -773,10 +882,11 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
           'DeviceRegistration: Requested $resourceType refresh after registration',
           tag: 'DeviceRegistration',
         );
-      } catch (e) {
+      } on Object catch (e) {
         LoggerService.warning(
-          'DeviceRegistration: Could not refresh $resourceType: $e',
-          tag: 'DeviceRegistration',
+          'DeviceRegistration: Could not refresh $resourceType: '
+          '${scrubErrorForLog(e)}',
+          tag: _tag,
         );
       }
     });
@@ -806,10 +916,11 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     final deadline = DateTime.now().add(const Duration(seconds: 6));
     while (DateTime.now().isBefore(deadline)) {
       final devices = ref.read(devicesNotifierProvider).valueOrNull;
-      if (devices != null && devices.any((d) {
-        final candidate = d.macAddress;
-        return candidate != null && _macKey(candidate) == target;
-      })) {
+      if (devices != null &&
+          devices.any((d) {
+            final candidate = d.macAddress;
+            return candidate != null && _macKey(candidate) == target;
+          })) {
         return true;
       }
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -819,6 +930,16 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
 
   static String _macKey(String mac) =>
       mac.replaceAll(RegExp('[^0-9A-Fa-f]'), '').toLowerCase();
+
+  void _debugRegistration(String phase, Map<String, dynamic> details) {
+    if (!LoggerService.isVerboseLoggingEnabled) {
+      return;
+    }
+    LoggerService.debug(
+      '[REGISTRATION_FLOW:$phase] ${formatForLog(details)}',
+      tag: _tag,
+    );
+  }
 
   /// Reset registration state to idle.
   void reset() {

@@ -1,8 +1,8 @@
 import 'package:logger/logger.dart';
-import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
@@ -12,9 +12,9 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     required WebSocketService webSocketService,
     required WebSocketCacheIntegration cacheIntegration,
     Logger? logger,
-  })  : _webSocketService = webSocketService,
-        _cacheIntegration = cacheIntegration,
-        _logger = logger ?? Logger();
+  }) : _webSocketService = webSocketService,
+       _cacheIntegration = cacheIntegration,
+       _logger = logger ?? Logger();
 
   final WebSocketService _webSocketService;
   final WebSocketCacheIntegration _cacheIntegration;
@@ -29,71 +29,118 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
   @override
   Future<List<SpeedTestConfig>> getSpeedTestConfigs() async {
-    _logger.i('SpeedTestWebSocketDataSource: getSpeedTestConfigs() called');
+    SpeedTestDebugLogger.debug('config_fetch_start', {
+      'source': 'websocket_data_source',
+      'resource_type': _speedTestConfigResourceType,
+    });
 
     // Try cache first
     final cachedConfigs = _cacheIntegration.getCachedSpeedTestConfigs();
     if (cachedConfigs.isNotEmpty) {
-      _logger.i(
-        'SpeedTestWebSocketDataSource: Returning ${cachedConfigs.length} configs from cache',
-      );
+      SpeedTestDebugLogger.debug('config_fetch_cache_hit', {
+        'source': 'websocket_data_source',
+        'resource_type': _speedTestConfigResourceType,
+        'count': cachedConfigs.length,
+      });
       return cachedConfigs;
     }
 
     // Fall back to WebSocket request if cache empty
     if (!_webSocketService.isConnected) {
-      _logger.w('SpeedTestWebSocketDataSource: WebSocket not connected');
+      SpeedTestDebugLogger.warning('error', {
+        'source': 'websocket_data_source',
+        'resource_type': _speedTestConfigResourceType,
+        'reason': 'WebSocket not connected',
+      });
       return [];
     }
 
     try {
+      final requestId = SpeedTestDebugLogger.newRequestId('speed-test-configs');
+      final payload = {
+        'action': 'resource_action',
+        'resource_type': _speedTestConfigResourceType,
+        'request_id': requestId,
+        'crud_action': 'index',
+      };
+      SpeedTestDebugLogger.debug('request', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'endpoint':
+            'ActionCable RxgChannel/resource_action/$_speedTestConfigResourceType',
+        'payload': payload,
+      });
       final response = await _webSocketService.requestActionCable(
         action: 'resource_action',
         resourceType: _speedTestConfigResourceType,
         additionalData: {'crud_action': 'index'},
+        requestId: requestId,
         timeout: const Duration(seconds: 15),
       );
 
       final data = response.payload['data'];
-      LoggerService.info(
-        'SpeedTestConfigs raw response: ${response.payload}',
-        tag: 'SpeedTestWS',
-      );
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestConfigResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
       if (data is List) {
-        LoggerService.info(
-          'SpeedTestConfigs received ${data.length} configs',
-          tag: 'SpeedTestWS',
-        );
-        for (int i = 0; i < data.length; i++) {
-          final json = data[i];
-          LoggerService.info(
-            'Config[$i]: id=${json['id']}, name=${json['name']}, target=${json['target']}',
-            tag: 'SpeedTestWS',
-          );
-        }
+        SpeedTestDebugLogger.debug('config_fetch_result', {
+          'source': 'websocket_data_source',
+          'request_id': requestId,
+          'count': data.length,
+        });
         return data
-            .map((dynamic json) => SpeedTestConfig.fromJson(
-                  Map<String, dynamic>.from(json as Map),
-                ))
+            .map(
+              (dynamic json) => SpeedTestConfig.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
             .toList();
       }
 
-      LoggerService.warning('SpeedTestConfigs: data is not a List', tag: 'SpeedTestWS');
+      SpeedTestDebugLogger.warning('error', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestConfigResourceType,
+        'reason': 'Response data is not a List',
+        'body': response.raw ?? response.payload,
+      });
       return [];
-    } catch (e) {
-      _logger.e('SpeedTestWebSocketDataSource: Failed to get configs: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'websocket_data_source',
+          'resource_type': _speedTestConfigResourceType,
+          'reason': 'Failed to get configs',
+          'error': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return [];
     }
   }
 
   @override
   Future<SpeedTestConfig> getSpeedTestConfig(int id) async {
-    _logger.i('SpeedTestWebSocketDataSource: getSpeedTestConfig($id) called');
+    SpeedTestDebugLogger.debug('config_fetch_start', {
+      'source': 'websocket_data_source',
+      'resource_type': _speedTestConfigResourceType,
+      'speed_test_id': id,
+    });
 
     // Try cache first
     final cachedConfig = _cacheIntegration.getSpeedTestConfigById(id);
     if (cachedConfig != null) {
-      _logger.i('SpeedTestWebSocketDataSource: Returning config $id from cache');
+      SpeedTestDebugLogger.debug('config_fetch_cache_hit', {
+        'source': 'websocket_data_source',
+        'resource_type': _speedTestConfigResourceType,
+        'speed_test_id': id,
+      });
       return cachedConfig;
     }
 
@@ -102,18 +149,39 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw StateError('WebSocket not connected');
     }
 
-    final response = await _webSocketService.requestActionCable(
-      action: 'resource_action',
-      resourceType: _speedTestConfigResourceType,
-      additionalData: {
+    final requestId = SpeedTestDebugLogger.newRequestId(
+      'speed-test-config-$id',
+    );
+    SpeedTestDebugLogger.debug('request', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'endpoint':
+          'ActionCable RxgChannel/resource_action/$_speedTestConfigResourceType',
+      'payload': {
+        'action': 'resource_action',
+        'resource_type': _speedTestConfigResourceType,
+        'request_id': requestId,
         'crud_action': 'show',
         'id': id,
       },
+    });
+    final response = await _webSocketService.requestActionCable(
+      action: 'resource_action',
+      resourceType: _speedTestConfigResourceType,
+      additionalData: {'crud_action': 'show', 'id': id},
+      requestId: requestId,
       timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];
     if (data != null) {
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestConfigResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
       return SpeedTestConfig.fromJson(Map<String, dynamic>.from(data as Map));
     }
 
@@ -131,11 +199,14 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
     int? limit,
     int? offset,
   }) async {
-    _logger.i(
-      'SpeedTestWebSocketDataSource: getSpeedTestResults('
-      'speedTestId: $speedTestId, accessPointId: $accessPointId, '
-      'limit: $limit, offset: $offset) called',
-    );
+    SpeedTestDebugLogger.debug('result_fetch_start', {
+      'source': 'websocket_data_source',
+      'resource_type': _speedTestResultResourceType,
+      if (speedTestId != null) 'speed_test_id': speedTestId,
+      if (accessPointId != null) 'access_point_id': accessPointId,
+      if (limit != null) 'limit': limit,
+      if (offset != null) 'offset': offset,
+    });
 
     // Try cache first with filtering
     var cachedResults = _cacheIntegration.getCachedSpeedTestResults();
@@ -168,6 +239,13 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
         _logger.i(
           'SpeedTestWebSocketDataSource: Returning ${cachedResults.length} results from cache',
         );
+        SpeedTestDebugLogger.debug('result_fetch_cache_hit', {
+          'source': 'websocket_data_source',
+          'resource_type': _speedTestResultResourceType,
+          'count': cachedResults.length,
+          if (speedTestId != null) 'speed_test_id': speedTestId,
+          if (accessPointId != null) 'access_point_id': accessPointId,
+        });
         return cachedResults;
       }
 
@@ -180,84 +258,136 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
     // Fall back to WebSocket request if cache empty
     if (!_webSocketService.isConnected) {
-      _logger.w('SpeedTestWebSocketDataSource: WebSocket not connected');
+      SpeedTestDebugLogger.warning('error', {
+        'source': 'websocket_data_source',
+        'resource_type': _speedTestResultResourceType,
+        'reason': 'WebSocket not connected',
+      });
       return [];
     }
 
     try {
-      final additionalData = <String, dynamic>{
-        'crud_action': 'index',
-      };
+      final additionalData = <String, dynamic>{'crud_action': 'index'};
       if (speedTestId != null) additionalData['speed_test_id'] = speedTestId;
       if (accessPointId != null) {
         additionalData['access_point_id'] = accessPointId;
       }
       if (limit != null) additionalData['limit'] = limit;
       if (offset != null) additionalData['offset'] = offset;
+      final requestId = SpeedTestDebugLogger.newRequestId('speed-test-results');
+      SpeedTestDebugLogger.debug('request', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'endpoint':
+            'ActionCable RxgChannel/resource_action/$_speedTestResultResourceType',
+        'payload': {
+          'action': 'resource_action',
+          'resource_type': _speedTestResultResourceType,
+          'request_id': requestId,
+          ...additionalData,
+        },
+      });
 
       final response = await _webSocketService.requestActionCable(
         action: 'resource_action',
         resourceType: _speedTestResultResourceType,
         additionalData: additionalData,
+        requestId: requestId,
         timeout: const Duration(seconds: 15),
       );
 
       final data = response.payload['data'];
-      LoggerService.info(
-        'SpeedTestResults raw response: ${response.payload}',
-        tag: 'SpeedTestWS',
-      );
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestResultResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
       if (data is List) {
-        LoggerService.info(
-          'SpeedTestResults received ${data.length} results',
-          tag: 'SpeedTestWS',
-        );
-        for (var i = 0; i < data.length && i < 5; i++) {
-          final json = data[i] as Map;
-          LoggerService.info(
-            'Result[$i]: id=${json['id']}, speed_test_id=${json['speed_test_id']}, '
-            'download=${json['download_mbps']}, upload=${json['upload_mbps']}',
-            tag: 'SpeedTestWS',
-          );
-        }
-        if (data.length > 5) {
-          LoggerService.info('... and ${data.length - 5} more results', tag: 'SpeedTestWS');
-        }
+        SpeedTestDebugLogger.debug('result_fetch_result', {
+          'source': 'websocket_data_source',
+          'request_id': requestId,
+          'count': data.length,
+        });
         return data
-            .map((dynamic json) => SpeedTestResult.fromJsonWithValidation(
-                  Map<String, dynamic>.from(json as Map),
-                ))
+            .map(
+              (dynamic json) => SpeedTestResult.fromJsonWithValidation(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
             .toList();
       }
 
-      LoggerService.warning('SpeedTestResults: data is not a List', tag: 'SpeedTestWS');
+      SpeedTestDebugLogger.warning('error', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestResultResourceType,
+        'reason': 'Response data is not a List',
+        'body': response.raw ?? response.payload,
+      });
       return [];
-    } catch (e) {
-      _logger.e('SpeedTestWebSocketDataSource: Failed to get results: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'websocket_data_source',
+          'resource_type': _speedTestResultResourceType,
+          'reason': 'Failed to get results',
+          'error': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return [];
     }
   }
 
   @override
   Future<SpeedTestResult> getSpeedTestResult(int id) async {
-    _logger.i('SpeedTestWebSocketDataSource: getSpeedTestResult($id) called');
+    SpeedTestDebugLogger.debug('result_fetch_start', {
+      'source': 'websocket_data_source',
+      'resource_type': _speedTestResultResourceType,
+      'result_id': id,
+    });
 
     if (!_webSocketService.isConnected) {
       throw StateError('WebSocket not connected');
     }
 
-    final response = await _webSocketService.requestActionCable(
-      action: 'resource_action',
-      resourceType: _speedTestResultResourceType,
-      additionalData: {
+    final requestId = SpeedTestDebugLogger.newRequestId(
+      'speed-test-result-$id',
+    );
+    SpeedTestDebugLogger.debug('request', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'endpoint':
+          'ActionCable RxgChannel/resource_action/$_speedTestResultResourceType',
+      'payload': {
+        'action': 'resource_action',
+        'resource_type': _speedTestResultResourceType,
+        'request_id': requestId,
         'crud_action': 'show',
         'id': id,
       },
+    });
+    final response = await _webSocketService.requestActionCable(
+      action: 'resource_action',
+      resourceType: _speedTestResultResourceType,
+      additionalData: {'crud_action': 'show', 'id': id},
+      requestId: requestId,
       timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];
     if (data != null) {
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestResultResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
       return SpeedTestResult.fromJsonWithValidation(
         Map<String, dynamic>.from(data as Map),
       );
@@ -268,37 +398,60 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
   @override
   Future<SpeedTestResult> createSpeedTestResult(SpeedTestResult result) async {
-    _logger.i('SpeedTestWebSocketDataSource: createSpeedTestResult() called');
+    final requestId = SpeedTestDebugLogger.newRequestId(
+      'create-speed-test-result',
+    );
+    SpeedTestDebugLogger.debug('submit_start', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'result': SpeedTestDebugLogger.resultSummary(result),
+    });
 
     if (!_webSocketService.isConnected) {
       throw StateError('WebSocket not connected');
     }
 
     final jsonToSend = result.toJson();
-    LoggerService.info(
-      'createSpeedTestResult sending: $jsonToSend',
-      tag: 'SpeedTestWS',
-    );
+    SpeedTestDebugLogger.debug('request', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'endpoint':
+          'ActionCable RxgChannel/create_resource/$_speedTestResultResourceType',
+      'payload': {
+        'action': 'create_resource',
+        'resource_type': _speedTestResultResourceType,
+        'request_id': requestId,
+        'params': jsonToSend,
+      },
+    });
 
     final response = await _webSocketService.requestActionCable(
       action: 'create_resource',
       resourceType: _speedTestResultResourceType,
-      additionalData: {
-        'params': jsonToSend,
-      },
+      additionalData: {'params': jsonToSend},
+      requestId: requestId,
       timeout: const Duration(seconds: 15),
     );
 
-    LoggerService.info(
-      'createSpeedTestResult response: ${response.payload}',
-      tag: 'SpeedTestWS',
-    );
+    SpeedTestDebugLogger.debug('response', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'resource_type': _speedTestResultResourceType,
+      'status': (response.payload['status'] as num?)?.toInt(),
+      'body': response.raw ?? response.payload,
+    });
 
     final data = response.payload['data'];
     if (data != null) {
-      return SpeedTestResult.fromJsonWithValidation(
+      final created = SpeedTestResult.fromJsonWithValidation(
         Map<String, dynamic>.from(data as Map),
       );
+      SpeedTestDebugLogger.debug('submit_result', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'result': SpeedTestDebugLogger.resultSummary(created),
+      });
+      return created;
     }
 
     throw Exception(
@@ -309,9 +462,14 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
 
   @override
   Future<SpeedTestResult> updateSpeedTestResult(SpeedTestResult result) async {
-    _logger.i(
-      'SpeedTestWebSocketDataSource: updateSpeedTestResult(${result.id}) called',
+    final requestId = SpeedTestDebugLogger.newRequestId(
+      'update-speed-test-result',
     );
+    SpeedTestDebugLogger.debug('submit_start', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'result': SpeedTestDebugLogger.resultSummary(result),
+    });
 
     if (!_webSocketService.isConnected) {
       throw StateError('WebSocket not connected');
@@ -321,21 +479,45 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw ArgumentError('Cannot update speed test result without id');
     }
 
-    final response = await _webSocketService.requestActionCable(
-      action: 'update_resource',
-      resourceType: _speedTestResultResourceType,
-      additionalData: {
+    SpeedTestDebugLogger.debug('request', {
+      'source': 'websocket_data_source',
+      'request_id': requestId,
+      'endpoint':
+          'ActionCable RxgChannel/update_resource/$_speedTestResultResourceType',
+      'payload': {
+        'action': 'update_resource',
+        'resource_type': _speedTestResultResourceType,
+        'request_id': requestId,
         'id': result.id,
         'params': result.toJson(),
       },
+    });
+    final response = await _webSocketService.requestActionCable(
+      action: 'update_resource',
+      resourceType: _speedTestResultResourceType,
+      additionalData: {'id': result.id, 'params': result.toJson()},
+      requestId: requestId,
       timeout: const Duration(seconds: 15),
     );
 
     final data = response.payload['data'];
     if (data != null) {
-      return SpeedTestResult.fromJsonWithValidation(
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'resource_type': _speedTestResultResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
+      final updated = SpeedTestResult.fromJsonWithValidation(
         Map<String, dynamic>.from(data as Map),
       );
+      SpeedTestDebugLogger.debug('submit_result', {
+        'source': 'websocket_data_source',
+        'request_id': requestId,
+        'result': SpeedTestDebugLogger.resultSummary(updated),
+      });
+      return updated;
     }
 
     throw Exception(

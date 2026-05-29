@@ -1,8 +1,8 @@
 import 'package:fpdart/fpdart.dart';
-import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/errors/failures.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_source.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/repositories/speed_test_repository.dart';
@@ -12,14 +12,11 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
   SpeedTestRepositoryImpl({
     required SpeedTestDataSource dataSource,
     required WebSocketCacheIntegration cacheIntegration,
-    Logger? logger,
-  })  : _dataSource = dataSource,
-        _cacheIntegration = cacheIntegration,
-        _logger = logger ?? Logger();
+  }) : _dataSource = dataSource,
+       _cacheIntegration = cacheIntegration;
 
   final SpeedTestDataSource _dataSource;
   final WebSocketCacheIntegration _cacheIntegration;
-  final Logger _logger;
 
   // ============================================================================
   // Speed Test Config Operations
@@ -28,14 +25,26 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
   @override
   Future<Either<Failure, List<SpeedTestConfig>>> getSpeedTestConfigs() async {
     try {
-      _logger.i('SpeedTestRepositoryImpl: getSpeedTestConfigs() called');
+      SpeedTestDebugLogger.debug('config_fetch_start', {
+        'source': 'repository',
+      });
       final configs = await _dataSource.getSpeedTestConfigs();
-      _logger.i(
-        'SpeedTestRepositoryImpl: Got ${configs.length} speed test configs',
-      );
+      SpeedTestDebugLogger.debug('config_fetch_result', {
+        'source': 'repository',
+        'count': configs.length,
+      });
       return Right(configs);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to get configs: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'getSpeedTestConfigs',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }
@@ -43,11 +52,24 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
   @override
   Future<Either<Failure, SpeedTestConfig>> getSpeedTestConfig(int id) async {
     try {
-      _logger.i('SpeedTestRepositoryImpl: getSpeedTestConfig($id) called');
+      SpeedTestDebugLogger.debug('config_fetch_start', {
+        'source': 'repository',
+        'speed_test_id': id,
+      });
       final config = await _dataSource.getSpeedTestConfig(id);
       return Right(config);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to get config $id: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'getSpeedTestConfig',
+          'speed_test_id': id,
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }
@@ -64,22 +86,35 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
     int? offset,
   }) async {
     try {
-      _logger.i(
-        'SpeedTestRepositoryImpl: getSpeedTestResults('
-        'speedTestId: $speedTestId, accessPointId: $accessPointId) called',
-      );
+      SpeedTestDebugLogger.debug('result_fetch_start', {
+        'source': 'repository',
+        if (speedTestId != null) 'speed_test_id': speedTestId,
+        if (accessPointId != null) 'access_point_id': accessPointId,
+        if (limit != null) 'limit': limit,
+        if (offset != null) 'offset': offset,
+      });
       final results = await _dataSource.getSpeedTestResults(
         speedTestId: speedTestId,
         accessPointId: accessPointId,
         limit: limit,
         offset: offset,
       );
-      _logger.i(
-        'SpeedTestRepositoryImpl: Got ${results.length} speed test results',
-      );
+      SpeedTestDebugLogger.debug('result_fetch_result', {
+        'source': 'repository',
+        'count': results.length,
+      });
       return Right(results);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to get results: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'getSpeedTestResults',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }
@@ -87,11 +122,24 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
   @override
   Future<Either<Failure, SpeedTestResult>> getSpeedTestResult(int id) async {
     try {
-      _logger.i('SpeedTestRepositoryImpl: getSpeedTestResult($id) called');
+      SpeedTestDebugLogger.debug('result_fetch_start', {
+        'source': 'repository',
+        'result_id': id,
+      });
       final result = await _dataSource.getSpeedTestResult(id);
       return Right(result);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to get result $id: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'getSpeedTestResult',
+          'result_id': id,
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }
@@ -101,12 +149,27 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
     SpeedTestResult result,
   ) async {
     try {
-      _logger.i('SpeedTestRepositoryImpl: createSpeedTestResult() called');
+      SpeedTestDebugLogger.debug('submit_start', {
+        'source': 'repository',
+        'result': SpeedTestDebugLogger.resultSummary(result),
+      });
       final created = await _dataSource.createSpeedTestResult(result);
-      _logger.i('SpeedTestRepositoryImpl: Created result with id ${created.id}');
+      SpeedTestDebugLogger.debug('submit_result', {
+        'source': 'repository',
+        'result': SpeedTestDebugLogger.resultSummary(created),
+      });
       return Right(created);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to create result: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'createSpeedTestResult',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }
@@ -116,17 +179,31 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
     SpeedTestResult result,
   ) async {
     try {
-      _logger.i(
-        'SpeedTestRepositoryImpl: updateSpeedTestResult(${result.id}) called',
-      );
+      SpeedTestDebugLogger.debug('submit_start', {
+        'source': 'repository',
+        'result': SpeedTestDebugLogger.resultSummary(result),
+      });
       final updated = await _dataSource.updateSpeedTestResult(result);
 
       // Update cache immediately (same pattern as device updates)
       _cacheIntegration.updateSpeedTestResultInCache(updated.toJson());
+      SpeedTestDebugLogger.debug('submit_result', {
+        'source': 'repository',
+        'result': SpeedTestDebugLogger.resultSummary(updated),
+      });
 
       return Right(updated);
-    } on Exception catch (e) {
-      _logger.e('SpeedTestRepositoryImpl: Failed to update result: $e');
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'repository',
+          'operation': 'updateSpeedTestResult',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return Left(_mapExceptionToFailure(e));
     }
   }

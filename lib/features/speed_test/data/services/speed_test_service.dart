@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/iperf3_service.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/network_gateway_service.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/iperf_error.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_status.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,8 +16,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SpeedTestService {
   /// Regular constructor - each notifier owns its own instance
   SpeedTestService()
-      : _iperf3Service = Iperf3Service(),
-        _gatewayService = NetworkGatewayService();
+    : _iperf3Service = Iperf3Service(),
+      _gatewayService = NetworkGatewayService();
 
   final Iperf3Service _iperf3Service;
   final NetworkGatewayService _gatewayService;
@@ -34,13 +36,14 @@ class SpeedTestService {
   SpeedTestResult? _lastResult;
   double _progress = 0.0;
   bool _isDownloadPhase = true; // Track which phase we're in
-  bool _isRetryingFallback =
-      false; // Track if we're in fallback retry mode
+  bool _isRetryingFallback = false; // Track if we're in fallback retry mode
   IperfErrorCategory? _lastErrorCategory; // Classified failure of last attempt
   double _completedDownloadSpeed =
       0.0; // Store completed download speed for upload phase
   double _completedUploadSpeed =
       0.0; // Store completed upload speed (for potential retest)
+  String? _currentRunId;
+  int? _lastProgressInterval;
 
   // Streams
   final StreamController<SpeedTestStatus> _statusController =
@@ -81,9 +84,21 @@ class SpeedTestService {
 
     await _saveConfiguration();
     await _loadLastResult();
+    SpeedTestDebugLogger.debug('init', {
+      'config': {
+        'server_host': _serverHost,
+        'server_port': _serverPort,
+        'duration_seconds': _testDuration,
+        'protocol': _useUdp ? 'udp' : 'tcp',
+        'bandwidth_mbps': _bandwidthMbps,
+        'parallel_streams': _parallelStreams,
+      },
+      'has_last_result': _lastResult != null,
+    });
 
-    _progressSubscription =
-        _iperf3Service.getProgressStream().listen((progress) {
+    _progressSubscription = _iperf3Service.getProgressStream().listen((
+      progress,
+    ) {
       final status = progress['status'];
       if (status != null && status is String) {
         _handleStatusUpdate(status, progress['details']);
@@ -94,6 +109,13 @@ class SpeedTestService {
   }
 
   void _handleStatusUpdate(String status, dynamic details) {
+    SpeedTestDebugLogger.debug('status', {
+      if (_currentRunId != null) 'run_id': _currentRunId,
+      'source': 'iperf3_progress_stream',
+      'status': status,
+      'phase': _isDownloadPhase ? 'download' : 'upload',
+      if (details != null) 'details': details,
+    });
     // Determine current phase based on status and add server context
     String getMessage() {
       final serverInfo = _serverHost.isNotEmpty ? ' to $_serverHost' : '';
@@ -181,6 +203,17 @@ class SpeedTestService {
   void _handleProgressUpdate(Map<String, dynamic> progress) {
     final interval = progress['interval'] as int?;
     final speedMbps = progress['mbps'] as double?;
+    if (interval != null && interval != _lastProgressInterval) {
+      _lastProgressInterval = interval;
+      SpeedTestDebugLogger.debug('progress', {
+        if (_currentRunId != null) 'run_id': _currentRunId,
+        'phase': _isDownloadPhase ? 'download' : 'upload',
+        'interval': interval,
+        'progress_pct': _progress,
+        if (speedMbps != null) 'throughput_mbps': speedMbps,
+        if (progress['details'] != null) 'details': progress['details'],
+      });
+    }
 
     if (interval != null && _testDuration > 0) {
       _progress = (interval / _testDuration * 100).clamp(0.0, 100.0);
@@ -191,8 +224,7 @@ class SpeedTestService {
         // Create a partial result for live updates based on current phase
         // Preserve completed phase speed so UI shows both download AND upload
         final liveResult = SpeedTestResult(
-          downloadMbps:
-              _isDownloadPhase ? speedMbps : _completedDownloadSpeed,
+          downloadMbps: _isDownloadPhase ? speedMbps : _completedDownloadSpeed,
           uploadMbps: !_isDownloadPhase ? speedMbps : _completedUploadSpeed,
           rtt: 0.0,
           completedAt: DateTime.now(),
@@ -204,6 +236,12 @@ class SpeedTestService {
   }
 
   void _updateStatus(SpeedTestStatus status) {
+    SpeedTestDebugLogger.debug('status', {
+      if (_currentRunId != null) 'run_id': _currentRunId,
+      'source': 'speed_test_service',
+      'previous_status': _status.name,
+      'next_status': status.name,
+    });
     _status = status;
     _statusController.add(_status);
   }
@@ -220,6 +258,11 @@ class SpeedTestService {
       for (final interface in interfaces) {
         for (final addr in interface.addresses) {
           if (!addr.isLoopback) {
+            SpeedTestDebugLogger.debug('network_info', {
+              if (_currentRunId != null) 'run_id': _currentRunId,
+              'local_ip_address': addr.address,
+              'interface': interface.name,
+            });
             return addr.address;
           }
         }
@@ -227,21 +270,31 @@ class SpeedTestService {
 
       return null;
     } catch (e) {
-      LoggerService.error('Failed to get local IP address: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to get local IP address: $e',
+        tag: 'SpeedTestService',
+      );
       return null;
     }
   }
 
   /// Run speed test with automatic fallback retry
   /// If a server fails, automatically tries the next fallback
-  Future<void> runSpeedTestWithFallback({String? configTarget}) async {
+  Future<void> runSpeedTestWithFallback({
+    String? configTarget,
+    SpeedTestConfig? config,
+    String? runId,
+  }) async {
     if (_status == SpeedTestStatus.running) {
-      LoggerService.warning('Speed test already running',
-          tag: 'SpeedTestService');
+      LoggerService.warning(
+        'Speed test already running',
+        tag: 'SpeedTestService',
+      );
       return;
     }
 
+    _currentRunId = runId ?? SpeedTestDebugLogger.newRunId();
+    _lastProgressInterval = null;
     _updateStatus(SpeedTestStatus.running);
     _progress = 0.0;
     _progressController.add(_progress);
@@ -255,12 +308,30 @@ class SpeedTestService {
     _completedDownloadSpeed = 0.0;
     _completedUploadSpeed = 0.0;
     _lastErrorCategory = null;
+    SpeedTestDebugLogger.info('start', {
+      'run_id': _currentRunId,
+      'target': configTarget,
+      'selected_config': SpeedTestDebugLogger.speedTestConfigSummary(config),
+      'runtime_config': {
+        'server_host': _serverHost,
+        'server_port': _serverPort,
+        'duration_seconds': _testDuration,
+        'protocol': _useUdp ? 'udp' : 'tcp',
+        'bandwidth_mbps': _useUdp ? _bandwidthMbps : null,
+        'parallel_streams': _parallelStreams,
+      },
+    });
 
     // Get local IP address
     final localIp = await _getLocalIpAddress();
 
     // Build fallback server list
     final fallbackServers = await _buildFallbackList(configTarget);
+    SpeedTestDebugLogger.debug('target_resolution', {
+      'run_id': _currentRunId,
+      'local_ip_address': localIp,
+      'fallback_servers': fallbackServers,
+    });
 
     // Try each server until one succeeds
     for (int i = 0; i < fallbackServers.length; i++) {
@@ -275,10 +346,22 @@ class SpeedTestService {
           'Attempt $attemptNum/${fallbackServers.length}: $serverLabel ($serverHost)';
       _statusMessageController.add(message);
       LoggerService.info(message, tag: 'SpeedTestService');
+      SpeedTestDebugLogger.info('attempt', {
+        'run_id': _currentRunId,
+        'attempt_number': attemptNum,
+        'attempt_total': fallbackServers.length,
+        'server_label': serverLabel,
+        'server_host': serverHost,
+      });
 
       try {
         // Attempt test with this server
-        final result = await _runTestWithServer(serverHost, localIp, initiatedAt);
+        final result = await _runTestWithServer(
+          serverHost,
+          localIp,
+          initiatedAt,
+          serverLabel: serverLabel,
+        );
 
         if (result != null) {
           // Success!
@@ -291,6 +374,12 @@ class SpeedTestService {
           _resultController.add(result);
           _updateStatus(SpeedTestStatus.completed);
           await _saveLastResult(result);
+          SpeedTestDebugLogger.info('result', {
+            'run_id': _currentRunId,
+            'server_label': serverLabel,
+            'server_host': serverHost,
+            'result': SpeedTestDebugLogger.resultSummary(result),
+          });
 
           LoggerService.info(
             'Speed test completed - Down: ${result.downloadSpeed.toStringAsFixed(2)} Mbps, '
@@ -300,9 +389,23 @@ class SpeedTestService {
           );
           return; // Success - exit the loop
         }
-      } catch (e) {
-        LoggerService.warning('$serverLabel ($serverHost) failed: $e',
-            tag: 'SpeedTestService');
+      } on Exception catch (e, stack) {
+        SpeedTestDebugLogger.warning('error', {
+          'run_id': _currentRunId,
+          'server_label': serverLabel,
+          'server_host': serverHost,
+          'reason': e.toString(),
+        });
+        LoggerService.error(
+          'Speed test attempt failed: $e',
+          tag: 'SpeedTestService',
+          error: e,
+          stackTrace: stack,
+        );
+        LoggerService.warning(
+          '$serverLabel ($serverHost) failed: $e',
+          tag: 'SpeedTestService',
+        );
       }
 
       // If not the last server, try next fallback
@@ -322,10 +425,20 @@ class SpeedTestService {
 
         _statusMessageController.add(userMessage);
         LoggerService.warning(
-            '$serverLabel ($serverHost) failed, $userMessage',
-            tag: 'SpeedTestService');
-        await Future.delayed(
-            const Duration(seconds: 1)); // Brief pause between retries
+          '$serverLabel ($serverHost) failed, $userMessage',
+          tag: 'SpeedTestService',
+        );
+        SpeedTestDebugLogger.warning('retry', {
+          'run_id': _currentRunId,
+          'failed_server_label': serverLabel,
+          'failed_server_host': serverHost,
+          'next_server_label': nextLabel,
+          'next_server_host': nextServer['host'],
+          'reason': _lastErrorCategory?.debugLabel,
+        });
+        await Future<void>.delayed(
+          const Duration(seconds: 1),
+        ); // Brief pause between retries
       } else {
         // All servers failed - show a message specific to the failure type
         _isRetryingFallback =
@@ -333,9 +446,18 @@ class SpeedTestService {
         final category = _lastErrorCategory ?? IperfErrorCategory.unknown;
         final errorMsg = category.userMessage;
         LoggerService.error(
-            'All servers failed (${category.debugLabel}): '
-            '${fallbackServers.map((s) => "${s["label"]} (${s["host"]})").join(", ")}',
-            tag: 'SpeedTestService');
+          'All servers failed (${category.debugLabel}): '
+          '${fallbackServers.map((s) => "${s["label"]} (${s["host"]})").join(", ")}',
+          tag: 'SpeedTestService',
+        );
+        SpeedTestDebugLogger.error('error', {
+          'run_id': _currentRunId,
+          'stage': 'all_servers_failed',
+          'error_category': category.debugLabel,
+          'user_message': category.userMessage,
+          'message': errorMsg,
+          'attempted_servers': fallbackServers,
+        });
         _setErrorResult(errorMsg);
       }
     }
@@ -344,18 +466,23 @@ class SpeedTestService {
   /// Build list of fallback servers in priority order
   /// Priority: Default Gateway → Test Configuration → External Server
   Future<List<Map<String, String>>> _buildFallbackList(
-      String? configTarget) async {
+    String? configTarget,
+  ) async {
     final servers = <Map<String, String>>[];
 
     // 1. Try default gateway first (network address + 1 - fastest & most reliable)
     try {
-      final gateway = await _gatewayService.getWifiGateway();
+      final gateway = await _gatewayService.getWifiGateway(
+        runId: _currentRunId,
+      );
       if (gateway != null && gateway.isNotEmpty) {
         servers.add({'host': gateway, 'label': 'Default gateway'});
       }
     } catch (e) {
-      LoggerService.warning('Gateway detection failed: $e',
-          tag: 'SpeedTestService');
+      LoggerService.warning(
+        'Gateway detection failed: $e',
+        tag: 'SpeedTestService',
+      );
     }
 
     // 2. Try test configuration target (from speed test config)
@@ -367,12 +494,23 @@ class SpeedTestService {
       }
     }
 
+    SpeedTestDebugLogger.debug('target_resolution', {
+      if (_currentRunId != null) 'run_id': _currentRunId,
+      'gateway_host': servers.isNotEmpty ? servers.first['host'] : null,
+      'config_target': configTarget,
+      'resolved_fallbacks': servers,
+    });
+
     return servers;
   }
 
   /// Run test with a specific server, returns result or null if failed
   Future<SpeedTestResult?> _runTestWithServer(
-      String serverHost, String? localIp, DateTime initiatedAt) async {
+    String serverHost,
+    String? localIp,
+    DateTime initiatedAt, {
+    required String serverLabel,
+  }) async {
     try {
       // Update the current server host being tested
       _serverHost = serverHost;
@@ -389,6 +527,9 @@ class SpeedTestService {
         reverse: true,
         useUdp: _useUdp,
         bandwidthMbps: _useUdp ? _bandwidthMbps : null,
+        runId: _currentRunId,
+        phase: 'download',
+        serverLabel: serverLabel,
       );
 
       if (downloadResult['success'] != true) {
@@ -396,14 +537,23 @@ class SpeedTestService {
         final code = (downloadResult['errorCode'] as num?)?.toInt();
         final category = classifyIperfError(code);
         _lastErrorCategory = category;
+        SpeedTestDebugLogger.warning('error', {
+          'run_id': _currentRunId,
+          'phase': 'download',
+          'server_label': serverLabel,
+          'server_host': serverHost,
+          ...describeIperfError(code, message: error.toString()),
+        });
         LoggerService.warning(
-            'Download failed on $serverHost: $error '
-            '[${category.debugLabel}, code=$code]',
-            tag: 'SpeedTestService');
+          'Download failed on $serverHost: $error '
+          '[${category.debugLabel}, code=$code]',
+          tag: 'SpeedTestService',
+        );
         return null;
       }
 
       final downloadSpeed = downloadResult['receiveMbps'] ?? 0.0;
+      final jitter = downloadResult['jitter'] ?? 0.0;
 
       // Store completed download speed so it's preserved during upload phase
       _completedDownloadSpeed = (downloadSpeed as num).toDouble();
@@ -425,6 +575,9 @@ class SpeedTestService {
         reverse: false,
         useUdp: _useUdp,
         bandwidthMbps: _useUdp ? _bandwidthMbps : null,
+        runId: _currentRunId,
+        phase: 'upload',
+        serverLabel: serverLabel,
       );
 
       if (uploadResult['success'] != true) {
@@ -432,19 +585,28 @@ class SpeedTestService {
         final code = (uploadResult['errorCode'] as num?)?.toInt();
         final category = classifyIperfError(code);
         _lastErrorCategory = category;
+        SpeedTestDebugLogger.warning('error', {
+          'run_id': _currentRunId,
+          'phase': 'upload',
+          'server_label': serverLabel,
+          'server_host': serverHost,
+          ...describeIperfError(code, message: error.toString()),
+        });
         LoggerService.warning(
-            'Upload failed on $serverHost: $error '
-            '[${category.debugLabel}, code=$code]',
-            tag: 'SpeedTestService');
+          'Upload failed on $serverHost: $error '
+          '[${category.debugLabel}, code=$code]',
+          tag: 'SpeedTestService',
+        );
         return null;
       }
 
-      final uploadSpeed = uploadResult['sendMbps'] ?? 0.0;
+      final uploadSpeed = (uploadResult['sendMbps'] as num?)?.toDouble() ?? 0.0;
+      _completedUploadSpeed = uploadSpeed;
 
       // Create result
-      return SpeedTestResult(
-        downloadMbps: (downloadSpeed as num).toDouble(),
-        uploadMbps: (uploadSpeed as num).toDouble(),
+      final result = SpeedTestResult(
+        downloadMbps: _completedDownloadSpeed,
+        uploadMbps: uploadSpeed,
         rtt: (latency as num).toDouble(),
         initiatedAt: initiatedAt,
         completedAt: DateTime.now(),
@@ -454,10 +616,33 @@ class SpeedTestService {
         localIpAddress: localIp,
         serverHost: serverHost,
       );
+      SpeedTestDebugLogger.debug('result', {
+        'run_id': _currentRunId,
+        'server_label': serverLabel,
+        'server_host': serverHost,
+        'phase_metrics': {
+          'download_mbps': downloadSpeed,
+          'upload_mbps': uploadSpeed,
+          'jitter_ms': jitter,
+          'latency_ms': latency,
+          'upload_jitter_ms': uploadResult['jitter'],
+          'upload_latency_ms': uploadResult['rtt'],
+        },
+      });
+      return result;
     } catch (e) {
       _lastErrorCategory = IperfErrorCategory.unknown;
-      LoggerService.error('Test error with $serverHost: $e',
-          tag: 'SpeedTestService');
+      SpeedTestDebugLogger.error('error', {
+        'run_id': _currentRunId,
+        'stage': 'run_test_with_server',
+        'server_label': serverLabel,
+        'server_host': serverHost,
+        'reason': e.toString(),
+      }, error: e);
+      LoggerService.error(
+        'Test error with $serverHost: $e',
+        tag: 'SpeedTestService',
+      );
       return null;
     }
   }
@@ -472,6 +657,11 @@ class SpeedTestService {
     _lastResult = result;
     _resultController.add(result);
     _updateStatus(SpeedTestStatus.error);
+    SpeedTestDebugLogger.warning('error', {
+      if (_currentRunId != null) 'run_id': _currentRunId,
+      'stage': 'set_error_result',
+      'reason': message,
+    });
   }
 
   Future<void> cancelTest() async {
@@ -482,9 +672,14 @@ class SpeedTestService {
       _updateStatus(SpeedTestStatus.idle);
       _progress = 0.0;
       _progressController.add(_progress);
+      SpeedTestDebugLogger.info('cancel', {
+        if (_currentRunId != null) 'run_id': _currentRunId,
+      });
     } catch (e) {
-      LoggerService.error('Failed to cancel speed test: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to cancel speed test: $e',
+        tag: 'SpeedTestService',
+      );
     }
   }
 
@@ -496,14 +691,18 @@ class SpeedTestService {
   Future<String?> resolveServerWithFallback({String? configTarget}) async {
     // Step 1: Try default gateway
     try {
-      final gateway = await _gatewayService.getWifiGateway();
+      final gateway = await _gatewayService.getWifiGateway(
+        runId: _currentRunId,
+      );
 
       if (gateway != null && gateway.isNotEmpty) {
         return gateway;
       }
     } catch (e) {
-      LoggerService.error('Gateway detection error: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Gateway detection error: $e',
+        tag: 'SpeedTestService',
+      );
     }
 
     // Step 2: Try speed test config target
@@ -530,6 +729,17 @@ class SpeedTestService {
     if (bandwidthMbps != null) _bandwidthMbps = bandwidthMbps;
     if (parallelStreams != null) _parallelStreams = parallelStreams;
 
+    SpeedTestDebugLogger.debug('config_update', {
+      if (_currentRunId != null) 'run_id': _currentRunId,
+      'config': {
+        'server_host': _serverHost,
+        'server_port': _serverPort,
+        'duration_seconds': _testDuration,
+        'protocol': _useUdp ? 'udp' : 'tcp',
+        'bandwidth_mbps': _bandwidthMbps,
+        'parallel_streams': _parallelStreams,
+      },
+    });
     await _saveConfiguration();
   }
 
@@ -538,13 +748,14 @@ class SpeedTestService {
       _serverHost = _prefs?.getString('speed_test_server_host') ?? '';
       _serverPort = _prefs?.getInt('speed_test_server_port') ?? 5201;
       _testDuration = _prefs?.getInt('speed_test_duration') ?? 10;
-      _useUdp =
-          _prefs?.getBool('speed_test_use_udp') ?? true; // Default to UDP
+      _useUdp = _prefs?.getBool('speed_test_use_udp') ?? true; // Default to UDP
       _bandwidthMbps = _prefs?.getInt('speed_test_bandwidth_mbps') ?? 500;
       _parallelStreams = _prefs?.getInt('speed_test_parallel_streams') ?? 16;
     } catch (e) {
-      LoggerService.error('Failed to load speed test configuration: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to load speed test configuration: $e',
+        tag: 'SpeedTestService',
+      );
     }
   }
 
@@ -557,8 +768,10 @@ class SpeedTestService {
       await _prefs?.setInt('speed_test_bandwidth_mbps', _bandwidthMbps);
       await _prefs?.setInt('speed_test_parallel_streams', _parallelStreams);
     } catch (e) {
-      LoggerService.error('Failed to save speed test configuration: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to save speed test configuration: $e',
+        tag: 'SpeedTestService',
+      );
     }
   }
 
@@ -572,8 +785,10 @@ class SpeedTestService {
         _lastResult = SpeedTestResult.fromJson(map);
       }
     } catch (e) {
-      LoggerService.error('Failed to load last speed test result: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to load last speed test result: $e',
+        tag: 'SpeedTestService',
+      );
     }
   }
 
@@ -582,15 +797,15 @@ class SpeedTestService {
       final json = await compute(_encodeJson, result.toJson());
       await _prefs?.setString('speed_test_last_result', json);
     } catch (e) {
-      LoggerService.error('Failed to save speed test result: $e',
-          tag: 'SpeedTestService');
+      LoggerService.error(
+        'Failed to save speed test result: $e',
+        tag: 'SpeedTestService',
+      );
     }
   }
 
   static Map<String, dynamic> _parseJson(String json) {
-    return Map<String, dynamic>.from(
-      const JsonCodec().decode(json) as Map,
-    );
+    return Map<String, dynamic>.from(const JsonCodec().decode(json) as Map);
   }
 
   static String _encodeJson(Map<String, dynamic> map) {

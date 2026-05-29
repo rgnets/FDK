@@ -10,6 +10,7 @@ import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_data_
 import 'package:rgnets_fdk/features/speed_test/data/datasources/speed_test_websocket_data_source.dart';
 import 'package:rgnets_fdk/features/speed_test/data/repositories/speed_test_repository_impl.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/network_gateway_service.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
 import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_service.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
@@ -45,7 +46,6 @@ SpeedTestRepository speedTestRepository(SpeedTestRepositoryRef ref) {
   return SpeedTestRepositoryImpl(
     dataSource: dataSource,
     cacheIntegration: cacheIntegration,
-    logger: Logger(),
   );
 }
 
@@ -70,9 +70,7 @@ class SpeedTestConfigsNotifier extends _$SpeedTestConfigsNotifier {
         throw Exception(failure.message);
       },
       (configs) {
-        _logger.i(
-          'SpeedTestConfigsNotifier: Loaded ${configs.length} configs',
-        );
+        _logger.i('SpeedTestConfigsNotifier: Loaded ${configs.length} configs');
         return configs;
       },
     );
@@ -121,9 +119,7 @@ class SpeedTestResultsNotifier extends _$SpeedTestResultsNotifier {
         throw Exception(failure.message);
       },
       (results) {
-        _logger.i(
-          'SpeedTestResultsNotifier: Loaded ${results.length} results',
-        );
+        _logger.i('SpeedTestResultsNotifier: Loaded ${results.length} results');
         return results;
       },
     );
@@ -186,6 +182,7 @@ class SpeedTestResultsNotifier extends _$SpeedTestResultsNotifier {
 @Riverpod(keepAlive: true)
 class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
   SpeedTestService? _service;
+  String? _activeRunId;
   StreamSubscription<SpeedTestResult>? _resultSub;
   StreamSubscription<SpeedTestStatus>? _statusSub;
   StreamSubscription<double>? _progressSub;
@@ -218,21 +215,41 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
   void _subscribeToStreams() {
     // Status stream
     _statusSub = _service!.statusStream.listen((status) {
+      SpeedTestDebugLogger.debug('status', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'execution_status': status.name,
+      });
       state = state.copyWith(executionStatus: status);
     });
 
     // Progress stream
     _progressSub = _service!.progressStream.listen((progress) {
+      SpeedTestDebugLogger.debug('progress', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'progress_pct': progress,
+      });
       state = state.copyWith(progress: progress);
     });
 
     // Status message stream
     _messageSub = _service!.statusMessageStream.listen((message) {
+      SpeedTestDebugLogger.debug('status', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'status_message': message,
+      });
       state = state.copyWith(statusMessage: message);
     });
 
     // Result stream
     _resultSub = _service!.resultStream.listen((result) {
+      SpeedTestDebugLogger.debug('result', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'result': SpeedTestDebugLogger.resultSummary(result),
+      });
       state = state.copyWith(
         downloadSpeed: result.downloadMbps ?? state.downloadSpeed,
         uploadSpeed: result.uploadMbps ?? state.uploadSpeed,
@@ -252,12 +269,15 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
 
   Future<void> _syncNetworkInfo() async {
     final networkService = NetworkGatewayService();
-    final localIp = await networkService.getWifiIP();
-    final gatewayIp = await networkService.getWifiGateway();
-    state = state.copyWith(
-      localIpAddress: localIp,
-      gatewayAddress: gatewayIp,
-    );
+    final localIp = await networkService.getWifiIP(runId: _activeRunId);
+    final gatewayIp = await networkService.getWifiGateway(runId: _activeRunId);
+    SpeedTestDebugLogger.debug('network_info', {
+      if (_activeRunId != null) 'run_id': _activeRunId,
+      'source': 'provider',
+      'local_ip_address': localIp,
+      'gateway_address': gatewayIp,
+    });
+    state = state.copyWith(localIpAddress: localIp, gatewayAddress: gatewayIp);
   }
 
   void _syncConfigFromService() {
@@ -277,6 +297,7 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
     String? configTarget,
   }) async {
     if (!state.isInitialized) await initialize();
+    _activeRunId = SpeedTestDebugLogger.newRunId();
 
     // Reset for new test
     state = state.copyWith(
@@ -292,10 +313,39 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
     );
 
     final target = configTarget ?? config?.target;
+    SpeedTestDebugLogger.info('start', {
+      'run_id': _activeRunId,
+      'source': 'provider',
+      'target': target,
+      'selected_config': SpeedTestDebugLogger.speedTestConfigSummary(config),
+      'runtime_config': {
+        'server_host': state.serverHost,
+        'server_port': state.serverPort,
+        'duration_seconds': state.testDuration,
+        'protocol': state.useUdp ? 'udp' : 'tcp',
+        'bandwidth_mbps': state.bandwidthMbps,
+        'parallel_streams': state.parallelStreams,
+      },
+    });
 
     try {
-      await _service!.runSpeedTestWithFallback(configTarget: target);
-    } catch (e) {
+      await _service!.runSpeedTestWithFallback(
+        configTarget: target,
+        config: config,
+        runId: _activeRunId,
+      );
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'run_id': _activeRunId,
+          'source': 'provider',
+          'stage': 'startTest',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       state = state.copyWith(errorMessage: e.toString());
     }
   }
@@ -338,16 +388,41 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
       port: state.serverPort,
       iperfProtocol: state.useUdp ? 'udp' : 'tcp',
     );
+    SpeedTestDebugLogger.debug('submit_start', {
+      if (_activeRunId != null) 'run_id': _activeRunId,
+      'source': 'provider',
+      'access_point_id': accessPointId,
+      'result': SpeedTestDebugLogger.resultSummary(result),
+    });
 
     try {
       await ref
-          .read(speedTestResultsNotifierProvider(
-            speedTestId: state.config?.id,
-            accessPointId: accessPointId,
-          ).notifier)
+          .read(
+            speedTestResultsNotifierProvider(
+              speedTestId: state.config?.id,
+              accessPointId: accessPointId,
+            ).notifier,
+          )
           .createResult(result);
+      SpeedTestDebugLogger.debug('submit_result', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'access_point_id': accessPointId,
+      });
       return true;
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          if (_activeRunId != null) 'run_id': _activeRunId,
+          'source': 'provider',
+          'stage': 'submitResult',
+          'access_point_id': accessPointId,
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       state = state.copyWith(errorMessage: 'Submission failed: $e');
       return false;
     }
@@ -359,8 +434,15 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
     if (state.completedResult == null) return false;
 
     final result = state.completedResult!;
+    SpeedTestDebugLogger.debug('submit_start', {
+      if (_activeRunId != null) 'run_id': _activeRunId,
+      'source': 'provider',
+      'result': SpeedTestDebugLogger.resultSummary(result),
+    });
     try {
-      await ref.read(webSocketCacheIntegrationProvider).createAdhocSpeedTestResult(
+      await ref
+          .read(webSocketCacheIntegrationProvider)
+          .createAdhocSpeedTestResult(
             downloadSpeed: result.downloadMbps ?? 0,
             uploadSpeed: result.uploadMbps ?? 0,
             latency: result.rtt ?? 0,
@@ -369,8 +451,24 @@ class SpeedTestRunNotifier extends _$SpeedTestRunNotifier {
             initiatedAt: result.initiatedAt,
             completedAt: result.completedAt,
           );
+      SpeedTestDebugLogger.debug('submit_result', {
+        if (_activeRunId != null) 'run_id': _activeRunId,
+        'source': 'provider',
+        'submission_type': 'adhoc',
+      });
       return true;
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          if (_activeRunId != null) 'run_id': _activeRunId,
+          'source': 'provider',
+          'stage': 'submitAdhocResult',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       state = state.copyWith(errorMessage: 'Submission failed: $e');
       return false;
     }

@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+import 'package:rgnets_fdk/core/models/websocket_events.dart';
 import 'package:rgnets_fdk/core/services/websocket_channel_factory.dart';
 import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -38,6 +39,8 @@ class WebSocketConfig {
     this.heartbeatInterval = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 45),
     this.sendClientPing = true,
+    this.logFrameBreakdown = true,
+    this.logPingFrames = false,
   });
 
   final Uri baseUri;
@@ -47,6 +50,8 @@ class WebSocketConfig {
   final Duration heartbeatInterval;
   final Duration heartbeatTimeout;
   final bool sendClientPing;
+  final bool logFrameBreakdown;
+  final bool logPingFrames;
 }
 
 /// Parameters used when establishing a socket connection.
@@ -112,6 +117,13 @@ class WebSocketService {
   int _consecutiveReconnectFailures = 0;
   bool _manuallyClosed = false;
 
+  /// Tracks whether the current channel's sink has been closed. A live
+  /// `_channel` reference is not sufficient to know the sink is writable: the
+  /// server can drop the connection (e.g. the rXg reject/404 behavior) before
+  /// our `onDone`/`onError` handlers run `_closeChannel`, leaving a brief
+  /// window where `sink.add` throws "Cannot add event after closing".
+  bool _sinkClosed = false;
+
   /// Maximum consecutive reconnect failures before emitting auth failure signal.
   static const int _maxReconnectBeforeAuthCheck = 3;
 
@@ -152,12 +164,28 @@ class WebSocketService {
   }
 
   /// Sends a raw payload. The message will be JSON-encoded before dispatch.
+  ///
+  /// Throws a [StateError] when the socket is not connected or its sink has
+  /// already been closed. Callers (and [request]) treat this as a normal
+  /// "not connected" failure rather than an uncaught crash.
   void send(Map<String, dynamic> message) {
-    if (_channel == null) {
+    final channel = _channel;
+    if (channel == null || _sinkClosed) {
       throw StateError('WebSocket not connected');
     }
     final encoded = jsonEncode(message);
-    _channel!.sink.add(encoded);
+    try {
+      channel.sink.add(encoded);
+      // ignore: avoid_catching_errors
+    } on StateError catch (e) {
+      // The sink was closed underneath us before `onDone`/`onError` ran
+      // (server dropped the connection). Record it and surface the standard
+      // not-connected error so callers handle it like any other disconnect
+      // instead of crashing on "Cannot add event after closing".
+      _sinkClosed = true;
+      _logger.w('WebSocketService: send() on a closed sink: ${e.message}');
+      throw StateError('WebSocket not connected');
+    }
   }
 
   /// Convenience helper that composes a message envelope.
@@ -224,13 +252,15 @@ class WebSocketService {
     String channelIdentifier = '{"channel":"RxgChannel"}',
     Map<String, dynamic>? additionalData,
     Duration timeout = const Duration(seconds: 30),
+    String? requestId,
   }) async {
-    final requestId = 'req-$resourceType-${_generateRequestId()}';
+    final effectiveRequestId =
+        requestId ?? 'req-$resourceType-${_generateRequestId()}';
 
     final data = <String, dynamic>{
       'action': action,
       'resource_type': resourceType,
-      'request_id': requestId,
+      'request_id': effectiveRequestId,
       if (additionalData != null) ...additionalData,
     };
 
@@ -238,7 +268,7 @@ class WebSocketService {
       'command': 'message',
       'identifier': channelIdentifier,
       'data': jsonEncode(data),
-      'request_id': requestId,
+      'request_id': effectiveRequestId,
     };
 
     return request(message, timeout: timeout);
@@ -260,10 +290,13 @@ class WebSocketService {
     try {
       // FM-8: scrub api_key from the URI before logging. `params.uri` carries
       // the ActionCable auth token as a query param on production builds.
-      _logger.i('WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}');
+      _logger.i(
+        'WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}',
+      );
       final channel = _channelFactory(params.uri, headers: params.headers);
 
       _channel = channel;
+      _sinkClosed = false;
 
       // Wait for the actual TCP + WebSocket upgrade to complete before
       // declaring the connection open.  Without this, the state flips to
@@ -340,9 +373,9 @@ class WebSocketService {
         return;
       }
 
-      final payload = _extractPayload(decoded);
-      final type = _extractType(decoded, payload);
-      final headers = _extractHeaders(decoded);
+      final payload = extractSocketPayload(decoded);
+      final type = extractSocketType(decoded, payload);
+      final headers = extractSocketHeaders(decoded);
 
       _lastHeartbeat = DateTime.now();
 
@@ -353,8 +386,10 @@ class WebSocketService {
         raw: decoded,
       );
 
+      _logIncomingFrameBreakdown(decoded);
+
       // Check if this is a response to a pending request
-      final requestId = _extractRequestId(decoded, payload);
+      final requestId = extractSocketRequestId(decoded, payload);
       if (requestId != null && _pendingRequests.containsKey(requestId)) {
         final pending = _pendingRequests.remove(requestId);
         if (pending != null && !pending.completer.isCompleted) {
@@ -374,25 +409,17 @@ class WebSocketService {
     }
   }
 
-  /// Extracts request_id from message for request/response correlation.
-  String? _extractRequestId(
-    Map<String, dynamic> decoded,
-    Map<String, dynamic> payload,
-  ) {
-    // Check various locations where request_id might be
-    if (decoded['request_id'] != null) {
-      return decoded['request_id'].toString();
+  void _logIncomingFrameBreakdown(Map<String, dynamic> decoded) {
+    if (!kDebugMode || !_config.logFrameBreakdown) {
+      return;
     }
-    if (payload['request_id'] != null) {
-      return payload['request_id'].toString();
+    final breakdown = WebSocketEnvelopeBreakdown.fromDecoded(decoded);
+    if (breakdown.isPing && !_config.logPingFrames) {
+      return;
     }
-    // Check in message field for ActionCable responses
-    final messageField = decoded['message'];
-    if (messageField is Map<String, dynamic> &&
-        messageField['request_id'] != null) {
-      return messageField['request_id'].toString();
-    }
-    return null;
+
+    final prefix = breakdown.isPing ? '[WS_PAYLOAD:ping]' : '[WS_PAYLOAD]';
+    _logger.d('$prefix inbound ${formatForLog(breakdown.toLogMap())}');
   }
 
   Future<void> _scheduleReconnect() async {
@@ -496,6 +523,7 @@ class WebSocketService {
     _heartbeatWatchdog = null;
     await _subscription?.cancel();
     _subscription = null;
+    _sinkClosed = true;
     await _channel?.sink.close(code, reason);
     _channel = null;
   }
@@ -526,55 +554,4 @@ class WebSocketService {
     await _messageController.close();
     await _authFailureController.close();
   }
-}
-
-Map<String, dynamic> _extractPayload(Map<String, dynamic> decoded) {
-  final payloadValue = decoded['payload'];
-  if (payloadValue is Map<String, dynamic>) {
-    return Map<String, dynamic>.from(payloadValue);
-  }
-
-  final messageValue = decoded['message'];
-  if (messageValue is Map<String, dynamic>) {
-    return Map<String, dynamic>.from(messageValue);
-  }
-  if (messageValue != null) {
-    return {'message': messageValue};
-  }
-
-  final fallback = Map<String, dynamic>.from(decoded)
-    ..remove('type')
-    ..remove('identifier')
-    ..remove('message')
-    ..remove('payload')
-    ..remove('headers');
-  return fallback;
-}
-
-String _extractType(
-  Map<String, dynamic> decoded,
-  Map<String, dynamic> payload,
-) {
-  final typeValue = decoded['type'];
-  if (typeValue is String && typeValue.isNotEmpty) {
-    return typeValue;
-  }
-  final actionValue = payload['action'];
-  if (actionValue is String && actionValue.isNotEmpty) {
-    return actionValue;
-  }
-  return 'message';
-}
-
-Map<String, dynamic>? _extractHeaders(Map<String, dynamic> decoded) {
-  final headers = decoded['headers'] as Map<String, dynamic>?;
-  final identifier = decoded['identifier'];
-  if (identifier == null) {
-    return headers;
-  }
-  final merged = <String, dynamic>{'identifier': identifier};
-  if (headers != null) {
-    merged.addAll(headers);
-  }
-  return merged;
 }

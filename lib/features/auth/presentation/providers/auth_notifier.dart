@@ -639,7 +639,26 @@ class Auth extends _$Auth {
         },
       );
       _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
-      service.send(subscriptionPayload);
+      try {
+        service.send(subscriptionPayload);
+        // ignore: avoid_catching_errors
+      } on StateError catch (e) {
+        // The socket dropped between connect() returning and this send (the
+        // rXg reject/404 behavior). send() surfaces this as a StateError —
+        // which is an Error, not an Exception, so it would escape the
+        // `on Exception` catch below. Fail the handshake through the existing
+        // completer flow instead of crashing.
+        _logger.e(
+          'AUTH_NOTIFIER: ❌ Failed to send subscription (socket closed): ${e.message}',
+        );
+        if (!completer.isCompleted) {
+          completer.complete(
+            const _ActionCableAuthResult.failure(
+              'Connection closed before subscription could be sent',
+            ),
+          );
+        }
+      }
       _logger.d('AUTH_NOTIFIER: Subscription sent, waiting for confirmation (15s timeout)...');
 
       final result = await completer.future.timeout(

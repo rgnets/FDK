@@ -144,3 +144,13 @@ IperfErrorCategory classifyIperfError(int? code) {
       return IperfErrorCategory.unknown;
   }
 }
+
+Map<String, dynamic> describeIperfError(int? code, {String? message}) {
+  final category = classifyIperfError(code);
+  return {
+    'error_code': code,
+    'error_category': category.debugLabel,
+    'user_message': category.userMessage,
+    if (message != null) 'message': message,
+  };
+}

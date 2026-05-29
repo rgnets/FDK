@@ -4,6 +4,7 @@ import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
@@ -13,9 +14,9 @@ class WebSocketSpeedTestCacheService {
     required WebSocketService webSocketService,
     Logger? logger,
     VoidCallback? onDataChanged,
-  })  : _webSocketService = webSocketService,
-        _logger = logger ?? Logger(),
-        _onDataChanged = onDataChanged;
+  }) : _webSocketService = webSocketService,
+       _logger = logger ?? Logger(),
+       _onDataChanged = onDataChanged;
 
   final WebSocketService _webSocketService;
   final Logger _logger;
@@ -179,6 +180,11 @@ class WebSocketSpeedTestCacheService {
     _notifySpeedTestResultCallbacks();
 
     _logger.i('updateSpeedTestResultInCache: Updated result $id in cache');
+    SpeedTestDebugLogger.debug('cache_upsert', {
+      'source': 'websocket_speed_test_cache_service',
+      'resource_type': resultResourceType,
+      'result_id': id,
+    });
   }
 
   Future<bool> createAdhocSpeedTestResult({
@@ -202,6 +208,9 @@ class WebSocketSpeedTestCacheService {
 
     try {
       final adhocConfig = getAdhocSpeedTestConfig();
+      final requestId = SpeedTestDebugLogger.newRequestId(
+        'adhoc-speed-test-result',
+      );
 
       final params = <String, dynamic>{
         'download_mbps': downloadSpeed,
@@ -219,21 +228,62 @@ class WebSocketSpeedTestCacheService {
         if (pmsRoomId != null) 'pms_room_id': pmsRoomId,
         if (roomType != null) 'room_type': roomType,
       };
+      SpeedTestDebugLogger.debug('submit_start', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'submission_type': 'adhoc',
+        'result': params,
+      });
+      SpeedTestDebugLogger.debug('request', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'endpoint':
+            'ActionCable RxgChannel/create_resource/$resultResourceType',
+        'payload': {
+          'action': 'create_resource',
+          'resource_type': resultResourceType,
+          'request_id': requestId,
+          'params': params,
+        },
+      });
 
       final response = await _webSocketService.requestActionCable(
         action: 'create_resource',
         resourceType: resultResourceType,
         additionalData: {'params': params},
+        requestId: requestId,
         timeout: const Duration(seconds: 15),
       );
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'resource_type': resultResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
 
       final data = response.payload['data'];
       if (data is Map<String, dynamic>) {
         applyUpsert(data, isConfig: false);
+        SpeedTestDebugLogger.debug('submit_result', {
+          'source': 'websocket_speed_test_cache_service',
+          'request_id': requestId,
+          'result': data,
+        });
         return true;
       }
       return false;
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'websocket_speed_test_cache_service',
+          'submission_type': 'adhoc',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       _logger.e('Failed to create adhoc speed test result: $e');
       return false;
     }
@@ -265,6 +315,9 @@ class WebSocketSpeedTestCacheService {
         _logger.w('Cannot update speed test result: Invalid device ID format');
         return false;
       }
+      final requestId = SpeedTestDebugLogger.newRequestId(
+        'device-speed-test-result',
+      );
 
       final existingResults = getSpeedTestResultsForDevice(deviceId);
       final speedTestId = existingResults.isNotEmpty
@@ -293,21 +346,65 @@ class WebSocketSpeedTestCacheService {
       } else if (deviceId.startsWith('ont_')) {
         params['tested_via_media_converter_id'] = numericId;
       }
+      SpeedTestDebugLogger.debug('submit_start', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'submission_type': 'device',
+        'device_id': deviceId,
+        'result': params,
+      });
+      SpeedTestDebugLogger.debug('request', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'endpoint':
+            'ActionCable RxgChannel/create_resource/$resultResourceType',
+        'payload': {
+          'action': 'create_resource',
+          'resource_type': resultResourceType,
+          'request_id': requestId,
+          'params': params,
+        },
+      });
 
       final response = await _webSocketService.requestActionCable(
         action: 'create_resource',
         resourceType: resultResourceType,
         additionalData: {'params': params},
+        requestId: requestId,
         timeout: const Duration(seconds: 15),
       );
+      SpeedTestDebugLogger.debug('response', {
+        'source': 'websocket_speed_test_cache_service',
+        'request_id': requestId,
+        'resource_type': resultResourceType,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
 
       final data = response.payload['data'];
       if (data is Map<String, dynamic>) {
         applyUpsert(data, isConfig: false);
+        SpeedTestDebugLogger.debug('submit_result', {
+          'source': 'websocket_speed_test_cache_service',
+          'request_id': requestId,
+          'device_id': deviceId,
+          'result': data,
+        });
         return true;
       }
       return false;
-    } catch (e) {
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          'source': 'websocket_speed_test_cache_service',
+          'submission_type': 'device',
+          'device_id': deviceId,
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       _logger.e('Failed to update device speed test result: $e');
       return false;
     }
@@ -322,7 +419,8 @@ class WebSocketSpeedTestCacheService {
   }
 
   void removeSpeedTestConfigCallback(
-      void Function(List<SpeedTestConfig>) callback) {
+    void Function(List<SpeedTestConfig>) callback,
+  ) {
     _speedTestConfigCallbacks.remove(callback);
   }
 
@@ -331,7 +429,8 @@ class WebSocketSpeedTestCacheService {
   }
 
   void removeSpeedTestResultCallback(
-      void Function(List<SpeedTestResult>) callback) {
+    void Function(List<SpeedTestResult>) callback,
+  ) {
     _speedTestResultCallbacks.remove(callback);
   }
 
@@ -339,8 +438,10 @@ class WebSocketSpeedTestCacheService {
   // Internal: called by facade routing
   // ---------------------------------------------------------------------------
 
-  void applySnapshot(List<Map<String, dynamic>> items,
-      {required bool isConfig}) {
+  void applySnapshot(
+    List<Map<String, dynamic>> items, {
+    required bool isConfig,
+  }) {
     if (isConfig) {
       _speedTestConfigCache
         ..clear()
@@ -351,6 +452,11 @@ class WebSocketSpeedTestCacheService {
       _logger.i(
         'WebSocketSpeedTestCacheService: speed_tests snapshot - ${items.length} items',
       );
+      SpeedTestDebugLogger.debug('cache_snapshot', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': configResourceType,
+        'count': items.length,
+      });
 
       _notifySpeedTestConfigCallbacks();
     } else {
@@ -363,19 +469,28 @@ class WebSocketSpeedTestCacheService {
       _logger.i(
         'WebSocketSpeedTestCacheService: speed_test_results snapshot - ${items.length} items',
       );
+      SpeedTestDebugLogger.debug('cache_snapshot', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': resultResourceType,
+        'count': items.length,
+      });
 
       _notifySpeedTestResultCallbacks();
     }
   }
 
-  void applyUpsert(Map<String, dynamic> data,
-      {required bool isConfig, String? action}) {
+  void applyUpsert(
+    Map<String, dynamic> data, {
+    required bool isConfig,
+    String? action,
+  }) {
     final id = data['id'];
     if (id == null) return;
 
     if (isConfig) {
-      final index =
-          _speedTestConfigCache.indexWhere((item) => item['id'] == id);
+      final index = _speedTestConfigCache.indexWhere(
+        (item) => item['id'] == id,
+      );
       if (index >= 0) {
         _speedTestConfigCache[index] = data;
       } else {
@@ -384,9 +499,16 @@ class WebSocketSpeedTestCacheService {
       _onDataChanged?.call();
       _bumpSpeedTestConfigUpdate();
       _notifySpeedTestConfigCallbacks();
+      SpeedTestDebugLogger.debug('cache_upsert', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': configResourceType,
+        'id': id,
+        if (action != null) 'action': action,
+      });
     } else {
-      final index =
-          _speedTestResultCache.indexWhere((item) => item['id'] == id);
+      final index = _speedTestResultCache.indexWhere(
+        (item) => item['id'] == id,
+      );
       if (index >= 0) {
         _speedTestResultCache[index] = data;
       } else {
@@ -395,6 +517,12 @@ class WebSocketSpeedTestCacheService {
       _onDataChanged?.call();
       _bumpSpeedTestResultUpdate();
       _notifySpeedTestResultCallbacks();
+      SpeedTestDebugLogger.debug('cache_upsert', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': resultResourceType,
+        'id': id,
+        if (action != null) 'action': action,
+      });
     }
   }
 
@@ -407,11 +535,21 @@ class WebSocketSpeedTestCacheService {
       _onDataChanged?.call();
       _bumpSpeedTestConfigUpdate();
       _notifySpeedTestConfigCallbacks();
+      SpeedTestDebugLogger.debug('cache_delete', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': configResourceType,
+        'id': id,
+      });
     } else {
       _speedTestResultCache.removeWhere((item) => item['id'] == id);
       _onDataChanged?.call();
       _bumpSpeedTestResultUpdate();
       _notifySpeedTestResultCallbacks();
+      SpeedTestDebugLogger.debug('cache_delete', {
+        'source': 'websocket_speed_test_cache_service',
+        'resource_type': resultResourceType,
+        'id': id,
+      });
     }
   }
 

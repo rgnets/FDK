@@ -1,11 +1,11 @@
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/scanner_validation_service.dart';
 import 'package:rgnets_fdk/features/scanner/data/utils/mac_database.dart';
 import 'package:rgnets_fdk/features/scanner/data/utils/mac_normalizer.dart';
-import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/value_objects/serial_patterns.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'scanner_notifier_v2.g.dart';
 
@@ -58,10 +58,16 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
-    final values = barcodes.map((b) => b.trim()).where((b) => b.isNotEmpty).toList();
+    final values = barcodes
+        .map((b) => b.trim())
+        .where((b) => b.isNotEmpty)
+        .toList();
     if (values.isEmpty) return;
 
-    LoggerService.debug('Processing frame with ${values.length} barcodes: $values', tag: _tag);
+    LoggerService.debug(
+      'Processing frame with ${values.length} barcodes: $values',
+      tag: _tag,
+    );
 
     // Determine device type: use current mode if already locked, otherwise auto-detect
     DeviceTypeFromSerial? detectedType;
@@ -70,7 +76,9 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     } else {
       // Auto mode: try to detect device type from any serial in the batch
       for (final value in values) {
-        detectedType = ScannerValidationService.detectDeviceTypeFromBarcode(value);
+        detectedType = ScannerValidationService.detectDeviceTypeFromBarcode(
+          value,
+        );
         if (detectedType != null) break;
       }
     }
@@ -108,7 +116,9 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     LoggerService.debug('Processing barcode: $value', tag: _tag);
 
     // Try to detect device type from serial pattern
-    final detectedType = ScannerValidationService.detectDeviceTypeFromBarcode(value);
+    final detectedType = ScannerValidationService.detectDeviceTypeFromBarcode(
+      value,
+    );
 
     if (detectedType != null) {
       _processSerial(value, detectedType);
@@ -164,14 +174,20 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
       return;
     }
 
-    LoggerService.debug('Barcode did not match any known pattern: $value', tag: _tag);
+    LoggerService.debug(
+      'Barcode did not match any known pattern: $value',
+      tag: _tag,
+    );
   }
 
   /// Accept a vendor-relaxed AP serial (e.g. Ruckus, which doesn't use
   /// 1K9/1M3/1HN prefixes). Mirrors the auto-lock behavior of [_processSerial].
   void _acceptVendorApSerial(String serial) {
     final upper = serial.toUpperCase();
-    LoggerService.debug('Accepting vendor-relaxed AP serial: $upper', tag: _tag);
+    LoggerService.debug(
+      'Accepting vendor-relaxed AP serial: $upper',
+      tag: _tag,
+    );
 
     final history = [
       ...state.scanData.scanHistory,
@@ -205,9 +221,9 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
   /// Whether the given MAC's OUI resolves to Ruckus Wireless.
   bool _isRuckusMac(String mac) {
-    return ScannerValidationService.getManufacturer(mac)
-        .toLowerCase()
-        .contains('ruckus');
+    return ScannerValidationService.getManufacturer(
+      mac,
+    ).toLowerCase().contains('ruckus');
   }
 
   /// Whether a value looks like a generic AP serial: alphanumeric, 10-16
@@ -230,12 +246,18 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   /// Process a serial number barcode.
   void _processSerial(String serial, DeviceTypeFromSerial detectedType) {
     final upperSerial = serial.toUpperCase();
-    LoggerService.debug('Processing serial: $upperSerial (type: ${detectedType.displayName})', tag: _tag);
+    LoggerService.debug(
+      'Processing serial: $upperSerial (type: ${detectedType.displayName})',
+      tag: _tag,
+    );
 
     // If in auto mode, lock to detected type
     if (state.scanMode == ScanMode.auto) {
       final newMode = _deviceTypeToScanMode(detectedType);
-      LoggerService.debug('Auto-locking to mode: ${newMode.displayName}', tag: _tag);
+      LoggerService.debug(
+        'Auto-locking to mode: ${newMode.displayName}',
+        tag: _tag,
+      );
 
       state = state.copyWith(
         scanMode: newMode,
@@ -246,7 +268,11 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
           hasValidSerial: true,
           scanHistory: [
             ...state.scanData.scanHistory,
-            ScanRecord(value: upperSerial, scannedAt: DateTime.now(), fieldType: 'serial'),
+            ScanRecord(
+              value: upperSerial,
+              scannedAt: DateTime.now(),
+              fieldType: 'serial',
+            ),
           ],
         ),
       );
@@ -271,7 +297,11 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
         hasValidSerial: true,
         scanHistory: [
           ...state.scanData.scanHistory,
-          ScanRecord(value: upperSerial, scannedAt: DateTime.now(), fieldType: 'serial'),
+          ScanRecord(
+            value: upperSerial,
+            scannedAt: DateTime.now(),
+            fieldType: 'serial',
+          ),
         ],
       ),
     );
@@ -311,7 +341,11 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
         mac: normalized,
         scanHistory: [
           ...state.scanData.scanHistory,
-          ScanRecord(value: normalized, scannedAt: DateTime.now(), fieldType: 'mac'),
+          ScanRecord(
+            value: normalized,
+            scannedAt: DateTime.now(),
+            fieldType: 'mac',
+          ),
         ],
       ),
     );
@@ -328,7 +362,11 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
         partNumber: partNumber,
         scanHistory: [
           ...state.scanData.scanHistory,
-          ScanRecord(value: partNumber, scannedAt: DateTime.now(), fieldType: 'partNumber'),
+          ScanRecord(
+            value: partNumber,
+            scannedAt: DateTime.now(),
+            fieldType: 'partNumber',
+          ),
         ],
       ),
     );
@@ -340,6 +378,16 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   void _checkCompletion() {
     if (state.isScanComplete) {
       LoggerService.debug('Scan data complete!', tag: _tag);
+      if (LoggerService.isVerboseLoggingEnabled) {
+        LoggerService.debug(
+          '[REGISTRATION_FLOW:scan_complete] ${formatForLog({
+            'scan_mode': state.scanMode.name,
+            'device_type': _scanModeToDeviceType(state.scanMode)?.name,
+            'identifiers': {if (state.scanData.mac.isNotEmpty) 'mac': state.scanData.mac, if (state.scanData.serialNumber.isNotEmpty) 'serial_number': state.scanData.serialNumber, if (state.scanData.partNumber.isNotEmpty) 'part_number': state.scanData.partNumber, if (state.scanData.model.isNotEmpty) 'model': state.scanData.model},
+          })}',
+          tag: 'DeviceRegistration',
+        );
+      }
       state = state.copyWith(uiState: ScannerUIState.success);
     }
   }
@@ -359,24 +407,21 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   /// Show the registration popup.
   void showRegistrationPopup() {
     LoggerService.debug('Showing registration popup', tag: _tag);
-    state = state.copyWith(
-      isPopupShowing: true,
-      uiState: ScannerUIState.popup,
-    );
+    state = state.copyWith(isPopupShowing: true, uiState: ScannerUIState.popup);
   }
 
   /// Hide the registration popup.
   void hideRegistrationPopup() {
     LoggerService.debug('Hiding registration popup', tag: _tag);
-    state = state.copyWith(
-      isPopupShowing: false,
-      uiState: ScannerUIState.idle,
-    );
+    state = state.copyWith(isPopupShowing: false, uiState: ScannerUIState.idle);
   }
 
   /// Set registration in progress flag.
   void setRegistrationInProgress(bool inProgress) {
-    LoggerService.debug('Setting registration in progress: $inProgress', tag: _tag);
+    LoggerService.debug(
+      'Setting registration in progress: $inProgress',
+      tag: _tag,
+    );
     state = state.copyWith(isRegistrationInProgress: inProgress);
   }
 
@@ -396,7 +441,10 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
   /// Set room selection for registration.
   void setRoomSelection(int? roomId, String? roomNumber) {
-    LoggerService.debug('Setting room selection: $roomId ($roomNumber)', tag: _tag);
+    LoggerService.debug(
+      'Setting room selection: $roomId ($roomNumber)',
+      tag: _tag,
+    );
     state = state.copyWith(
       selectedRoomId: roomId,
       selectedRoomNumber: roomNumber,
@@ -411,7 +459,10 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
     int? deviceRoomId,
     String? deviceRoomName,
   }) {
-    LoggerService.debug('Setting device match status: ${status.displayName}', tag: _tag);
+    LoggerService.debug(
+      'Setting device match status: ${status.displayName}',
+      tag: _tag,
+    );
     state = state.copyWith(
       matchStatus: status,
       matchedDeviceId: deviceId,
@@ -423,7 +474,10 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
   /// Clear all accumulated scan data and reset mode to auto.
   void clearScanData() {
-    LoggerService.debug('Clearing scan data and resetting to auto mode', tag: _tag);
+    LoggerService.debug(
+      'Clearing scan data and resetting to auto mode',
+      tag: _tag,
+    );
     state = state.copyWith(
       scanData: const AccumulatedScanData(),
       selectedRoomId: null,
@@ -451,7 +505,10 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
   }
 
   /// Apply batch-parsed result from ScannerValidationService to state.
-  void _applyBatchResult(ParsedDeviceData result, DeviceTypeFromSerial detectedType) {
+  void _applyBatchResult(
+    ParsedDeviceData result,
+    DeviceTypeFromSerial detectedType,
+  ) {
     LoggerService.debug(
       'Batch result: MAC=${result.mac}, Serial=${result.serialNumber}, '
       'PN=${result.partNumber}, complete=${result.isComplete}',
@@ -469,20 +526,39 @@ class ScannerNotifierV2 extends _$ScannerNotifierV2 {
 
     if (result.mac.isNotEmpty && result.mac != state.scanData.mac) {
       newMac = result.mac;
-      newHistory.add(ScanRecord(value: result.mac, scannedAt: now, fieldType: 'mac'));
+      newHistory.add(
+        ScanRecord(value: result.mac, scannedAt: now, fieldType: 'mac'),
+      );
     }
-    if (result.serialNumber.isNotEmpty && result.serialNumber != state.scanData.serialNumber) {
+    if (result.serialNumber.isNotEmpty &&
+        result.serialNumber != state.scanData.serialNumber) {
       newSerial = result.serialNumber;
       newHasValidSerial = true;
-      newHistory.add(ScanRecord(value: result.serialNumber, scannedAt: now, fieldType: 'serial'));
+      newHistory.add(
+        ScanRecord(
+          value: result.serialNumber,
+          scannedAt: now,
+          fieldType: 'serial',
+        ),
+      );
     }
-    if (result.partNumber != null && result.partNumber!.isNotEmpty && result.partNumber != state.scanData.partNumber) {
+    if (result.partNumber != null &&
+        result.partNumber!.isNotEmpty &&
+        result.partNumber != state.scanData.partNumber) {
       newPartNumber = result.partNumber!;
-      newHistory.add(ScanRecord(value: result.partNumber!, scannedAt: now, fieldType: 'partNumber'));
+      newHistory.add(
+        ScanRecord(
+          value: result.partNumber!,
+          scannedAt: now,
+          fieldType: 'partNumber',
+        ),
+      );
     }
 
     // Auto-lock mode if in auto
-    final newMode = state.scanMode == ScanMode.auto ? _deviceTypeToScanMode(detectedType) : state.scanMode;
+    final newMode = state.scanMode == ScanMode.auto
+        ? _deviceTypeToScanMode(detectedType)
+        : state.scanMode;
     final autoLocked = state.scanMode == ScanMode.auto || state.isAutoLocked;
 
     state = state.copyWith(

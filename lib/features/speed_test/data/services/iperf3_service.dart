@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'package:flutter/services.dart';
+import 'package:rgnets_fdk/features/speed_test/data/services/speed_test_debug_logger.dart';
+import 'package:rgnets_fdk/features/speed_test/domain/entities/iperf_error.dart';
 
 /// Service for interacting with native iPerf3 implementation
 class Iperf3Service {
-  static const MethodChannel _channel =
-      MethodChannel('com.rgnets.fdk/iperf3');
-  static const EventChannel _progressChannel =
-      EventChannel('com.rgnets.fdk/iperf3_progress');
+  static const MethodChannel _channel = MethodChannel('com.rgnets.fdk/iperf3');
+  static const EventChannel _progressChannel = EventChannel(
+    'com.rgnets.fdk/iperf3_progress',
+  );
 
   Stream<Map<String, dynamic>>? _progressStream;
 
@@ -19,8 +20,12 @@ class Iperf3Service {
   ///   - sum_received = what client received FROM server = DOWNLOAD speed
   /// - [reverse]=false: UPLOAD test (client sends to server, normal mode)
   ///   - sum_received = what server received FROM client = UPLOAD speed
-  Map<String, dynamic> _parseIperf3Json(String jsonOutput,
-      {required bool reverse}) {
+  Map<String, dynamic> _parseIperf3Json(
+    String jsonOutput, {
+    required bool reverse,
+    String? runId,
+    String? phase,
+  }) {
     try {
       final json = jsonDecode(jsonOutput);
       final results = <String, dynamic>{};
@@ -35,9 +40,6 @@ class Iperf3Service {
         final isTcp = !isUdp;
 
         if (isTcp) {
-          // TCP: Has separate sum_sent and sum_received
-          developer.log('Parsing TCP test results', name: 'Iperf3Service');
-
           // Get sent data (upload speed)
           if (end['sum_sent'] != null) {
             final sumSent = end['sum_sent'];
@@ -64,15 +66,12 @@ class Iperf3Service {
             final firstStream = end['streams'][0];
             if (firstStream['sender'] != null &&
                 firstStream['sender']['mean_rtt'] != null) {
-              results['rtt'] = firstStream['sender']['mean_rtt'] /
+              results['rtt'] =
+                  firstStream['sender']['mean_rtt'] /
                   1000.0; // Convert microseconds to milliseconds
             }
           }
         } else {
-          // UDP test - use the reverse parameter to determine if this is upload or download
-          developer.log('Parsing UDP test results (reverse=$reverse)',
-              name: 'Iperf3Service');
-
           // Get the sum_received which contains the server-measured throughput
           // This is the most accurate measurement for both upload and download
           final sumReceived = end['sum_received'];
@@ -82,11 +81,6 @@ class Iperf3Service {
             final receivedBytes = sumReceived['bytes'] ?? 0;
 
             if (reverse) {
-              // DOWNLOAD test (reverse=true): server sends to client
-              // sum_received contains the download speed (what client received from server)
-              developer.log(
-                  'UDP DOWNLOAD (reverse): received ${receivedBps / 1000000.0} Mbps',
-                  name: 'Iperf3Service');
               results['receivedBitsPerSecond'] = receivedBps;
               results['receiveMbps'] = receivedBps / 1000000.0;
               results['receivedBytes'] = receivedBytes;
@@ -96,11 +90,6 @@ class Iperf3Service {
               results['sendMbps'] = 0.0;
               results['sentBytes'] = 0;
             } else {
-              // UPLOAD test (reverse=false): client sends to server
-              // sum_received contains the upload speed (what server received from client)
-              developer.log(
-                  'UDP UPLOAD (normal): sent ${receivedBps / 1000000.0} Mbps',
-                  name: 'Iperf3Service');
               results['sentBitsPerSecond'] = receivedBps;
               results['sendMbps'] = receivedBps / 1000000.0;
               results['sentBytes'] = receivedBytes;
@@ -111,8 +100,6 @@ class Iperf3Service {
               results['receivedBytes'] = 0;
             }
           } else {
-            // No sum_received - shouldn't happen in normal tests
-            developer.log('UDP: no sum_received data!', name: 'Iperf3Service');
             results['sentBitsPerSecond'] = 0.0;
             results['sendMbps'] = 0.0;
             results['sentBytes'] = 0;
@@ -140,13 +127,35 @@ class Iperf3Service {
         }
       }
 
-      developer.log(
-          'Parsed JSON results: sendMbps=${results['sendMbps']}, receiveMbps=${results['receiveMbps']}, jitter=${results['jitter']}',
-          name: 'Iperf3Service');
+      SpeedTestDebugLogger.debug('result', {
+        if (runId != null) 'run_id': runId,
+        'source': 'iperf3_service',
+        if (phase != null) 'phase': phase,
+        'parsed_metrics': {
+          'send_mbps': results['sendMbps'],
+          'receive_mbps': results['receiveMbps'],
+          'jitter_ms': results['jitter'],
+          'latency_ms': results['rtt'],
+          'lost_packets': results['lostPackets'],
+          'total_packets': results['totalPackets'],
+          'lost_percent': results['lostPercent'],
+        },
+      });
 
       return results;
-    } catch (e) {
-      developer.log('Failed to parse JSON: $e', name: 'Iperf3Service', error: e);
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          if (runId != null) 'run_id': runId,
+          'source': 'iperf3_service',
+          if (phase != null) 'phase': phase,
+          'stage': 'parse_json',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       return {};
     }
   }
@@ -160,73 +169,107 @@ class Iperf3Service {
     bool reverse = false,
     bool useUdp = true, // Default to UDP
     int? bandwidthMbps, // Target bandwidth in Mbps (null = use iperf3 default)
+    String? runId,
+    String? phase,
+    String? serverLabel,
   }) async {
     try {
-      developer.log('=== Flutter: Starting iperf3 client test ===',
-          name: 'Iperf3Service');
-      developer.log(
-          'Host: $serverHost, Port: $port, Duration: $durationSeconds sec',
-          name: 'Iperf3Service');
-      developer.log(
-          'Protocol: ${useUdp ? "UDP" : "TCP"}, Parallel: $parallelStreams, Reverse: $reverse',
-          name: 'Iperf3Service');
-
       // Convert Mbps to bits/sec for native layer
-      final int bandwidthBps =
-          bandwidthMbps != null ? bandwidthMbps * 1000000 : 0;
-      if (bandwidthBps > 0) {
-        developer.log('Bandwidth limit: $bandwidthMbps Mbits/sec',
-            name: 'Iperf3Service');
-      }
-
-      developer.log('Calling native method...', name: 'Iperf3Service');
-      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-          'runClient', {
-        'host': serverHost,
-        'port': port,
-        'duration': durationSeconds,
-        'parallel': parallelStreams,
-        'reverse': reverse,
-        'useUdp': useUdp,
-        'bandwidthBps': bandwidthBps,
+      final int bandwidthBps = bandwidthMbps != null
+          ? bandwidthMbps * 1000000
+          : 0;
+      SpeedTestDebugLogger.debug('request', {
+        if (runId != null) 'run_id': runId,
+        'source': 'iperf3_service',
+        'request': {
+          ...SpeedTestDebugLogger.configDetails(
+            host: serverHost,
+            port: port,
+            durationSeconds: durationSeconds,
+            useUdp: useUdp,
+            parallelStreams: parallelStreams,
+            bandwidthMbps: bandwidthMbps,
+            reverse: reverse,
+            phase: phase,
+            serverLabel: serverLabel,
+          ),
+          'native_method': 'runClient',
+          'bandwidth_bps': bandwidthBps,
+        },
       });
+      final result = await _channel
+          .invokeMethod<Map<dynamic, dynamic>>('runClient', {
+            'host': serverHost,
+            'port': port,
+            'duration': durationSeconds,
+            'parallel': parallelStreams,
+            'reverse': reverse,
+            'useUdp': useUdp,
+            'bandwidthBps': bandwidthBps,
+          });
 
-      developer.log('Native method returned', name: 'Iperf3Service');
       final resultMap = Map<String, dynamic>.from(result ?? {});
 
       if (resultMap['success'] == true) {
-        developer.log('Test completed successfully', name: 'Iperf3Service');
-
         // Parse JSON output to extract actual results
         if (resultMap['jsonOutput'] != null &&
             resultMap['jsonOutput'] is String) {
-          developer.log('Parsing JSON output...', name: 'Iperf3Service');
           final parsedResults = _parseIperf3Json(
             resultMap['jsonOutput'] as String,
             reverse: reverse,
+            runId: runId,
+            phase: phase,
           );
 
           // Merge parsed results into the result map (overwriting the 0 values from native)
           resultMap.addAll(parsedResults);
-
-          developer.log(
-              'Final results: sendMbps=${resultMap['sendMbps']}, receiveMbps=${resultMap['receiveMbps']}',
-              name: 'Iperf3Service');
-        } else {
-          developer.log('No JSON output to parse', name: 'Iperf3Service');
         }
+        SpeedTestDebugLogger.debug('response', {
+          if (runId != null) 'run_id': runId,
+          'source': 'iperf3_service',
+          if (phase != null) 'phase': phase,
+          'success': true,
+          'result': {
+            'send_mbps': resultMap['sendMbps'],
+            'receive_mbps': resultMap['receiveMbps'],
+            'jitter_ms': resultMap['jitter'],
+            'latency_ms': resultMap['rtt'],
+            'error_code': resultMap['errorCode'],
+          },
+        });
       } else {
-        developer.log('Test failed: ${resultMap['error']}',
-            name: 'Iperf3Service');
+        final code = (resultMap['errorCode'] as num?)?.toInt();
+        SpeedTestDebugLogger.warning('error', {
+          if (runId != null) 'run_id': runId,
+          'source': 'iperf3_service',
+          if (phase != null) 'phase': phase,
+          ...describeIperfError(code, message: resultMap['error']?.toString()),
+        });
       }
 
       return resultMap;
     } on PlatformException catch (e) {
-      developer.log('Platform exception: ${e.message}',
-          name: 'Iperf3Service', error: e);
+      SpeedTestDebugLogger.error('error', {
+        if (runId != null) 'run_id': runId,
+        'source': 'iperf3_service',
+        if (phase != null) 'phase': phase,
+        'stage': 'run_client',
+        'reason': e.message ?? 'Platform exception',
+      }, error: e);
       throw Exception('Failed to run iperf3 client: ${e.message}');
-    } catch (e) {
-      developer.log('Unexpected error: $e', name: 'Iperf3Service', error: e);
+    } on Exception catch (e, stack) {
+      SpeedTestDebugLogger.error(
+        'error',
+        {
+          if (runId != null) 'run_id': runId,
+          'source': 'iperf3_service',
+          if (phase != null) 'phase': phase,
+          'stage': 'run_client',
+          'reason': e.toString(),
+        },
+        error: e,
+        stackTrace: stack,
+      );
       rethrow;
     }
   }
@@ -267,8 +310,9 @@ class Iperf3Service {
   /// Cancel running client test
   Future<bool> cancelClient() async {
     try {
-      final bool? wasRunning =
-          await _channel.invokeMethod<bool>('cancelClient');
+      final bool? wasRunning = await _channel.invokeMethod<bool>(
+        'cancelClient',
+      );
       return wasRunning ?? false;
     } on PlatformException catch (e) {
       throw Exception('Failed to cancel iperf3 client: ${e.message}');
@@ -276,15 +320,22 @@ class Iperf3Service {
   }
 
   /// Get default gateway IP address
-  Future<String?> getDefaultGateway() async {
+  Future<String?> getDefaultGateway({String? runId}) async {
     try {
-      final String? gateway =
-          await _channel.invokeMethod<String>('getDefaultGateway');
+      final String? gateway = await _channel.invokeMethod<String>(
+        'getDefaultGateway',
+      );
       if (gateway == null || gateway.isEmpty) {
         return null;
       }
       return gateway;
     } on PlatformException catch (e) {
+      SpeedTestDebugLogger.error('error', {
+        if (runId != null) 'run_id': runId,
+        'source': 'iperf3_service',
+        'stage': 'get_default_gateway',
+        'reason': e.message ?? 'Failed to fetch default gateway',
+      }, error: e);
       throw Exception('Failed to fetch default gateway: ${e.message}');
     }
   }
@@ -292,10 +343,10 @@ class Iperf3Service {
   /// Get gateway for a specific destination hostname
   Future<Map<String, dynamic>> getGatewayForDestination(String hostname) async {
     try {
-      final result = await _channel
-          .invokeMethod<Map<dynamic, dynamic>>('getGatewayForDestination', {
-        'hostname': hostname,
-      });
+      final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'getGatewayForDestination',
+        {'hostname': hostname},
+      );
       return Map<String, dynamic>.from(result ?? {});
     } on PlatformException catch (e) {
       return {
@@ -307,8 +358,7 @@ class Iperf3Service {
 
   /// Get real-time progress stream
   Stream<Map<String, dynamic>> getProgressStream() {
-    _progressStream ??=
-        _progressChannel.receiveBroadcastStream().map((event) {
+    _progressStream ??= _progressChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {
         return Map<String, dynamic>.from(event);
       }

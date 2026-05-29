@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/core/utils/log_redaction.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 
 /// Outcome of a device-registration round-trip with the backend.
@@ -9,17 +10,15 @@ import 'package:rgnets_fdk/features/scanner/domain/entities/scan_session.dart';
 /// `success` is the rXg's authoritative verdict, not just whether the
 /// WebSocket frame was sent.
 class RegistrationServiceOutcome {
-  const RegistrationServiceOutcome.success({
-    this.data,
-    this.status = 200,
-  })  : success = true,
-        errorMessage = null;
+  const RegistrationServiceOutcome.success({this.data, this.status = 200})
+    : success = true,
+      errorMessage = null;
 
   const RegistrationServiceOutcome.failure({
     required this.errorMessage,
     required this.status,
-  })  : success = false,
-        data = null;
+  }) : success = false,
+       data = null;
 
   final bool success;
   final String? errorMessage;
@@ -30,7 +29,7 @@ class RegistrationServiceOutcome {
 /// Service for registering devices via WebSocket.
 class DeviceRegistrationService {
   DeviceRegistrationService({required WebSocketService webSocketService})
-      : _wsService = webSocketService;
+    : _wsService = webSocketService;
 
   static const String _tag = 'DeviceRegistration';
 
@@ -53,10 +52,14 @@ class DeviceRegistrationService {
     String? model,
     int? existingDeviceId,
     Duration timeout = const Duration(seconds: 30),
+    String? attemptId,
   }) async {
+    attemptId ??=
+        'reg-${deviceType.name}-${DateTime.now().millisecondsSinceEpoch}';
     if (!_wsService.isConnected) {
       LoggerService.error(
-        'Cannot register device: WebSocket not connected',
+        'Cannot register device: WebSocket not connected '
+        '(attempt_id=$attemptId, device_type=${deviceType.name})',
         tag: _tag,
       );
       return const RegistrationServiceOutcome.failure(
@@ -66,7 +69,8 @@ class DeviceRegistrationService {
     }
 
     LoggerService.info(
-      'Registering ${deviceType.displayName} via WebSocket',
+      '[REGISTRATION_FLOW] Starting ${deviceType.displayName} registration '
+      '(attempt_id=$attemptId)',
       tag: _tag,
     );
 
@@ -79,6 +83,33 @@ class DeviceRegistrationService {
       model: model,
       existingDeviceId: existingDeviceId,
     );
+    final actionData = {
+      'action': 'resource_action',
+      'resource_type': payload.resourceType,
+      'request_id': attemptId,
+      ...payload.additionalData,
+    };
+    final endpoint =
+        'ActionCable RxgChannel/resource_action/${payload.resourceType}';
+
+    _debugRegistration('attempt', {
+      'attempt_id': attemptId,
+      'device_type': deviceType.name,
+      'device_display_name': deviceType.displayName,
+      'identifiers': {
+        'mac': mac,
+        'serial_number': serialNumber,
+        if (partNumber != null) 'part_number': partNumber,
+        if (model != null) 'model': model,
+        if (existingDeviceId != null) 'existing_device_id': existingDeviceId,
+        'pms_room_id': pmsRoomId,
+      },
+    });
+    _debugRegistration('request', {
+      'attempt_id': attemptId,
+      'endpoint': endpoint,
+      'payload': actionData,
+    });
 
     try {
       final response = await _wsService.requestActionCable(
@@ -86,26 +117,80 @@ class DeviceRegistrationService {
         resourceType: payload.resourceType,
         additionalData: payload.additionalData,
         timeout: timeout,
+        requestId: attemptId,
       );
-      return _parseResponse(response);
+      _debugRegistration('response', {
+        'attempt_id': attemptId,
+        'status': (response.payload['status'] as num?)?.toInt(),
+        'body': response.raw ?? response.payload,
+      });
+
+      final outcome = _parseResponse(response);
+      if (outcome.success) {
+        LoggerService.info(
+          '[REGISTRATION_FLOW] Registration confirmed '
+          '(attempt_id=$attemptId, device_type=${deviceType.name}, '
+          'status=${outcome.status})',
+          tag: _tag,
+        );
+        _debugRegistration('success', {
+          'attempt_id': attemptId,
+          'device_type': deviceType.name,
+          'status': outcome.status,
+          if (outcome.data != null) 'data': outcome.data,
+        });
+      } else {
+        LoggerService.warning(
+          '[REGISTRATION_FLOW] Registration failed '
+          '(attempt_id=$attemptId, device_type=${deviceType.name}, '
+          'status=${outcome.status}, reason=${outcome.errorMessage})',
+          tag: _tag,
+        );
+        _debugRegistration('failure', {
+          'attempt_id': attemptId,
+          'device_type': deviceType.name,
+          'status': outcome.status,
+          'reason': outcome.errorMessage,
+        });
+      }
+      return outcome;
     } on TimeoutException {
       LoggerService.warning(
-        'Registration timed out waiting for backend response',
+        '[REGISTRATION_FLOW] Registration timed out waiting for backend '
+        '(attempt_id=$attemptId, device_type=${deviceType.name})',
         tag: _tag,
       );
+      _debugRegistration('failure', {
+        'attempt_id': attemptId,
+        'device_type': deviceType.name,
+        'status': 0,
+        'reason': 'Timed out waiting for backend',
+        'endpoint': endpoint,
+        'payload': actionData,
+      });
       return const RegistrationServiceOutcome.failure(
         errorMessage: 'Timed out waiting for backend',
         status: 0,
       );
     } on Object catch (e, stack) {
       LoggerService.error(
-        'Registration failed before receiving backend response: $e',
+        '[REGISTRATION_FLOW] Registration failed before backend response: '
+        '${scrubErrorForLog(e)} (attempt_id=$attemptId, '
+        'device_type=${deviceType.name})',
         tag: _tag,
-        error: e,
+        error: scrubErrorForLog(e),
         stackTrace: stack,
       );
+      _debugRegistration('failure', {
+        'attempt_id': attemptId,
+        'device_type': deviceType.name,
+        'status': 0,
+        'reason': scrubErrorForLog(e),
+        'endpoint': endpoint,
+        'payload': actionData,
+      });
       return RegistrationServiceOutcome.failure(
-        errorMessage: e.toString(),
+        errorMessage: scrubErrorForLog(e),
         status: 0,
       );
     }
@@ -126,7 +211,8 @@ class DeviceRegistrationService {
     final isError = response.type == 'error' || status >= 400;
 
     if (isError) {
-      final errMsg = _extractErrorMessage(payload) ??
+      final errMsg =
+          _extractErrorMessage(payload) ??
           'Registration failed (status $status)';
       return RegistrationServiceOutcome.failure(
         errorMessage: errMsg,
@@ -161,11 +247,21 @@ class DeviceRegistrationService {
     return null;
   }
 
+  void _debugRegistration(String phase, Map<String, dynamic> details) {
+    if (!LoggerService.isVerboseLoggingEnabled) {
+      return;
+    }
+    LoggerService.debug(
+      '[REGISTRATION_FLOW:$phase] ${formatForLog(details)}',
+      tag: _tag,
+    );
+  }
+
   /// Builds the ActionCable inner-data payload for one device-type, minus
   /// the fields that `WebSocketService.requestActionCable` adds itself
   /// (`action`, `resource_type`, `request_id`).
   ({String resourceType, Map<String, dynamic> additionalData})
-      _buildExtraActionPayload({
+  _buildExtraActionPayload({
     required DeviceType deviceType,
     required String mac,
     required String serialNumber,
