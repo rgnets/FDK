@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/features/scanner/domain/entities/device_category.dart
 import 'package:rgnets_fdk/features/scanner/domain/entities/device_registration_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/services/device_classifier.dart';
+import 'package:rgnets_fdk/features/scanner/domain/services/registration_gate.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/device_registration_provider.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier_v2.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
@@ -51,7 +52,8 @@ class _ScannerRegistrationPopupState
     extends ConsumerState<ScannerRegistrationPopup> {
   bool _isLoading = false;
   Device? _selectedDevice;
-  bool _createNewDevice = true;
+  bool _createNewDevice = false;
+  bool _selectionMade = false;
 
   @override
   void initState() {
@@ -117,6 +119,13 @@ class _ScannerRegistrationPopupState
     final isMismatch = scannerState.matchStatus == DeviceMatchStatus.mismatch ||
         scannerState.matchStatus == DeviceMatchStatus.multipleMatch;
 
+    // Load the room's selectable devices once so both the selector and the
+    // action button agree on what (if anything) can be registered.
+    final showDeviceSelector =
+        !isMismatch && scannerState.selectedRoomId != null;
+    final deviceOptions =
+        showDeviceSelector ? _readDeviceOptions(scannerState) : null;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -180,15 +189,15 @@ class _ScannerRegistrationPopupState
                     _buildMoveIndicator(context, scannerState),
 
                   // Device selection (only if not mismatch)
-                  if (!isMismatch && scannerState.selectedRoomId != null) ...[
+                  if (showDeviceSelector) ...[
                     const SizedBox(height: 16),
-                    _buildDeviceSelector(context, scannerState),
+                    _buildDeviceSelector(context, scannerState, deviceOptions!),
                   ],
 
                   const SizedBox(height: 24),
 
                   // Action buttons
-                  _buildActionButtons(context, scannerState, isMismatch),
+                  _buildActionButtons(context, scannerState, isMismatch, deviceOptions),
                 ],
               ),
             ),
@@ -540,24 +549,60 @@ class _ScannerRegistrationPopupState
     );
   }
 
-  Widget _buildDeviceSelector(BuildContext context, ScannerState state) {
-    final theme = Theme.of(context);
+  /// Devices in the room narrowed to the currently-scanned device type.
+  List<Device> _devicesOfScanType(List<Device> devices, ScanMode mode) {
+    final filter = ScannerUtils.getDeviceTypeForMode(mode);
+    return filter != null ? devices.where((d) => d.type == filter).toList() : devices;
+  }
+
+  /// Splits the room's devices (of the scanned type) into designed/assigned
+  /// buckets. Free creation is only allowed when the room has no designed slot
+  /// to bind to.
+  _DeviceOptions _buildDeviceOptions(RoomDeviceState deviceState, ScanMode mode) {
+    final filtered = _devicesOfScanType(deviceState.allDevices, mode);
+    final categorized = DeviceClassifier.categorizeDevices(filtered);
+    return _DeviceOptions(
+      isLoading: deviceState.isLoading,
+      hasError: deviceState.error != null,
+      designed: categorized[DeviceCategory.designed] ?? const [],
+      assigned: categorized[DeviceCategory.assigned] ?? const [],
+      allowCreateNew: DeviceClassifier.allowFreeCreation(filtered),
+    );
+  }
+
+  /// Reactively reads the selectable devices for the currently-selected room.
+  _DeviceOptions _readDeviceOptions(ScannerState state) {
     final roomId = state.selectedRoomId?.toString() ?? '';
-    final deviceState = ref.watch(roomDeviceNotifierProvider(roomId));
-    final deviceTypeFilter = ScannerUtils.getDeviceTypeForMode(state.scanMode);
+    return _buildDeviceOptions(
+      ref.watch(roomDeviceNotifierProvider(roomId)),
+      state.scanMode,
+    );
+  }
+
+  Widget _buildDeviceSelector(
+    BuildContext context,
+    ScannerState state,
+    _DeviceOptions options,
+  ) {
+    final theme = Theme.of(context);
+
+    final typeName = ScannerUtils.getFullDeviceTypeName(state.scanMode);
+    final title = options.allowCreateNew
+        ? 'Select or create $typeName'
+        : 'Select designed or assigned $typeName';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select Designed ${ScannerUtils.getFullDeviceTypeName(state.scanMode)} or Create New',
+          title,
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
 
-        if (deviceState.isLoading)
+        if (options.isLoading)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -581,7 +626,7 @@ class _ScannerRegistrationPopupState
               ],
             ),
           )
-        else if (deviceState.error != null)
+        else if (options.hasError)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -605,60 +650,52 @@ class _ScannerRegistrationPopupState
             ),
           )
         else
-          _buildDeviceDropdown(
-            context,
-            deviceState.allDevices,
-            deviceTypeFilter,
-            state.scanMode,
-          ),
+          _buildDeviceDropdown(context, options, state.scanMode),
       ],
     );
   }
 
   Widget _buildDeviceDropdown(
     BuildContext context,
-    List<Device> allDevices,
-    String? deviceTypeFilter,
+    _DeviceOptions options,
     ScanMode scanMode,
   ) {
     final theme = Theme.of(context);
 
-    // Filter by type
-    final filteredDevices = deviceTypeFilter != null
-        ? allDevices.where((d) => d.type == deviceTypeFilter).toList()
-        : allDevices;
-
-    // Categorize
-    final categorized = DeviceClassifier.categorizeDevices(filteredDevices);
-    final designedDevices = categorized[DeviceCategory.designed] ?? [];
-    final assignedDevices = categorized[DeviceCategory.assigned] ?? [];
+    final designedDevices = options.designed;
+    final assignedDevices = options.assigned;
+    final allowCreateNew = options.allowCreateNew;
 
     // Build items
     final items = <DropdownMenuItem<String>>[];
 
-    // Create New option (always first, green)
-    items.add(
-      DropdownMenuItem(
-        value: 'create_new',
-        child: Row(
-          children: [
-            const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Create New ${ScannerUtils.getFullDeviceTypeName(scanMode)}',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.green.shade700,
-                  fontWeight: FontWeight.w600,
+    // Create New option — only offered as a fallback when the room has no
+    // designed slot to bind to. When a designed device exists the tech must
+    // pick one (or an already-assigned device), never invent a new name.
+    if (allowCreateNew) {
+      items.add(
+        DropdownMenuItem(
+          value: 'create_new',
+          child: Row(
+            children: [
+              const Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Create New ${ScannerUtils.getFullDeviceTypeName(scanMode)}',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.green.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
 
     // Designed devices (blue)
     if (designedDevices.isNotEmpty) {
@@ -744,33 +781,46 @@ class _ScannerRegistrationPopupState
       }
     }
 
-    // Current value
-    String currentValue = 'create_new';
-    if (!_createNewDevice && _selectedDevice != null) {
-      final category = DeviceClassifier.isDesignedDevice(_selectedDevice!) ? 'designed' : 'assigned';
-      currentValue = '${category}_${_selectedDevice!.id}';
+    // Current value. Null until the tech makes an explicit choice — a
+    // brand-new scan must be deliberately bound to a device, never silently
+    // defaulted to one.
+    String? currentValue;
+    if (_selectionMade) {
+      if (_createNewDevice) {
+        currentValue = 'create_new';
+      } else if (_selectedDevice != null) {
+        // Derive the category from the device's CURRENT bucket rather than
+        // re-classifying it, so a designed slot that loads its serial/MAC and
+        // reclassifies to assigned mid-session keeps the tech's selection.
+        final id = _selectedDevice!.id;
+        if (designedDevices.any((d) => d.id == id)) {
+          currentValue = 'designed_$id';
+        } else if (assignedDevices.any((d) => d.id == id)) {
+          currentValue = 'assigned_$id';
+        }
+      }
     }
 
     // Guard against DropdownButton's "exactly one item" assertion. The device
     // list can refresh under us (a device reclassifying designed<->assigned
     // when its serial loads, an optimistic insert, or a room switch), which
     // can leave currentValue orphaned or produce duplicate item values.
-    // Drop duplicate non-null values, then fall back to create_new if the
-    // selected value no longer maps to exactly one item.
+    // Drop duplicate non-null values, then clear the selection if the chosen
+    // value no longer maps to exactly one item (e.g. create_new disappeared
+    // once a designed slot loaded, or the picked device left the room).
     final seenValues = <String>{};
     items.retainWhere((item) {
       final v = item.value;
       if (v == null) return true; // keep section header/separator items
       return seenValues.add(v); // false (dropped) if value already seen
     });
-    if (currentValue != 'create_new' && !seenValues.contains(currentValue)) {
-      currentValue = 'create_new';
-      // The previously-selected device is gone from the list — reset the
-      // stale selection after this frame so registration doesn't target it.
+    if (currentValue != null && !seenValues.contains(currentValue)) {
+      currentValue = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && (!_createNewDevice || _selectedDevice != null)) {
+        if (mounted && _selectionMade) {
           setState(() {
-            _createNewDevice = true;
+            _selectionMade = false;
+            _createNewDevice = false;
             _selectedDevice = null;
           });
         }
@@ -783,6 +833,12 @@ class _ScannerRegistrationPopupState
 
     return DropdownButtonFormField<String>(
       value: currentValue,
+      hint: Text(
+        'Select a ${ScannerUtils.getFullDeviceTypeName(scanMode)}',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
       decoration: InputDecoration(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -857,6 +913,7 @@ class _ScannerRegistrationPopupState
         if (value == null) return;
 
         setState(() {
+          _selectionMade = true;
           if (value == 'create_new') {
             _createNewDevice = true;
             _selectedDevice = null;
@@ -865,10 +922,12 @@ class _ScannerRegistrationPopupState
             final parts = value.split('_');
             if (parts.length >= 2) {
               final deviceId = parts.sublist(1).join('_');
-              final found = filteredDevices.where((d) => d.id == deviceId);
+              final found = combinedDevices.where((d) => d.id == deviceId);
               _selectedDevice = found.isNotEmpty ? found.first : null;
+              // If the picked device vanished from the list, revert to the
+              // unselected state rather than silently falling into create-new.
               if (_selectedDevice == null) {
-                _createNewDevice = true;
+                _selectionMade = false;
               }
             }
           }
@@ -877,11 +936,37 @@ class _ScannerRegistrationPopupState
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, ScannerState state, bool isMismatch) {
+  Widget _buildActionButtons(
+    BuildContext context,
+    ScannerState state,
+    bool isMismatch,
+    _DeviceOptions? options,
+  ) {
     final isExisting = state.matchStatus == DeviceMatchStatus.fullMatch;
     final isSameRoom = isExisting && state.matchedDeviceRoomId == state.selectedRoomId;
     final isLoading = state.isRegistrationInProgress;
-    final canRegister = state.selectedRoomId != null && !isMismatch && !isLoading;
+    final allowCreateNew = options?.allowCreateNew ?? false;
+    final optionsReady = options != null && !options.isLoading && !options.hasError;
+
+    // The picked device must still be present in the current room's options —
+    // guards against a selection made before a room switch or a list refresh
+    // that removed it.
+    final selectedDeviceAvailable = _selectedDevice != null &&
+        options != null &&
+        [...options.designed, ...options.assigned]
+            .any((d) => d.id == _selectedDevice!.id);
+
+    final canRegister = RegistrationGate.canRegister(
+      roomSelected: state.selectedRoomId != null,
+      isMismatch: isMismatch,
+      registrationInProgress: isLoading,
+      isExistingMatch: isExisting,
+      optionsReady: optionsReady,
+      selectionMade: _selectionMade,
+      createNewSelected: _createNewDevice,
+      allowCreateNew: allowCreateNew,
+      selectedDeviceAvailable: selectedDeviceAvailable,
+    );
 
     // Determine button text and color
     String buttonText;
@@ -899,18 +984,23 @@ class _ScannerRegistrationPopupState
       } else {
         buttonText = 'Select Room First';
       }
-    } else if (_createNewDevice) {
+    } else if (state.selectedRoomId == null) {
+      buttonText = 'Select Room First';
+    } else if (options?.isLoading ?? false) {
+      buttonText = 'Loading devices…';
+    } else if (options?.hasError ?? false) {
+      buttonText = 'Devices unavailable';
+    } else if (_createNewDevice && _selectionMade && allowCreateNew) {
       buttonText = 'Create New';
       buttonColor = Colors.green;
-    } else if (_selectedDevice != null && DeviceClassifier.isDesignedDevice(_selectedDevice!)) {
+    } else if (!selectedDeviceAvailable) {
+      buttonText = 'Select a Device';
+    } else if (DeviceClassifier.isDesignedDevice(_selectedDevice!)) {
       buttonText = 'Assign to Designed';
       buttonColor = Colors.blue;
-    } else if (_selectedDevice != null) {
+    } else {
       buttonText = 'Replace Existing';
       buttonColor = Colors.orange;
-    } else {
-      buttonText = 'Register';
-      buttonColor = Colors.green;
     }
 
     return Row(
@@ -971,6 +1061,13 @@ class _ScannerRegistrationPopupState
               roomId,
               displayName,
             );
+        // A device picked for the previous room must not carry over — the new
+        // room has its own designed/assigned slots.
+        setState(() {
+          _selectionMade = false;
+          _createNewDevice = false;
+          _selectedDevice = null;
+        });
       }
     });
   }
@@ -980,6 +1077,13 @@ class _ScannerRegistrationPopupState
     ref.read(scannerNotifierV2Provider.notifier).clearScanData();
     Navigator.pop(context, false);
     widget.onCancel?.call();
+  }
+
+  void _showRegisterBlocked(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
   }
 
   Future<void> _handleRegister() async {
@@ -996,9 +1100,46 @@ class _ScannerRegistrationPopupState
       return;
     }
 
+    final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
+
+    // Re-validate the selection against the room's CURRENT devices (read, not
+    // watched) before committing. The button gate normally prevents these, but
+    // the device list can refresh between build and tap — never silently
+    // create a badly-named device or assign to a slot that has vanished.
+    if (!isExisting) {
+      final roomId = scannerState.selectedRoomId!.toString();
+      final options = _buildDeviceOptions(
+        ref.read(roomDeviceNotifierProvider(roomId)),
+        scannerState.scanMode,
+      );
+      // Fail closed while the device list is unknown: a loading/errored room
+      // can report an empty list, which would falsely allow create-new.
+      if (options.isLoading || options.hasError) {
+        _showRegisterBlocked('Devices are still loading — try again in a moment.');
+        return;
+      }
+      if (_createNewDevice) {
+        if (!options.allowCreateNew) {
+          _showRegisterBlocked(
+            'A designed device exists for this room — select it instead of '
+            'creating a new one.',
+          );
+          return;
+        }
+      } else {
+        final available = [...options.designed, ...options.assigned]
+            .any((d) => d.id == _selectedDevice?.id);
+        if (!available) {
+          _showRegisterBlocked(
+            'The selected device is no longer available — pick another.',
+          );
+          return;
+        }
+      }
+    }
+
     ref.read(scannerNotifierV2Provider.notifier).setRegistrationInProgress(true);
 
-    final isExisting = scannerState.matchStatus == DeviceMatchStatus.fullMatch;
     final isSameRoom = isExisting && scannerState.matchedDeviceRoomId == scannerState.selectedRoomId;
 
     int? existingDeviceId;
@@ -1081,6 +1222,25 @@ class _ScannerRegistrationPopupState
     }
   }
 
+}
+
+/// Selectable devices for the chosen room, pre-categorized for the registration
+/// popup. [allowCreateNew] is true only when the room has no designed slot to
+/// bind to, in which case free creation is offered as a fallback.
+class _DeviceOptions {
+  const _DeviceOptions({
+    required this.isLoading,
+    required this.hasError,
+    required this.designed,
+    required this.assigned,
+    required this.allowCreateNew,
+  });
+
+  final bool isLoading;
+  final bool hasError;
+  final List<Device> designed;
+  final List<Device> assigned;
+  final bool allowCreateNew;
 }
 
 extension on RegistrationResult {
