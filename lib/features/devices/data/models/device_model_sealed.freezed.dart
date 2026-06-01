@@ -48,7 +48,6 @@ mixin _$DeviceModelSealed {
   String? get location => throw _privateConstructorUsedError;
   @JsonKey(name: 'last_seen')
   DateTime? get lastSeen => throw _privateConstructorUsedError;
-  Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
   String? get model => throw _privateConstructorUsedError;
   @JsonKey(name: 'serial_number')
   String? get serialNumber => throw _privateConstructorUsedError;
@@ -62,6 +61,7 @@ mixin _$DeviceModelSealed {
       throw _privateConstructorUsedError;
   @JsonKey(name: 'hn_counts')
   HealthCountsModel? get hnCounts => throw _privateConstructorUsedError;
+  String? get phase => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function(
@@ -74,7 +74,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -93,7 +92,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)
         ap,
     required TResult Function(
             String id,
@@ -105,7 +105,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -134,7 +133,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -151,7 +149,8 @@ mixin _$DeviceModelSealed {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)
+            int? temperature,
+            String? phase)
         switchDevice,
     required TResult Function(
             String id,
@@ -163,7 +162,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -180,7 +178,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)
         wlan,
   }) =>
       throw _privateConstructorUsedError;
@@ -196,7 +195,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -215,7 +213,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult? Function(
             String id,
@@ -227,7 +226,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -256,7 +254,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -273,7 +270,8 @@ mixin _$DeviceModelSealed {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult? Function(
             String id,
@@ -285,7 +283,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -302,7 +299,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
   }) =>
       throw _privateConstructorUsedError;
@@ -318,7 +316,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -337,7 +334,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult Function(
             String id,
@@ -349,7 +347,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -378,7 +375,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -395,7 +391,8 @@ mixin _$DeviceModelSealed {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult Function(
             String id,
@@ -407,7 +404,6 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -424,7 +420,8 @@ mixin _$DeviceModelSealed {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
     required TResult orElse(),
   }) =>
@@ -476,7 +473,6 @@ abstract class $DeviceModelSealedCopyWith<$Res> {
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
       @JsonKey(name: 'last_seen') DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       @JsonKey(name: 'serial_number') String? serialNumber,
       String? firmware,
@@ -484,7 +480,8 @@ abstract class $DeviceModelSealedCopyWith<$Res> {
       List<String>? images,
       @JsonKey(name: 'image_signed_ids') List<String>? imageSignedIds,
       @JsonKey(name: 'health_notices') List<HealthNoticeModel>? healthNotices,
-      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts});
+      @JsonKey(name: 'hn_counts') HealthCountsModel? hnCounts,
+      String? phase});
 
   $RoomModelCopyWith<$Res>? get pmsRoom;
   $HealthCountsModelCopyWith<$Res>? get hnCounts;
@@ -512,7 +509,6 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
@@ -521,6 +517,7 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
     Object? imageSignedIds = freezed,
     Object? healthNotices = freezed,
     Object? hnCounts = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -559,10 +556,6 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value.metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -595,6 +588,10 @@ class _$DeviceModelSealedCopyWithImpl<$Res, $Val extends DeviceModelSealed>
           ? _value.hnCounts
           : hnCounts // ignore: cast_nullable_to_non_nullable
               as HealthCountsModel?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 
@@ -641,7 +638,6 @@ abstract class _$$APModelImplCopyWith<$Res>
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
       @JsonKey(name: 'last_seen') DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       @JsonKey(name: 'serial_number') String? serialNumber,
       String? firmware,
@@ -659,7 +655,8 @@ abstract class _$$APModelImplCopyWith<$Res>
       @JsonKey(name: 'current_upload') double? currentUpload,
       @JsonKey(name: 'current_download') double? currentDownload,
       @JsonKey(name: 'ap_onboarding_status')
-      OnboardingStatusPayload? onboardingStatus});
+      OnboardingStatusPayload? onboardingStatus,
+      String? phase});
 
   @override
   $RoomModelCopyWith<$Res>? get pmsRoom;
@@ -688,7 +685,6 @@ class __$$APModelImplCopyWithImpl<$Res>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
@@ -706,6 +702,7 @@ class __$$APModelImplCopyWithImpl<$Res>
     Object? currentUpload = freezed,
     Object? currentDownload = freezed,
     Object? onboardingStatus = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_$APModelImpl(
       id: null == id
@@ -744,10 +741,6 @@ class __$$APModelImplCopyWithImpl<$Res>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -816,6 +809,10 @@ class __$$APModelImplCopyWithImpl<$Res>
           ? _value.onboardingStatus
           : onboardingStatus // ignore: cast_nullable_to_non_nullable
               as OnboardingStatusPayload?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 
@@ -846,7 +843,6 @@ class _$APModelImpl extends APModel {
       @JsonKey(name: 'mac_address') this.macAddress,
       this.location,
       @JsonKey(name: 'last_seen') this.lastSeen,
-      final Map<String, dynamic>? metadata,
       this.model,
       @JsonKey(name: 'serial_number') this.serialNumber,
       this.firmware,
@@ -865,9 +861,9 @@ class _$APModelImpl extends APModel {
       @JsonKey(name: 'current_upload') this.currentUpload,
       @JsonKey(name: 'current_download') this.currentDownload,
       @JsonKey(name: 'ap_onboarding_status') this.onboardingStatus,
+      this.phase,
       final String? $type})
-      : _metadata = metadata,
-        _images = images,
+      : _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         $type = $type ?? 'access_point',
@@ -900,16 +896,6 @@ class _$APModelImpl extends APModel {
   @override
   @JsonKey(name: 'last_seen')
   final DateTime? lastSeen;
-  final Map<String, dynamic>? _metadata;
-  @override
-  Map<String, dynamic>? get metadata {
-    final value = _metadata;
-    if (value == null) return null;
-    if (_metadata is EqualUnmodifiableMapView) return _metadata;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
   @override
   final String? model;
   @override
@@ -980,13 +966,15 @@ class _$APModelImpl extends APModel {
   @override
   @JsonKey(name: 'ap_onboarding_status')
   final OnboardingStatusPayload? onboardingStatus;
+  @override
+  final String? phase;
 
   @JsonKey(name: 'device_type')
   final String $type;
 
   @override
   String toString() {
-    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus)';
+    return 'DeviceModelSealed.ap(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, connectionState: $connectionState, signalStrength: $signalStrength, connectedClients: $connectedClients, ssid: $ssid, channel: $channel, maxClients: $maxClients, currentUpload: $currentUpload, currentDownload: $currentDownload, onboardingStatus: $onboardingStatus, phase: $phase)';
   }
 
   @override
@@ -1008,7 +996,6 @@ class _$APModelImpl extends APModel {
                 other.location == location) &&
             (identical(other.lastSeen, lastSeen) ||
                 other.lastSeen == lastSeen) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
             (identical(other.model, model) || other.model == model) &&
             (identical(other.serialNumber, serialNumber) ||
                 other.serialNumber == serialNumber) &&
@@ -1037,7 +1024,8 @@ class _$APModelImpl extends APModel {
             (identical(other.currentDownload, currentDownload) ||
                 other.currentDownload == currentDownload) &&
             (identical(other.onboardingStatus, onboardingStatus) ||
-                other.onboardingStatus == onboardingStatus));
+                other.onboardingStatus == onboardingStatus) &&
+            (identical(other.phase, phase) || other.phase == phase));
   }
 
   @JsonKey(ignore: true)
@@ -1053,7 +1041,6 @@ class _$APModelImpl extends APModel {
         macAddress,
         location,
         lastSeen,
-        const DeepCollectionEquality().hash(_metadata),
         model,
         serialNumber,
         firmware,
@@ -1070,7 +1057,8 @@ class _$APModelImpl extends APModel {
         maxClients,
         currentUpload,
         currentDownload,
-        onboardingStatus
+        onboardingStatus,
+        phase
       ]);
 
   @JsonKey(ignore: true)
@@ -1092,7 +1080,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1111,7 +1098,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)
         ap,
     required TResult Function(
             String id,
@@ -1123,7 +1111,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1152,7 +1139,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1169,7 +1155,8 @@ class _$APModelImpl extends APModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)
+            int? temperature,
+            String? phase)
         switchDevice,
     required TResult Function(
             String id,
@@ -1181,7 +1168,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1198,7 +1184,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)
         wlan,
   }) {
     return ap(
@@ -1211,7 +1198,6 @@ class _$APModelImpl extends APModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -1228,7 +1214,8 @@ class _$APModelImpl extends APModel {
         maxClients,
         currentUpload,
         currentDownload,
-        onboardingStatus);
+        onboardingStatus,
+        phase);
   }
 
   @override
@@ -1244,7 +1231,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1263,7 +1249,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult? Function(
             String id,
@@ -1275,7 +1262,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1304,7 +1290,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1321,7 +1306,8 @@ class _$APModelImpl extends APModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult? Function(
             String id,
@@ -1333,7 +1319,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1350,7 +1335,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
   }) {
     return ap?.call(
@@ -1363,7 +1349,6 @@ class _$APModelImpl extends APModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -1380,7 +1365,8 @@ class _$APModelImpl extends APModel {
         maxClients,
         currentUpload,
         currentDownload,
-        onboardingStatus);
+        onboardingStatus,
+        phase);
   }
 
   @override
@@ -1396,7 +1382,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1415,7 +1400,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult Function(
             String id,
@@ -1427,7 +1413,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1456,7 +1441,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1473,7 +1457,8 @@ class _$APModelImpl extends APModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult Function(
             String id,
@@ -1485,7 +1470,6 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -1502,7 +1486,8 @@ class _$APModelImpl extends APModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
     required TResult orElse(),
   }) {
@@ -1517,7 +1502,6 @@ class _$APModelImpl extends APModel {
           macAddress,
           location,
           lastSeen,
-          metadata,
           model,
           serialNumber,
           firmware,
@@ -1534,7 +1518,8 @@ class _$APModelImpl extends APModel {
           maxClients,
           currentUpload,
           currentDownload,
-          onboardingStatus);
+          onboardingStatus,
+          phase);
     }
     return orElse();
   }
@@ -1595,7 +1580,6 @@ abstract class APModel extends DeviceModelSealed {
       @JsonKey(name: 'mac_address') final String? macAddress,
       final String? location,
       @JsonKey(name: 'last_seen') final DateTime? lastSeen,
-      final Map<String, dynamic>? metadata,
       final String? model,
       @JsonKey(name: 'serial_number') final String? serialNumber,
       final String? firmware,
@@ -1614,7 +1598,8 @@ abstract class APModel extends DeviceModelSealed {
       @JsonKey(name: 'current_upload') final double? currentUpload,
       @JsonKey(name: 'current_download') final double? currentDownload,
       @JsonKey(name: 'ap_onboarding_status')
-      final OnboardingStatusPayload? onboardingStatus}) = _$APModelImpl;
+      final OnboardingStatusPayload? onboardingStatus,
+      final String? phase}) = _$APModelImpl;
   const APModel._() : super._();
 
   factory APModel.fromJson(Map<String, dynamic> json) = _$APModelImpl.fromJson;
@@ -1642,8 +1627,6 @@ abstract class APModel extends DeviceModelSealed {
   @override
   @JsonKey(name: 'last_seen')
   DateTime? get lastSeen;
-  @override
-  Map<String, dynamic>? get metadata;
   @override
   String? get model;
   @override
@@ -1681,6 +1664,8 @@ abstract class APModel extends DeviceModelSealed {
   @JsonKey(name: 'ap_onboarding_status')
   OnboardingStatusPayload? get onboardingStatus;
   @override
+  String? get phase;
+  @override
   @JsonKey(ignore: true)
   _$$APModelImplCopyWith<_$APModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
@@ -1704,7 +1689,6 @@ abstract class _$$ONTModelImplCopyWith<$Res>
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
       @JsonKey(name: 'last_seen') DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       @JsonKey(name: 'serial_number') String? serialNumber,
       String? firmware,
@@ -1748,7 +1732,6 @@ class __$$ONTModelImplCopyWithImpl<$Res>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
@@ -1801,10 +1784,6 @@ class __$$ONTModelImplCopyWithImpl<$Res>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -1891,7 +1870,6 @@ class _$ONTModelImpl extends ONTModel {
       @JsonKey(name: 'mac_address') this.macAddress,
       this.location,
       @JsonKey(name: 'last_seen') this.lastSeen,
-      final Map<String, dynamic>? metadata,
       this.model,
       @JsonKey(name: 'serial_number') this.serialNumber,
       this.firmware,
@@ -1908,8 +1886,7 @@ class _$ONTModelImpl extends ONTModel {
       this.uptime,
       this.phase,
       final String? $type})
-      : _metadata = metadata,
-        _images = images,
+      : _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         _switchPort = switchPort,
@@ -1944,16 +1921,6 @@ class _$ONTModelImpl extends ONTModel {
   @override
   @JsonKey(name: 'last_seen')
   final DateTime? lastSeen;
-  final Map<String, dynamic>? _metadata;
-  @override
-  Map<String, dynamic>? get metadata {
-    final value = _metadata;
-    if (value == null) return null;
-    if (_metadata is EqualUnmodifiableMapView) return _metadata;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
   @override
   final String? model;
   @override
@@ -2037,7 +2004,7 @@ class _$ONTModelImpl extends ONTModel {
 
   @override
   String toString() {
-    return 'DeviceModelSealed.ont(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, isRegistered: $isRegistered, switchPort: $switchPort, onboardingStatus: $onboardingStatus, ports: $ports, uptime: $uptime, phase: $phase)';
+    return 'DeviceModelSealed.ont(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, isRegistered: $isRegistered, switchPort: $switchPort, onboardingStatus: $onboardingStatus, ports: $ports, uptime: $uptime, phase: $phase)';
   }
 
   @override
@@ -2059,7 +2026,6 @@ class _$ONTModelImpl extends ONTModel {
                 other.location == location) &&
             (identical(other.lastSeen, lastSeen) ||
                 other.lastSeen == lastSeen) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
             (identical(other.model, model) || other.model == model) &&
             (identical(other.serialNumber, serialNumber) ||
                 other.serialNumber == serialNumber) &&
@@ -2097,7 +2063,6 @@ class _$ONTModelImpl extends ONTModel {
         macAddress,
         location,
         lastSeen,
-        const DeepCollectionEquality().hash(_metadata),
         model,
         serialNumber,
         firmware,
@@ -2133,7 +2098,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2152,7 +2116,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)
         ap,
     required TResult Function(
             String id,
@@ -2164,7 +2129,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2193,7 +2157,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2210,7 +2173,8 @@ class _$ONTModelImpl extends ONTModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)
+            int? temperature,
+            String? phase)
         switchDevice,
     required TResult Function(
             String id,
@@ -2222,7 +2186,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2239,7 +2202,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)
         wlan,
   }) {
     return ont(
@@ -2252,7 +2216,6 @@ class _$ONTModelImpl extends ONTModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -2282,7 +2245,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2301,7 +2263,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult? Function(
             String id,
@@ -2313,7 +2276,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2342,7 +2304,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2359,7 +2320,8 @@ class _$ONTModelImpl extends ONTModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult? Function(
             String id,
@@ -2371,7 +2333,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2388,7 +2349,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
   }) {
     return ont?.call(
@@ -2401,7 +2363,6 @@ class _$ONTModelImpl extends ONTModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -2431,7 +2392,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2450,7 +2410,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult Function(
             String id,
@@ -2462,7 +2423,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2491,7 +2451,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2508,7 +2467,8 @@ class _$ONTModelImpl extends ONTModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult Function(
             String id,
@@ -2520,7 +2480,6 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -2537,7 +2496,8 @@ class _$ONTModelImpl extends ONTModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
     required TResult orElse(),
   }) {
@@ -2552,7 +2512,6 @@ class _$ONTModelImpl extends ONTModel {
           macAddress,
           location,
           lastSeen,
-          metadata,
           model,
           serialNumber,
           firmware,
@@ -2627,7 +2586,6 @@ abstract class ONTModel extends DeviceModelSealed {
       @JsonKey(name: 'mac_address') final String? macAddress,
       final String? location,
       @JsonKey(name: 'last_seen') final DateTime? lastSeen,
-      final Map<String, dynamic>? metadata,
       final String? model,
       @JsonKey(name: 'serial_number') final String? serialNumber,
       final String? firmware,
@@ -2673,8 +2631,6 @@ abstract class ONTModel extends DeviceModelSealed {
   @JsonKey(name: 'last_seen')
   DateTime? get lastSeen;
   @override
-  Map<String, dynamic>? get metadata;
-  @override
   String? get model;
   @override
   @JsonKey(name: 'serial_number')
@@ -2703,6 +2659,7 @@ abstract class ONTModel extends DeviceModelSealed {
   @JsonKey(name: 'ont_ports')
   List<Map<String, dynamic>>? get ports;
   String? get uptime;
+  @override
   String? get phase;
   @override
   @JsonKey(ignore: true)
@@ -2729,7 +2686,6 @@ abstract class _$$SwitchModelImplCopyWith<$Res>
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
       @JsonKey(name: 'last_seen') DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       @JsonKey(name: 'serial_number') String? serialNumber,
       String? firmware,
@@ -2745,7 +2701,8 @@ abstract class _$$SwitchModelImplCopyWith<$Res>
       DateTime? lastConfigSyncAttempt,
       @JsonKey(name: 'cpu_usage') int? cpuUsage,
       @JsonKey(name: 'memory_usage') int? memoryUsage,
-      int? temperature});
+      int? temperature,
+      String? phase});
 
   @override
   $RoomModelCopyWith<$Res>? get pmsRoom;
@@ -2774,7 +2731,6 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
@@ -2790,6 +2746,7 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
     Object? cpuUsage = freezed,
     Object? memoryUsage = freezed,
     Object? temperature = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_$SwitchModelImpl(
       id: null == id
@@ -2832,10 +2789,6 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -2896,6 +2849,10 @@ class __$$SwitchModelImplCopyWithImpl<$Res>
           ? _value.temperature
           : temperature // ignore: cast_nullable_to_non_nullable
               as int?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -2914,7 +2871,6 @@ class _$SwitchModelImpl extends SwitchModel {
       @JsonKey(name: 'mac_address') this.macAddress,
       this.location,
       @JsonKey(name: 'last_seen') this.lastSeen,
-      final Map<String, dynamic>? metadata,
       this.model,
       @JsonKey(name: 'serial_number') this.serialNumber,
       this.firmware,
@@ -2931,9 +2887,9 @@ class _$SwitchModelImpl extends SwitchModel {
       @JsonKey(name: 'cpu_usage') this.cpuUsage,
       @JsonKey(name: 'memory_usage') this.memoryUsage,
       this.temperature,
+      this.phase,
       final String? $type})
       : _pmsRooms = pmsRooms,
-        _metadata = metadata,
         _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
@@ -2985,16 +2941,6 @@ class _$SwitchModelImpl extends SwitchModel {
   @override
   @JsonKey(name: 'last_seen')
   final DateTime? lastSeen;
-  final Map<String, dynamic>? _metadata;
-  @override
-  Map<String, dynamic>? get metadata {
-    final value = _metadata;
-    if (value == null) return null;
-    if (_metadata is EqualUnmodifiableMapView) return _metadata;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
   @override
   final String? model;
   @override
@@ -3067,13 +3013,15 @@ class _$SwitchModelImpl extends SwitchModel {
   final int? memoryUsage;
   @override
   final int? temperature;
+  @override
+  final String? phase;
 
   @JsonKey(name: 'device_type')
   final String $type;
 
   @override
   String toString() {
-    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, pmsRooms: $pmsRooms, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature)';
+    return 'DeviceModelSealed.switchDevice(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, pmsRooms: $pmsRooms, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, host: $host, ports: $ports, lastConfigSync: $lastConfigSync, lastConfigSyncAttempt: $lastConfigSyncAttempt, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, phase: $phase)';
   }
 
   @override
@@ -3096,7 +3044,6 @@ class _$SwitchModelImpl extends SwitchModel {
                 other.location == location) &&
             (identical(other.lastSeen, lastSeen) ||
                 other.lastSeen == lastSeen) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
             (identical(other.model, model) || other.model == model) &&
             (identical(other.serialNumber, serialNumber) ||
                 other.serialNumber == serialNumber) &&
@@ -3121,7 +3068,8 @@ class _$SwitchModelImpl extends SwitchModel {
             (identical(other.memoryUsage, memoryUsage) ||
                 other.memoryUsage == memoryUsage) &&
             (identical(other.temperature, temperature) ||
-                other.temperature == temperature));
+                other.temperature == temperature) &&
+            (identical(other.phase, phase) || other.phase == phase));
   }
 
   @JsonKey(ignore: true)
@@ -3138,7 +3086,6 @@ class _$SwitchModelImpl extends SwitchModel {
         macAddress,
         location,
         lastSeen,
-        const DeepCollectionEquality().hash(_metadata),
         model,
         serialNumber,
         firmware,
@@ -3153,7 +3100,8 @@ class _$SwitchModelImpl extends SwitchModel {
         lastConfigSyncAttempt,
         cpuUsage,
         memoryUsage,
-        temperature
+        temperature,
+        phase
       ]);
 
   @JsonKey(ignore: true)
@@ -3175,7 +3123,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3194,7 +3141,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)
         ap,
     required TResult Function(
             String id,
@@ -3206,7 +3154,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3235,7 +3182,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3252,7 +3198,8 @@ class _$SwitchModelImpl extends SwitchModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)
+            int? temperature,
+            String? phase)
         switchDevice,
     required TResult Function(
             String id,
@@ -3264,7 +3211,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3281,7 +3227,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)
         wlan,
   }) {
     return switchDevice(
@@ -3295,7 +3242,6 @@ class _$SwitchModelImpl extends SwitchModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -3310,7 +3256,8 @@ class _$SwitchModelImpl extends SwitchModel {
         lastConfigSyncAttempt,
         cpuUsage,
         memoryUsage,
-        temperature);
+        temperature,
+        phase);
   }
 
   @override
@@ -3326,7 +3273,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3345,7 +3291,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult? Function(
             String id,
@@ -3357,7 +3304,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3386,7 +3332,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3403,7 +3348,8 @@ class _$SwitchModelImpl extends SwitchModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult? Function(
             String id,
@@ -3415,7 +3361,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3432,7 +3377,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
   }) {
     return switchDevice?.call(
@@ -3446,7 +3392,6 @@ class _$SwitchModelImpl extends SwitchModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -3461,7 +3406,8 @@ class _$SwitchModelImpl extends SwitchModel {
         lastConfigSyncAttempt,
         cpuUsage,
         memoryUsage,
-        temperature);
+        temperature,
+        phase);
   }
 
   @override
@@ -3477,7 +3423,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3496,7 +3441,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult Function(
             String id,
@@ -3508,7 +3454,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3537,7 +3482,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3554,7 +3498,8 @@ class _$SwitchModelImpl extends SwitchModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult Function(
             String id,
@@ -3566,7 +3511,6 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -3583,7 +3527,8 @@ class _$SwitchModelImpl extends SwitchModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
     required TResult orElse(),
   }) {
@@ -3599,7 +3544,6 @@ class _$SwitchModelImpl extends SwitchModel {
           macAddress,
           location,
           lastSeen,
-          metadata,
           model,
           serialNumber,
           firmware,
@@ -3614,7 +3558,8 @@ class _$SwitchModelImpl extends SwitchModel {
           lastConfigSyncAttempt,
           cpuUsage,
           memoryUsage,
-          temperature);
+          temperature,
+          phase);
     }
     return orElse();
   }
@@ -3676,7 +3621,6 @@ abstract class SwitchModel extends DeviceModelSealed {
       @JsonKey(name: 'mac_address') final String? macAddress,
       final String? location,
       @JsonKey(name: 'last_seen') final DateTime? lastSeen,
-      final Map<String, dynamic>? metadata,
       final String? model,
       @JsonKey(name: 'serial_number') final String? serialNumber,
       final String? firmware,
@@ -3693,7 +3637,8 @@ abstract class SwitchModel extends DeviceModelSealed {
       final DateTime? lastConfigSyncAttempt,
       @JsonKey(name: 'cpu_usage') final int? cpuUsage,
       @JsonKey(name: 'memory_usage') final int? memoryUsage,
-      final int? temperature}) = _$SwitchModelImpl;
+      final int? temperature,
+      final String? phase}) = _$SwitchModelImpl;
   const SwitchModel._() : super._();
 
   factory SwitchModel.fromJson(Map<String, dynamic> json) =
@@ -3728,8 +3673,6 @@ abstract class SwitchModel extends DeviceModelSealed {
   @JsonKey(name: 'last_seen')
   DateTime? get lastSeen;
   @override
-  Map<String, dynamic>? get metadata;
-  @override
   String? get model;
   @override
   @JsonKey(name: 'serial_number')
@@ -3762,6 +3705,8 @@ abstract class SwitchModel extends DeviceModelSealed {
   int? get memoryUsage;
   int? get temperature;
   @override
+  String? get phase;
+  @override
   @JsonKey(ignore: true)
   _$$SwitchModelImplCopyWith<_$SwitchModelImpl> get copyWith =>
       throw _privateConstructorUsedError;
@@ -3785,7 +3730,6 @@ abstract class _$$WLANModelImplCopyWith<$Res>
       @JsonKey(name: 'mac_address') String? macAddress,
       String? location,
       @JsonKey(name: 'last_seen') DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       @JsonKey(name: 'serial_number') String? serialNumber,
       String? firmware,
@@ -3801,7 +3745,8 @@ abstract class _$$WLANModelImplCopyWith<$Res>
       @JsonKey(name: 'total_download') int? totalDownload,
       @JsonKey(name: 'packet_loss') double? packetLoss,
       int? latency,
-      @JsonKey(name: 'restart_count') int? restartCount});
+      @JsonKey(name: 'restart_count') int? restartCount,
+      String? phase});
 
   @override
   $RoomModelCopyWith<$Res>? get pmsRoom;
@@ -3829,7 +3774,6 @@ class __$$WLANModelImplCopyWithImpl<$Res>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
@@ -3846,6 +3790,7 @@ class __$$WLANModelImplCopyWithImpl<$Res>
     Object? packetLoss = freezed,
     Object? latency = freezed,
     Object? restartCount = freezed,
+    Object? phase = freezed,
   }) {
     return _then(_$WLANModelImpl(
       id: null == id
@@ -3884,10 +3829,6 @@ class __$$WLANModelImplCopyWithImpl<$Res>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -3952,6 +3893,10 @@ class __$$WLANModelImplCopyWithImpl<$Res>
           ? _value.restartCount
           : restartCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -3969,7 +3914,6 @@ class _$WLANModelImpl extends WLANModel {
       @JsonKey(name: 'mac_address') this.macAddress,
       this.location,
       @JsonKey(name: 'last_seen') this.lastSeen,
-      final Map<String, dynamic>? metadata,
       this.model,
       @JsonKey(name: 'serial_number') this.serialNumber,
       this.firmware,
@@ -3987,9 +3931,9 @@ class _$WLANModelImpl extends WLANModel {
       @JsonKey(name: 'packet_loss') this.packetLoss,
       this.latency,
       @JsonKey(name: 'restart_count') this.restartCount,
+      this.phase,
       final String? $type})
-      : _metadata = metadata,
-        _images = images,
+      : _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         $type = $type ?? 'wlan_controller',
@@ -4022,16 +3966,6 @@ class _$WLANModelImpl extends WLANModel {
   @override
   @JsonKey(name: 'last_seen')
   final DateTime? lastSeen;
-  final Map<String, dynamic>? _metadata;
-  @override
-  Map<String, dynamic>? get metadata {
-    final value = _metadata;
-    if (value == null) return null;
-    if (_metadata is EqualUnmodifiableMapView) return _metadata;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
   @override
   final String? model;
   @override
@@ -4099,13 +4033,15 @@ class _$WLANModelImpl extends WLANModel {
   @override
   @JsonKey(name: 'restart_count')
   final int? restartCount;
+  @override
+  final String? phase;
 
   @JsonKey(name: 'device_type')
   final String $type;
 
   @override
   String toString() {
-    return 'DeviceModelSealed.wlan(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, controllerType: $controllerType, managedAPs: $managedAPs, vlan: $vlan, totalUpload: $totalUpload, totalDownload: $totalDownload, packetLoss: $packetLoss, latency: $latency, restartCount: $restartCount)';
+    return 'DeviceModelSealed.wlan(id: $id, name: $name, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, model: $model, serialNumber: $serialNumber, firmware: $firmware, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts, controllerType: $controllerType, managedAPs: $managedAPs, vlan: $vlan, totalUpload: $totalUpload, totalDownload: $totalDownload, packetLoss: $packetLoss, latency: $latency, restartCount: $restartCount, phase: $phase)';
   }
 
   @override
@@ -4127,7 +4063,6 @@ class _$WLANModelImpl extends WLANModel {
                 other.location == location) &&
             (identical(other.lastSeen, lastSeen) ||
                 other.lastSeen == lastSeen) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
             (identical(other.model, model) || other.model == model) &&
             (identical(other.serialNumber, serialNumber) ||
                 other.serialNumber == serialNumber) &&
@@ -4154,7 +4089,8 @@ class _$WLANModelImpl extends WLANModel {
                 other.packetLoss == packetLoss) &&
             (identical(other.latency, latency) || other.latency == latency) &&
             (identical(other.restartCount, restartCount) ||
-                other.restartCount == restartCount));
+                other.restartCount == restartCount) &&
+            (identical(other.phase, phase) || other.phase == phase));
   }
 
   @JsonKey(ignore: true)
@@ -4170,7 +4106,6 @@ class _$WLANModelImpl extends WLANModel {
         macAddress,
         location,
         lastSeen,
-        const DeepCollectionEquality().hash(_metadata),
         model,
         serialNumber,
         firmware,
@@ -4186,7 +4121,8 @@ class _$WLANModelImpl extends WLANModel {
         totalDownload,
         packetLoss,
         latency,
-        restartCount
+        restartCount,
+        phase
       ]);
 
   @JsonKey(ignore: true)
@@ -4208,7 +4144,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4227,7 +4162,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)
         ap,
     required TResult Function(
             String id,
@@ -4239,7 +4175,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4268,7 +4203,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4285,7 +4219,8 @@ class _$WLANModelImpl extends WLANModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)
+            int? temperature,
+            String? phase)
         switchDevice,
     required TResult Function(
             String id,
@@ -4297,7 +4232,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4314,7 +4248,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)
         wlan,
   }) {
     return wlan(
@@ -4327,7 +4262,6 @@ class _$WLANModelImpl extends WLANModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -4343,7 +4277,8 @@ class _$WLANModelImpl extends WLANModel {
         totalDownload,
         packetLoss,
         latency,
-        restartCount);
+        restartCount,
+        phase);
   }
 
   @override
@@ -4359,7 +4294,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4378,7 +4312,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult? Function(
             String id,
@@ -4390,7 +4325,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4419,7 +4353,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4436,7 +4369,8 @@ class _$WLANModelImpl extends WLANModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult? Function(
             String id,
@@ -4448,7 +4382,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4465,7 +4398,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
   }) {
     return wlan?.call(
@@ -4478,7 +4412,6 @@ class _$WLANModelImpl extends WLANModel {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
@@ -4494,7 +4427,8 @@ class _$WLANModelImpl extends WLANModel {
         totalDownload,
         packetLoss,
         latency,
-        restartCount);
+        restartCount,
+        phase);
   }
 
   @override
@@ -4510,7 +4444,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4529,7 +4462,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'current_upload') double? currentUpload,
             @JsonKey(name: 'current_download') double? currentDownload,
             @JsonKey(name: 'ap_onboarding_status')
-            OnboardingStatusPayload? onboardingStatus)?
+            OnboardingStatusPayload? onboardingStatus,
+            String? phase)?
         ap,
     TResult Function(
             String id,
@@ -4541,7 +4475,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4570,7 +4503,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4587,7 +4519,8 @@ class _$WLANModelImpl extends WLANModel {
             DateTime? lastConfigSyncAttempt,
             @JsonKey(name: 'cpu_usage') int? cpuUsage,
             @JsonKey(name: 'memory_usage') int? memoryUsage,
-            int? temperature)?
+            int? temperature,
+            String? phase)?
         switchDevice,
     TResult Function(
             String id,
@@ -4599,7 +4532,6 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'mac_address') String? macAddress,
             String? location,
             @JsonKey(name: 'last_seen') DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             @JsonKey(name: 'serial_number') String? serialNumber,
             String? firmware,
@@ -4616,7 +4548,8 @@ class _$WLANModelImpl extends WLANModel {
             @JsonKey(name: 'total_download') int? totalDownload,
             @JsonKey(name: 'packet_loss') double? packetLoss,
             int? latency,
-            @JsonKey(name: 'restart_count') int? restartCount)?
+            @JsonKey(name: 'restart_count') int? restartCount,
+            String? phase)?
         wlan,
     required TResult orElse(),
   }) {
@@ -4631,7 +4564,6 @@ class _$WLANModelImpl extends WLANModel {
           macAddress,
           location,
           lastSeen,
-          metadata,
           model,
           serialNumber,
           firmware,
@@ -4647,7 +4579,8 @@ class _$WLANModelImpl extends WLANModel {
           totalDownload,
           packetLoss,
           latency,
-          restartCount);
+          restartCount,
+          phase);
     }
     return orElse();
   }
@@ -4699,34 +4632,33 @@ class _$WLANModelImpl extends WLANModel {
 
 abstract class WLANModel extends DeviceModelSealed {
   const factory WLANModel(
-          {required final String id,
-          required final String name,
-          required final String status,
-          @JsonKey(name: 'pms_room') final RoomModel? pmsRoom,
-          @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
-          @JsonKey(name: 'ip_address') final String? ipAddress,
-          @JsonKey(name: 'mac_address') final String? macAddress,
-          final String? location,
-          @JsonKey(name: 'last_seen') final DateTime? lastSeen,
-          final Map<String, dynamic>? metadata,
-          final String? model,
-          @JsonKey(name: 'serial_number') final String? serialNumber,
-          final String? firmware,
-          final String? note,
-          final List<String>? images,
-          @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
-          @JsonKey(name: 'health_notices')
-          final List<HealthNoticeModel>? healthNotices,
-          @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
-          @JsonKey(name: 'controller_type') final String? controllerType,
-          @JsonKey(name: 'managed_aps') final int? managedAPs,
-          final int? vlan,
-          @JsonKey(name: 'total_upload') final int? totalUpload,
-          @JsonKey(name: 'total_download') final int? totalDownload,
-          @JsonKey(name: 'packet_loss') final double? packetLoss,
-          final int? latency,
-          @JsonKey(name: 'restart_count') final int? restartCount}) =
-      _$WLANModelImpl;
+      {required final String id,
+      required final String name,
+      required final String status,
+      @JsonKey(name: 'pms_room') final RoomModel? pmsRoom,
+      @JsonKey(name: 'pms_room_id') final int? pmsRoomId,
+      @JsonKey(name: 'ip_address') final String? ipAddress,
+      @JsonKey(name: 'mac_address') final String? macAddress,
+      final String? location,
+      @JsonKey(name: 'last_seen') final DateTime? lastSeen,
+      final String? model,
+      @JsonKey(name: 'serial_number') final String? serialNumber,
+      final String? firmware,
+      final String? note,
+      final List<String>? images,
+      @JsonKey(name: 'image_signed_ids') final List<String>? imageSignedIds,
+      @JsonKey(name: 'health_notices')
+      final List<HealthNoticeModel>? healthNotices,
+      @JsonKey(name: 'hn_counts') final HealthCountsModel? hnCounts,
+      @JsonKey(name: 'controller_type') final String? controllerType,
+      @JsonKey(name: 'managed_aps') final int? managedAPs,
+      final int? vlan,
+      @JsonKey(name: 'total_upload') final int? totalUpload,
+      @JsonKey(name: 'total_download') final int? totalDownload,
+      @JsonKey(name: 'packet_loss') final double? packetLoss,
+      final int? latency,
+      @JsonKey(name: 'restart_count') final int? restartCount,
+      final String? phase}) = _$WLANModelImpl;
   const WLANModel._() : super._();
 
   factory WLANModel.fromJson(Map<String, dynamic> json) =
@@ -4755,8 +4687,6 @@ abstract class WLANModel extends DeviceModelSealed {
   @override
   @JsonKey(name: 'last_seen')
   DateTime? get lastSeen;
-  @override
-  Map<String, dynamic>? get metadata;
   @override
   String? get model;
   @override
@@ -4791,6 +4721,8 @@ abstract class WLANModel extends DeviceModelSealed {
   int? get latency;
   @JsonKey(name: 'restart_count')
   int? get restartCount;
+  @override
+  String? get phase;
   @override
   @JsonKey(ignore: true)
   _$$WLANModelImplCopyWith<_$WLANModelImpl> get copyWith =>

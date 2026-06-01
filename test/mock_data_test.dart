@@ -33,11 +33,9 @@ void main() {
           expect(entity.macAddress, matches(RegExp(r'^[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}$')));
         }
 
-        // Check metadata exists and has realistic values
-        expect(entity.metadata, isNotNull);
-        expect(entity.metadata!['firmware'], isNotNull);
-        expect(entity.metadata!['model'], isNotNull);
-        expect(entity.metadata!['vlan'], isNotNull);
+        // Check typed fields are populated with realistic values
+        expect(entity.model, isNotNull);
+        expect(entity.firmware, isNotNull);
       }
     });
     

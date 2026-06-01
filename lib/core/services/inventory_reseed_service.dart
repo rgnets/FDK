@@ -8,6 +8,30 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_device_cache_service.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 
+/// Per-resource outcome of a reseed, streamed live so the startup loader can
+/// render a checklist as each resource finishes (rather than waiting for the
+/// whole batch). [done] carries the item count; [failed] means the REST fetch
+/// or cache-apply for that resource did not succeed.
+enum ReseedResourceStatus { done, failed }
+
+/// A single live progress event from [InventoryReseedService.progress].
+class ReseedProgress {
+  const ReseedProgress({
+    required this.resourceType,
+    required this.status,
+    this.count = 0,
+  });
+
+  /// Matches [InventoryRestSeederService] resource types, e.g. `access_points`,
+  /// `switch_devices`, `media_converters`, `wlan_devices`, `pms_rooms`.
+  final String resourceType;
+  final ReseedResourceStatus status;
+
+  /// Number of items applied to the cache (only meaningful when [status] is
+  /// [ReseedResourceStatus.done]).
+  final int count;
+}
+
 /// Owns full-inventory loading over REST and is the single entry point for
 /// (re)seeding the device/room caches.
 ///
@@ -34,7 +58,23 @@ class InventoryReseedService {
 
   bool _seedInFlight = false;
   bool _trailingRequested = false;
+  Future<void>? _inFlightSeed;
   DateTime? _lastSeedCompletedAt;
+
+  /// Broadcasts per-resource progress for the active full seed. Broadcast so
+  /// the startup loader can subscribe/unsubscribe per init without affecting
+  /// background reseeds. Never closed — this service is keep-alive.
+  final StreamController<ReseedProgress> _progressController =
+      StreamController<ReseedProgress>.broadcast();
+
+  /// Live per-resource progress of full seeds (see [ReseedProgress]).
+  Stream<ReseedProgress> get progress => _progressController.stream;
+
+  void _emitProgress(ReseedProgress event) {
+    if (!_progressController.isClosed) {
+      _progressController.add(event);
+    }
+  }
 
   /// Request a full REST reseed of the device + room caches. Coalesced and
   /// throttled per the class policy. [reason] is for logging only.
@@ -45,15 +85,42 @@ class InventoryReseedService {
   /// by a recently-completed seed (e.g. on rapid re-login or site switch, where
   /// the cache was just cleared and MUST be repopulated). Automatic reconnect
   /// heals pass `force: false` so connection flaps stay throttled.
-  Future<void> triggerReseed({required String reason, bool force = false}) async {
+  ///
+  /// [coalesceWhenInFlight] controls what happens when a seed is ALREADY
+  /// running. Only genuine reconnect-after-gap recovery sets it `true`: the
+  /// in-flight seed may have started before the gap and missed deltas, so a
+  /// trailing seed is queued to run afterward. Every other caller just wants
+  /// fresh full inventory — which the in-flight seed already produces — so they
+  /// default to *joining* (awaiting) it rather than queuing a redundant second
+  /// full fetch. This is what keeps a boot where both the first-connect seed
+  /// and the `init` seed fire from running the whole inventory twice (~2×10s);
+  /// the blocking `init` caller still awaits the single in-flight seed, so the
+  /// startup loader holds the technician out until inventory is actually ready.
+  Future<void> triggerReseed({
+    required String reason,
+    bool force = false,
+    bool coalesceWhenInFlight = false,
+  }) async {
     if (_seedInFlight) {
-      // A seed is already running; ensure one more runs afterward so a
-      // reconnect that landed mid-seed still recovers missed deltas.
-      _trailingRequested = true;
+      if (coalesceWhenInFlight) {
+        // A reconnect landed mid-seed; ensure one more runs afterward so deltas
+        // missed during the disconnect gap are still recovered.
+        _trailingRequested = true;
+        LoggerService.debug(
+          'Reseed ($reason) folded into trailing request (seed in flight)',
+          tag: _tag,
+        );
+        return;
+      }
+      // A full seed is already running and produces complete inventory; join it
+      // instead of queuing a redundant second full fetch. Awaiting keeps
+      // blocking callers (the startup loader's `init` seed) holding the
+      // technician out until the inventory is seeded.
       LoggerService.debug(
-        'Reseed ($reason) folded into trailing request (seed in flight)',
+        'Reseed ($reason) joined in-flight seed',
         tag: _tag,
       );
+      await _inFlightSeed;
       return;
     }
 
@@ -67,19 +134,38 @@ class InventoryReseedService {
     }
 
     _seedInFlight = true;
+    final seed = _runFullSeed(reason);
+    _inFlightSeed = seed;
     try {
-      await _runFullSeed(reason);
+      await seed;
     } finally {
       _lastSeedCompletedAt = DateTime.now();
       _seedInFlight = false;
+      _inFlightSeed = null;
     }
 
     if (_trailingRequested) {
       _trailingRequested = false;
-      LoggerService.debug('Running trailing reseed', tag: _tag);
-      // force: the trailing seed runs immediately after the previous one
-      // completed, so it would otherwise always be suppressed by the cooldown.
-      await triggerReseed(reason: 'trailing', force: true);
+      LoggerService.debug('Running trailing reseed (background)', tag: _tag);
+      // Fire-and-forget: the trailing reseed is a delta-recovery safety net for
+      // deltas missed during a disconnect gap. It must NOT block the caller —
+      // notably the startup loader's `init` seed, which would otherwise hold the
+      // technician behind a second full inventory fetch even though the first
+      // seed already populated everything. Run it detached so callers are
+      // released as soon as the first full seed is applied and persisted.
+      // force: runs immediately after the previous seed, so it would otherwise
+      // always be suppressed by the cooldown.
+      // coalesceWhenInFlight: a reconnect during the trailing seed should queue
+      // yet another recovery seed, matching the pre-existing recovery chain.
+      unawaited(
+        triggerReseed(
+          reason: 'trailing',
+          force: true,
+          coalesceWhenInFlight: true,
+        ).catchError((Object e, StackTrace st) {
+          LoggerService.warning('Trailing reseed failed: $e', tag: _tag);
+        }),
+      );
     }
   }
 
@@ -158,6 +244,13 @@ class InventoryReseedService {
             wsci.deviceCacheService.applySnapshot(resourceType, items);
           }
           await dataSync.applyRestDeviceSnapshot(resourceType, items);
+          _emitProgress(
+            ReseedProgress(
+              resourceType: resourceType,
+              status: ReseedResourceStatus.done,
+              count: items.length,
+            ),
+          );
         },
         onRooms: (items) async {
           final stale = await _staleReason(creds);
@@ -167,8 +260,27 @@ class InventoryReseedService {
           }
           wsci.roomCacheService.applySnapshot(items);
           await dataSync.applyRestRoomSnapshot(items);
+          _emitProgress(
+            ReseedProgress(
+              resourceType: InventoryRestSeederService.roomResourceType,
+              status: ReseedResourceStatus.done,
+              count: items.length,
+            ),
+          );
         },
       );
+      // Surface any resource whose fetch/apply failed so the loader can mark
+      // it (the success callbacks above never fired for these).
+      for (final outcome in result.outcomes) {
+        if (!outcome.success) {
+          _emitProgress(
+            ReseedProgress(
+              resourceType: outcome.resourceType,
+              status: ReseedResourceStatus.failed,
+            ),
+          );
+        }
+      }
       // Persist the typed SQLite caches once after the batch.
       await dataSync.flushTypedCaches();
       LoggerService.info(

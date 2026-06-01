@@ -271,14 +271,6 @@ class MockDataService {
         model: 'RG-WLAN-5000',
         serialNumber: 'SN-WLAN-${deviceIdCounter.toString().padLeft(6, '0')}',
         lastSeen: DateTime.now().subtract(Duration(seconds: _random.nextInt(60))),
-        metadata: {
-          'managed_aps': devices.where((d) => 
-            d.type == 'access_point' && 
-            d.location != null &&
-            d.location!.contains(building)
-          ).length,
-          'active_clients': _random.nextInt(500) + 100,
-        },
       );
       devices.add(controller);
     }
@@ -323,11 +315,6 @@ class MockDataService {
       connectedClients: isOnline ? _random.nextInt(20) : 0,
       ssid: 'RGNets-WiFi',
       channel: [1, 6, 11, 36, 40, 44, 48, 149, 153, 157, 161][_random.nextInt(11)],
-      metadata: {
-        'band': _random.nextDouble() < 0.8 ? '2.4GHz/5GHz' : '2.4GHz',
-        'firmware': '3.2.${_random.nextInt(10)}',
-        'uptime': isOnline ? '${_random.nextInt(30)}d ${_random.nextInt(24)}h' : null,
-      },
     );
   }
 
@@ -365,20 +352,10 @@ class MockDataService {
           ? DateTime.now().subtract(Duration(seconds: _random.nextInt(600)))
           : DateTime.now().subtract(Duration(hours: _random.nextInt(72) + 1)),
       temperature: isOnline ? 35 + _random.nextInt(15) : null, // 35-50°C
-      metadata: {
-        'rx_power': isOnline ? '-${18 + _random.nextInt(7)}' : null, // -18 to -25 dBm
-        'tx_power': isOnline ? '${1 + _random.nextInt(3)}' : null, // 1-4 dBm
-        'fiber_status': isOnline ? 'connected' : 'disconnected',
-        'pon_port': 'PON${(id ~/ 32) % 8}/SLOT${(id ~/ 8) % 4}/PORT${id % 8}',
-      },
     );
   }
 
   Device _createSwitch(int id, int roomId, String roomLocation, String name, String model, String switchType, bool isOnline) {
-    final portCount = switchType == 'core' ? 48 : 
-                     switchType == 'distribution' ? 48 :
-                     switchType == 'idf' ? 24 : 8;
-    
     final pmsRoomId = roomId;
     
     // Extract building and room info for production-like naming
@@ -421,14 +398,6 @@ class MockDataService {
           ? DateTime.now().subtract(Duration(seconds: _random.nextInt(120)))
           : DateTime.now().subtract(Duration(hours: _random.nextInt(24) + 1)),
       vlan: switchType == 'core' ? 1 : 100 + (id % 50),
-      metadata: {
-        'switch_type': switchType,
-        'port_count': portCount,
-        'ports_active': isOnline ? _random.nextInt(portCount - 2) + 2 : 0,
-        'uplink_status': isOnline ? 'active' : 'down',
-        'spanning_tree': switchType != 'room' ? 'enabled' : 'disabled',
-        'firmware': '2.1.${_random.nextInt(20)}',
-      },
     );
   }
 
@@ -473,9 +442,11 @@ class MockDataService {
     
     // Find offline devices for notifications
     final offlineDevices = _devices.where((d) => d.status == 'offline').toList();
-    final criticalDevices = offlineDevices.where((d) => 
-      d.type == 'switch' && (d.metadata?['switch_type'] == 'core' || 
-      d.metadata?['switch_type'] == 'distribution')
+    // Core/distribution switches are named with an MDF suffix (see
+    // _createSwitch); use that to flag the critical ones now that the raw
+    // switch_type metadata is no longer retained.
+    final criticalDevices = offlineDevices.where((d) =>
+      d.type == 'switch' && d.name.contains('MDF')
     ).toList();
     
     // Critical alerts for core/distribution switches

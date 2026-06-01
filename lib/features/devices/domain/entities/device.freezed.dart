@@ -26,10 +26,14 @@ mixin _$Device {
   String? get macAddress => throw _privateConstructorUsedError;
   String? get location => throw _privateConstructorUsedError;
   DateTime? get lastSeen => throw _privateConstructorUsedError;
-  Map<String, dynamic>? get metadata => throw _privateConstructorUsedError;
   String? get model => throw _privateConstructorUsedError;
   String? get serialNumber => throw _privateConstructorUsedError;
   String? get firmware => throw _privateConstructorUsedError;
+
+  /// Deployment phase (e.g. "Phase 1"); drives phase filtering. Promoted
+  /// from the raw record so the device list can group/filter by it without
+  /// retaining the entire rXg payload.
+  String? get phase => throw _privateConstructorUsedError;
   int? get signalStrength => throw _privateConstructorUsedError;
   int? get uptime => throw _privateConstructorUsedError;
   int? get connectedClients => throw _privateConstructorUsedError;
@@ -72,10 +76,10 @@ mixin _$Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -114,10 +118,10 @@ mixin _$Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -156,10 +160,10 @@ mixin _$Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -223,10 +227,10 @@ abstract class $DeviceCopyWith<$Res> {
       String? macAddress,
       String? location,
       DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       String? serialNumber,
       String? firmware,
+      String? phase,
       int? signalStrength,
       int? uptime,
       int? connectedClients,
@@ -277,10 +281,10 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
+    Object? phase = freezed,
     Object? signalStrength = freezed,
     Object? uptime = freezed,
     Object? connectedClients = freezed,
@@ -345,10 +349,6 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value.metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -360,6 +360,10 @@ class _$DeviceCopyWithImpl<$Res, $Val extends Device>
       firmware: freezed == firmware
           ? _value.firmware
           : firmware // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
               as String?,
       signalStrength: freezed == signalStrength
           ? _value.signalStrength
@@ -495,10 +499,10 @@ abstract class _$$DeviceImplCopyWith<$Res> implements $DeviceCopyWith<$Res> {
       String? macAddress,
       String? location,
       DateTime? lastSeen,
-      Map<String, dynamic>? metadata,
       String? model,
       String? serialNumber,
       String? firmware,
+      String? phase,
       int? signalStrength,
       int? uptime,
       int? connectedClients,
@@ -549,10 +553,10 @@ class __$$DeviceImplCopyWithImpl<$Res>
     Object? macAddress = freezed,
     Object? location = freezed,
     Object? lastSeen = freezed,
-    Object? metadata = freezed,
     Object? model = freezed,
     Object? serialNumber = freezed,
     Object? firmware = freezed,
+    Object? phase = freezed,
     Object? signalStrength = freezed,
     Object? uptime = freezed,
     Object? connectedClients = freezed,
@@ -617,10 +621,6 @@ class __$$DeviceImplCopyWithImpl<$Res>
           ? _value.lastSeen
           : lastSeen // ignore: cast_nullable_to_non_nullable
               as DateTime?,
-      metadata: freezed == metadata
-          ? _value._metadata
-          : metadata // ignore: cast_nullable_to_non_nullable
-              as Map<String, dynamic>?,
       model: freezed == model
           ? _value.model
           : model // ignore: cast_nullable_to_non_nullable
@@ -632,6 +632,10 @@ class __$$DeviceImplCopyWithImpl<$Res>
       firmware: freezed == firmware
           ? _value.firmware
           : firmware // ignore: cast_nullable_to_non_nullable
+              as String?,
+      phase: freezed == phase
+          ? _value.phase
+          : phase // ignore: cast_nullable_to_non_nullable
               as String?,
       signalStrength: freezed == signalStrength
           ? _value.signalStrength
@@ -739,10 +743,10 @@ class _$DeviceImpl extends _Device {
       this.macAddress,
       this.location,
       this.lastSeen,
-      final Map<String, dynamic>? metadata,
       this.model,
       this.serialNumber,
       this.firmware,
+      this.phase,
       this.signalStrength,
       this.uptime,
       this.connectedClients,
@@ -765,8 +769,7 @@ class _$DeviceImpl extends _Device {
       final List<String>? imageSignedIds,
       final List<HealthNotice>? healthNotices,
       this.hnCounts})
-      : _metadata = metadata,
-        _images = images,
+      : _images = images,
         _imageSignedIds = imageSignedIds,
         _healthNotices = healthNotices,
         super._();
@@ -791,22 +794,18 @@ class _$DeviceImpl extends _Device {
   final String? location;
   @override
   final DateTime? lastSeen;
-  final Map<String, dynamic>? _metadata;
-  @override
-  Map<String, dynamic>? get metadata {
-    final value = _metadata;
-    if (value == null) return null;
-    if (_metadata is EqualUnmodifiableMapView) return _metadata;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableMapView(value);
-  }
-
   @override
   final String? model;
   @override
   final String? serialNumber;
   @override
   final String? firmware;
+
+  /// Deployment phase (e.g. "Phase 1"); drives phase filtering. Promoted
+  /// from the raw record so the device list can group/filter by it without
+  /// retaining the entire rXg payload.
+  @override
+  final String? phase;
   @override
   final int? signalStrength;
   @override
@@ -887,7 +886,7 @@ class _$DeviceImpl extends _Device {
 
   @override
   String toString() {
-    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, metadata: $metadata, model: $model, serialNumber: $serialNumber, firmware: $firmware, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts)';
+    return 'Device(id: $id, name: $name, type: $type, status: $status, pmsRoom: $pmsRoom, pmsRoomId: $pmsRoomId, ipAddress: $ipAddress, macAddress: $macAddress, location: $location, lastSeen: $lastSeen, model: $model, serialNumber: $serialNumber, firmware: $firmware, phase: $phase, signalStrength: $signalStrength, uptime: $uptime, connectedClients: $connectedClients, vlan: $vlan, ssid: $ssid, channel: $channel, totalUpload: $totalUpload, totalDownload: $totalDownload, currentUpload: $currentUpload, currentDownload: $currentDownload, packetLoss: $packetLoss, latency: $latency, cpuUsage: $cpuUsage, memoryUsage: $memoryUsage, temperature: $temperature, restartCount: $restartCount, maxClients: $maxClients, note: $note, images: $images, imageSignedIds: $imageSignedIds, healthNotices: $healthNotices, hnCounts: $hnCounts)';
   }
 
   @override
@@ -910,12 +909,12 @@ class _$DeviceImpl extends _Device {
                 other.location == location) &&
             (identical(other.lastSeen, lastSeen) ||
                 other.lastSeen == lastSeen) &&
-            const DeepCollectionEquality().equals(other._metadata, _metadata) &&
             (identical(other.model, model) || other.model == model) &&
             (identical(other.serialNumber, serialNumber) ||
                 other.serialNumber == serialNumber) &&
             (identical(other.firmware, firmware) ||
                 other.firmware == firmware) &&
+            (identical(other.phase, phase) || other.phase == phase) &&
             (identical(other.signalStrength, signalStrength) ||
                 other.signalStrength == signalStrength) &&
             (identical(other.uptime, uptime) || other.uptime == uptime) &&
@@ -968,10 +967,10 @@ class _$DeviceImpl extends _Device {
         macAddress,
         location,
         lastSeen,
-        const DeepCollectionEquality().hash(_metadata),
         model,
         serialNumber,
         firmware,
+        phase,
         signalStrength,
         uptime,
         connectedClients,
@@ -1016,10 +1015,10 @@ class _$DeviceImpl extends _Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -1055,10 +1054,10 @@ class _$DeviceImpl extends _Device {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
+        phase,
         signalStrength,
         uptime,
         connectedClients,
@@ -1097,10 +1096,10 @@ class _$DeviceImpl extends _Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -1136,10 +1135,10 @@ class _$DeviceImpl extends _Device {
         macAddress,
         location,
         lastSeen,
-        metadata,
         model,
         serialNumber,
         firmware,
+        phase,
         signalStrength,
         uptime,
         connectedClients,
@@ -1178,10 +1177,10 @@ class _$DeviceImpl extends _Device {
             String? macAddress,
             String? location,
             DateTime? lastSeen,
-            Map<String, dynamic>? metadata,
             String? model,
             String? serialNumber,
             String? firmware,
+            String? phase,
             int? signalStrength,
             int? uptime,
             int? connectedClients,
@@ -1219,10 +1218,10 @@ class _$DeviceImpl extends _Device {
           macAddress,
           location,
           lastSeen,
-          metadata,
           model,
           serialNumber,
           firmware,
+          phase,
           signalStrength,
           uptime,
           connectedClients,
@@ -1290,10 +1289,10 @@ abstract class _Device extends Device {
       final String? macAddress,
       final String? location,
       final DateTime? lastSeen,
-      final Map<String, dynamic>? metadata,
       final String? model,
       final String? serialNumber,
       final String? firmware,
+      final String? phase,
       final int? signalStrength,
       final int? uptime,
       final int? connectedClients,
@@ -1339,13 +1338,17 @@ abstract class _Device extends Device {
   @override
   DateTime? get lastSeen;
   @override
-  Map<String, dynamic>? get metadata;
-  @override
   String? get model;
   @override
   String? get serialNumber;
   @override
   String? get firmware;
+  @override
+
+  /// Deployment phase (e.g. "Phase 1"); drives phase filtering. Promoted
+  /// from the raw record so the device list can group/filter by it without
+  /// retaining the entire rXg payload.
+  String? get phase;
   @override
   int? get signalStrength;
   @override

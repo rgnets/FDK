@@ -58,3 +58,34 @@ DateTime? _parseDate(Object? value) {
   if (value is String) return DateTime.tryParse(value);
   return null;
 }
+
+/// The only raw-room keys the app actually reads: the entity promotes
+/// description/location/created/updated in [RoomModelX.toEntity], and the room
+/// detail screen shows area/capacity/department/last-maintenance. Everything
+/// else in the raw rXg PmsRoom record is unused.
+const Set<String> kRoomMetadataKeysToKeep = {
+  'description',
+  'location',
+  'created_at',
+  'createdAt',
+  'updated_at',
+  'updatedAt',
+  'area_sqft',
+  'capacity',
+  'department',
+  'last_maintenance',
+};
+
+/// Keep only the room metadata keys the app consumes (see
+/// [kRoomMetadataKeysToKeep]), dropping the rest of the raw rXg record. This
+/// keeps the cached room payload tiny so persisting the room cache is fast —
+/// the room equivalent of the device models carrying only typed fields.
+Map<String, dynamic>? slimRoomMetadata(Map<String, dynamic>? raw) {
+  if (raw == null) return null;
+  final slim = <String, dynamic>{};
+  for (final key in kRoomMetadataKeysToKeep) {
+    final value = raw[key];
+    if (value != null) slim[key] = value;
+  }
+  return slim.isEmpty ? null : slim;
+}

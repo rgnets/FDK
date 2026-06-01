@@ -257,7 +257,7 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
         connectedClients: deviceMap['connected_clients'] as int?,
         ssid: deviceMap['ssid']?.toString(),
         channel: deviceMap['channel'] as int?,
-        metadata: deviceMap,
+        phase: deviceMap['phase']?.toString(),
       ) as APModel;
     }).toList();
   }
@@ -311,7 +311,7 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
         cpuUsage: deviceMap['cpu_usage'] as int?,
         memoryUsage: deviceMap['memory_usage'] as int?,
         temperature: deviceMap['temperature'] as int?,
-        metadata: deviceMap,
+        phase: deviceMap['phase']?.toString(),
       ) as SwitchModel;
     }).toList();
   }
@@ -358,7 +358,7 @@ class DeviceMockDataSourceImpl implements DeviceDataSource {
         lastSeen: lastSeen,
         firmware: deviceMap['firmware']?.toString(),
         uptime: deviceMap['uptime']?.toString(),
-        metadata: deviceMap,
+        phase: deviceMap['phase']?.toString(),
       ) as ONTModel;
     }).toList();
   }

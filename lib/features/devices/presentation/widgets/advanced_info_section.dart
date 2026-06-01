@@ -110,14 +110,6 @@ class AdvancedInfoSection extends StatelessWidget {
       fields.add(MapEntry('Restart Count', device.restartCount.toString()));
     }
 
-    // Metadata
-    if (device.metadata != null && device.metadata!.isNotEmpty) {
-      for (final entry in device.metadata!.entries) {
-        final value = entry.value?.toString() ?? 'null';
-        fields.add(MapEntry(_formatKey(entry.key), value));
-      }
-    }
-
     if (fields.isEmpty) {
       return Center(
         child: Padding(
@@ -142,17 +134,6 @@ class AdvancedInfoSection extends StatelessWidget {
         );
       }).toList(),
     );
-  }
-
-  String _formatKey(String key) {
-    return key
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map(
-          (word) =>
-              word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '',
-        )
-        .join(' ');
   }
 
   /// Simple MAC manufacturer lookup based on OUI prefix.

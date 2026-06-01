@@ -108,9 +108,12 @@ final webSocketCacheIntegrationProvider = Provider<WebSocketCacheIntegration>((
     // subscribes for live deltas. These callbacks let the WS layer ask the
     // reseed coordinator for a full or targeted REST reload on reconnect or
     // when a legacy caller invokes the (repurposed) snapshot methods.
-    onReconnectReseed: ({bool force = false}) => ref
-        .read(inventoryReseedProvider)
-        .triggerReseed(reason: 'reconnect', force: force),
+    onReconnectReseed: ({bool force = false, bool coalesceWhenInFlight = false}) =>
+        ref.read(inventoryReseedProvider).triggerReseed(
+              reason: 'reconnect',
+              force: force,
+              coalesceWhenInFlight: coalesceWhenInFlight,
+            ),
     onResourceReseed: (resourceType) =>
         ref.read(inventoryReseedProvider).triggerResourceReseed(resourceType),
   );

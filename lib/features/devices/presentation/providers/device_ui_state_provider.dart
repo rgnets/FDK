@@ -186,10 +186,8 @@ List<Device> filteredDevicesList(FilteredDevicesListRef ref) {
                 (device.ipAddress?.toLowerCase().contains(query) ?? false) ||
                 (device.macAddress?.toLowerCase().contains(query) ?? false);
 
-            // Filter by phase (using metadata) - handle both String and int types
-            final rawPhase = device.metadata?['phase'];
-            final devicePhase = rawPhase?.toString();
-            final matchesPhase = phaseFilter.matchesFilter(devicePhase);
+            // Filter by phase (promoted typed field)
+            final matchesPhase = phaseFilter.matchesFilter(device.phase);
 
             // Filter by status
             final matchesStatus = statusFilter.matchesFilter(device.status);

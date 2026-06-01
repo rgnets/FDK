@@ -21,7 +21,6 @@ _$APModelImpl _$$APModelImplFromJson(Map<String, dynamic> json) =>
       lastSeen: json['last_seen'] == null
           ? null
           : DateTime.parse(json['last_seen'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
       model: json['model'] as String?,
       serialNumber: json['serial_number'] as String?,
       firmware: json['firmware'] as String?,
@@ -50,6 +49,7 @@ _$APModelImpl _$$APModelImplFromJson(Map<String, dynamic> json) =>
           ? null
           : OnboardingStatusPayload.fromJson(
               json['ap_onboarding_status'] as Map<String, dynamic>),
+      phase: json['phase'] as String?,
       $type: json['device_type'] as String?,
     );
 
@@ -72,7 +72,6 @@ Map<String, dynamic> _$$APModelImplToJson(_$APModelImpl instance) {
   writeNotNull('mac_address', instance.macAddress);
   writeNotNull('location', instance.location);
   writeNotNull('last_seen', instance.lastSeen?.toIso8601String());
-  writeNotNull('metadata', instance.metadata);
   writeNotNull('model', instance.model);
   writeNotNull('serial_number', instance.serialNumber);
   writeNotNull('firmware', instance.firmware);
@@ -91,6 +90,7 @@ Map<String, dynamic> _$$APModelImplToJson(_$APModelImpl instance) {
   writeNotNull('current_upload', instance.currentUpload);
   writeNotNull('current_download', instance.currentDownload);
   writeNotNull('ap_onboarding_status', instance.onboardingStatus?.toJson());
+  writeNotNull('phase', instance.phase);
   val['device_type'] = instance.$type;
   return val;
 }
@@ -110,7 +110,6 @@ _$ONTModelImpl _$$ONTModelImplFromJson(Map<String, dynamic> json) =>
       lastSeen: json['last_seen'] == null
           ? null
           : DateTime.parse(json['last_seen'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
       model: json['model'] as String?,
       serialNumber: json['serial_number'] as String?,
       firmware: json['firmware'] as String?,
@@ -160,7 +159,6 @@ Map<String, dynamic> _$$ONTModelImplToJson(_$ONTModelImpl instance) {
   writeNotNull('mac_address', instance.macAddress);
   writeNotNull('location', instance.location);
   writeNotNull('last_seen', instance.lastSeen?.toIso8601String());
-  writeNotNull('metadata', instance.metadata);
   writeNotNull('model', instance.model);
   writeNotNull('serial_number', instance.serialNumber);
   writeNotNull('firmware', instance.firmware);
@@ -198,7 +196,6 @@ _$SwitchModelImpl _$$SwitchModelImplFromJson(Map<String, dynamic> json) =>
       lastSeen: json['last_seen'] == null
           ? null
           : DateTime.parse(json['last_seen'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
       model: json['model'] as String?,
       serialNumber: json['serial_number'] as String?,
       firmware: json['firmware'] as String?,
@@ -228,6 +225,7 @@ _$SwitchModelImpl _$$SwitchModelImplFromJson(Map<String, dynamic> json) =>
       cpuUsage: (json['cpu_usage'] as num?)?.toInt(),
       memoryUsage: (json['memory_usage'] as num?)?.toInt(),
       temperature: (json['temperature'] as num?)?.toInt(),
+      phase: json['phase'] as String?,
       $type: json['device_type'] as String?,
     );
 
@@ -251,7 +249,6 @@ Map<String, dynamic> _$$SwitchModelImplToJson(_$SwitchModelImpl instance) {
   writeNotNull('mac_address', instance.macAddress);
   writeNotNull('location', instance.location);
   writeNotNull('last_seen', instance.lastSeen?.toIso8601String());
-  writeNotNull('metadata', instance.metadata);
   writeNotNull('model', instance.model);
   writeNotNull('serial_number', instance.serialNumber);
   writeNotNull('firmware', instance.firmware);
@@ -270,6 +267,7 @@ Map<String, dynamic> _$$SwitchModelImplToJson(_$SwitchModelImpl instance) {
   writeNotNull('cpu_usage', instance.cpuUsage);
   writeNotNull('memory_usage', instance.memoryUsage);
   writeNotNull('temperature', instance.temperature);
+  writeNotNull('phase', instance.phase);
   val['device_type'] = instance.$type;
   return val;
 }
@@ -289,7 +287,6 @@ _$WLANModelImpl _$$WLANModelImplFromJson(Map<String, dynamic> json) =>
       lastSeen: json['last_seen'] == null
           ? null
           : DateTime.parse(json['last_seen'] as String),
-      metadata: json['metadata'] as Map<String, dynamic>?,
       model: json['model'] as String?,
       serialNumber: json['serial_number'] as String?,
       firmware: json['firmware'] as String?,
@@ -314,6 +311,7 @@ _$WLANModelImpl _$$WLANModelImplFromJson(Map<String, dynamic> json) =>
       packetLoss: (json['packet_loss'] as num?)?.toDouble(),
       latency: (json['latency'] as num?)?.toInt(),
       restartCount: (json['restart_count'] as num?)?.toInt(),
+      phase: json['phase'] as String?,
       $type: json['device_type'] as String?,
     );
 
@@ -336,7 +334,6 @@ Map<String, dynamic> _$$WLANModelImplToJson(_$WLANModelImpl instance) {
   writeNotNull('mac_address', instance.macAddress);
   writeNotNull('location', instance.location);
   writeNotNull('last_seen', instance.lastSeen?.toIso8601String());
-  writeNotNull('metadata', instance.metadata);
   writeNotNull('model', instance.model);
   writeNotNull('serial_number', instance.serialNumber);
   writeNotNull('firmware', instance.firmware);
@@ -354,6 +351,7 @@ Map<String, dynamic> _$$WLANModelImplToJson(_$WLANModelImpl instance) {
   writeNotNull('packet_loss', instance.packetLoss);
   writeNotNull('latency', instance.latency);
   writeNotNull('restart_count', instance.restartCount);
+  writeNotNull('phase', instance.phase);
   val['device_type'] = instance.$type;
   return val;
 }

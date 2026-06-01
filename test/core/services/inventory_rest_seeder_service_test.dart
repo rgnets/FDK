@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -32,7 +31,8 @@ void main() {
         expect(uri.host, 'example.netlab.ninja');
         expect(uri.path, startsWith('/api/'));
         expect(uri.queryParameters['api_key'], 'k');
-        expect(uri.queryParameters['page_size'], '10000');
+        expect(uri.queryParameters['page_size'], '1000');
+        expect(uri.queryParameters['page'], '1');
       }
     });
 
@@ -199,6 +199,147 @@ void main() {
       );
 
       expect(captured!.length, 1);
+    });
+
+    test('paginates across pages until a short page and combines results',
+        () async {
+      // Page 1 is full (1000), page 2 is short (300) — total 1300 across 2 GETs.
+      List<Map<String, dynamic>> pageItems(int start, int n) => [
+            for (var i = 0; i < n; i++) {'id': start + i},
+          ];
+      final apPages = <int>[];
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/access_points.json') {
+          final page = int.parse(req.url.queryParameters['page']!);
+          apPages.add(page);
+          final items = page == 1 ? pageItems(0, 1000) : pageItems(1000, 300);
+          return http.Response(
+            jsonEncode({'results': items, 'count': 1300, 'page': page}),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      List<Map<String, dynamic>>? captured;
+      await seeder.seedAll(
+        onDevices: (type, items) {
+          if (type == 'access_points') captured = items;
+        },
+        onRooms: (_) {},
+      );
+
+      expect(apPages, [1, 2]);
+      expect(captured!.length, 1300);
+    });
+
+    test('stops at the advertised count even when the last page is full',
+        () async {
+      // Page 1 returns a full page AND count==1000 — no second request needed.
+      final apPages = <int>[];
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/access_points.json') {
+          apPages.add(int.parse(req.url.queryParameters['page']!));
+          return http.Response(
+            jsonEncode({
+              'results': [for (var i = 0; i < 1000; i++) {'id': i}],
+              'count': 1000,
+              'page': 1,
+            }),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      await seeder.seedAll(onDevices: (_, __) {}, onRooms: (_) {});
+
+      expect(apPages, [1]);
+    });
+
+    test('does not loop unboundedly when the server ignores `page`', () async {
+      // Server always re-serves a full page 1 (no count). The echoed-page guard
+      // must stop paging instead of running to the _maxPages cap.
+      final apPages = <int>[];
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/access_points.json') {
+          apPages.add(int.parse(req.url.queryParameters['page']!));
+          return http.Response(
+            jsonEncode({
+              'results': [for (var i = 0; i < 1000; i++) {'id': i}],
+              'page': 1,
+            }),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      await seeder.seedAll(onDevices: (_, __) {}, onRooms: (_) {});
+
+      // Page 1 then page 2 (which echoes page 1 → stop). Far below the cap.
+      expect(apPages, [1, 2]);
+    });
+
+    test('a later-page failure fails the whole resource (no partial seed)',
+        () async {
+      // Page 1 full + count high so paging continues; page 2 errors. The
+      // resource must report failure rather than seeding only page 1.
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/access_points.json') {
+          final page = int.parse(req.url.queryParameters['page']!);
+          if (page == 1) {
+            return http.Response(
+              jsonEncode({
+                'results': [for (var i = 0; i < 1000; i++) {'id': i}],
+                'count': 5000,
+                'page': 1,
+              }),
+              200,
+            );
+          }
+          return http.Response('boom', 500);
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      var applied = false;
+      final result = await seeder.seedAll(
+        onDevices: (type, _) {
+          if (type == 'access_points') applied = true;
+        },
+        onRooms: (_) {},
+      );
+
+      expect(applied, isFalse);
+      final ap = result.outcomes
+          .firstWhere((o) => o.resourceType == 'access_points');
+      expect(ap.success, isFalse);
+      expect(ap.statusCode, 500);
     });
 
     test('network exception is caught — failure recorded, no propagation',

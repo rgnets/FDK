@@ -194,7 +194,13 @@ class _FDKAppState extends ConsumerState<FDKApp> {
         'User already authenticated, starting initialization',
         tag: 'Init',
       );
-      ref.read(initializationNotifierProvider.notifier).initialize();
+      // Block the technician behind the startup loader until the inventory
+      // seed completes (waitForSync), so they never land on empty lists.
+      unawaited(
+        ref
+            .read(initializationNotifierProvider.notifier)
+            .initialize(waitForSync: true),
+      );
       ref.read(complianceTriggerWiringProvider);
     }
   }
@@ -257,7 +263,12 @@ class _FDKAppState extends ConsumerState<FDKApp> {
           'User authenticated, starting initialization',
           tag: 'Init',
         );
-        ref.read(initializationNotifierProvider.notifier).initialize();
+        // Block behind the startup loader until the inventory seed completes.
+        unawaited(
+          ref
+              .read(initializationNotifierProvider.notifier)
+              .initialize(waitForSync: true),
+        );
         ref.read(complianceTriggerWiringProvider);
       } else if (!isAuthenticated && wasAuthenticated) {
         LoggerService.info(
