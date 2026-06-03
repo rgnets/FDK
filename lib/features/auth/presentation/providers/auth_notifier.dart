@@ -563,7 +563,12 @@ class Auth extends _$Auth {
     );
     final headers = _buildAuthHeaders(token);
 
-    if (service.isConnected) {
+    // Force a clean disconnected baseline before connecting with these
+    // credentials. Disconnecting only when fully `connected` isn't enough: if a
+    // prior attempt is mid `connecting`/`reconnecting` (e.g. cache integration
+    // already dialing a stale host), connect() would hit _open()'s
+    // "already connecting" guard and no-op, wedging the handshake.
+    if (service.currentState != SocketConnectionState.disconnected) {
       await service.disconnect(code: 4000, reason: 'Re-authenticating');
     }
 
@@ -607,14 +612,53 @@ class Auth extends _$Auth {
       }
     });
 
+    // The subscription must be sent only once the socket is actually
+    // `connected`. `service.connect()` returns as soon as the first attempt is
+    // made (it does not await success), so sending right after it would throw
+    // StateError on a host that is still reconnecting.
+    var subscribed = false;
     final stateSubscription = service.connectionState.listen((connState) {
       _logger.d('AUTH_NOTIFIER: 🔌 WebSocket connection state changed: $connState');
-      if (connState == SocketConnectionState.disconnected &&
+      if (connState == SocketConnectionState.connected &&
+          !subscribed &&
+          service.isConnected) {
+        // `isConnected` guards against the state flipping away between the event
+        // and this callback. Send first and only mark subscribed on success, so
+        // a rare throw doesn't wedge the handshake with no subscription sent;
+        // fail the handshake instead of waiting out the timeout.
+        try {
+          _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
+          service.send(subscriptionPayload);
+          subscribed = true;
+        } on Object catch (e) {
+          _logger.e('AUTH_NOTIFIER: ❌ Failed to send subscription: $e');
+          if (!completer.isCompleted) {
+            completer.complete(
+              _ActionCableAuthResult.failure('Failed to send subscription: $e'),
+            );
+          }
+        }
+      } else if (connState == SocketConnectionState.disconnected &&
           !completer.isCompleted) {
         _logger.e('AUTH_NOTIFIER: ❌ Connection closed before subscription confirmed');
         completer.complete(
           const _ActionCableAuthResult.failure(
             'Connection closed before subscription confirmed',
+          ),
+        );
+      }
+    });
+
+    // The socket gave up after exhausting its connection-timeout budget (e.g.
+    // an unreachable / unresolvable host). Fail the handshake immediately with a
+    // clear, user-facing message instead of waiting out the handshake timeout.
+    final failedSubscription = service.connectionFailed.listen((_) {
+      if (!completer.isCompleted) {
+        _logger.e('AUTH_NOTIFIER: ❌ Server unreachable — gave up connecting');
+        completer.complete(
+          const _ActionCableAuthResult.failure(
+            'Could not reach the server. Check the address and your network '
+            'connection, then try again.',
           ),
         );
       }
@@ -629,18 +673,25 @@ class Auth extends _$Auth {
 
     try {
       _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
+      // Outer safety net only. connect() returns after the first attempt, and
+      // the service's own connectionTimeout drives the give-up + connectionFailed
+      // signal — so keep this strictly longer than connectionTimeout so that
+      // failure path (with its specific "could not reach the server" message)
+      // wins the race instead of this generic timeout.
+      final connectSafetyTimeout =
+          config.connectionTimeout + const Duration(seconds: 5);
       await service.connect(
         WebSocketConnectionParams(uri: uri, headers: headers),
       ).timeout(
-        const Duration(seconds: 10),
+        connectSafetyTimeout,
         onTimeout: () {
-          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after 10 seconds');
+          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after '
+              '${connectSafetyTimeout.inSeconds}s');
           throw TimeoutException('Connection to server timed out');
         },
       );
-      _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
-      service.send(subscriptionPayload);
-      _logger.d('AUTH_NOTIFIER: Subscription sent, waiting for confirmation (15s timeout)...');
+      _logger.d('AUTH_NOTIFIER: connect() returned; subscription is sent once '
+          'the socket reports connected. Awaiting confirmation (15s timeout)...');
 
       final result = await completer.future.timeout(
         const Duration(seconds: 15),
@@ -704,6 +755,7 @@ class Auth extends _$Auth {
     } finally {
       await subscription.cancel();
       await stateSubscription.cancel();
+      await failedSubscription.cancel();
     }
   }
 
