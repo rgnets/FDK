@@ -49,6 +49,7 @@ class WebSocketConfig {
     this.initialReconnectDelay = const Duration(seconds: 1),
     this.maxReconnectDelay = const Duration(seconds: 32),
     this.connectionTimeout = const Duration(seconds: 10),
+    this.maxReconnectAttempts = 10,
     this.heartbeatInterval = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 45),
     this.sendClientPing = true,
@@ -65,6 +66,14 @@ class WebSocketConfig {
   /// retrying and emits [connectionFailed] instead of looping forever (e.g. an
   /// unresolvable host).
   final Duration connectionTimeout;
+
+  /// Upper bound on consecutive reconnect attempts for an already-established
+  /// session before the service gives up (emits [connectionFailed] and stops).
+  /// With the capped backoff this is a generous window that heals transient
+  /// network blips but still stops churning against a permanently dead host.
+  /// `null` means retry indefinitely. (The initial connect is bounded by
+  /// [connectionTimeout], not this count.)
+  final int? maxReconnectAttempts;
 
   final Duration heartbeatInterval;
   final Duration heartbeatTimeout;
@@ -647,6 +656,18 @@ class WebSocketService {
         _logger.w(
           'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
         );
+        // Established-session cap: a previously-connected session retries
+        // generously (to heal transient blips) but eventually gives up against
+        // a permanently dead host instead of churning forever. The initial
+        // connect is bounded by the connectionTimeout deadline, not this count.
+        final maxAttempts = _config.maxReconnectAttempts;
+        if (maxAttempts != null &&
+            _consecutiveReconnectFailures >= maxAttempts) {
+          _giveUp(
+            '$_consecutiveReconnectFailures consecutive reconnect failures',
+          );
+          return;
+        }
         if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
           if (_lastFailureWasConnectivity) {
             // DNS / host-unreachable / timeout — a network problem, not auth.
@@ -676,9 +697,21 @@ class WebSocketService {
   }
 
   // Classifies a failure as a connectivity problem (vs. a possible auth issue).
-  // Matched by text so it stays web-safe (no dart:io SocketException import);
-  // TimeoutException (stalled upgrade) also counts as connectivity.
+  //
+  // Policy: a failure to ESTABLISH the socket is treated as connectivity unless
+  // it explicitly looks like an authorization rejection. This is deliberate —
+  // the browser WebSocket API cannot distinguish "couldn't reach the host" from
+  // "handshake rejected", and a wrongful forced sign-out is worse than a delayed
+  // one (genuine API-key revocation also arrives via the explicit revocation
+  // event). So only a clear 401/403-style rejection flags a potential auth issue;
+  // everything else (SocketException, host lookup, timeout, and the generic web
+  // `WebSocketChannelException: WebSocket connection failed`) is connectivity.
+  //
+  // Text-matched to stay web-safe (no dart:io SocketException import).
   static bool _isConnectivityError(Object error) {
+    if (_looksLikeAuthRejection(error)) {
+      return false;
+    }
     if (error is TimeoutException) {
       return true;
     }
@@ -690,7 +723,23 @@ class WebSocketService {
         text.contains('Connection timed out') ||
         text.contains('Network is unreachable') ||
         text.contains('No route to host') ||
-        text.contains('Connection reset');
+        text.contains('Connection reset') ||
+        // Generic web/native WebSocket connect failures (no socket detail).
+        text.contains('WebSocketChannelException') ||
+        text.contains('WebSocketException') ||
+        text.contains('WebSocket connection failed') ||
+        text.contains('Failed to connect WebSocket') ||
+        text.contains('was not upgraded to websocket');
+  }
+
+  // Heuristic: does this connect error look like an authorization rejection
+  // (HTTP 401/403) rather than a network failure?
+  static bool _looksLikeAuthRejection(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('401') ||
+        text.contains('403') ||
+        text.contains('unauthorized') ||
+        text.contains('forbidden');
   }
 
   /// Arms the connect/reconnect give-up deadline. Idempotent: a cycle's first
@@ -718,9 +767,17 @@ class WebSocketService {
   /// signals listeners so the UI can show a real error instead of spinning.
   void _onConnectDeadlineExpired() {
     _connectDeadline = null;
+    _giveUp(
+      'could not connect within ${_config.connectionTimeout.inSeconds}s',
+    );
+  }
+
+  /// Stops the connect/reconnect loop for good (until a fresh connect): tears
+  /// down any in-flight attempt and emits [connectionFailed]. Shared by the
+  /// initial-connect deadline and the established-session attempt cap.
+  void _giveUp(String reason) {
     // Nothing to give up on if we already connected, were torn down, or the
-    // caller has since disconnected / backgrounded us (those paths cancel this
-    // timer, but guard against a callback that fired in the same tick).
+    // caller has since disconnected / backgrounded us.
     if (_disposed ||
         _manuallyClosed ||
         _lifecycleSuspended ||
@@ -728,10 +785,9 @@ class WebSocketService {
       return;
     }
     _gaveUp = true;
-    _logger.w(
-      'WebSocketService: Giving up — could not connect within '
-      '${_config.connectionTimeout.inSeconds}s',
-    );
+    _logger.w('WebSocketService: Giving up — $reason');
+    _connectDeadline?.cancel();
+    _connectDeadline = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     // Abandons any in-flight _open() (bumps the generation) and closes a
