@@ -648,7 +648,13 @@ class WebSocketService {
   /// signals listeners so the UI can show a real error instead of spinning.
   void _onConnectDeadlineExpired() {
     _connectDeadline = null;
-    if (_disposed || _state == SocketConnectionState.connected) {
+    // Nothing to give up on if we already connected, were torn down, or the
+    // caller has since disconnected / backgrounded us (those paths cancel this
+    // timer, but guard against a callback that fired in the same tick).
+    if (_disposed ||
+        _manuallyClosed ||
+        _lifecycleSuspended ||
+        _state == SocketConnectionState.connected) {
       return;
     }
     _gaveUp = true;
@@ -661,10 +667,14 @@ class WebSocketService {
     // Abandons any in-flight _open() (bumps the generation) and closes a
     // half-open socket so a late `ready` can't resurrect the connection.
     unawaited(_closeChannel());
-    _updateState(SocketConnectionState.disconnected);
+    // Emit the terminal failure BEFORE the disconnected state change so a
+    // listener that reacts to both (e.g. the auth handshake) surfaces the
+    // specific "could not reach the server" reason rather than the generic
+    // "connection closed" one.
     if (!_connectionFailedController.isClosed) {
       _connectionFailedController.add(null);
     }
+    _updateState(SocketConnectionState.disconnected);
   }
 
   void _startHeartbeat(int generation) {

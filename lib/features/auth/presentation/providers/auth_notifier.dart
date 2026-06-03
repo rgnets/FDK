@@ -614,7 +614,13 @@ class Auth extends _$Auth {
     var subscribed = false;
     final stateSubscription = service.connectionState.listen((connState) {
       _logger.d('AUTH_NOTIFIER: 🔌 WebSocket connection state changed: $connState');
-      if (connState == SocketConnectionState.connected && !subscribed) {
+      if (connState == SocketConnectionState.connected &&
+          !subscribed &&
+          service.isConnected) {
+        // Only mark subscribed once the send actually happens — `isConnected`
+        // guards against the state flipping away between the event and this
+        // callback, which would otherwise throw StateError or wedge the
+        // handshake with no subscription ever sent.
         subscribed = true;
         _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
         service.send(subscriptionPayload);
