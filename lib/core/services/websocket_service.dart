@@ -158,6 +158,12 @@ class WebSocketService {
   // immediately instead of leaving a half-open socket until its own timeout.
   WebSocketChannel? _pendingChannel;
 
+  // Whether the most recent connection failure was a connectivity problem
+  // (DNS/host unreachable/timeout) rather than something that could be auth.
+  // Gates the potential-auth-failure signal so an unreachable host is never
+  // misreported as an auth issue (which would wrongly sign the user out).
+  bool _lastFailureWasConnectivity = false;
+
   // Suspended by the OS app-lifecycle (background), as opposed to a manual
   // disconnect/sign-out. Resume reconnects only what lifecycle suspended.
   bool _lifecycleSuspended = false;
@@ -491,6 +497,7 @@ class WebSocketService {
     if (generation != _connectionGeneration) {
       return;
     }
+    _lastFailureWasConnectivity = _isConnectivityError(error);
     _logger.e(
       'WebSocketService: Error - ${scrubErrorForLog(error)}',
       stackTrace: stack,
@@ -641,11 +648,21 @@ class WebSocketService {
           'WebSocketService: Reconnect failure #$_consecutiveReconnectFailures',
         );
         if (_consecutiveReconnectFailures >= _maxReconnectBeforeAuthCheck) {
-          _logger.w(
-            'WebSocketService: Multiple reconnect failures ($_consecutiveReconnectFailures), '
-            'may indicate auth issue',
-          );
-          _authFailureController.add(_consecutiveReconnectFailures);
+          if (_lastFailureWasConnectivity) {
+            // DNS / host-unreachable / timeout — a network problem, not auth.
+            // Do NOT raise the auth-failure signal (it would sign the user out).
+            _logger.w(
+              'WebSocketService: $_consecutiveReconnectFailures consecutive '
+              'reconnect failures — server unreachable (network/DNS), not an '
+              'auth problem',
+            );
+          } else {
+            _logger.w(
+              'WebSocketService: Multiple reconnect failures '
+              '($_consecutiveReconnectFailures), may indicate auth issue',
+            );
+            _authFailureController.add(_consecutiveReconnectFailures);
+          }
         }
       }
     });
@@ -656,6 +673,24 @@ class WebSocketService {
     final maxMs = _config.maxReconnectDelay.inMilliseconds;
     final delayMs = baseMs * pow(2, attempt - 1);
     return Duration(milliseconds: min(delayMs.toInt(), maxMs));
+  }
+
+  // Classifies a failure as a connectivity problem (vs. a possible auth issue).
+  // Matched by text so it stays web-safe (no dart:io SocketException import);
+  // TimeoutException (stalled upgrade) also counts as connectivity.
+  static bool _isConnectivityError(Object error) {
+    if (error is TimeoutException) {
+      return true;
+    }
+    final text = error.toString();
+    return text.contains('SocketException') ||
+        text.contains('Failed host lookup') ||
+        text.contains('nodename nor servname') ||
+        text.contains('Connection refused') ||
+        text.contains('Connection timed out') ||
+        text.contains('Network is unreachable') ||
+        text.contains('No route to host') ||
+        text.contains('Connection reset');
   }
 
   /// Arms the connect/reconnect give-up deadline. Idempotent: a cycle's first

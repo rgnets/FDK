@@ -35,9 +35,10 @@ class _FakeSink implements WebSocketSink {
 
 /// A controllable fake [WebSocketChannel] for driving the service in tests.
 class _FakeChannel implements WebSocketChannel {
-  _FakeChannel({bool failReady = false, bool hangReady = false})
+  _FakeChannel({bool failReady = false, bool hangReady = false, Object? readyError})
       : _failReady = failReady,
-        _hangReady = hangReady {
+        _hangReady = hangReady,
+        _readyError = readyError {
     _sink = _FakeSink(() {
       if (!_inbound.isClosed) _inbound.close();
     });
@@ -48,6 +49,9 @@ class _FakeChannel implements WebSocketChannel {
   // Never completes its `ready` future — simulates a host that accepts the
   // socket but stalls the upgrade, so the service must time the attempt out.
   final bool _hangReady;
+  // A specific error to fail `ready` with (e.g. a SocketException-like message),
+  // for exercising connectivity-vs-auth failure classification.
+  final Object? _readyError;
   late final _FakeSink _sink;
 
   /// Simulate an inbound server message.
@@ -77,6 +81,9 @@ class _FakeChannel implements WebSocketChannel {
   Future<void> get ready {
     if (_hangReady) {
       return Completer<void>().future;
+    }
+    if (_readyError != null) {
+      return Future<void>.error(_readyError);
     }
     return _failReady
         ? Future<void>.error(Exception('conn failed'))
@@ -396,6 +403,67 @@ void main() {
           reason: 'established session must not give up after connectionTimeout');
       expect(calls.value, greaterThan(2),
           reason: 'must keep retrying past the timeout window');
+
+      await sub.cancel();
+      await service.disconnect();
+    });
+
+    test('repeated connectivity-error reconnects do NOT flag an auth issue',
+        () async {
+      // A DNS/host-unreachable failure is a network problem, not auth — the
+      // potentialAuthFailures signal (which triggers sign-out) must stay silent.
+      final good = _FakeChannel();
+      var first = true;
+      var authSignals = 0;
+      final service = WebSocketService(
+        config: WebSocketConfig(
+          baseUri: Uri.parse('wss://example.test/cable'),
+          initialReconnectDelay: const Duration(milliseconds: 20),
+          maxReconnectDelay: const Duration(milliseconds: 40),
+          sendClientPing: false,
+        ),
+        channelFactory: (uri, {headers}) {
+          if (first) {
+            first = false;
+            return good;
+          }
+          return _FakeChannel(
+            readyError: Exception(
+              'WebSocketChannelException: SocketException: Failed host lookup',
+            ),
+          );
+        },
+      );
+      final sub = service.potentialAuthFailures.listen((_) => authSignals++);
+
+      await service.connect(paramsFor());
+      expect(service.isConnected, isTrue);
+      good.emitError(Exception('drop')); // established session drops
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      expect(authSignals, 0,
+          reason: 'network/DNS failures must not be reported as auth issues');
+
+      await sub.cancel();
+      await service.disconnect();
+    });
+
+    test('repeated non-connectivity reconnect failures DO flag an auth issue',
+        () async {
+      // A non-network repeated failure still surfaces the potential-auth signal.
+      final calls = _Counter();
+      final good = _FakeChannel();
+      var authSignals = 0;
+      final service = buildService([good], calls: calls);
+      final sub = service.potentialAuthFailures.listen((_) => authSignals++);
+
+      await service.connect(paramsFor());
+      expect(service.isConnected, isTrue);
+      good.emitError(Exception('drop')); // buildService overflow = 'conn failed'
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      expect(authSignals, greaterThan(0),
+          reason: 'non-network repeated failures still flag a potential auth issue');
 
       await sub.cancel();
       await service.disconnect();
