@@ -419,6 +419,13 @@ void main() {
           'WebSocketChannelException: SocketException: Failed host lookup',
       'web generic failure':
           'WebSocketChannelException: WebSocket connection failed.',
+      // Stray digits adjacent to other numbers must not read as a 401/403.
+      'native with stray digits':
+          'WebSocketChannelException: SocketException: Failed host lookup '
+              '(OS Error: errno = 11403, port 4010)',
+      // A bare 403 with no HTTP/status/upgrade context is still connectivity.
+      'bare code without http context':
+          'WebSocketChannelException: WebSocket connection failed 403',
     }.entries) {
       test('repeated ${entry.key} reconnects do NOT flag an auth issue',
           () async {
@@ -497,6 +504,27 @@ void main() {
           reason: 'an explicit auth rejection should still flag a potential auth issue');
 
       await sub.cancel();
+      await service.disconnect();
+    });
+
+    test('maxReconnectAttempts does NOT cap the initial connect', () async {
+      // The cap is established-session only; an initial connect is governed by
+      // the connectionTimeout deadline, so a tiny cap must not cut it short.
+      final calls = _Counter();
+      final service = buildService(
+        [_FakeChannel(failReady: true)],
+        calls: calls,
+        connectionTimeout: const Duration(milliseconds: 400),
+        maxReconnectAttempts: 1,
+      );
+
+      await service.connect(paramsFor());
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+
+      expect(calls.value, greaterThan(2),
+          reason: 'initial connect must keep retrying until the deadline, '
+              'not stop after the attempt cap');
+
       await service.disconnect();
     });
 

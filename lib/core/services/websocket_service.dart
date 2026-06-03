@@ -658,10 +658,12 @@ class WebSocketService {
         );
         // Established-session cap: a previously-connected session retries
         // generously (to heal transient blips) but eventually gives up against
-        // a permanently dead host instead of churning forever. The initial
-        // connect is bounded by the connectionTimeout deadline, not this count.
+        // a permanently dead host instead of churning forever. Gated on
+        // _hasEverConnected — the INITIAL connect is bounded by the
+        // connectionTimeout deadline, never this count.
         final maxAttempts = _config.maxReconnectAttempts;
-        if (maxAttempts != null &&
+        if (_hasEverConnected &&
+            maxAttempts != null &&
             _consecutiveReconnectFailures >= maxAttempts) {
           _giveUp(
             '$_consecutiveReconnectFailures consecutive reconnect failures',
@@ -733,13 +735,27 @@ class WebSocketService {
   }
 
   // Heuristic: does this connect error look like an authorization rejection
-  // (HTTP 401/403) rather than a network failure?
+  // (HTTP 401/403) rather than a network failure? Matches the words
+  // unauthorized/forbidden, or a 401/403 status code that is (a) on a digit
+  // boundary (so '1403', ports, and timestamps don't match) and (b) in an
+  // HTTP/status/upgrade context (so an incidental standalone number doesn't
+  // match). Conservative on purpose — a false positive forces a wrongful
+  // sign-out.
+  static final RegExp _authStatusPattern = RegExp(r'\b(401|403)\b');
   static bool _looksLikeAuthRejection(Object error) {
     final text = error.toString().toLowerCase();
-    return text.contains('401') ||
-        text.contains('403') ||
-        text.contains('unauthorized') ||
-        text.contains('forbidden');
+    if (text.contains('unauthorized') || text.contains('forbidden')) {
+      return true;
+    }
+    if (!_authStatusPattern.hasMatch(text)) {
+      return false;
+    }
+    // Require an HTTP/status/upgrade context so a stray standalone 401/403 in a
+    // network diagnostic isn't read as auth. ('websocket' is intentionally NOT
+    // here — it appears in every WS error and would defeat the guard.)
+    return text.contains('http') ||
+        text.contains('status') ||
+        text.contains('upgrad');
   }
 
   /// Arms the connect/reconnect give-up deadline. Idempotent: a cycle's first
@@ -776,9 +792,11 @@ class WebSocketService {
   /// down any in-flight attempt and emits [connectionFailed]. Shared by the
   /// initial-connect deadline and the established-session attempt cap.
   void _giveUp(String reason) {
-    // Nothing to give up on if we already connected, were torn down, or the
-    // caller has since disconnected / backgrounded us.
-    if (_disposed ||
+    // Nothing to give up on if we already gave up (idempotent — avoids duplicate
+    // connectionFailed events / teardown), already connected, were torn down, or
+    // the caller has since disconnected / backgrounded us.
+    if (_gaveUp ||
+        _disposed ||
         _manuallyClosed ||
         _lifecycleSuspended ||
         _state == SocketConnectionState.connected) {
