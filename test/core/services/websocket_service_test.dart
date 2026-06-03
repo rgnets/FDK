@@ -347,6 +347,28 @@ void main() {
       expect(service.isConnected, isFalse);
     });
 
+    test('a manual connect() preempts a pending reconnect', () async {
+      // A manual connect during the reconnect backoff must cancel the pending
+      // reconnect and connect via the new attempt, not race it.
+      final calls = _Counter();
+      final ch1 = _FakeChannel();
+      final ch2 = _FakeChannel();
+      final ch3 = _FakeChannel();
+      final service = buildService([ch1, ch2, ch3], calls: calls);
+
+      await service.connect(paramsFor());
+      expect(service.isConnected, isTrue);
+
+      ch1.emitError(Exception('drop')); // schedules a reconnect on the backoff
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      await service.connect(paramsFor()); // manual connect via ch2
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      expect(service.isConnected, isTrue);
+      expect(calls.value, 2,
+          reason: 'pending reconnect must not open a third channel');
+    });
+
     test('an established session keeps reconnecting past connectionTimeout',
         () async {
       // Regression guard for the give-up scope: once a session has connected,

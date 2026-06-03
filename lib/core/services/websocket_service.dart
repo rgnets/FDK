@@ -406,11 +406,14 @@ class WebSocketService {
           : SocketConnectionState.connecting,
     );
     final generation = ++_connectionGeneration;
+    // Declared outside the try so the `finally` can reconcile the pending slot
+    // regardless of how this attempt ends (success, stale, Exception, Error).
+    WebSocketChannel? channel;
     try {
       // FM-8: scrub api_key from the URI before logging. `params.uri` carries
       // the ActionCable auth token as a query param on production builds.
       _logger.i('WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}');
-      final channel = _channelFactory(params.uri, headers: params.headers);
+      channel = _channelFactory(params.uri, headers: params.headers);
       // Track the not-yet-promoted channel so the give-up / teardown path can
       // close it immediately (it isn't in `_channel` until `ready` succeeds).
       _pendingChannel = channel;
@@ -426,7 +429,7 @@ class WebSocketService {
         onTimeout: () {
           // Tear down the half-open socket — it isn't tracked in `_channel`
           // yet, so the error path below can't close it for us.
-          unawaited(channel.sink.close());
+          unawaited(channel!.sink.close());
           throw TimeoutException(
             'WebSocket upgrade timed out',
             _config.connectionTimeout,
@@ -439,13 +442,11 @@ class WebSocketService {
       // on it (or wiring callbacks after disposal).
       if (_disposed || generation != _connectionGeneration) {
         _logger.d('WebSocketService: Abandoning stale connection attempt');
-        _pendingChannel = null;
         unawaited(channel.sink.close());
         return;
       }
 
       _channel = channel;
-      _pendingChannel = null;
       _subscription = channel.stream.listen(
         (data) => _handleMessage(generation, data),
         onDone: () => _handleDone(generation),
@@ -469,12 +470,20 @@ class WebSocketService {
       // logger is intentionally the raw object — the underlying logger's
       // formatter doesn't auto-print it as text in our printer config; if
       // that changes, this scrub becomes the only guarantee.
-      _pendingChannel = null;
       _logger.e(
         'WebSocketService: Connection failed: ${scrubErrorForLog(e)}',
         stackTrace: stack,
       );
       await _handleError(generation, e, stack);
+    } finally {
+      // Clear the pending slot only if this attempt still owns it. A newer
+      // _open() that started while we awaited `ready` will have replaced
+      // _pendingChannel with its own channel — nulling it here would orphan the
+      // newer socket. On success the channel is promoted to _channel (still
+      // identical), so clearing the pending pointer is correct.
+      if (identical(_pendingChannel, channel)) {
+        _pendingChannel = null;
+      }
     }
   }
 

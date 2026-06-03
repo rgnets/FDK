@@ -563,7 +563,12 @@ class Auth extends _$Auth {
     );
     final headers = _buildAuthHeaders(token);
 
-    if (service.isConnected) {
+    // Force a clean disconnected baseline before connecting with these
+    // credentials. Disconnecting only when fully `connected` isn't enough: if a
+    // prior attempt is mid `connecting`/`reconnecting` (e.g. cache integration
+    // already dialing a stale host), connect() would hit _open()'s
+    // "already connecting" guard and no-op, wedging the handshake.
+    if (service.currentState != SocketConnectionState.disconnected) {
       await service.disconnect(code: 4000, reason: 'Re-authenticating');
     }
 
