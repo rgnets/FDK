@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:rgnets_fdk/core/services/inventory_reseed_service.dart';
 import 'package:rgnets_fdk/core/widgets/connection_details_dialog.dart';
 import 'package:rgnets_fdk/core/widgets/hold_to_confirm_button.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
+import 'package:rgnets_fdk/features/initialization/presentation/providers/initialization_provider.dart';
 import 'package:rgnets_fdk/features/notifications/presentation/providers/notifications_domain_provider.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
 import 'package:rgnets_fdk/features/scanner/data/utils/mac_database.dart';
@@ -219,16 +219,16 @@ class SettingsScreen extends ConsumerWidget {
             onTap: isLoading
                 ? null
                 : () async {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Syncing data...')),
-                    );
-
-                    // Full inventory reloads over REST via the reseed
-                    // coordinator (force: bypass the cooldown for an explicit
-                    // user-initiated sync). WS stays subscribed for deltas.
-                    await ref
-                        .read(inventoryReseedProvider)
-                        .triggerReseed(reason: 'manualSync', force: true);
+                    // Re-run the blocking init path so the full-screen
+                    // initialization overlay (with the per-resource checklist)
+                    // is shown again, just like app startup. reset() drops the
+                    // state to uninitialized so initialize() doesn't early-out;
+                    // initialize(waitForSync: true) reseeds the full inventory
+                    // over REST and holds the overlay up until it finishes.
+                    final initNotifier =
+                        ref.read(initializationNotifierProvider.notifier)
+                          ..reset();
+                    await initNotifier.initialize(waitForSync: true);
 
                     // Refresh providers to pick up the new data
                     await Future.wait([
