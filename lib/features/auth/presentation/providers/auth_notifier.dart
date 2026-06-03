@@ -673,12 +673,20 @@ class Auth extends _$Auth {
 
     try {
       _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
+      // Outer safety net only. connect() returns after the first attempt, and
+      // the service's own connectionTimeout drives the give-up + connectionFailed
+      // signal — so keep this strictly longer than connectionTimeout so that
+      // failure path (with its specific "could not reach the server" message)
+      // wins the race instead of this generic timeout.
+      final connectSafetyTimeout =
+          config.connectionTimeout + const Duration(seconds: 5);
       await service.connect(
         WebSocketConnectionParams(uri: uri, headers: headers),
       ).timeout(
-        const Duration(seconds: 10),
+        connectSafetyTimeout,
         onTimeout: () {
-          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after 10 seconds');
+          _logger.e('AUTH_NOTIFIER: ⏱️ Connection TIMED OUT after '
+              '${connectSafetyTimeout.inSeconds}s');
           throw TimeoutException('Connection to server timed out');
         },
       );
