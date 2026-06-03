@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/secure_http_client.dart';
 import 'package:rgnets_fdk/core/utils/log_redaction.dart' as log_redaction;
@@ -77,8 +78,12 @@ class InventoryRestSeederService {
   static const _timeout = Duration(seconds: 30);
 
   /// Rows requested per page. The rXg serializes one big page server-side, so a
-  /// smaller page returns faster; we loop pages to still pull the full set.
-  static const int _pageSize = 1000;
+  /// smaller page returns faster; we loop pages to still pull the full set. Kept
+  /// below the rXg's server-side page-size clamp (~500) so a clamped short page
+  /// is never mistaken for the final page by the `length < _pageSize` stop test
+  /// in [_fetchAllPages]. Combined with [DeviceFieldSets.seedFields] (`&only=`),
+  /// this keeps each device page well inside [_timeout].
+  static const int _pageSize = 200;
 
   /// Hard cap on pages fetched per resource so a server that ignores `page`
   /// (always returning the same full page) can't loop unboundedly. _pageSize *
@@ -113,9 +118,11 @@ class InventoryRestSeederService {
     return normalized;
   }
 
-  Uri _api(String resourceFile, {required int page}) => Uri.parse(
+  Uri _api(String resourceFile, {required int page, List<String>? fields}) =>
+      Uri.parse(
         'https://$siteUrl/api/$resourceFile'
-        '?api_key=$apiKey&page_size=$_pageSize&page=$page',
+        '?api_key=$apiKey&page_size=$_pageSize&page=$page'
+        '${DeviceFieldSets.buildFieldsParam(fields)}',
       );
 
   /// Fire one parallel batch of GETs and apply each successful result to the
@@ -151,7 +158,11 @@ class InventoryRestSeederService {
     String resourceType,
     SeedDeviceApply onDevices,
   ) async {
-    final fetch = await _fetchAllPages('$resourceType.json', resourceType);
+    final fetch = await _fetchAllPages(
+      '$resourceType.json',
+      resourceType,
+      fields: DeviceFieldSets.seedFields,
+    );
     if (fetch.items == null) {
       return SeedOutcome(
         resourceType: resourceType,
@@ -191,6 +202,10 @@ class InventoryRestSeederService {
   /// Seed the rooms resource via REST and apply it to the cache. Public for
   /// targeted single-resource reseed (see [seedDeviceResource]).
   Future<SeedOutcome> seedRoomResource(SeedRoomApply onRooms) async {
+    // Rooms are fetched WITHOUT an `&only=` filter: the device field set
+    // (DeviceFieldSets.seedFields) is AP/switch-shaped and would strip a rooms
+    // record down to almost nothing. A rooms-specific slim set can be added
+    // later; for now rooms serialize their full (already-working) record.
     final fetch = await _fetchAllPages('$roomResourceType.json', roomResourceType);
     if (fetch.items == null) {
       return SeedOutcome(
@@ -236,13 +251,14 @@ class InventoryRestSeederService {
   /// seeding a truncated inventory), matching the old single-GET behaviour.
   Future<_FetchResult> _fetchAllPages(
     String resourceFile,
-    String resourceType,
-  ) async {
+    String resourceType, {
+    List<String>? fields,
+  }) async {
     final all = <Map<String, dynamic>>[];
     int? statusCode;
     var page = 1;
     for (; page <= _maxPages; page++) {
-      final uri = _api(resourceFile, page: page);
+      final uri = _api(resourceFile, page: page, fields: fields);
       LoggerService.debug('GET ${_scrub(uri)}', tag: _tag);
       final fetch = await _fetchPage(uri, resourceType);
       if (fetch.items == null) {
