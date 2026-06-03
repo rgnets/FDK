@@ -70,6 +70,41 @@ class HealthNotice with _$HealthNotice {
 
   /// Check if this notice is overdue (older than 24 hours)
   bool get isOverdue => age.inHours > 24;
+
+  /// Whether this notice is a device-actionable FIELD issue worth showing to a
+  /// field engineer, mirroring what the AT&T Field Engineer tool surfaces
+  /// (offline, missing photos, missing speed test, config-sync). The rxg
+  /// `health_notices` table also carries raw infrastructure/OS plumbing notices
+  /// — e.g. "heartbeat timeout of 900s exceeded for /var/run/nokia..." — that
+  /// ATT-FE never displays; those are filtered out.
+  ///
+  /// FDK-synthesized notices are always actionable: compliance-derived notices
+  /// have negative ids (missing images / failed speed tests), and the offline
+  /// synthesis uses the `fdk_device_offline_` name prefix.
+  bool get isFieldActionable {
+    if (id < 0 || name.startsWith('fdk_')) {
+      return true;
+    }
+    final n = name.toLowerCase();
+    final m = shortMessage.toLowerCase();
+    // Device offline / unreachable (rxg uses `monitor_infrastructure_*` names).
+    if (n.startsWith('monitor_infrastructure_') ||
+        n.contains('offline') ||
+        m.contains('offline')) {
+      return true;
+    }
+    // Missing / failed speed test.
+    if (n.contains('speed_test') || m.contains('speed test')) {
+      return true;
+    }
+    // Configuration sync failure.
+    if (n.contains('config_sync') ||
+        m.contains('config sync') ||
+        m.contains('configuration synchronization')) {
+      return true;
+    }
+    return false;
+  }
 }
 
 /// Extension for counting health notices by severity

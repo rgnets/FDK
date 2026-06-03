@@ -268,12 +268,23 @@ class HealthNoticesNotifier extends _$HealthNoticesNotifier {
       offlineNoticesAdded++;
     }
 
+    // ATT-FE parity: only surface device-actionable field issues (offline,
+    // missing photos, missing speed test, config-sync). Drop the raw
+    // infrastructure/OS plumbing notices the rxg table also carries (e.g.
+    // "heartbeat timeout of 900s exceeded for /var/run/nokia...") which the
+    // AT&T Field Engineer tool never shows. Applied at the source so the Alerts
+    // list and the badge counts stay consistent.
+    final beforeFilter = notices.length;
+    notices.retainWhere((n) => n.isFieldActionable);
+    final filteredOut = beforeFilter - notices.length;
+
     LoggerService.debug(
       'HEALTH: Extracted ${notices.length} notices '
       '($devicesWithNotices devices with notices, '
       '$tableNoticesAdded from health_notices table, '
       '${complianceFailures.length} compliance failures, '
-      '$offlineNoticesAdded synthesized offline)',
+      '$offlineNoticesAdded synthesized offline; '
+      '$filteredOut non-field notices filtered out)',
       tag: 'HealthNotices',
     );
 
