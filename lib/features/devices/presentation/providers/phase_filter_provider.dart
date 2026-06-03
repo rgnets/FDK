@@ -52,8 +52,7 @@ class PhaseFilterState {
     final Set<String> phases = {};
 
     for (final device in devices) {
-      final rawPhase = device.metadata?['phase'];
-      final phase = rawPhase?.toString();
+      final phase = device.phase;
       if (phase != null && phase.isNotEmpty) {
         phases.add(phase);
       } else {

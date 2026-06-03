@@ -18,10 +18,13 @@ class Device with _$Device {
     String? macAddress,
     String? location,
     DateTime? lastSeen,
-    Map<String, dynamic>? metadata,
     String? model,
     String? serialNumber,
     String? firmware,
+    /// Deployment phase (e.g. "Phase 1"); drives phase filtering. Promoted
+    /// from the raw record so the device list can group/filter by it without
+    /// retaining the entire rXg payload.
+    String? phase,
     int? signalStrength,
     int? uptime,
     int? connectedClients,

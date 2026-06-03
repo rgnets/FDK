@@ -14,7 +14,9 @@ class RoomDataProcessor {
       id: id,
       name: displayName,
       deviceIds: extractDeviceIds(roomData),
-      metadata: roomData,
+      // Keep only the keys the app reads, not the whole raw record — this is
+      // what keeps the room cache small and the startup "Finalizing…" fast.
+      metadata: slimRoomMetadata(roomData),
     );
   }
 

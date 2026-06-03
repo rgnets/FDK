@@ -179,7 +179,7 @@ class RoomWebSocketDataSource implements RoomDataSource {
       name: displayName,
       number: roomNumber,
       deviceIds: deviceIds,
-      metadata: roomData,
+      metadata: slimRoomMetadata(roomData),
     );
   }
 

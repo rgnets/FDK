@@ -50,7 +50,7 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
         name: displayName,
         number: roomNumber,
         deviceIds: _extractDeviceIds(roomData),
-        metadata: roomData,
+        metadata: slimRoomMetadata(roomData),
       );
     }).toList();
   }
@@ -89,7 +89,7 @@ class RoomMockDataSourceImpl implements RoomMockDataSource {
       name: displayName,
       number: roomNumber,
       deviceIds: _extractDeviceIds(roomData),
-      metadata: roomData,
+      metadata: slimRoomMetadata(roomData),
     );
   }
 

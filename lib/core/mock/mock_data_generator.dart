@@ -182,17 +182,6 @@ class MockDataGenerator {
       final serialNumber = 'SN${_random.nextInt(900000) + 100000}';
       final firmware = '${_random.nextInt(10) + 1}.${_random.nextInt(20)}.${_random.nextInt(100)}';
       final locationStr = '$building - $floor - $room';
-      final metadata = <String, dynamic>{
-        'firmware': firmware,
-        'model': deviceModel,
-        'vlan': _vlans[vlanId],
-        'uptime': '${_random.nextInt(365)}d ${_random.nextInt(24)}h ${_random.nextInt(60)}m',
-        'cpu_usage': status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
-        'memory_usage': status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
-        'temperature': _random.nextInt(20) + 30,
-        'clients': connectedClients,
-        'bandwidth': '${_random.nextInt(900) + 100} Mbps',
-      };
 
       // Create appropriate sealed model variant based on device type
       final device = switch (deviceType) {
@@ -211,7 +200,6 @@ class MockDataGenerator {
           connectedClients: connectedClients,
           ssid: 'RGNets-${building.replaceAll(' ', '')}',
           channel: _random.nextInt(11) + 1,
-          metadata: metadata,
         ),
         'Switch' => DeviceModelSealed.switchDevice(
           id: id,
@@ -227,7 +215,6 @@ class MockDataGenerator {
           cpuUsage: status == 'warning' ? _random.nextInt(30) + 70 : _random.nextInt(50),
           memoryUsage: status == 'warning' ? _random.nextInt(30) + 60 : _random.nextInt(60),
           temperature: _random.nextInt(20) + 30,
-          metadata: metadata,
         ),
         'ONT' => DeviceModelSealed.ont(
           id: id,
@@ -241,7 +228,6 @@ class MockDataGenerator {
           serialNumber: serialNumber,
           firmware: firmware,
           uptime: uptime.toString(),
-          metadata: metadata,
         ),
         _ => DeviceModelSealed.ap(
           id: id,
@@ -254,7 +240,6 @@ class MockDataGenerator {
           model: deviceModel,
           serialNumber: serialNumber,
           firmware: firmware,
-          metadata: metadata,
         ),
       };
       devices.add(device);
@@ -281,18 +266,6 @@ class MockDataGenerator {
         cpuUsage: 15,
         memoryUsage: 35,
         temperature: 38,
-        metadata: const {
-          'firmware': '16.2.1',
-          'model': 'Cisco Catalyst 9400',
-          'vlan': 'MGMT-VLAN',
-          'uptime': '180d 12h 30m',
-          'cpu_usage': 15,
-          'memory_usage': 35,
-          'temperature': 38,
-          'bandwidth': '40000 Mbps',
-          'ports': 48,
-          'ports_active': 42,
-        },
       ),
     ];
   }

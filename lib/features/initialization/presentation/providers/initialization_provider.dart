@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/initialization/domain/entities/initialization_state.dart';
+import 'package:rgnets_fdk/features/initialization/presentation/providers/seed_checklist_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'initialization_provider.g.dart';
@@ -16,6 +17,13 @@ part 'initialization_provider.g.dart';
 final webSocketServiceOverrideProvider = Provider<WebSocketService?>((ref) => null);
 final webSocketDataSyncServiceOverrideProvider =
     Provider<WebSocketDataSyncService?>((ref) => null);
+final inventoryReseedServiceOverrideProvider =
+    Provider<InventoryReseedService?>((ref) => null);
+
+/// How long to wait for the WebSocket to (re)connect before failing init.
+/// Overridable so tests don't spin on the real 10s poll loop.
+final initializationConnectionWaitProvider =
+    Provider<Duration>((ref) => const Duration(seconds: 10));
 
 /// Manages the app initialization state and progress.
 ///
@@ -31,18 +39,32 @@ class InitializationNotifier extends _$InitializationNotifier {
   /// Maximum number of retry attempts before giving up.
   static const int maxRetries = 3;
 
+  /// Upper bound on how long the blocking init waits for the inventory seed
+  /// before releasing the overlay (the seed continues in the background). Sized
+  /// above the seeder's internal per-resource timeouts so it only fires on a
+  /// genuine stall, not normal slow boots.
+  static const Duration _seedTimeout = Duration(seconds: 60);
+
   int _retryCount = 0;
   int _bytesDownloaded = 0;
   DateTime _lastProgressUpdate = DateTime.now();
   StreamSubscription<WebSocketDataSyncEvent>? _eventSubscription;
+  StreamSubscription<ReseedProgress>? _reseedSubscription;
   bool _isInitializing = false;
 
   @override
   InitializationState build() {
     ref.onDispose(() {
       _eventSubscription?.cancel();
+      _reseedSubscription?.cancel();
     });
     return const InitializationState.uninitialized();
+  }
+
+  /// Get the inventory reseed coordinator, with test override support.
+  InventoryReseedService get _reseedService {
+    final override = ref.read(inventoryReseedServiceOverrideProvider);
+    return override ?? ref.read(inventoryReseedProvider);
   }
 
   /// Get the WebSocket service, with test override support.
@@ -114,11 +136,13 @@ class InitializationNotifier extends _$InitializationNotifier {
         // connection, but provider graph updates can briefly drop it.
         // ATT-FE-Tool avoids this by validating via REST first; in FDK we
         // give the auto-reconnect enough time to re-establish.
+        final maxWait = ref.read(initializationConnectionWaitProvider);
+        final attempts = (maxWait.inMilliseconds / 100).ceil();
         LoggerService.debug(
-          'WebSocket not connected, waiting up to 10s...',
+          'WebSocket not connected, waiting up to ${maxWait.inSeconds}s...',
           tag: 'InitProvider',
         );
-        for (var i = 0; i < 100 && !isConnected; i++) {
+        for (var i = 0; i < attempts && !isConnected; i++) {
           await Future<void>.delayed(const Duration(milliseconds: 100));
           isConnected = _webSocketService.isConnected;
         }
@@ -149,13 +173,24 @@ class InitializationNotifier extends _$InitializationNotifier {
       await Future<void>.delayed(const Duration(milliseconds: 100));
 
       if (waitForSync) {
-        // Step 3: Load data via WebSocket (blocking)
+        // Step 3: Load data via REST (blocking). The overlay stays up — and the
+        // technician is held out of the app — until the inventory seed finishes.
         state = const InitializationState.loadingData(
-          currentOperation: 'Loading devices and rooms...',
+          currentOperation: 'Loading inventory...',
         );
         LoggerService.debug('State -> loadingData', tag: 'InitProvider');
 
         _setupProgressListener();
+
+        // Drive the per-resource checklist shown in the overlay: reset to
+        // pending, flip to loading, then mark each resource done/failed as the
+        // reseed coordinator reports it.
+        final checklist = ref.read(seedChecklistProvider.notifier)
+          ..reset()
+          ..startLoading();
+        final reseed = _reseedService;
+        await _reseedSubscription?.cancel();
+        _reseedSubscription = reseed.progress.listen(checklist.apply);
 
         LoggerService.debug(
           'Calling syncInitialData with 45s timeout...',
@@ -169,14 +204,27 @@ class InitializationNotifier extends _$InitializationNotifier {
         // start — including persisted-session reopen, where the auth sign-in
         // transition that also reseeds may have already fired before its
         // listener registered. `force` bypasses the cooldown.
-        await ref
-            .read(inventoryReseedProvider)
-            .triggerReseed(reason: 'init', force: true);
+        //
+        // Bounded so the overlay can never hang the technician indefinitely on a
+        // stalled persist/fetch. On timeout we proceed to `ready` anyway: the
+        // inventory is already applied to the in-memory caches by this point;
+        // the reseed (incl. its SQLite flush) keeps running in the background.
+        await reseed
+            .triggerReseed(reason: 'init', force: true)
+            .timeout(_seedTimeout, onTimeout: () {
+          LoggerService.warning(
+            'init seed exceeded ${_seedTimeout.inSeconds}s; releasing overlay '
+            '(seed continues in background)',
+            tag: 'InitProvider',
+          );
+        });
         LoggerService.debug('syncInitialData completed', tag: 'InitProvider');
 
-        // Clean up event subscription - no longer needed after initial sync
+        // Clean up subscriptions - no longer needed after initial sync
         _eventSubscription?.cancel();
         _eventSubscription = null;
+        await _reseedSubscription?.cancel();
+        _reseedSubscription = null;
 
         // Step 4: Ready
         state = const InitializationState.ready();
@@ -206,8 +254,7 @@ class InitializationNotifier extends _$InitializationNotifier {
         // longer sends `index` snapshots). Reliable boot-time seed for every
         // authed start, including persisted-session reopen.
         unawaited(
-          ref
-              .read(inventoryReseedProvider)
+          _reseedService
               .triggerReseed(reason: 'init', force: true)
               .catchError((Object e, StackTrace st) {
             LoggerService.error(
@@ -227,9 +274,11 @@ class InitializationNotifier extends _$InitializationNotifier {
         );
       }
     } on Exception catch (e, stack) {
-      // Clean up event subscription on error
+      // Clean up subscriptions on error
       _eventSubscription?.cancel();
       _eventSubscription = null;
+      await _reseedSubscription?.cancel();
+      _reseedSubscription = null;
 
       LoggerService.error(
         'Initialization failed with exception: $e\n$stack',
@@ -295,7 +344,8 @@ class InitializationNotifier extends _$InitializationNotifier {
     _retryCount++;
     _bytesDownloaded = 0;
     state = const InitializationState.uninitialized();
-    await initialize();
+    // Re-run the blocking path so the checklist is shown again on retry.
+    await initialize(waitForSync: true);
   }
 
   /// Reset the initialization state.
@@ -306,7 +356,10 @@ class InitializationNotifier extends _$InitializationNotifier {
     _bytesDownloaded = 0;
     _eventSubscription?.cancel();
     _eventSubscription = null;
+    _reseedSubscription?.cancel();
+    _reseedSubscription = null;
     _isInitializing = false;
+    ref.read(seedChecklistProvider.notifier).reset();
     state = const InitializationState.uninitialized();
   }
 

@@ -11,6 +11,7 @@ import 'package:rgnets_fdk/core/services/websocket_data_sync_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/initialization/domain/entities/initialization_state.dart';
 import 'package:rgnets_fdk/features/initialization/presentation/providers/initialization_provider.dart';
+import 'package:rgnets_fdk/features/initialization/presentation/providers/seed_checklist_provider.dart';
 
 class MockWebSocketService extends Mock implements WebSocketService {}
 
@@ -35,13 +36,17 @@ void main() {
 
   late MockWebSocketService mockWebSocketService;
   late MockWebSocketDataSyncService mockDataSyncService;
+  late MockInventoryReseedService mockReseedService;
   late StreamController<WebSocketDataSyncEvent> eventsController;
+  late StreamController<ReseedProgress> reseedProgressController;
   late ProviderContainer container;
 
   setUp(() {
     mockWebSocketService = MockWebSocketService();
     mockDataSyncService = MockWebSocketDataSyncService();
+    mockReseedService = MockInventoryReseedService();
     eventsController = StreamController<WebSocketDataSyncEvent>.broadcast();
+    reseedProgressController = StreamController<ReseedProgress>.broadcast();
 
     when(() => mockWebSocketService.isConnected).thenReturn(true);
     when(
@@ -53,6 +58,14 @@ void main() {
       (_) => eventsController.stream,
     );
     when(() => mockDataSyncService.start()).thenAnswer((_) async {});
+    when(() => mockReseedService.progress)
+        .thenAnswer((_) => reseedProgressController.stream);
+    when(
+      () => mockReseedService.triggerReseed(
+        reason: any(named: 'reason'),
+        force: any(named: 'force'),
+      ),
+    ).thenAnswer((_) async {});
 
     container = ProviderContainer(
       overrides: [
@@ -66,6 +79,7 @@ void main() {
 
   tearDown(() async {
     await eventsController.close();
+    await reseedProgressController.close();
     container.dispose();
   });
 
@@ -488,6 +502,115 @@ void main() {
         container.read(initializationNotifierProvider),
         const InitializationState.ready(),
       );
+    });
+  });
+
+  group('seed checklist integration', () {
+    test('blocking init drives the checklist from reseed progress', () async {
+      when(
+        () =>
+            mockDataSyncService.syncInitialData(timeout: any(named: 'timeout')),
+      ).thenAnswer(
+        (_) async => Future<void>.delayed(const Duration(milliseconds: 500)),
+      );
+
+      final notifier =
+          container.read(initializationNotifierProvider.notifier);
+      final initFuture = notifier.initialize(waitForSync: true);
+
+      // Past the 100ms validatingCredentials delay → loadingData, rows loading.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(
+        container
+            .read(seedChecklistProvider)
+            .every((i) => i.status == SeedItemStatus.loading),
+        isTrue,
+      );
+
+      reseedProgressController
+        ..add(
+          const ReseedProgress(
+            resourceType: 'access_points',
+            status: ReseedResourceStatus.done,
+            count: 7,
+          ),
+        )
+        ..add(
+          const ReseedProgress(
+            resourceType: 'wlan_devices',
+            status: ReseedResourceStatus.failed,
+          ),
+        );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final items = container.read(seedChecklistProvider);
+      final ap = items.firstWhere((i) => i.resourceType == 'access_points');
+      final wlan = items.firstWhere((i) => i.resourceType == 'wlan_devices');
+      expect(ap.status, SeedItemStatus.done);
+      expect(ap.count, 7);
+      expect(wlan.status, SeedItemStatus.failed);
+
+      await initFuture;
+      expect(
+        container.read(initializationNotifierProvider),
+        const InitializationState.ready(),
+      );
+    });
+  });
+
+  group('SeedChecklistNotifier', () {
+    test('initial rows are pending and cover the seed resources', () {
+      final items = container.read(seedChecklistProvider);
+      expect(
+        items.map((i) => i.resourceType),
+        containsAll(<String>[
+          'access_points',
+          'switch_devices',
+          'media_converters',
+          'wlan_devices',
+          'pms_rooms',
+        ]),
+      );
+      expect(items.every((i) => i.status == SeedItemStatus.pending), isTrue);
+    });
+
+    test('startLoading then reset round-trips the row states', () {
+      container.read(seedChecklistProvider.notifier).startLoading();
+      expect(
+        container
+            .read(seedChecklistProvider)
+            .every((i) => i.status == SeedItemStatus.loading),
+        isTrue,
+      );
+      container.read(seedChecklistProvider.notifier).reset();
+      expect(
+        container
+            .read(seedChecklistProvider)
+            .every((i) => i.status == SeedItemStatus.pending),
+        isTrue,
+      );
+    });
+
+    test('a late failed event does not clobber an already-done row', () {
+      container.read(seedChecklistProvider.notifier)
+        ..apply(
+          const ReseedProgress(
+            resourceType: 'pms_rooms',
+            status: ReseedResourceStatus.done,
+            count: 3,
+          ),
+        )
+        ..apply(
+          const ReseedProgress(
+            resourceType: 'pms_rooms',
+            status: ReseedResourceStatus.failed,
+          ),
+        );
+      final rooms = container
+          .read(seedChecklistProvider)
+          .firstWhere((i) => i.resourceType == 'pms_rooms');
+      expect(rooms.status, SeedItemStatus.done);
+      expect(rooms.count, 3);
     });
   });
 }

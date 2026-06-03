@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:rgnets_fdk/core/services/secure_storage_service.dart';
 import 'package:rgnets_fdk/core/services/storage_service.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/phase_filter_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 void main() {
   group('PhaseFilterState', () {
@@ -59,39 +63,37 @@ void main() {
           name: 'AP-1',
           type: 'access_point',
           status: 'online',
-          metadata: {'phase': 'Phase 1'},
+          phase: 'Phase 1',
         ),
         const Device(
           id: '2',
           name: 'AP-2',
           type: 'access_point',
           status: 'online',
-          metadata: {'phase': 'Phase 2'},
+          phase: 'Phase 2',
         ),
         const Device(
           id: '3',
           name: 'AP-3',
           type: 'access_point',
           status: 'offline',
-          metadata: {'phase': 'Phase 1'},
+          phase: 'Phase 1',
         ),
         const Device(
           id: '4',
           name: 'Switch-1',
           type: 'switch',
           status: 'online',
-          metadata: null, // No phase assigned
+          phase: null, // No phase assigned
         ),
       ];
     });
 
-    test('should filter devices by phase using metadata', () {
+    test('should filter devices by phase using the typed phase field', () {
       const state = PhaseFilterState(selectedPhase: 'Phase 1');
 
       final filtered = testDevices.where((device) {
-        final rawPhase = device.metadata?['phase'];
-        final phase = rawPhase?.toString();
-        return state.matchesFilter(phase);
+        return state.matchesFilter(device.phase);
       }).toList();
 
       expect(filtered.length, equals(2));
@@ -102,9 +104,7 @@ void main() {
       const state = PhaseFilterState(selectedPhase: 'Unassigned');
 
       final filtered = testDevices.where((device) {
-        final rawPhase = device.metadata?['phase'];
-        final phase = rawPhase?.toString();
-        return state.matchesFilter(phase);
+        return state.matchesFilter(device.phase);
       }).toList();
 
       expect(filtered.length, equals(1));
@@ -120,28 +120,28 @@ void main() {
           name: 'AP-1',
           type: 'access_point',
           status: 'online',
-          metadata: {'phase': 'Phase 1'},
+          phase: 'Phase 1',
         ),
         const Device(
           id: '2',
           name: 'AP-2',
           type: 'access_point',
           status: 'online',
-          metadata: {'phase': 'Phase 2'},
+          phase: 'Phase 2',
         ),
         const Device(
           id: '3',
           name: 'AP-3',
           type: 'access_point',
           status: 'online',
-          metadata: {'phase': 'Phase 1'}, // Duplicate
+          phase: 'Phase 1', // Duplicate
         ),
         const Device(
           id: '4',
           name: 'Switch-1',
           type: 'switch',
           status: 'online',
-          metadata: null,
+          phase: null,
         ),
       ];
 
@@ -168,7 +168,7 @@ void main() {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
-      storageService = StorageService(prefs);
+      storageService = StorageService(prefs, MockSecureStorageService());
     });
 
     test('should save selected phase to storage', () async {
@@ -184,7 +184,7 @@ void main() {
     test('should load saved phase from storage', () async {
       await prefs.setString(StorageService.keyPhaseFilter, 'Phase 2');
 
-      final storageService2 = StorageService(prefs);
+      final storageService2 = StorageService(prefs, MockSecureStorageService());
       final loaded = storageService2.getString(StorageService.keyPhaseFilter);
       expect(loaded, equals('Phase 2'));
     });

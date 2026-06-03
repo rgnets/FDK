@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:rgnets_fdk/core/constants/device_field_sets.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/secure_http_client.dart';
 import 'package:rgnets_fdk/core/utils/log_redaction.dart' as log_redaction;
@@ -76,6 +77,20 @@ class InventoryRestSeederService {
   static const _tag = 'InventoryRestSeederService';
   static const _timeout = Duration(seconds: 30);
 
+  /// Rows requested per page. The rXg serializes one big page server-side, so a
+  /// smaller page returns faster; we loop pages to still pull the full set. Kept
+  /// below the rXg's server-side page-size clamp (~500) so a clamped short page
+  /// is never mistaken for the final page by the `length < _pageSize` stop test
+  /// in [_fetchAllPages]. Combined with [DeviceFieldSets.seedFields] (`&only=`),
+  /// this keeps each device page well inside [_timeout].
+  static const int _pageSize = 200;
+
+  /// Hard cap on pages fetched per resource so a server that ignores `page`
+  /// (always returning the same full page) can't loop unboundedly. _pageSize *
+  /// _maxPages (50k) is far above the previous single-page 10k ceiling, so this
+  /// only ever truncates inventories that the old single-GET already truncated.
+  static const int _maxPages = 50;
+
   /// Resource types served via REST seed. Matches the paged set we previously
   /// tried to fetch over WS `resource_action index`. Order is intentional:
   /// access_points first because the UI binds device count off it.
@@ -103,8 +118,11 @@ class InventoryRestSeederService {
     return normalized;
   }
 
-  Uri _api(String resourceFile) => Uri.parse(
-        'https://$siteUrl/api/$resourceFile?api_key=$apiKey&page_size=10000',
+  Uri _api(String resourceFile, {required int page, List<String>? fields}) =>
+      Uri.parse(
+        'https://$siteUrl/api/$resourceFile'
+        '?api_key=$apiKey&page_size=$_pageSize&page=$page'
+        '${DeviceFieldSets.buildFieldsParam(fields)}',
       );
 
   /// Fire one parallel batch of GETs and apply each successful result to the
@@ -140,9 +158,11 @@ class InventoryRestSeederService {
     String resourceType,
     SeedDeviceApply onDevices,
   ) async {
-    final uri = _api('$resourceType.json');
-    LoggerService.debug('GET ${_scrub(uri)}', tag: _tag);
-    final fetch = await _fetchList(uri, resourceType);
+    final fetch = await _fetchAllPages(
+      '$resourceType.json',
+      resourceType,
+      fields: DeviceFieldSets.seedFields,
+    );
     if (fetch.items == null) {
       return SeedOutcome(
         resourceType: resourceType,
@@ -182,9 +202,11 @@ class InventoryRestSeederService {
   /// Seed the rooms resource via REST and apply it to the cache. Public for
   /// targeted single-resource reseed (see [seedDeviceResource]).
   Future<SeedOutcome> seedRoomResource(SeedRoomApply onRooms) async {
-    final uri = _api('$roomResourceType.json');
-    LoggerService.debug('GET ${_scrub(uri)}', tag: _tag);
-    final fetch = await _fetchList(uri, roomResourceType);
+    // Rooms are fetched WITHOUT an `&only=` filter: the device field set
+    // (DeviceFieldSets.seedFields) is AP/switch-shaped and would strip a rooms
+    // record down to almost nothing. A rooms-specific slim set can be added
+    // later; for now rooms serialize their full (already-working) record.
+    final fetch = await _fetchAllPages('$roomResourceType.json', roomResourceType);
     if (fetch.items == null) {
       return SeedOutcome(
         resourceType: roomResourceType,
@@ -221,11 +243,59 @@ class InventoryRestSeederService {
     );
   }
 
+  /// Fetch every page of [resourceFile] (e.g. `access_points.json`) and return
+  /// the combined list. Pages are pulled sequentially with [_pageSize] rows
+  /// each; the loop stops when a short page arrives, the advertised `count` is
+  /// reached, the server stops advancing the echoed `page`, or [_maxPages] is
+  /// hit. Any page-level failure fails the whole resource (rather than silently
+  /// seeding a truncated inventory), matching the old single-GET behaviour.
+  Future<_FetchResult> _fetchAllPages(
+    String resourceFile,
+    String resourceType, {
+    List<String>? fields,
+  }) async {
+    final all = <Map<String, dynamic>>[];
+    int? statusCode;
+    var page = 1;
+    for (; page <= _maxPages; page++) {
+      final uri = _api(resourceFile, page: page, fields: fields);
+      LoggerService.debug('GET ${_scrub(uri)}', tag: _tag);
+      final fetch = await _fetchPage(uri, resourceType);
+      if (fetch.items == null) {
+        // Propagate the failure; do not return a partial (truncated) set.
+        return _FetchResult(statusCode: fetch.statusCode, error: fetch.error);
+      }
+      statusCode = fetch.statusCode;
+      all.addAll(fetch.items!);
+
+      final reachedCount =
+          fetch.totalCount != null && all.length >= fetch.totalCount!;
+      // A server that ignores `page` re-serves page 1; its echoed page won't
+      // advance past 1, so stop rather than accumulate duplicates.
+      final serverNotPaging =
+          fetch.page != null && fetch.page != page && page > 1;
+      if (fetch.items!.length < _pageSize ||
+          reachedCount ||
+          serverNotPaging) {
+        break;
+      }
+    }
+    if (page > _maxPages) {
+      LoggerService.warning(
+        '$resourceType hit the $_maxPages-page cap (${all.length} items); '
+        'inventory may be incomplete',
+        tag: _tag,
+      );
+    }
+    return _FetchResult(items: all, statusCode: statusCode);
+  }
+
   /// GET [uri] and extract the result list. Returns a [_FetchResult] whose
   /// `items` is `null` for any failure (non-200, parse error, unknown shape,
   /// network exception). `statusCode` is set whenever the HTTP layer
-  /// produced a response.
-  Future<_FetchResult> _fetchList(Uri uri, String resourceType) async {
+  /// produced a response. [totalCount]/[page] are populated from the rXg's
+  /// paginated body shape when present, so the caller can terminate paging.
+  Future<_FetchResult> _fetchPage(Uri uri, String resourceType) async {
     final http.Response response;
     try {
       response = await _client.get(uri).timeout(_timeout);
@@ -268,7 +338,16 @@ class InventoryRestSeederService {
     return _FetchResult(
       items: list.whereType<Map<String, dynamic>>().toList(),
       statusCode: response.statusCode,
+      totalCount: _asInt(decoded is Map<String, dynamic> ? decoded['count'] : null),
+      page: _asInt(decoded is Map<String, dynamic> ? decoded['page'] : null),
     );
+  }
+
+  static int? _asInt(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v);
+    return null;
   }
 
   /// rxg's REST list endpoints emit one of three shapes:
@@ -302,8 +381,20 @@ class InventoryRestSeederService {
 /// [SeedOutcome.statusCode] on non-200 responses without losing the
 /// "items unavailable" signal.
 class _FetchResult {
-  _FetchResult({this.items, this.statusCode, this.error});
+  _FetchResult({
+    this.items,
+    this.statusCode,
+    this.error,
+    this.totalCount,
+    this.page,
+  });
   final List<Map<String, dynamic>>? items;
   final int? statusCode;
   final String? error;
+
+  /// Advertised total record count from a paginated body (`count`), if present.
+  final int? totalCount;
+
+  /// Echoed page number from a paginated body (`page`), if present.
+  final int? page;
 }

@@ -86,7 +86,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'mac_address') String? macAddress,
     String? location,
     @JsonKey(name: 'last_seen') DateTime? lastSeen,
-    Map<String, dynamic>? metadata,
     String? model,
     @JsonKey(name: 'serial_number') String? serialNumber,
     String? firmware,
@@ -106,6 +105,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'current_upload') double? currentUpload,
     @JsonKey(name: 'current_download') double? currentDownload,
     @JsonKey(name: 'ap_onboarding_status') OnboardingStatusPayload? onboardingStatus,
+    String? phase,
   }) = APModel;
 
   // ============================================================================
@@ -124,7 +124,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'mac_address') String? macAddress,
     String? location,
     @JsonKey(name: 'last_seen') DateTime? lastSeen,
-    Map<String, dynamic>? metadata,
     String? model,
     @JsonKey(name: 'serial_number') String? serialNumber,
     String? firmware,
@@ -163,7 +162,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'mac_address') String? macAddress,
     String? location,
     @JsonKey(name: 'last_seen') DateTime? lastSeen,
-    Map<String, dynamic>? metadata,
     String? model,
     @JsonKey(name: 'serial_number') String? serialNumber,
     String? firmware,
@@ -181,6 +179,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'cpu_usage') int? cpuUsage,
     @JsonKey(name: 'memory_usage') int? memoryUsage,
     int? temperature,
+    String? phase,
   }) = SwitchModel;
 
   // ============================================================================
@@ -199,7 +198,6 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'mac_address') String? macAddress,
     String? location,
     @JsonKey(name: 'last_seen') DateTime? lastSeen,
-    Map<String, dynamic>? metadata,
     String? model,
     @JsonKey(name: 'serial_number') String? serialNumber,
     String? firmware,
@@ -218,6 +216,7 @@ sealed class DeviceModelSealed with _$DeviceModelSealed {
     @JsonKey(name: 'packet_loss') double? packetLoss,
     int? latency,
     @JsonKey(name: 'restart_count') int? restartCount,
+    String? phase,
   }) = WLANModel;
 
   factory DeviceModelSealed.fromJson(Map<String, dynamic> json) =>
@@ -243,7 +242,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         macAddress: ap.macAddress,
         location: ap.location ?? ap.pmsRoom?.name,
         lastSeen: ap.lastSeen,
-        metadata: ap.metadata,
+        phase: ap.phase,
         model: ap.model,
         serialNumber: ap.serialNumber,
         firmware: ap.firmware,
@@ -271,7 +270,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         macAddress: ont.macAddress,
         location: ont.location ?? ont.pmsRoom?.name,
         lastSeen: ont.lastSeen,
-        metadata: ont.metadata,
+        phase: ont.phase,
         model: ont.model,
         serialNumber: ont.serialNumber,
         firmware: ont.firmware,
@@ -296,7 +295,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
             ?? sw.pmsRoom?.name
             ?? sw.pmsRooms?.firstOrNull?.name,
         lastSeen: sw.lastSeen,
-        metadata: sw.metadata,
+        phase: sw.phase,
         model: sw.model,
         serialNumber: sw.serialNumber,
         firmware: sw.firmware,
@@ -320,7 +319,7 @@ extension DeviceModelSealedX on DeviceModelSealed {
         macAddress: wlan.macAddress,
         location: wlan.location ?? wlan.pmsRoom?.name,
         lastSeen: wlan.lastSeen,
-        metadata: wlan.metadata,
+        phase: wlan.phase,
         model: wlan.model,
         serialNumber: wlan.serialNumber,
         firmware: wlan.firmware,

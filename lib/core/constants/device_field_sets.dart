@@ -33,6 +33,32 @@ class DeviceFieldSets {
     'health_notices', // Health notice list for alerts screen
   ];
 
+  /// Fields requested by the initial REST inventory seed.
+  ///
+  /// The seed populates the in-memory + typed device caches that back the list
+  /// view AND any screen that reads device data WITHOUT re-fetching. The rXg
+  /// serializes every requested column/association per record server-side, so
+  /// requesting the full record makes a 1000-row access_points page too heavy
+  /// to return inside the seed timeout (APs end up dropped entirely). This set
+  /// is [listFields] plus the handful of fields whose consumers do NOT refetch:
+  ///   - `ap_onboarding_status` / `ont_onboarding_status`: room-readiness reads
+  ///     these straight off the seeded cache (no per-device refetch), so they
+  ///     must be seeded or onboarding status goes null.
+  ///   - `model` / `serial_number` / `firmware` / `version` / `phase`: cheap
+  ///     scalars used by list filters and headers off the seeded cache.
+  /// Detail-only data (perf metrics, cpu/mem/temp, vlan, totals) is intentionally
+  /// excluded — the detail screen refetches full records ([detailFields]) on open.
+  static const List<String> seedFields = [
+    ...listFields,
+    'ap_onboarding_status',
+    'ont_onboarding_status',
+    'model',
+    'serial_number',
+    'firmware',
+    'version',
+    'phase',
+  ];
+
   /// All fields for detail view
   /// Empty list means fetch all available fields
   static const List<String> detailFields = [];

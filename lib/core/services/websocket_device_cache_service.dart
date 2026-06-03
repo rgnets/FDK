@@ -110,7 +110,7 @@ class WebSocketDeviceCacheService {
             imageSignedIds: apImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
-            metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
             onboardingStatus: deviceMap['ap_onboarding_status'] != null
                 ? OnboardingStatusPayload.fromJson(
                     deviceMap['ap_onboarding_status'] as Map<String, dynamic>,
@@ -134,7 +134,7 @@ class WebSocketDeviceCacheService {
             imageSignedIds: mcImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
-            metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
             onboardingStatus: deviceMap['ont_onboarding_status'] != null
                 ? OnboardingStatusPayload.fromJson(
                     deviceMap['ont_onboarding_status'] as Map<String, dynamic>,
@@ -167,7 +167,7 @@ class WebSocketDeviceCacheService {
             imageSignedIds: swImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
-            metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
           );
 
         case 'wlan_devices':
@@ -187,7 +187,7 @@ class WebSocketDeviceCacheService {
             imageSignedIds: wlanImageData?.signedIds,
             hnCounts: hnCounts,
             healthNotices: healthNotices,
-            metadata: deviceMap,
+            phase: deviceMap['phase']?.toString(),
           );
 
         default:
