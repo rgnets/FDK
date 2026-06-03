@@ -35,7 +35,9 @@ class _FakeSink implements WebSocketSink {
 
 /// A controllable fake [WebSocketChannel] for driving the service in tests.
 class _FakeChannel implements WebSocketChannel {
-  _FakeChannel({bool failReady = false}) : _failReady = failReady {
+  _FakeChannel({bool failReady = false, bool hangReady = false})
+      : _failReady = failReady,
+        _hangReady = hangReady {
     _sink = _FakeSink(() {
       if (!_inbound.isClosed) _inbound.close();
     });
@@ -43,6 +45,9 @@ class _FakeChannel implements WebSocketChannel {
 
   final _inbound = StreamController<dynamic>.broadcast();
   final bool _failReady;
+  // Never completes its `ready` future — simulates a host that accepts the
+  // socket but stalls the upgrade, so the service must time the attempt out.
+  final bool _hangReady;
   late final _FakeSink _sink;
 
   /// Simulate an inbound server message.
@@ -69,8 +74,14 @@ class _FakeChannel implements WebSocketChannel {
   // Built lazily on access so a failing future is consumed by _open's await in
   // the same microtask (never floats as an unhandled async error).
   @override
-  Future<void> get ready =>
-      _failReady ? Future<void>.error(Exception('conn failed')) : Future<void>.value();
+  Future<void> get ready {
+    if (_hangReady) {
+      return Completer<void>().future;
+    }
+    return _failReady
+        ? Future<void>.error(Exception('conn failed'))
+        : Future<void>.value();
+  }
 
   @override
   int? get closeCode => null;
@@ -88,18 +99,27 @@ class _FakeChannel implements WebSocketChannel {
 
 void main() {
   // Tiny delays so reconnect timing is observable without slow tests.
-  WebSocketService buildService(List<_FakeChannel> channels, {required _Counter calls}) {
+  WebSocketService buildService(
+    List<_FakeChannel> channels, {
+    required _Counter calls,
+    Duration? connectionTimeout,
+  }) {
     final config = WebSocketConfig(
       baseUri: Uri.parse('wss://example.test/cable'),
       initialReconnectDelay: const Duration(milliseconds: 20),
       maxReconnectDelay: const Duration(milliseconds: 40),
+      connectionTimeout: connectionTimeout ?? const Duration(seconds: 10),
       sendClientPing: false,
     );
     return WebSocketService(
       config: config,
       channelFactory: (uri, {headers}) {
         calls.value += 1;
-        return channels[calls.value - 1];
+        // Past the supplied list, keep handing back failing channels so an
+        // all-failing run exercises the give-up path without a RangeError.
+        return calls.value <= channels.length
+            ? channels[calls.value - 1]
+            : _FakeChannel(failReady: true);
       },
     );
   }
@@ -281,6 +301,77 @@ void main() {
       expect(service.isConnected, isFalse);
       await Future<void>.delayed(const Duration(milliseconds: 80));
       expect(calls.value, 1);
+    });
+
+    test('gives up and stops retrying after connectionTimeout', () async {
+      // An unresolvable host fails every attempt; the service must stop the
+      // reconnect loop once the connectionTimeout budget is spent, rather than
+      // retrying forever.
+      final calls = _Counter();
+      final service = buildService(
+        [_FakeChannel(failReady: true)],
+        calls: calls,
+        connectionTimeout: const Duration(milliseconds: 80),
+      );
+
+      final failed = expectLater(service.connectionFailed, emits(null));
+      await service.connect(paramsFor());
+
+      // Past the deadline, plus margin for what would be further backoff retries.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await failed;
+
+      expect(service.isConnected, isFalse);
+      final attemptsAtGiveUp = calls.value;
+      // No further channels are opened once it has given up.
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      expect(calls.value, attemptsAtGiveUp,
+          reason: 'reconnect loop must stop after giving up');
+    });
+
+    test('a hung ready is timed out and counts as a failed attempt', () async {
+      // Host accepts the socket but never completes the upgrade. The attempt
+      // must time out (not hang forever) and feed the give-up path.
+      final calls = _Counter();
+      final service = buildService(
+        [_FakeChannel(hangReady: true)],
+        calls: calls,
+        connectionTimeout: const Duration(milliseconds: 80),
+      );
+
+      final failed = expectLater(service.connectionFailed, emits(null));
+      await service.connect(paramsFor());
+
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await failed;
+      expect(service.isConnected, isFalse);
+    });
+
+    test('a fresh connect() after giving up can succeed', () async {
+      // Giving up must not permanently wedge the service: a new connect resets
+      // the deadline and connects normally. A toggle decides whether the
+      // factory hands back a failing or a healthy channel.
+      var healthy = false;
+      final service = WebSocketService(
+        config: WebSocketConfig(
+          baseUri: Uri.parse('wss://example.test/cable'),
+          initialReconnectDelay: const Duration(milliseconds: 20),
+          maxReconnectDelay: const Duration(milliseconds: 40),
+          connectionTimeout: const Duration(milliseconds: 80),
+          sendClientPing: false,
+        ),
+        channelFactory: (uri, {headers}) =>
+            healthy ? _FakeChannel() : _FakeChannel(failReady: true),
+      );
+
+      await service.connect(paramsFor());
+      await expectLater(service.connectionFailed, emits(null));
+      expect(service.isConnected, isFalse);
+
+      healthy = true;
+      await service.connect(paramsFor());
+      expect(service.isConnected, isTrue,
+          reason: 'give-up must not wedge future connects');
     });
   });
 }

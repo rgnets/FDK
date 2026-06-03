@@ -607,14 +607,38 @@ class Auth extends _$Auth {
       }
     });
 
+    // The subscription must be sent only once the socket is actually
+    // `connected`. `service.connect()` returns as soon as the first attempt is
+    // made (it does not await success), so sending right after it would throw
+    // StateError on a host that is still reconnecting.
+    var subscribed = false;
     final stateSubscription = service.connectionState.listen((connState) {
       _logger.d('AUTH_NOTIFIER: 🔌 WebSocket connection state changed: $connState');
-      if (connState == SocketConnectionState.disconnected &&
+      if (connState == SocketConnectionState.connected && !subscribed) {
+        subscribed = true;
+        _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
+        service.send(subscriptionPayload);
+      } else if (connState == SocketConnectionState.disconnected &&
           !completer.isCompleted) {
         _logger.e('AUTH_NOTIFIER: ❌ Connection closed before subscription confirmed');
         completer.complete(
           const _ActionCableAuthResult.failure(
             'Connection closed before subscription confirmed',
+          ),
+        );
+      }
+    });
+
+    // The socket gave up after exhausting its connection-timeout budget (e.g.
+    // an unreachable / unresolvable host). Fail the handshake immediately with a
+    // clear, user-facing message instead of waiting out the handshake timeout.
+    final failedSubscription = service.connectionFailed.listen((_) {
+      if (!completer.isCompleted) {
+        _logger.e('AUTH_NOTIFIER: ❌ Server unreachable — gave up connecting');
+        completer.complete(
+          const _ActionCableAuthResult.failure(
+            'Could not reach the server. Check the address and your network '
+            'connection, then try again.',
           ),
         );
       }
@@ -638,9 +662,8 @@ class Auth extends _$Auth {
           throw TimeoutException('Connection to server timed out');
         },
       );
-      _logger.d('AUTH_NOTIFIER: WebSocket connected, sending subscription...');
-      service.send(subscriptionPayload);
-      _logger.d('AUTH_NOTIFIER: Subscription sent, waiting for confirmation (15s timeout)...');
+      _logger.d('AUTH_NOTIFIER: connect() returned; subscription is sent once '
+          'the socket reports connected. Awaiting confirmation (15s timeout)...');
 
       final result = await completer.future.timeout(
         const Duration(seconds: 15),
@@ -704,6 +727,7 @@ class Auth extends _$Auth {
     } finally {
       await subscription.cancel();
       await stateSubscription.cancel();
+      await failedSubscription.cancel();
     }
   }
 

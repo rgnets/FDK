@@ -48,6 +48,7 @@ class WebSocketConfig {
     this.autoReconnect = true,
     this.initialReconnectDelay = const Duration(seconds: 1),
     this.maxReconnectDelay = const Duration(seconds: 32),
+    this.connectionTimeout = const Duration(seconds: 10),
     this.heartbeatInterval = const Duration(seconds: 30),
     this.heartbeatTimeout = const Duration(seconds: 45),
     this.sendClientPing = true,
@@ -57,6 +58,14 @@ class WebSocketConfig {
   final bool autoReconnect;
   final Duration initialReconnectDelay;
   final Duration maxReconnectDelay;
+
+  /// Wall-clock budget for establishing a connection. Bounds each individual
+  /// attempt's upgrade handshake and the whole connect/reconnect cycle: if the
+  /// socket cannot reach `connected` within this window, the service stops
+  /// retrying and emits [connectionFailed] instead of looping forever (e.g. an
+  /// unresolvable host).
+  final Duration connectionTimeout;
+
   final Duration heartbeatInterval;
   final Duration heartbeatTimeout;
   final bool sendClientPing;
@@ -111,6 +120,7 @@ class WebSocketService {
   final _stateController = StreamController<SocketConnectionState>.broadcast();
   final _messageController = StreamController<SocketMessage>.broadcast();
   final _authFailureController = StreamController<int>.broadcast();
+  final _connectionFailedController = StreamController<void>.broadcast();
   final Map<String, _PendingRequest> _pendingRequests = {};
 
   SocketConnectionState _state = SocketConnectionState.disconnected;
@@ -125,6 +135,16 @@ class WebSocketService {
   int _reconnectAttempts = 0;
   int _consecutiveReconnectFailures = 0;
   bool _manuallyClosed = false;
+
+  // Wall-clock give-up timer for the current connect/reconnect cycle. Armed on
+  // the first attempt of a cycle, cleared on a successful connect. When it fires
+  // the service has spent the whole connectionTimeout budget without connecting,
+  // so it stops retrying (see _onConnectDeadlineExpired).
+  Timer? _connectDeadline;
+
+  // Set once the deadline fired: blocks _scheduleReconnect from restarting the
+  // loop. Cleared by a fresh manual connect / lifecycle resume.
+  bool _gaveUp = false;
 
   // Suspended by the OS app-lifecycle (background), as opposed to a manual
   // disconnect/sign-out. Resume reconnects only what lifecycle suspended.
@@ -157,6 +177,12 @@ class WebSocketService {
   /// when multiple failures suggest a potential auth issue.
   Stream<int> get potentialAuthFailures => _authFailureController.stream;
 
+  /// Emits when the service gives up connecting after exhausting
+  /// [WebSocketConfig.connectionTimeout] without reaching `connected`. Auto
+  /// reconnection has stopped; the UI should surface a real error (e.g. the
+  /// host is unreachable) rather than show an indefinite spinner.
+  Stream<void> get connectionFailed => _connectionFailedController.stream;
+
   /// Latest socket message, useful for debug tooling.
   SocketMessage? get lastMessage => _lastMessage;
 
@@ -179,6 +205,7 @@ class WebSocketService {
     _lifecycleSuspended = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _clearConnectDeadline();
     _currentParams = params;
     _reconnectAttempts = 0;
     _consecutiveReconnectFailures = 0;
@@ -198,6 +225,7 @@ class WebSocketService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _reconnectAttempts = 0;
+    _clearConnectDeadline();
     await _closeChannel(code: code, reason: reason);
     _updateState(SocketConnectionState.disconnected);
   }
@@ -230,6 +258,7 @@ class WebSocketService {
     _lifecycleSuspended = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _clearConnectDeadline();
     await _closeChannel();
     _updateState(SocketConnectionState.disconnected);
   }
@@ -242,6 +271,7 @@ class WebSocketService {
     if (_manuallyClosed || _currentParams == null) {
       return;
     }
+    _clearConnectDeadline();
     _reconnectAttempts = 0;
     _consecutiveReconnectFailures = 0;
     await _open(_currentParams!);
@@ -351,6 +381,9 @@ class WebSocketService {
       );
       return;
     }
+    // Arm the give-up deadline on the first attempt of this cycle; idempotent
+    // so it spans every retry until we connect or the budget is exhausted.
+    _startConnectDeadline();
     _updateState(
       _reconnectAttempts > 0
           ? SocketConnectionState.reconnecting
@@ -367,7 +400,20 @@ class WebSocketService {
       // declaring the connection open.  Without this, the state flips to
       // "connected" immediately (IOWebSocketChannel.connect is lazy) and
       // callers start sending messages into a channel that isn't ready yet.
-      await channel.ready;
+      // Bound the wait: a host that accepts the socket but stalls the upgrade
+      // would otherwise hang here forever, never failing into the retry loop.
+      await channel.ready.timeout(
+        _config.connectionTimeout,
+        onTimeout: () {
+          // Tear down the half-open socket — it isn't tracked in `_channel`
+          // yet, so the error path below can't close it for us.
+          unawaited(channel.sink.close());
+          throw TimeoutException(
+            'WebSocket upgrade timed out',
+            _config.connectionTimeout,
+          );
+        },
+      );
 
       // A suspend/disconnect/newer-open/dispose happened while we awaited
       // `ready` — abandon this socket instead of marking the service connected
@@ -387,6 +433,7 @@ class WebSocketService {
         cancelOnError: true,
       );
 
+      _clearConnectDeadline();
       _updateState(SocketConnectionState.connected);
       _startHeartbeat(generation);
 
@@ -529,6 +576,7 @@ class WebSocketService {
     if (_disposed ||
         _manuallyClosed ||
         _lifecycleSuspended ||
+        _gaveUp ||
         (_reconnectTimer?.isActive ?? false)) {
       return;
     }
@@ -576,6 +624,47 @@ class WebSocketService {
     final maxMs = _config.maxReconnectDelay.inMilliseconds;
     final delayMs = baseMs * pow(2, attempt - 1);
     return Duration(milliseconds: min(delayMs.toInt(), maxMs));
+  }
+
+  /// Arms the connect/reconnect give-up deadline. Idempotent: a cycle's first
+  /// attempt starts it and every subsequent retry leaves the running timer
+  /// alone, so the whole cycle shares one [WebSocketConfig.connectionTimeout]
+  /// budget.
+  void _startConnectDeadline() {
+    if (_disposed || _gaveUp || _connectDeadline != null) {
+      return;
+    }
+    _connectDeadline = Timer(_config.connectionTimeout, _onConnectDeadlineExpired);
+  }
+
+  void _clearConnectDeadline() {
+    _connectDeadline?.cancel();
+    _connectDeadline = null;
+    _gaveUp = false;
+  }
+
+  /// Fired when [WebSocketConfig.connectionTimeout] elapses without reaching
+  /// `connected`. Stops the retry loop, tears down any in-flight attempt, and
+  /// signals listeners so the UI can show a real error instead of spinning.
+  void _onConnectDeadlineExpired() {
+    _connectDeadline = null;
+    if (_disposed || _state == SocketConnectionState.connected) {
+      return;
+    }
+    _gaveUp = true;
+    _logger.w(
+      'WebSocketService: Giving up — could not connect within '
+      '${_config.connectionTimeout.inSeconds}s',
+    );
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    // Abandons any in-flight _open() (bumps the generation) and closes a
+    // half-open socket so a late `ready` can't resurrect the connection.
+    unawaited(_closeChannel());
+    _updateState(SocketConnectionState.disconnected);
+    if (!_connectionFailedController.isClosed) {
+      _connectionFailedController.add(null);
+    }
   }
 
   void _startHeartbeat(int generation) {
@@ -676,6 +765,8 @@ class WebSocketService {
     _manuallyClosed = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _connectDeadline?.cancel();
+    _connectDeadline = null;
 
     // Cancel all pending requests
     for (final pending in _pendingRequests.values) {
@@ -695,6 +786,7 @@ class WebSocketService {
     await _stateController.close();
     await _messageController.close();
     await _authFailureController.close();
+    await _connectionFailedController.close();
   }
 }
 
