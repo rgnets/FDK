@@ -617,13 +617,22 @@ class Auth extends _$Auth {
       if (connState == SocketConnectionState.connected &&
           !subscribed &&
           service.isConnected) {
-        // Only mark subscribed once the send actually happens — `isConnected`
-        // guards against the state flipping away between the event and this
-        // callback, which would otherwise throw StateError or wedge the
-        // handshake with no subscription ever sent.
-        subscribed = true;
-        _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
-        service.send(subscriptionPayload);
+        // `isConnected` guards against the state flipping away between the event
+        // and this callback. Send first and only mark subscribed on success, so
+        // a rare throw doesn't wedge the handshake with no subscription sent;
+        // fail the handshake instead of waiting out the timeout.
+        try {
+          _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
+          service.send(subscriptionPayload);
+          subscribed = true;
+        } on Object catch (e) {
+          _logger.e('AUTH_NOTIFIER: ❌ Failed to send subscription: $e');
+          if (!completer.isCompleted) {
+            completer.complete(
+              _ActionCableAuthResult.failure('Failed to send subscription: $e'),
+            );
+          }
+        }
       } else if (connState == SocketConnectionState.disconnected &&
           !completer.isCompleted) {
         _logger.e('AUTH_NOTIFIER: ❌ Connection closed before subscription confirmed');

@@ -347,6 +347,38 @@ void main() {
       expect(service.isConnected, isFalse);
     });
 
+    test('an established session keeps reconnecting past connectionTimeout',
+        () async {
+      // Regression guard for the give-up scope: once a session has connected,
+      // a later drop must NOT give up after connectionTimeout — it should keep
+      // retrying so it heals after a transient network blip.
+      final calls = _Counter();
+      final ch1 = _FakeChannel();
+      final service = buildService(
+        [ch1],
+        calls: calls,
+        connectionTimeout: const Duration(milliseconds: 80),
+      );
+      var gaveUp = false;
+      final sub = service.connectionFailed.listen((_) => gaveUp = true);
+
+      await service.connect(paramsFor());
+      expect(service.isConnected, isTrue);
+
+      // Drop the established session; every subsequent attempt fails (buildService
+      // hands back failing channels past the list).
+      ch1.emitError(Exception('drop'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      expect(gaveUp, isFalse,
+          reason: 'established session must not give up after connectionTimeout');
+      expect(calls.value, greaterThan(2),
+          reason: 'must keep retrying past the timeout window');
+
+      await sub.cancel();
+      await service.disconnect();
+    });
+
     test('a fresh connect() after giving up can succeed', () async {
       // Giving up must not permanently wedge the service: a new connect resets
       // the deadline and connects normally. A toggle decides whether the

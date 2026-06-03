@@ -146,6 +146,18 @@ class WebSocketService {
   // loop. Cleared by a fresh manual connect / lifecycle resume.
   bool _gaveUp = false;
 
+  // True once this params cycle has reached `connected` at least once. The
+  // give-up deadline only guards the INITIAL connect (an unreachable host that
+  // never connects); a previously-established session that drops keeps
+  // reconnecting indefinitely so it heals after a transient network blip.
+  // Reset by a fresh manual connect / disconnect.
+  bool _hasEverConnected = false;
+
+  // The channel for an in-flight _open() that is still awaiting `ready` (not yet
+  // promoted to _channel). Tracked so the give-up / teardown path can close it
+  // immediately instead of leaving a half-open socket until its own timeout.
+  WebSocketChannel? _pendingChannel;
+
   // Suspended by the OS app-lifecycle (background), as opposed to a manual
   // disconnect/sign-out. Resume reconnects only what lifecycle suspended.
   bool _lifecycleSuspended = false;
@@ -206,6 +218,9 @@ class WebSocketService {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _clearConnectDeadline();
+    // Fresh connect (possibly new params / a manual retry after giving up):
+    // the give-up deadline guards this attempt again until it connects.
+    _hasEverConnected = false;
     _currentParams = params;
     _reconnectAttempts = 0;
     _consecutiveReconnectFailures = 0;
@@ -226,6 +241,7 @@ class WebSocketService {
     _reconnectTimer = null;
     _reconnectAttempts = 0;
     _clearConnectDeadline();
+    _hasEverConnected = false;
     await _closeChannel(code: code, reason: reason);
     _updateState(SocketConnectionState.disconnected);
   }
@@ -395,6 +411,9 @@ class WebSocketService {
       // the ActionCable auth token as a query param on production builds.
       _logger.i('WebSocketService: Connecting to ${scrubUrlForLog(params.uri)}');
       final channel = _channelFactory(params.uri, headers: params.headers);
+      // Track the not-yet-promoted channel so the give-up / teardown path can
+      // close it immediately (it isn't in `_channel` until `ready` succeeds).
+      _pendingChannel = channel;
 
       // Wait for the actual TCP + WebSocket upgrade to complete before
       // declaring the connection open.  Without this, the state flips to
@@ -420,11 +439,13 @@ class WebSocketService {
       // on it (or wiring callbacks after disposal).
       if (_disposed || generation != _connectionGeneration) {
         _logger.d('WebSocketService: Abandoning stale connection attempt');
+        _pendingChannel = null;
         unawaited(channel.sink.close());
         return;
       }
 
       _channel = channel;
+      _pendingChannel = null;
       _subscription = channel.stream.listen(
         (data) => _handleMessage(generation, data),
         onDone: () => _handleDone(generation),
@@ -433,6 +454,7 @@ class WebSocketService {
         cancelOnError: true,
       );
 
+      _hasEverConnected = true;
       _clearConnectDeadline();
       _updateState(SocketConnectionState.connected);
       _startHeartbeat(generation);
@@ -447,6 +469,7 @@ class WebSocketService {
       // logger is intentionally the raw object — the underlying logger's
       // formatter doesn't auto-print it as text in our printer config; if
       // that changes, this scrub becomes the only guarantee.
+      _pendingChannel = null;
       _logger.e(
         'WebSocketService: Connection failed: ${scrubErrorForLog(e)}',
         stackTrace: stack,
@@ -631,7 +654,10 @@ class WebSocketService {
   /// alone, so the whole cycle shares one [WebSocketConfig.connectionTimeout]
   /// budget.
   void _startConnectDeadline() {
-    if (_disposed || _gaveUp || _connectDeadline != null) {
+    // Only guard the initial connect. Once a session has connected, reconnects
+    // after a drop retry indefinitely so the app heals after a transient blip;
+    // a never-reachable host still gives up here on the first cycle.
+    if (_disposed || _gaveUp || _hasEverConnected || _connectDeadline != null) {
       return;
     }
     _connectDeadline = Timer(_config.connectionTimeout, _onConnectDeadlineExpired);
@@ -752,10 +778,17 @@ class WebSocketService {
     // close/open work must never close or null a newer socket.
     final subscription = _subscription;
     final channel = _channel;
+    // An attempt still awaiting `ready` lives in _pendingChannel (never both set
+    // with _channel). Close it too so a half-open socket can't outlive a give-up.
+    final pending = _pendingChannel;
     _subscription = null;
     _channel = null;
+    _pendingChannel = null;
     await subscription?.cancel();
     await channel?.sink.close(code, reason);
+    if (pending != null && !identical(pending, channel)) {
+      unawaited(pending.sink.close());
+    }
   }
 
   void _updateState(SocketConnectionState newState) {
