@@ -1,3 +1,6 @@
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +18,16 @@ class MockWebSocketService extends Mock implements WebSocketService {}
 class MockWebSocketDataSyncService extends Mock
     implements WebSocketDataSyncService {}
 
-class MockInventoryReseedService extends Mock
-    implements InventoryReseedService {}
+/// No-op so `initialize()`'s REST reseed stays isolated from the real provider
+/// graph; otherwise it calls flutter_secure_storage and throws without a
+/// test binding.
+class _NoopInventoryReseed extends InventoryReseedService {
+  _NoopInventoryReseed(Ref ref) : super(ref);
+  @override
+  Future<void> triggerReseed({required String reason, bool force = false}) async {}
+  @override
+  Future<void> triggerResourceReseed(String resourceType) async {}
+}
 
 void main() {
   setUpAll(() {
@@ -61,11 +72,7 @@ void main() {
         webSocketServiceOverrideProvider.overrideWithValue(mockWebSocketService),
         webSocketDataSyncServiceOverrideProvider
             .overrideWithValue(mockDataSyncService),
-        inventoryReseedServiceOverrideProvider
-            .overrideWithValue(mockReseedService),
-        // Don't spin on the real 10s reconnect poll in unit tests.
-        initializationConnectionWaitProvider
-            .overrideWithValue(Duration.zero),
+        inventoryReseedProvider.overrideWith((ref) => _NoopInventoryReseed(ref)),
       ],
     );
   });

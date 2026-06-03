@@ -8,6 +8,7 @@ import 'package:rgnets_fdk/core/navigation/app_router.dart';
 import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/providers/deeplink_provider.dart';
 import 'package:rgnets_fdk/core/providers/repository_providers.dart';
+import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/app_initializer.dart';
 import 'package:rgnets_fdk/core/services/deeplink_service.dart';
@@ -158,16 +159,49 @@ class FDKApp extends ConsumerStatefulWidget {
   ConsumerState<FDKApp> createState() => _FDKAppState();
 }
 
-class _FDKAppState extends ConsumerState<FDKApp> {
+class _FDKAppState extends ConsumerState<FDKApp> with WidgetsBindingObserver {
   bool _servicesInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Start background refresh service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeServices();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// The app is WebSocket-only, so a backgrounded socket that the OS tears down
+  /// must be deliberately suspended and re-established. Without this the socket
+  /// silently dies during sleep and the app appears frozen on resume. Only
+  /// `paused`/`detached` count as backgrounded — `inactive`/`hidden` are
+  /// transient (Control Center, app switcher, permission prompts) and must not
+  /// drop the connection. Resume is gated on auth so a signed-out session is
+  /// never silently reconnected.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!ref.read(isAuthenticatedProvider)) {
+      return;
+    }
+    final socket = ref.read(webSocketServiceProvider);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        unawaited(socket.suspendForLifecycle());
+      case AppLifecycleState.resumed:
+        unawaited(socket.resumeForLifecycle());
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+        break;
+    }
   }
 
   /// Initialize background services (called once from initState callback)
