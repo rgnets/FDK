@@ -1,11 +1,12 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/theme/app_colors.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
 import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/providers/speed_test_providers.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/speed_test_popup.dart';
@@ -63,20 +64,38 @@ class _DeviceSpeedTestSectionState
     if (!mounted) return;
 
     final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
+    final deviceId = _getNumericDeviceId();
+    final isOnt = widget.device.type == DeviceTypes.ont;
 
-    // Try to get config from the device's existing results (uses the same test config)
-    SpeedTestConfig? config;
-    if (deviceResults.isNotEmpty) {
-      final speedTestId = deviceResults.first.speedTestId;
-      config = cacheIntegration.getSpeedTestConfigById(speedTestId);
+    // The validation speed test for this device type, matched by EXACT name
+    // (AP -> "Validation AP", ONT -> "Validation ONT"), like ATT-FE-Tool.
+    final validationConfig =
+        cacheIntegration.getValidationConfigForDeviceType(widget.device.type);
+
+    // Find the device's existing result — the row we UPDATE (we never create
+    // from a device; creation is home-page only). AP: match the device via
+    // tested_via_access_point_id AND the Validation AP config; ONT: match via
+    // tested_via_media_converter_id. There should be 0 or 1.
+    final existingResult = deviceResults.firstWhereOrNull((r) {
+      if (isOnt) {
+        return r.testedViaMediaConverterId == deviceId;
+      }
+      final apMatch = r.testedViaAccessPointId == deviceId;
+      return validationConfig != null
+          ? apMatch && r.speedTestId == validationConfig.id
+          : apMatch;
+    });
+
+    // No pre-existing result for this device's validation test -> refuse to run
+    // (per-device results are pre-created on the rXg; we only update them).
+    if (existingResult == null || existingResult.id == null) {
+      _showConfigMissingMessage();
+      return;
     }
 
-    config ??= cacheIntegration.getAdhocSpeedTestConfig();
-
-    final apId = _getNumericDeviceId();
-
-    // Get the existing result to update (if any)
-    final existingResult = deviceResults.isNotEmpty ? deviceResults.first : null;
+    // Use the existing result's own config (matches ATT's resultWithConfig.config).
+    final config =
+        cacheIntegration.getSpeedTestConfigById(existingResult.speedTestId);
 
     showDialog<void>(
       context: context,
@@ -88,7 +107,7 @@ class _DeviceSpeedTestSectionState
             if (mounted) {
               // Invalidate provider to refresh results
               ref.invalidate(
-                speedTestResultsNotifierProvider(accessPointId: apId),
+                speedTestResultsNotifierProvider(accessPointId: deviceId),
               );
             }
           },
@@ -99,6 +118,24 @@ class _DeviceSpeedTestSectionState
           },
         );
       },
+    );
+  }
+
+  /// Shown when a device has no pre-existing result to update — i.e. it isn't
+  /// assigned to its "Validation AP"/"Validation ONT" speed test on the rXg.
+  /// Mirrors ATT-FE-Tool: refuse to run rather than create an orphan result.
+  void _showConfigMissingMessage() {
+    if (!mounted) return;
+    final label = widget.device.type == DeviceTypes.ont ? 'ONT' : 'AP';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'No validation speed test is set up for this $label yet. '
+          'Speed tests are created on the home page and assigned on the rXg.',
+        ),
+        backgroundColor: AppColors.warning,
+        duration: const Duration(seconds: 4),
+      ),
     );
   }
 
@@ -125,6 +162,8 @@ class _DeviceSpeedTestSectionState
     }
 
     try {
+      final apId = _getNumericDeviceId();
+      final isOnt = widget.device.type == DeviceTypes.ont;
       final updatedResult = existingResult.copyWith(
         downloadMbps: newTestResult.downloadMbps,
         uploadMbps: newTestResult.uploadMbps,
@@ -137,9 +176,25 @@ class _DeviceSpeedTestSectionState
         iperfProtocol: newTestResult.iperfProtocol,
         initiatedAt: newTestResult.initiatedAt,
         completedAt: newTestResult.completedAt,
+        // Re-assert the device linkage and derive the room from the device so
+        // the updated result surfaces under BOTH the device and its room. The
+        // rXg only auto-fills pms_room in its dedicated submit_test_result
+        // endpoint, which we don't use; the generic update_resource path leaves
+        // the server-precreated result's pms_room_id null, so the room query
+        // (where pms_room_id) finds nothing. Setting it here fixes that. ONTs
+        // link via tested_via_media_converter_id; APs via the access-point ids.
+        pmsRoomId: widget.device.pmsRoomId ?? existingResult.pmsRoomId,
+        accessPointId: isOnt
+            ? existingResult.accessPointId
+            : (apId ?? existingResult.accessPointId),
+        testedViaAccessPointId: isOnt
+            ? existingResult.testedViaAccessPointId
+            : (apId ?? existingResult.testedViaAccessPointId),
+        testedViaMediaConverterId: isOnt
+            ? (apId ?? existingResult.testedViaMediaConverterId)
+            : existingResult.testedViaMediaConverterId,
       );
 
-      final apId = _getNumericDeviceId();
       final response = await ref
           .read(speedTestRepositoryProvider)
           .updateSpeedTestResult(updatedResult);

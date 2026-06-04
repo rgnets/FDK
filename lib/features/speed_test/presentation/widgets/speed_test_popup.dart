@@ -37,9 +37,14 @@ class _SpeedTestPopupState extends ConsumerState<SpeedTestPopup>
   void initState() {
     super.initState();
     _initializePulseAnimation();
-    // Initialize notifier (idempotent)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(speedTestRunNotifierProvider.notifier).initialize();
+      final notifier = ref.read(speedTestRunNotifierProvider.notifier);
+      // Clear any completed result left over from a previous run/popup BEFORE
+      // initializing — otherwise the build's auto-submit (status == completed)
+      // fires immediately and saves that stale result onto the speed test this
+      // popup was just opened for (e.g. after switching the room dropdown).
+      notifier.reset();
+      notifier.initialize();
     });
   }
 

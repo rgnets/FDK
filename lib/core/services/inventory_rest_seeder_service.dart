@@ -47,6 +47,9 @@ typedef SeedDeviceApply = FutureOr<void> Function(
   List<Map<String, dynamic>> items,
 );
 typedef SeedRoomApply = FutureOr<void> Function(List<Map<String, dynamic>> items);
+typedef SeedSpeedTestApply = FutureOr<void> Function(
+  List<Map<String, dynamic>> items,
+);
 
 /// Fetches the full inventory of paging-sensitive resources via REST at
 /// sign-in, then pushes the results into the existing WS cache services.
@@ -80,13 +83,13 @@ class InventoryRestSeederService {
   /// Rows requested per page. The rXg serializes one big page server-side, so a
   /// smaller page returns faster; we loop pages to still pull the full set. Kept
   /// below the rXg's server-side page-size clamp (~500) so a clamped short page
-  /// is never mistaken for the final page by the `length < _pageSize` stop test
+  /// is never mistaken for the final page by the `length < pageSize` stop test
   /// in [_fetchAllPages]. Combined with [DeviceFieldSets.seedFields] (`&only=`),
   /// this keeps each device page well inside [_timeout].
-  static const int _pageSize = 200;
+  static const int pageSize = 200;
 
   /// Hard cap on pages fetched per resource so a server that ignores `page`
-  /// (always returning the same full page) can't loop unboundedly. _pageSize *
+  /// (always returning the same full page) can't loop unboundedly. pageSize *
   /// _maxPages (50k) is far above the previous single-page 10k ceiling, so this
   /// only ever truncates inventories that the old single-GET already truncated.
   static const int _maxPages = 50;
@@ -105,6 +108,19 @@ class InventoryRestSeederService {
   ];
   static const String roomResourceType = 'pms_rooms';
 
+  /// Speed-test *configs* (the rXg `speed_tests` table). Seeded over REST like
+  /// devices/rooms because the WS layer ignores snapshots (deltas only) and
+  /// these configs are otherwise never bulk-loaded — leaving the speed-test
+  /// config cache empty at startup. Carries the iperf `target` the speed-test
+  /// fallback list needs as its backup server.
+  static const String speedTestResourceType = 'speed_tests';
+
+  /// Speed-test *results* (the rXg `speed_test_results` table). Seeded over REST
+  /// alongside the configs so the device/room speed-test screens can find the
+  /// existing per-device/per-room result to UPDATE (they read the cache, not an
+  /// on-demand fetch). Like configs, the WS layer never bulk-loads these.
+  static const String speedTestResultResourceType = 'speed_test_results';
+
   static String _normalizeSiteUrl(String url) {
     var normalized = url;
     if (normalized.startsWith('https://')) {
@@ -121,7 +137,7 @@ class InventoryRestSeederService {
   Uri _api(String resourceFile, {required int page, List<String>? fields}) =>
       Uri.parse(
         'https://$siteUrl/api/$resourceFile'
-        '?api_key=$apiKey&page_size=$_pageSize&page=$page'
+        '?api_key=$apiKey&page_size=$pageSize&page=$page'
         '${DeviceFieldSets.buildFieldsParam(fields)}',
       );
 
@@ -131,14 +147,19 @@ class InventoryRestSeederService {
   Future<SeedResult> seedAll({
     required SeedDeviceApply onDevices,
     required SeedRoomApply onRooms,
+    required SeedSpeedTestApply onSpeedTests,
+    required SeedSpeedTestApply onSpeedTestResults,
   }) async {
     LoggerService.info(
-      'Starting REST seed for ${deviceResourceTypes.length} device types + rooms',
+      'Starting REST seed for ${deviceResourceTypes.length} device types '
+      '+ rooms + speed tests + speed test results',
       tag: _tag,
     );
     final futures = <Future<SeedOutcome>>[
       for (final type in deviceResourceTypes) seedDeviceResource(type, onDevices),
       seedRoomResource(onRooms),
+      seedSpeedTestResource(onSpeedTests),
+      seedSpeedTestResultResource(onSpeedTestResults),
     ];
     final outcomes = await Future.wait(futures);
     final total = outcomes.fold<int>(0, (s, o) => s + o.itemCount);
@@ -243,8 +264,99 @@ class InventoryRestSeederService {
     );
   }
 
+  /// Seed the speed-test configs (`speed_tests`) via REST and apply them to the
+  /// speed-test cache. Public for targeted single-resource reseed. Fetched
+  /// WITHOUT an `&only=` filter — the config rows are few and small, and the
+  /// device field set does not apply to them.
+  Future<SeedOutcome> seedSpeedTestResource(
+    SeedSpeedTestApply onSpeedTests,
+  ) async {
+    final fetch =
+        await _fetchAllPages('$speedTestResourceType.json', speedTestResourceType);
+    if (fetch.items == null) {
+      return SeedOutcome(
+        resourceType: speedTestResourceType,
+        success: false,
+        itemCount: 0,
+        statusCode: fetch.statusCode,
+        error: fetch.error,
+      );
+    }
+    try {
+      await onSpeedTests(fetch.items!);
+    } on Object catch (e) {
+      LoggerService.error(
+        'Apply $speedTestResourceType to speed-test cache failed: ${_safeError(e)}',
+        tag: _tag,
+      );
+      return SeedOutcome(
+        resourceType: speedTestResourceType,
+        success: false,
+        itemCount: fetch.items!.length,
+        statusCode: fetch.statusCode,
+        error: _safeError(e),
+      );
+    }
+    LoggerService.info(
+      'Seeded $speedTestResourceType: ${fetch.items!.length} items',
+      tag: _tag,
+    );
+    return SeedOutcome(
+      resourceType: speedTestResourceType,
+      success: true,
+      itemCount: fetch.items!.length,
+      statusCode: fetch.statusCode,
+    );
+  }
+
+  /// Seed the speed-test results (`speed_test_results`) via REST and apply them
+  /// to the speed-test cache. Public for targeted single-resource reseed.
+  Future<SeedOutcome> seedSpeedTestResultResource(
+    SeedSpeedTestApply onSpeedTestResults,
+  ) async {
+    final fetch = await _fetchAllPages(
+      '$speedTestResultResourceType.json',
+      speedTestResultResourceType,
+    );
+    if (fetch.items == null) {
+      return SeedOutcome(
+        resourceType: speedTestResultResourceType,
+        success: false,
+        itemCount: 0,
+        statusCode: fetch.statusCode,
+        error: fetch.error,
+      );
+    }
+    try {
+      await onSpeedTestResults(fetch.items!);
+    } on Object catch (e) {
+      LoggerService.error(
+        'Apply $speedTestResultResourceType to speed-test cache failed: '
+        '${_safeError(e)}',
+        tag: _tag,
+      );
+      return SeedOutcome(
+        resourceType: speedTestResultResourceType,
+        success: false,
+        itemCount: fetch.items!.length,
+        statusCode: fetch.statusCode,
+        error: _safeError(e),
+      );
+    }
+    LoggerService.info(
+      'Seeded $speedTestResultResourceType: ${fetch.items!.length} items',
+      tag: _tag,
+    );
+    return SeedOutcome(
+      resourceType: speedTestResultResourceType,
+      success: true,
+      itemCount: fetch.items!.length,
+      statusCode: fetch.statusCode,
+    );
+  }
+
   /// Fetch every page of [resourceFile] (e.g. `access_points.json`) and return
-  /// the combined list. Pages are pulled sequentially with [_pageSize] rows
+  /// the combined list. Pages are pulled sequentially with [pageSize] rows
   /// each; the loop stops when a short page arrives, the advertised `count` is
   /// reached, the server stops advancing the echoed `page`, or [_maxPages] is
   /// hit. Any page-level failure fails the whole resource (rather than silently
@@ -274,7 +386,7 @@ class InventoryRestSeederService {
       // advance past 1, so stop rather than accumulate duplicates.
       final serverNotPaging =
           fetch.page != null && fetch.page != page && page > 1;
-      if (fetch.items!.length < _pageSize ||
+      if (fetch.items!.length < pageSize ||
           reachedCount ||
           serverNotPaging) {
         break;

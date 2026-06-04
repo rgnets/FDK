@@ -226,6 +226,19 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     }
 
     try {
+      // Coverage tests are room-level and must NOT be attributed to an AP.
+      // Validation AP/ONT tests keep their AP — the result's existing AP, else
+      // the room's first AP (matches ATT-FE-Tool).
+      final config = ref
+          .read(webSocketCacheIntegrationProvider)
+          .getSpeedTestConfigById(_selectedResult!.speedTestId);
+      final isCoverage =
+          config?.name?.toLowerCase().contains('coverage') ?? false;
+      final testedViaAccessPointId = isCoverage
+          ? null
+          : (_selectedResult!.testedViaAccessPointId ??
+              (widget.apIds.isNotEmpty ? widget.apIds.first : null));
+
       final updatedResult = _selectedResult!.copyWith(
         downloadMbps: newTestResult.downloadMbps,
         uploadMbps: newTestResult.uploadMbps,
@@ -239,7 +252,10 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         initiatedAt: newTestResult.initiatedAt,
         completedAt: newTestResult.completedAt,
         pmsRoomId: widget.pmsRoomId,
-        roomType: widget.roomType,
+        // Keep the selected result's own coverage location, not a single
+        // widget-level value, so switching results doesn't clobber room_type.
+        roomType: _selectedResult!.roomType ?? widget.roomType,
+        testedViaAccessPointId: testedViaAccessPointId,
       );
 
       // Update via repository (which updates cache immediately)
@@ -631,12 +647,8 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    int? testedViaAccessPointId =
-                        currentResult.testedViaAccessPointId;
-                    if (testedViaAccessPointId == null &&
-                        widget.apIds.isNotEmpty) {
-                      testedViaAccessPointId = widget.apIds.first;
-                    }
+                    // AP attribution is resolved in _submitCoverageResult
+                    // (existing AP, else the room's first AP).
                     showDialog<void>(
                       context: context,
                       barrierDismissible: false,

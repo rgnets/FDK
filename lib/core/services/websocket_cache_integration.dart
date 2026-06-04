@@ -176,6 +176,8 @@ class WebSocketCacheIntegration {
       _speedTestCacheService.getMostRecentAdhocSpeedTestResult();
   SpeedTestConfig? getSpeedTestConfigById(int? id) =>
       _speedTestCacheService.getSpeedTestConfigById(id);
+  SpeedTestConfig? getValidationConfigForDeviceType(String? deviceType) =>
+      _speedTestCacheService.getValidationConfigForDeviceType(deviceType);
   List<SpeedTestResult> getCachedSpeedTestResults() =>
       _speedTestCacheService.getCachedSpeedTestResults();
   List<SpeedTestResult> getSpeedTestResultsForDevice(String deviceId,
