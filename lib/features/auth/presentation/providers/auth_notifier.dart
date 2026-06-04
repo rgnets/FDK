@@ -18,6 +18,7 @@ import 'package:rgnets_fdk/features/auth/domain/entities/auth_status.dart';
 import 'package:rgnets_fdk/features/auth/domain/entities/user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/authenticate_user.dart';
 import 'package:rgnets_fdk/features/auth/domain/usecases/get_current_user.dart';
+import 'package:rgnets_fdk/features/auth/presentation/providers/login_connection_status.dart';
 import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_failures_aggregate_provider.dart'
     as compliance_aggregate;
 import 'package:rgnets_fdk/features/compliance/presentation/providers/compliance_providers.dart'
@@ -242,6 +243,10 @@ class Auth extends _$Auth {
         'AUTH_NOTIFIER: State after setting to authenticating: ${state.value}',
       );
     state = const AsyncValue.data(AuthStatus.authenticating());
+    // Surface live connection progress in the login overlay.
+    ref
+        .read(loginConnectionStatusProvider.notifier)
+        .set(LoginStep.validatingCredentials);
 
     try {
       // Get the use case
@@ -279,6 +284,9 @@ class Auth extends _$Auth {
             success: false,
             message: failure.message,
           );
+          ref
+              .read(loginConnectionStatusProvider.notifier)
+              .fail(failure.message);
           state = AsyncValue.data(AuthStatus.failure(failure.message));
         },
         (user) async {
@@ -312,6 +320,9 @@ class Auth extends _$Auth {
             _logger
               ..e('AUTH_NOTIFIER: WebSocket handshake failed: $e')
               ..d('AUTH_NOTIFIER: Handshake failure stacktrace: $stack');
+            ref
+                .read(loginConnectionStatusProvider.notifier)
+                .fail(_loginErrorMessage(e));
             state = AsyncValue.data(AuthStatus.failure(e.toString()));
           }
         },
@@ -322,10 +333,18 @@ class Auth extends _$Auth {
         'AUTH_NOTIFIER: ⚠️ Exception during authentication: ${scrubErrorForLog(e)}\n$stack',
       );
       // Exception handled by logger
+      ref.read(loginConnectionStatusProvider.notifier).fail(_loginErrorMessage(e));
       state = AsyncValue.data(AuthStatus.failure(e.toString()));
     } finally {
       _isAuthenticating = false;
     }
+  }
+
+  /// Strip the `Exception: ` prefix Dart adds to `Exception(msg).toString()` so
+  /// the login overlay shows a clean, user-facing reason.
+  static String _loginErrorMessage(Object e) {
+    final text = e.toString();
+    return text.startsWith('Exception: ') ? text.substring(11) : text;
   }
 
   Future<void> signOut() async {
@@ -584,6 +603,9 @@ class Auth extends _$Auth {
       if (message.type == 'confirm_subscription' &&
           _identifierMatches(message, identifier)) {
         _logger.i('AUTH_NOTIFIER: ✅ Subscription confirmed!');
+        ref
+            .read(loginConnectionStatusProvider.notifier)
+            .set(LoginStep.connected);
         if (!completer.isCompleted) {
           completer.complete(const _ActionCableAuthResult.success());
         }
@@ -630,6 +652,9 @@ class Auth extends _$Auth {
           _logger.d('AUTH_NOTIFIER: Connected — sending subscription');
           service.send(subscriptionPayload);
           subscribed = true;
+          ref
+              .read(loginConnectionStatusProvider.notifier)
+              .set(LoginStep.authorizing);
         } on Object catch (e) {
           _logger.e('AUTH_NOTIFIER: ❌ Failed to send subscription: $e');
           if (!completer.isCompleted) {
@@ -673,6 +698,7 @@ class Auth extends _$Auth {
 
     try {
       _logger.d('AUTH_NOTIFIER: Calling service.connect()...');
+      ref.read(loginConnectionStatusProvider.notifier).set(LoginStep.connecting);
       // Outer safety net only. connect() returns after the first attempt, and
       // the service's own connectionTimeout drives the give-up + connectionFailed
       // signal — so keep this strictly longer than connectionTimeout so that

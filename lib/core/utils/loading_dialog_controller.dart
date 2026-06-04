@@ -55,7 +55,7 @@ class LoadingDialogController {
   /// The dialog is shown with:
   /// - `useRootNavigator: true` to ensure consistent dismiss behavior
   /// - `barrierDismissible: false` to prevent accidental dismissal
-  void show(BuildContext context) {
+  void show(BuildContext context, {Widget? child}) {
     if (_isShowing) {
       return; // Prevent double-showing
     }
@@ -68,9 +68,9 @@ class LoadingDialogController {
       context: context,
       barrierDismissible: false,
       useRootNavigator: true, // KEY: Use root navigator for both show and dismiss
-      builder: (context) => const PopScope(
+      builder: (context) => PopScope(
         canPop: false, // Prevent back button dismissal
-        child: Center(child: LoadingIndicator()),
+        child: child ?? const Center(child: LoadingIndicator()),
       ),
     );
   }

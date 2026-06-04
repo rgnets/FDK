@@ -8,7 +8,9 @@ import 'package:rgnets_fdk/core/providers/core_providers.dart';
 import 'package:rgnets_fdk/core/utils/loading_dialog_controller.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/auth/presentation/providers/auth_notifier.dart';
+import 'package:rgnets_fdk/features/auth/presentation/providers/login_connection_status.dart';
 import 'package:rgnets_fdk/features/auth/presentation/widgets/credential_approval_sheet.dart';
+import 'package:rgnets_fdk/features/auth/presentation/widgets/login_connection_dialog.dart';
 
 /// Authentication screen for QR code scanning
 class AuthScreen extends ConsumerStatefulWidget {
@@ -241,8 +243,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         return;
       }
 
-      // Show loading dialog using the controller (ensures consistent show/dismiss)
-      _loadingController.show(context);
+      // Reset the connection-status checklist, then show the live overlay that
+      // tracks the handshake (validating → connecting → authorizing → connected).
+      ref.read(loginConnectionStatusProvider.notifier).reset();
+      _loadingController.show(context, child: const LoginConnectionDialog());
       logger.d('AUTH_SCREEN: Loading dialog shown');
 
       if (!mounted) {
