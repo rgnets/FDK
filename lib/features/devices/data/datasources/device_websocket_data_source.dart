@@ -130,6 +130,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         timeout: const Duration(seconds: 15),
       );
 
+      _throwOnErrorResponse(response, 'getDevice');
+
       final deviceData = _extractDeviceData(response.payload, response.raw);
       if (deviceData != null) {
         return _mapToDeviceModel(resourceType, deviceData);
@@ -218,6 +220,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         timeout: const Duration(seconds: 15),
       );
 
+      _throwOnErrorResponse(response, 'updateDevice');
+
       final deviceData = _extractDeviceData(response.payload, response.raw);
       if (deviceData != null) {
         return _mapToDeviceModel(resourceType, deviceData);
@@ -252,6 +256,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         },
         timeout: const Duration(seconds: 15),
       );
+
+      _throwOnErrorResponse(response, 'updateDeviceNote');
 
       final deviceData = _extractDeviceData(response.payload, response.raw);
       if (deviceData != null) {
@@ -454,6 +460,39 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
     return deviceId;
   }
 
+  /// Throws if the server replied with an error frame (`action: 'error'`) or
+  /// an HTTP-style `status >= 400`. Without this guard an error response — which
+  /// carries no `id` and no `data` map — slips past [_extractDeviceData] as
+  /// `null` and the caller silently reports success. Mirrors the error contract
+  /// handled in DeviceRegistrationService: message comes from `payload.error`
+  /// first, then `payload.data.message` / `payload.data.error`.
+  void _throwOnErrorResponse(SocketMessage response, String action) {
+    final payload = response.payload;
+    final status = (payload['status'] as num?)?.toInt() ?? 0;
+    if (response.type != 'error' && status < 400) return;
+
+    final message =
+        _extractServerError(payload) ?? '$action failed (status $status)';
+    _logger.e(
+      'DeviceWebSocketDataSource: $action error status=$status message=$message',
+    );
+    throw Exception(message);
+  }
+
+  String? _extractServerError(Map<String, dynamic> payload) {
+    final error = payload['error'];
+    if (error is String && error.isNotEmpty) return error;
+
+    final data = payload['data'];
+    if (data is Map) {
+      final message = data['message'];
+      if (message is String && message.isNotEmpty) return message;
+      final dataError = data['error'];
+      if (dataError is String && dataError.isNotEmpty) return dataError;
+    }
+    return null;
+  }
+
   Map<String, dynamic>? _extractDeviceData(
     Map<String, dynamic> payload,
     Map<String, dynamic>? raw,
@@ -511,6 +550,8 @@ class DeviceWebSocketDataSource implements DeviceDataSource {
         },
         timeout: const Duration(seconds: 30),
       );
+
+      _throwOnErrorResponse(response, 'uploadDeviceImages');
 
       final deviceData = _extractDeviceData(response.payload, response.raw);
       if (deviceData != null) {
