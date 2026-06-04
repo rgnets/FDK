@@ -67,6 +67,13 @@ class _DeviceSpeedTestSectionState
     final deviceId = _getNumericDeviceId();
     final isOnt = widget.device.type == DeviceTypes.ont;
 
+    // Running Validation ONT tests from the app is disabled. Guard here too so
+    // no path (button, retry) can kick one off.
+    if (isOnt) {
+      _showOntDisabledMessage();
+      return;
+    }
+
     // The validation speed test for this device type, matched by EXACT name
     // (AP -> "Validation AP", ONT -> "Validation ONT"), like ATT-FE-Tool.
     final validationConfig =
@@ -135,6 +142,19 @@ class _DeviceSpeedTestSectionState
         ),
         backgroundColor: AppColors.warning,
         duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Shown when someone tries to run a Validation ONT test — running ONT
+  /// validation from the app is disabled.
+  void _showOntDisabledMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Running ONT validation tests is disabled.'),
+        backgroundColor: AppColors.warning,
+        duration: Duration(seconds: 3),
       ),
     );
   }
@@ -625,8 +645,27 @@ class _DeviceSpeedTestSectionState
               ),
             ],
 
-            // Run test button - hide if result is not applicable
-            if (latestResult == null || latestResult.isApplicable)
+            // Run test button. Running Validation ONT from the app is disabled,
+            // so ONTs show a disabled note instead of the button. APs keep the
+            // button (hidden when the latest result isn't applicable).
+            if (widget.device.type == DeviceTypes.ont)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.block, size: 16, color: AppColors.gray500),
+                    const SizedBox(width: 8),
+                    Text(
+                      "ONT validation can't be run from the app",
+                      style: TextStyle(fontSize: 13, color: AppColors.gray500),
+                    ),
+                  ],
+                ),
+              )
+            else if (latestResult == null || latestResult.isApplicable)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

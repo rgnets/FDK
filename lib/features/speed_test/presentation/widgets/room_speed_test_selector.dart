@@ -232,6 +232,10 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
       final config = ref
           .read(webSocketCacheIntegrationProvider)
           .getSpeedTestConfigById(_selectedResult!.speedTestId);
+      // Running Validation ONT from the app is disabled — never submit one.
+      if (config?.name?.toLowerCase() == 'validation ont') {
+        return;
+      }
       final isCoverage =
           config?.name?.toLowerCase().contains('coverage') ?? false;
       final testedViaAccessPointId = isCoverage
@@ -640,8 +644,34 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
             const SizedBox(height: 16),
             _buildResultDetails(currentResult, selectedConfig),
 
+            // Running Validation ONT from the app is disabled — show a note
+            // instead of the run button for that test.
+            if (selectedConfig.name?.toLowerCase() == 'validation ont') ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.block, size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        "ONT validation can't be run from the app",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ]
             // Run test button - only show if result is applicable
-            if (currentResult.isApplicable) ...[
+            else if (currentResult.isApplicable) ...[
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
