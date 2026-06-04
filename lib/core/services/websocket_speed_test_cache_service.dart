@@ -79,6 +79,25 @@ class WebSocketSpeedTestCacheService {
     return configs.first;
   }
 
+  /// Find the "validation" speed-test config that matches a device type, by
+  /// EXACT name (AP -> "Validation AP", ONT -> "Validation ONT"), matching
+  /// ATT-FE-Tool's selection. Returns null if no matching config is cached.
+  /// PMS-room "Coverage" tests are resolved separately by the room selector.
+  SpeedTestConfig? getValidationConfigForDeviceType(String? deviceType) {
+    final configs = getCachedSpeedTestConfigs();
+    if (configs.isEmpty) return null;
+
+    if (deviceType == DeviceTypes.ont) {
+      return configs
+          .firstWhereOrNull((c) => c.name?.toLowerCase() == 'validation ont');
+    }
+    if (deviceType == DeviceTypes.accessPoint) {
+      return configs
+          .firstWhereOrNull((c) => c.name?.toLowerCase() == 'validation ap');
+    }
+    return null;
+  }
+
   SpeedTestResult? getMostRecentAdhocSpeedTestResult() {
     final results = getCachedSpeedTestResults();
     if (results.isEmpty) return null;

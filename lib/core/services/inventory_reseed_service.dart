@@ -191,6 +191,22 @@ class InventoryReseedService {
           wsci.roomCacheService.applySnapshot(items);
           await dataSync.applyRestRoomSnapshot(items);
         });
+      } else if (resourceType ==
+          InventoryRestSeederService.speedTestResourceType) {
+        await seeder.seedSpeedTestResource((items) async {
+          if (await _staleReason(creds) != null) {
+            return;
+          }
+          wsci.speedTestCacheService.applySnapshot(items, isConfig: true);
+        });
+      } else if (resourceType ==
+          InventoryRestSeederService.speedTestResultResourceType) {
+        await seeder.seedSpeedTestResultResource((items) async {
+          if (await _staleReason(creds) != null) {
+            return;
+          }
+          wsci.speedTestCacheService.applySnapshot(items, isConfig: false);
+        });
       } else {
         await seeder.seedDeviceResource(resourceType, (type, items) async {
           if (await _staleReason(creds) != null) {
@@ -263,6 +279,42 @@ class InventoryReseedService {
           _emitProgress(
             ReseedProgress(
               resourceType: InventoryRestSeederService.roomResourceType,
+              status: ReseedResourceStatus.done,
+              count: items.length,
+            ),
+          );
+        },
+        onSpeedTests: (items) async {
+          final stale = await _staleReason(creds);
+          if (stale != null) {
+            LoggerService.warning(
+                'Dropping stale reseed for speed_tests — $stale', tag: _tag);
+            return;
+          }
+          // Speed-test configs live only in the in-memory WS cache (no typed
+          // SQLite fallback), so applying the snapshot there is the whole job.
+          wsci.speedTestCacheService.applySnapshot(items, isConfig: true);
+          _emitProgress(
+            ReseedProgress(
+              resourceType: InventoryRestSeederService.speedTestResourceType,
+              status: ReseedResourceStatus.done,
+              count: items.length,
+            ),
+          );
+        },
+        onSpeedTestResults: (items) async {
+          final stale = await _staleReason(creds);
+          if (stale != null) {
+            LoggerService.warning(
+                'Dropping stale reseed for speed_test_results — $stale',
+                tag: _tag);
+            return;
+          }
+          wsci.speedTestCacheService.applySnapshot(items, isConfig: false);
+          _emitProgress(
+            ReseedProgress(
+              resourceType:
+                  InventoryRestSeederService.speedTestResultResourceType,
               status: ReseedResourceStatus.done,
               count: items.length,
             ),

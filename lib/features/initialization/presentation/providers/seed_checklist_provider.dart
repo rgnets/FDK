@@ -30,14 +30,16 @@ class SeedItem {
 }
 
 /// Canonical resource types shown in the loader, in display order. AP first
-/// (the UI binds device counts off it), then switches/ONTs/WLAN, rooms last —
-/// matching [InventoryRestSeederService]'s seed set.
+/// (the UI binds device counts off it), then switches/ONTs/WLAN, rooms, then
+/// speed tests + results last — matching [InventoryRestSeederService]'s seed set.
 const Map<String, String> _seedItemLabels = {
   'access_points': 'Access Points',
   'switch_devices': 'Switches',
   'media_converters': 'ONTs',
   'wlan_devices': 'WLAN Controllers',
   'pms_rooms': 'Rooms',
+  'speed_tests': 'Speed Tests',
+  'speed_test_results': 'Speed Test Results',
 };
 
 /// Tracks the per-resource progress of the startup inventory seed so the

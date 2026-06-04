@@ -23,6 +23,8 @@ void main() {
       await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(hits, isNotEmpty);
@@ -31,12 +33,14 @@ void main() {
         expect(uri.host, 'example.netlab.ninja');
         expect(uri.path, startsWith('/api/'));
         expect(uri.queryParameters['api_key'], 'k');
-        expect(uri.queryParameters['page_size'], '1000');
+        expect(uri.queryParameters['page_size'],
+            InventoryRestSeederService.pageSize.toString());
         expect(uri.queryParameters['page'], '1');
       }
     });
 
-    test('seedAll fires GETs for AP + switch + MC + rooms (parallel)', () async {
+    test('seedAll fires GETs for AP + switch + MC + WLAN + rooms + speed_tests '
+        '+ speed_test_results (parallel)', () async {
       final hits = <String>[];
       final client = MockClient((http.Request req) async {
         hits.add(req.url.path);
@@ -52,6 +56,8 @@ void main() {
       await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(hits, containsAll(<String>[
@@ -60,8 +66,10 @@ void main() {
         '/api/media_converters.json',
         '/api/wlan_devices.json',
         '/api/pms_rooms.json',
+        '/api/speed_tests.json',
+        '/api/speed_test_results.json',
       ]));
-      expect(hits.length, 5);
+      expect(hits.length, 7);
     });
 
     test('per-resource success is independent (one 500 does not block others)',
@@ -90,10 +98,12 @@ void main() {
         onRooms: (items) {
           roomCalls = items.length;
         },
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(result.allSucceeded, isFalse);
-      expect(result.outcomes.where((o) => o.success).length, 4);
+      expect(result.outcomes.where((o) => o.success).length, 6);
       final failed = result.outcomes
           .firstWhere((o) => o.resourceType == 'switch_devices');
       expect(failed.success, isFalse);
@@ -131,6 +141,8 @@ void main() {
           if (type == 'access_points') captured = items;
         },
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(captured, isNotNull);
@@ -164,6 +176,8 @@ void main() {
         onRooms: (items) {
           captured = items;
         },
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(captured, isNotNull);
@@ -196,6 +210,8 @@ void main() {
           if (type == 'access_points') captured = items;
         },
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(captured!.length, 1);
@@ -233,6 +249,8 @@ void main() {
           if (type == 'access_points') captured = items;
         },
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(apPages, [1, 2]);
@@ -264,7 +282,8 @@ void main() {
         client: client,
       );
 
-      await seeder.seedAll(onDevices: (_, __) {}, onRooms: (_) {});
+      await seeder.seedAll(
+          onDevices: (_, __) {}, onRooms: (_) {}, onSpeedTests: (_) {}, onSpeedTestResults: (_) {});
 
       expect(apPages, [1]);
     });
@@ -293,7 +312,8 @@ void main() {
         client: client,
       );
 
-      await seeder.seedAll(onDevices: (_, __) {}, onRooms: (_) {});
+      await seeder.seedAll(
+          onDevices: (_, __) {}, onRooms: (_) {}, onSpeedTests: (_) {}, onSpeedTestResults: (_) {});
 
       // Page 1 then page 2 (which echoes page 1 → stop). Far below the cap.
       expect(apPages, [1, 2]);
@@ -333,6 +353,8 @@ void main() {
           if (type == 'access_points') applied = true;
         },
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(applied, isFalse);
@@ -357,9 +379,11 @@ void main() {
       final result = await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
-      expect(result.outcomes, hasLength(5));
+      expect(result.outcomes, hasLength(7));
       expect(result.outcomes.every((o) => o.success), isFalse);
       expect(result.outcomes.every((o) => o.itemCount == 0), isTrue);
     });
@@ -386,6 +410,8 @@ void main() {
       final result = await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       for (final outcome in result.outcomes) {
@@ -412,6 +438,8 @@ void main() {
         final result = await seeder.seedAll(
           onDevices: (_, __) {},
           onRooms: (_) {},
+          onSpeedTests: (_) {},
+          onSpeedTestResults: (_) {},
         );
 
         expect(result.outcomes.every((o) => !o.success), isTrue,
@@ -432,6 +460,8 @@ void main() {
       final result = await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(result.outcomes.every((o) => !o.success), isTrue);
@@ -451,6 +481,8 @@ void main() {
       final result = await seeder.seedAll(
         onDevices: (_, __) {},
         onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(result.outcomes.every((o) => !o.success), isTrue);
@@ -462,9 +494,13 @@ void main() {
         final path = req.url.path;
         if (path == '/api/access_points.json') {
           return http.Response(
-            jsonEncode([
-              for (var i = 1; i <= 379; i++) {'id': i, 'name': 'AP$i'},
-            ]),
+            jsonEncode({
+              'results': [
+                for (var i = 1; i <= 379; i++) {'id': i, 'name': 'AP$i'},
+              ],
+              'count': 379,
+              'page': 1,
+            }),
             200,
           );
         }
@@ -479,17 +515,25 @@ void main() {
         }
         if (path == '/api/media_converters.json') {
           return http.Response(
-            jsonEncode([
-              for (var i = 1; i <= 386; i++) {'id': i, 'name': 'MC$i'},
-            ]),
+            jsonEncode({
+              'results': [
+                for (var i = 1; i <= 386; i++) {'id': i, 'name': 'MC$i'},
+              ],
+              'count': 386,
+              'page': 1,
+            }),
             200,
           );
         }
         if (path == '/api/pms_rooms.json') {
           return http.Response(
-            jsonEncode([
-              for (var i = 1; i <= 396; i++) {'id': i, 'room': 'Room$i'},
-            ]),
+            jsonEncode({
+              'results': [
+                for (var i = 1; i <= 396; i++) {'id': i, 'room': 'Room$i'},
+              ],
+              'count': 396,
+              'page': 1,
+            }),
             200,
           );
         }
@@ -507,6 +551,8 @@ void main() {
       final result = await seeder.seedAll(
         onDevices: (type, items) => devicePerType[type] = items.length,
         onRooms: (items) => roomCount = items.length,
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
       );
 
       expect(result.allSucceeded, isTrue);
@@ -515,6 +561,72 @@ void main() {
       expect(devicePerType['switch_devices'], 2);
       expect(devicePerType['media_converters'], 386);
       expect(roomCount, 396);
+    });
+
+    test('seeds speed_tests configs and applies them via onSpeedTests',
+        () async {
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/speed_tests.json') {
+          return http.Response(
+            jsonEncode([
+              {'id': 7, 'name': 'Lobby iperf', 'target': '10.0.0.1'},
+              {'id': 8, 'name': 'Pool iperf', 'target': '10.0.0.2'},
+            ]),
+            200,
+          );
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      List<Map<String, dynamic>>? captured;
+      final result = await seeder.seedAll(
+        onDevices: (_, __) {},
+        onRooms: (_) {},
+        onSpeedTests: (items) => captured = items,
+        onSpeedTestResults: (_) {},
+      );
+
+      expect(captured, isNotNull);
+      expect(captured!.length, 2);
+      // The `target` (backup iperf server) must survive the seed unmodified.
+      expect(captured!.first['target'], '10.0.0.1');
+      final outcome = result.outcomes
+          .firstWhere((o) => o.resourceType == 'speed_tests');
+      expect(outcome.success, isTrue);
+      expect(outcome.itemCount, 2);
+    });
+
+    test('speed_tests is seeded WITHOUT an &only= field filter', () async {
+      Uri? speedTestUri;
+      final client = MockClient((http.Request req) async {
+        if (req.url.path == '/api/speed_tests.json') {
+          speedTestUri = req.url;
+        }
+        return http.Response('[]', 200);
+      });
+
+      final seeder = InventoryRestSeederService(
+        siteUrl: 'rxg.test',
+        apiKey: 'k',
+        client: client,
+      );
+
+      await seeder.seedAll(
+        onDevices: (_, __) {},
+        onRooms: (_) {},
+        onSpeedTests: (_) {},
+        onSpeedTestResults: (_) {},
+      );
+
+      expect(speedTestUri, isNotNull);
+      expect(speedTestUri!.queryParameters.containsKey('only'), isFalse,
+          reason: 'config rows are small; no slim field set applies to them');
     });
   });
 }
