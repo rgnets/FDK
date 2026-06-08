@@ -121,3 +121,12 @@ class RoomDataProcessor {
     return deviceIds.toList();
   }
 }
+
+/// A room is hidden from the view when it has no devices of any kind.
+///
+/// Linked sub-rooms (`101-A`/`-B`/`-C` under `101`) carry no devices, while
+/// every real room does — so "no devices" is the device-field-tool-appropriate
+/// signal for dropping them. Reuses [RoomDataProcessor.extractDeviceIds] so this
+/// stays in lock-step with how the room view counts devices.
+bool roomHasNoDevices(Map<String, dynamic> roomData) =>
+    RoomDataProcessor().extractDeviceIds(roomData).isEmpty;

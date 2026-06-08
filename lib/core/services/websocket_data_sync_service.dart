@@ -386,13 +386,26 @@ class WebSocketDataSyncService {
     required String? resourceType,
   }) {
     final models = <RoomModel>[];
+    var deviceLessCount = 0;
     for (final item in items) {
+      final RoomModel model;
       try {
-        models.add(_roomProcessor.buildRoomModel(item));
+        model = _roomProcessor.buildRoomModel(item);
       } on Exception catch (e) {
         _logger.w('WebSocketDataSync: Failed to parse room: $e');
+        continue;
       }
+      // Hide rooms with no devices (linked sub-rooms carry no devices).
+      if (model.deviceIds == null || model.deviceIds!.isEmpty) {
+        deviceLessCount++;
+        continue;
+      }
+      models.add(model);
     }
+    _logger.i(
+      'WebSocketDataSync: room snapshot ${items.length} total, '
+      '$deviceLessCount device-less filtered, ${models.length} kept',
+    );
 
     if (resourceType == null) {
       _roomSnapshots

@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:rgnets_fdk/core/services/room_data_processor.dart';
+
 /// Manages room caches synced via WebSocket.
 class WebSocketRoomCacheService {
   WebSocketRoomCacheService({
@@ -44,19 +46,29 @@ class WebSocketRoomCacheService {
   // ---------------------------------------------------------------------------
 
   void applySnapshot(List<Map<String, dynamic>> items) {
+    // Hide rooms with no devices of any kind: linked sub-rooms
+    // (`101-A`/`-B`/`-C`) carry no devices while real rooms do.
+    final roomsWithDevices =
+        items.where((item) => !roomHasNoDevices(item)).toList();
     _roomCache
       ..clear()
-      ..addAll(items);
+      ..addAll(roomsWithDevices);
     _onDataChanged?.call();
 
     for (final callback in _roomDataCallbacks) {
-      callback(items);
+      callback(roomsWithDevices);
     }
   }
 
   void applyUpsert(Map<String, dynamic> data) {
     final id = data['id'];
     if (id == null) return;
+
+    // Don't add device-less rooms to the view. We deliberately do NOT delete an
+    // existing entry here: a partial room upsert may omit the device arrays, and
+    // dropping a real room on a partial payload would be worse than a stale
+    // entry that the next full snapshot corrects.
+    if (roomHasNoDevices(data)) return;
 
     final index = _roomCache.indexWhere((item) => item['id'] == id);
     if (index >= 0) {
