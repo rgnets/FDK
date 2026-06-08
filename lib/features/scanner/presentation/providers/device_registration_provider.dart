@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/core/providers/websocket_providers.dart';
 import 'package:rgnets_fdk/core/providers/websocket_sync_providers.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/domain/constants/device_types.dart';
 import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/scanner/data/services/device_registration_service.dart';
@@ -691,7 +692,7 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
         // up, the registration actually succeeded.
         final isTimeout = outcome.status == 0 &&
             (outcome.errorMessage?.toLowerCase().contains('timed out') ?? false);
-        if (isTimeout && await _waitForDeviceInCache(mac, deviceType)) {
+        if (isTimeout && await _findRegisteredDevice(mac, deviceType) != null) {
           LoggerService.warning(
             'DeviceRegistration: Backend ack lost but device materialized '
             'in cache (MAC=$mac) — treating as success',
@@ -782,17 +783,36 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     });
   }
 
-  /// Polls the devices snapshot for up to ~6s looking for a device with
-  /// [mac]. Used as a soft-acknowledgment when the backend's reply was
-  /// lost but the subscription stream may still deliver the new record
-  /// (the rXg-side gRPC DeadlineExceeded case).
-  Future<bool> _waitForDeviceInCache(String mac, DeviceType deviceType) async {
+  /// Canonical (type-prefixed) domain id of the just-registered device, for
+  /// routing straight to its detail screen. Null if not located in time.
+  Future<String?> locateRegisteredDeviceId({
+    required String mac,
+    required DeviceType deviceType,
+  }) async {
+    final device = await _findRegisteredDevice(mac, deviceType);
+    return device?.id;
+  }
+
+  /// Polls the devices snapshot ~6s for a device of [deviceType] with [mac],
+  /// returning the match or null. Serves both lost-ack recovery (rXg-side gRPC
+  /// DeadlineExceeded) and post-registration navigation.
+  Future<Device?> _findRegisteredDevice(
+    String mac,
+    DeviceType deviceType,
+  ) async {
     // Kick the snapshot refresh now instead of the 2s delayed path used
     // on the happy flow.
     final resourceType = switch (deviceType) {
       DeviceType.accessPoint => 'access_points',
       DeviceType.ont => 'media_converters',
       DeviceType.switchDevice => 'switch_devices',
+    };
+    // Constrain matches to the registered type so a stale duplicate-MAC row of
+    // another type can't resolve to the wrong device.
+    final expectedType = switch (deviceType) {
+      DeviceType.accessPoint => DeviceTypes.accessPoint,
+      DeviceType.ont => DeviceTypes.ont,
+      DeviceType.switchDevice => DeviceTypes.networkSwitch,
     };
     try {
       ref
@@ -806,15 +826,19 @@ class DeviceRegistrationNotifier extends _$DeviceRegistrationNotifier {
     final deadline = DateTime.now().add(const Duration(seconds: 6));
     while (DateTime.now().isBefore(deadline)) {
       final devices = ref.read(devicesNotifierProvider).valueOrNull;
-      if (devices != null && devices.any((d) {
-        final candidate = d.macAddress;
-        return candidate != null && _macKey(candidate) == target;
-      })) {
-        return true;
+      if (devices != null) {
+        for (final device in devices) {
+          final candidate = device.macAddress;
+          if (device.type == expectedType &&
+              candidate != null &&
+              _macKey(candidate) == target) {
+            return device;
+          }
+        }
       }
       await Future<void>.delayed(const Duration(milliseconds: 400));
     }
-    return false;
+    return null;
   }
 
   static String _macKey(String mac) =>

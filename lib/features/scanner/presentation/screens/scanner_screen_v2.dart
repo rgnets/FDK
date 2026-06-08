@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:rgnets_fdk/core/services/logger_service.dart';
@@ -10,7 +11,9 @@ import 'package:rgnets_fdk/core/utils/foldable_camera_wrapper.dart';
 import 'package:rgnets_fdk/core/widgets/widgets.dart';
 import 'package:rgnets_fdk/features/scanner/domain/entities/scanner_state.dart';
 import 'package:rgnets_fdk/features/scanner/domain/usecases/process_auth_qr.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/providers/device_registration_provider.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/providers/scanner_notifier_v2.dart';
+import 'package:rgnets_fdk/features/scanner/presentation/utils/scanner_utils.dart';
 import 'package:rgnets_fdk/features/scanner/presentation/widgets/scanner_registration_popup.dart';
 
 /// Scanner screen using the new V2 notifier with auto-detection support.
@@ -50,9 +53,14 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
   // Serializes camera start/stop so a fast lock/unlock cannot overlap them.
   Future<void> _cameraLifecycleOp = Future<void>.value();
 
+  // Cached keep-alive notifier so dispose() (and the post-registration
+  // callback) can touch scanner state without ref after the element is gone.
+  late final ScannerNotifierV2 _scannerNotifier;
+
   @override
   void initState() {
     super.initState();
+    _scannerNotifier = ref.read(scannerNotifierV2Provider.notifier);
     WidgetsBinding.instance.addObserver(this);
     _initializeScanner();
     _initializeAnimations();
@@ -163,7 +171,8 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
     _controller = null;
     _pulseController.dispose();
     // Reset any partial scan state so re-entering the scanner starts fresh.
-    ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+    // Use the cached notifier — ref is unusable once the element is disposed.
+    _scannerNotifier.clearScanData();
     super.dispose();
   }
 
@@ -340,25 +349,47 @@ class _ScannerScreenV2State extends ConsumerState<ScannerScreenV2>
       return;
     }
 
+    // keep-alive registration notifier, safe to use after the sheet closes
+    // even if the scanner was disposed mid-close.
+    final registrationNotifier =
+        ref.read(deviceRegistrationNotifierProvider.notifier);
+
     // Set flag BEFORE showing popup to prevent race conditions
-    ref.read(scannerNotifierV2Provider.notifier).showRegistrationPopup();
+    _scannerNotifier.showRegistrationPopup();
 
     LoggerService.debug('Showing registration popup', tag: _tag);
 
-    ScannerRegistrationPopup.show(context).then((result) {
-      // Always clear the popup flag so the Register Device button stays
-      // responsive even if the user dismisses (swipe / back / cancel)
-      // without completing registration.
-      ref.read(scannerNotifierV2Provider.notifier).hideRegistrationPopup();
-      if (result == true) {
-        // Registration successful - reset for next scan
-        ref.read(scannerNotifierV2Provider.notifier).clearScanData();
+    ScannerRegistrationPopup.show(context).then((result) async {
+      // Clear the popup flag so the Register Device button stays responsive.
+      _scannerNotifier.hideRegistrationPopup();
+
+      String? deviceRouteId;
+      if (result == true && mounted) {
+        // Capture scan context before clearing, then resolve the canonical id
+        // of the device we just created/modified to route straight to it.
+        final scannerState = ref.read(scannerNotifierV2Provider);
+        final registeredMac = scannerState.scanData.mac;
+        final registeredType = ScannerUtils.toDeviceType(scannerState.scanMode);
+        _scannerNotifier.clearScanData();
+        deviceRouteId = await registrationNotifier.locateRegisteredDeviceId(
+          mac: registeredMac,
+          deviceType: registeredType,
+        );
+      } else if (result == true) {
+        // Scanner already torn down — reset scan state for the next entry.
+        _scannerNotifier.clearScanData();
       }
-      // Always reset lastScannedCode so same barcode can be re-scanned if needed
-      if (mounted) {
-        setState(() {
-          _lastScannedCode = null;
-        });
+
+      if (!mounted) return;
+      // Reset lastScannedCode so the same barcode can be re-scanned if needed.
+      setState(() {
+        _lastScannedCode = null;
+      });
+
+      if (deviceRouteId != null) {
+        // go (not push): Back lands on the Devices list and the scanner tears
+        // down cleanly (camera disposed).
+        context.go('/devices/$deviceRouteId');
       }
     });
   }
