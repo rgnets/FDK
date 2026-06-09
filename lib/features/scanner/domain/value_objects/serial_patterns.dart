@@ -22,6 +22,7 @@ class SerialPatterns {
     'FNS',
     'FNK',
     'FNH',
+    'FEK',
     'CYR',
   ];
 
