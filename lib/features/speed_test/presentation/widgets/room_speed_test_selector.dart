@@ -48,6 +48,11 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
   String? _errorMessage;
   SpeedTestResult? _selectedResult;
 
+  /// Access-point id -> display name, so each per-AP Validation result can be
+  /// labeled by its AP (a room has multiple APs whose rows are otherwise
+  /// indistinguishable). Rebuilt on each load from the device cache.
+  Map<int, String> _apNames = {};
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +69,15 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
 
       final cacheIntegration = ref.read(webSocketCacheIntegrationProvider);
       final allResults = cacheIntegration.getCachedSpeedTestResults();
+
+      // Build an AP id -> name map so per-AP Validation results show which AP
+      // they belong to (device ids are prefixed `ap_<id>`).
+      _apNames = {
+        for (final device in cacheIntegration.getAllCachedDeviceModels())
+          if (device.id.startsWith('ap_'))
+            if (int.tryParse(device.id.substring(3)) case final int apId)
+              apId: device.name,
+      };
 
       if (allResults.isEmpty) {
         LoggerService.warning(
@@ -200,6 +214,39 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     return result.passed || (downloadPass && uploadPass);
   }
 
+  /// Human label for a result row. Coverage tests keep their room location;
+  /// Validation AP/ONT rows are labeled by the AP/ONT they ran on (resolved
+  /// from [_apNames]) so multiple devices in the same room are distinguishable
+  /// — without this they all read "Result #id" and look identical.
+  String _labelForResult(SpeedTestResult result, SpeedTestConfig config) {
+    final name = config.name?.toLowerCase() ?? '';
+    final roomType = result.roomType;
+    final hasRoomType = roomType != null && roomType.isNotEmpty;
+
+    if (name.contains('coverage')) {
+      return hasRoomType ? roomType : 'Coverage';
+    }
+
+    final apId = result.testedViaAccessPointId;
+    if (apId != null && _apNames.containsKey(apId)) {
+      return _apNames[apId]!;
+    }
+    if (hasRoomType) return roomType;
+    if (apId != null) return 'AP #$apId';
+    return 'Result #${result.id?.toString() ?? "-"}';
+  }
+
+  /// The admin who ran the test. The rXg stamps `updated_by` with the
+  /// authenticated admin on every save (falling back to `created_by`), so this
+  /// is who last ran it. Returns null when neither is set.
+  String? _ranBy(SpeedTestResult result) {
+    final updatedBy = result.updatedBy;
+    if (updatedBy != null && updatedBy.isNotEmpty) return updatedBy;
+    final createdBy = result.createdBy;
+    if (createdBy != null && createdBy.isNotEmpty) return createdBy;
+    return null;
+  }
+
   /// Update existing speed test result with new test data.
   /// This is used for coverage/validation tests in room selector.
   Future<void> _submitCoverageResult(SpeedTestResult newTestResult) async {
@@ -227,8 +274,10 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
 
     try {
       // Coverage tests are room-level and must NOT be attributed to an AP.
-      // Validation AP/ONT tests keep their AP — the result's existing AP, else
-      // the room's first AP (matches ATT-FE-Tool).
+      // Validation AP/ONT tests keep the SELECTED row's OWN access point — we
+      // never re-attribute (previously: `?? apIds.first`), because forcing a
+      // null-AP result onto the room's first AP let one test bleed onto another
+      // AP in the same room.
       final config = ref
           .read(webSocketCacheIntegrationProvider)
           .getSpeedTestConfigById(_selectedResult!.speedTestId);
@@ -238,12 +287,8 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
       }
       final isCoverage =
           config?.name?.toLowerCase().contains('coverage') ?? false;
-      final testedViaAccessPointId = isCoverage
-          ? null
-          : (_selectedResult!.testedViaAccessPointId ??
-              (widget.apIds.isNotEmpty ? widget.apIds.first : null));
 
-      final updatedResult = _selectedResult!.copyWith(
+      var updatedResult = _selectedResult!.copyWith(
         downloadMbps: newTestResult.downloadMbps,
         uploadMbps: newTestResult.uploadMbps,
         rtt: newTestResult.rtt,
@@ -259,8 +304,14 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         // Keep the selected result's own coverage location, not a single
         // widget-level value, so switching results doesn't clobber room_type.
         roomType: _selectedResult!.roomType ?? widget.roomType,
-        testedViaAccessPointId: testedViaAccessPointId,
+        // tested_via_access_point_id is intentionally NOT overridden here: the
+        // selected per-AP row already carries the correct AP, and preserving it
+        // is what stops a test from being written onto a different AP.
       );
+      // Coverage tests are room-level — clear any AP attribution.
+      if (isCoverage) {
+        updatedResult = updatedResult.copyWith(testedViaAccessPointId: null);
+      }
 
       // Update via repository (which updates cache immediately)
       final response = await ref
@@ -548,10 +599,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     final selectedConfig = selectedEntry['config'] as SpeedTestConfig;
     final selectedPassed = selectedEntry['passed'] as bool? ??
         _resultPassesForConfig(currentResult, selectedConfig);
-    final String resultLabel =
-        (currentResult.roomType != null && currentResult.roomType!.isNotEmpty)
-            ? currentResult.roomType!
-            : 'Result #${currentResult.id?.toString() ?? "-"}';
+    final resultLabel = _labelForResult(currentResult, selectedConfig);
 
     return Card(
             child: Padding(
@@ -807,12 +855,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         final bool passed =
             item['passed'] as bool? ?? _resultPassesForConfig(result, config);
 
-        String displayText = '';
-        if (result.roomType != null && result.roomType!.isNotEmpty) {
-          displayText = result.roomType!;
-        } else {
-          displayText = config.name ?? 'Result #${result.id}';
-        }
+        final displayText = _labelForResult(result, config);
 
         listItems.add(
           ListTile(
@@ -1072,6 +1115,28 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                 fontSize: 11,
                 color: AppColors.textSecondary,
               ),
+            ),
+          ],
+          // Who ran the test. The rXg stamps updated_by / created_by with the
+          // authenticated admin on every save, so this is the admin who ran it.
+          if (_ranBy(result) != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 13,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Run by ${_ranBy(result)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
           // Mark as Not Applicable / Applicable button
