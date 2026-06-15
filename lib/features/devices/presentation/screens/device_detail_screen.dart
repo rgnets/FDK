@@ -7,6 +7,7 @@ import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provi
 import 'package:rgnets_fdk/features/devices/presentation/screens/note_edit_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/device_issues_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_speed_test_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/editable_note_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/unified_summary_card.dart';
@@ -532,6 +533,10 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
           ),
         ),
         const SizedBox(height: 16),
+
+        // Device issues (e.g. missing photo, no speed test) sourced from the
+        // backend compliance feeds. Renders nothing when there are no issues.
+        DeviceIssuesSection(device: widget.device),
 
         // Speed Test Section (for APs and ONTs)
         if (widget.device.type == DeviceTypes.accessPoint ||
