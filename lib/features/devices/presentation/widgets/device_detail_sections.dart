@@ -26,22 +26,27 @@ class DeviceDetailSections extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Several sections return SizedBox.shrink() when they have no data (e.g. a
+    // switch has no Wireless/Performance section). Drop those empties so their
+    // 16px spacers don't stack into a blank gap before the Images section —
+    // only space between sections that actually render.
+    final sections = <Widget>[
+      _buildBasicInfoSection(context),
+      _buildLocationSection(context),
+      _buildWirelessSection(context),
+      _buildPerformanceSection(context),
+      _buildTrafficSection(context),
+      _buildSystemSection(context),
+      _buildImagesSection(context, ref),
+    ].where((w) => w is! SizedBox).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildBasicInfoSection(context),
-        const SizedBox(height: 16),
-        _buildLocationSection(context),
-        const SizedBox(height: 16),
-        _buildWirelessSection(context),
-        const SizedBox(height: 16),
-        _buildPerformanceSection(context),
-        const SizedBox(height: 16),
-        _buildTrafficSection(context),
-        const SizedBox(height: 16),
-        _buildSystemSection(context),
-        const SizedBox(height: 16),
-        _buildImagesSection(context, ref),
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i > 0) const SizedBox(height: 16),
+          sections[i],
+        ],
       ],
     );
   }
