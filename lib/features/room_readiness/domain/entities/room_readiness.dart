@@ -51,6 +51,24 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
 
   int get totalIssueCount => issues.length;
 
+  /// Single per-room readiness score (0–100): the share of the room's devices
+  /// that are fully ready — online, onboarded, and (for APs) images present and
+  /// speed test passed. Every failed check is an `Issue` tied to a device, so a
+  /// room with no issues scores 100 (green) and one device's failure(s) count
+  /// once. Empty rooms return 0 (rendered grey via `status`). Compliance only
+  /// contributes failures, so an un-run compliance check never lowers the score.
+  double get readinessScore {
+    if (totalDevices == 0) return 0;
+    if (issues.isEmpty) return 100;
+    final unreadyDevices = issues
+        .map((i) => i.metadata['deviceId']?.toString())
+        .whereType<String>()
+        .toSet()
+        .length;
+    final ready = (totalDevices - unreadyDevices).clamp(0, totalDevices);
+    return ready / totalDevices * 100;
+  }
+
   bool get isReady => status == RoomStatus.ready;
 
   bool get isEmpty => status == RoomStatus.empty;

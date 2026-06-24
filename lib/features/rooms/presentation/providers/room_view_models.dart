@@ -16,12 +16,14 @@ class RoomViewModel {
     required this.deviceCount,
     required this.onlineDevices,
     required this.status,
-  });
+    double? readinessScore,
+  }) : _readinessScore = readinessScore;
 
   final Room room;
   final int deviceCount;
   final int onlineDevices;
   final RoomStatus status;
+  final double? _readinessScore;
 
   String get id => room.id.toString();
   String get name => room.name;
@@ -31,6 +33,12 @@ class RoomViewModel {
 
   double get onlinePercentage =>
       deviceCount > 0 ? (onlineDevices / deviceCount) * 100 : 0;
+
+  /// Unified per-room readiness (0–100): online + onboarding + (for APs) images
+  /// & speed test, sourced from the room-readiness metrics. 100 when the room
+  /// has no issues. Falls back to the device-online percentage when no readiness
+  /// metric is available yet.
+  double get readinessScore => _readinessScore ?? onlinePercentage;
 
   /// Returns true if room has issues (partial or down status)
   bool get hasIssues => status == RoomStatus.partial || status == RoomStatus.down;
@@ -92,6 +100,7 @@ List<RoomViewModel> roomViewModels(RoomViewModelsRef ref) {
           deviceCount: deviceCount,
           onlineDevices: onlineDevices,
           status: status,
+          readinessScore: readinessMetrics?.readinessScore,
         );
       }).toList();
     },
