@@ -465,6 +465,30 @@ class WebSocketCacheIntegration {
     return false;
   }
 
+  /// Whether the RxgChannel subscription is confirmed — i.e. AnyCable will
+  /// accept performs (writes) on it. Writes sent while this is false are
+  /// silently dropped server-side as "unknown subscription".
+  bool get isChannelConfirmed => _channelConfirmed;
+
+  /// Waits until the RxgChannel subscription is confirmed (kicking the
+  /// handshake if it hasn't been sent yet), up to [timeout]. Call this before
+  /// issuing a WS write so a write fired in the window between `connected` and
+  /// channel confirmation isn't silently dropped and left to time out. Returns
+  /// false if the socket is down or confirmation doesn't arrive in time.
+  Future<bool> ensureChannelReady({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (_channelConfirmed) return true;
+    if (!_webSocketService.isConnected) return false;
+    _ensureChannelSubscription();
+    final deadline = DateTime.now().add(timeout);
+    while (!_channelConfirmed && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (!_webSocketService.isConnected) return false;
+    }
+    return _channelConfirmed;
+  }
+
   bool _sendActionCableMessage(Map<String, dynamic> data) {
     if (!_webSocketService.isConnected) {
       _logger.w(

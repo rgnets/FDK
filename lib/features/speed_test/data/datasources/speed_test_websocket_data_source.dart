@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:logger/logger.dart';
 import 'package:rgnets_fdk/core/services/logger_service.dart';
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
@@ -321,26 +323,54 @@ class SpeedTestWebSocketDataSource implements SpeedTestDataSource {
       throw ArgumentError('Cannot update speed test result without id');
     }
 
-    final response = await _webSocketService.requestActionCable(
-      action: 'update_resource',
-      resourceType: _speedTestResultResourceType,
-      additionalData: {
-        'id': result.id,
-        'params': result.toJson(),
-      },
-      timeout: const Duration(seconds: 15),
-    );
+    Future<SpeedTestResult> send() async {
+      final response = await _webSocketService.requestActionCable(
+        action: 'update_resource',
+        resourceType: _speedTestResultResourceType,
+        additionalData: {
+          'id': result.id,
+          'params': result.toJson(),
+        },
+        timeout: const Duration(seconds: 15),
+      );
 
-    final data = response.payload['data'];
-    if (data != null) {
-      return SpeedTestResult.fromJsonWithValidation(
-        Map<String, dynamic>.from(data as Map),
+      final data = response.payload['data'];
+      if (data != null) {
+        return SpeedTestResult.fromJsonWithValidation(
+          Map<String, dynamic>.from(data as Map),
+        );
+      }
+
+      throw Exception(
+        response.payload['error']?.toString() ??
+            'Failed to update speed test result',
       );
     }
 
-    throw Exception(
-      response.payload['error']?.toString() ??
-          'Failed to update speed test result',
-    );
+    // The update is an AnyCable perform on the RxgChannel subscription, which
+    // the gateway drops as "unknown subscription" until that subscription is
+    // confirmed. Wait for write-readiness first so an update issued in the
+    // window right after (re)connect isn't silently dropped and left to time
+    // out — previously the user had to manually re-run the test to recover.
+    await _cacheIntegration.ensureChannelReady();
+
+    try {
+      return await send();
+    } on TimeoutException {
+      // The channel may have only just (re)subscribed. Re-ensure readiness and
+      // retry once — update_resource is idempotent, so a retry can't duplicate
+      // data. If the channel still isn't ready, surface a clear reason.
+      _logger.w(
+        'SpeedTestWebSocketDataSource: update(${result.id}) timed out; '
+        're-ensuring channel readiness and retrying once',
+      );
+      final ready = await _cacheIntegration.ensureChannelReady();
+      if (!ready) {
+        throw TimeoutException(
+          'Speed test update could not be sent: realtime channel not ready',
+        );
+      }
+      return await send();
+    }
   }
 }
