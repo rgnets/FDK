@@ -255,45 +255,28 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     for (final ref in deviceRefs) {
       final isAp = ref['type'] == 'AP';
-      dynamic device;
+
+      // Room membership is authoritative from the LIVE device cache's
+      // pms_room_id — for EVERY device type, not just APs — NOT the embedded
+      // pms_room snapshot (access_points / media_converters / switch_ports),
+      // which goes stale when a device is reassigned/removed and leaves "ghost"
+      // entries in a room it no longer belongs to. Look the device up in the
+      // cache and skip it unless the cache still places it in this room. This
+      // keeps the issue list consistent with the room's actual device list
+      // (_getDevicesForRoom, which filters the same way: pmsRoomId == room.id).
+      // Without this gate, stale ONT/Switch references produced phantom
+      // "Device Not Found" / offline issues for rooms with no associated devices.
+      final device = isAp
+          ? (deviceLookup['ap_${ref['id']}'] ?? deviceLookup['${ref['id']}'])
+          : _findDevice(ref, deviceLookup);
+      if (device == null || _devicePmsRoomId(device) != roomId) {
+        continue;
+      }
 
       if (isAp) {
-        // AP room membership is authoritative from the LIVE device cache's
-        // pms_room_id — NOT the embedded pms_room.access_points snapshot, which
-        // goes stale when an AP is reassigned/removed and leaves "ghost" offline
-        // APs in a room they no longer belong to. Look the AP up directly in the
-        // cache (no inline fallback) and skip it unless the cache still places it
-        // in this room. Mirrors _getDevicesForRoom (device.pmsRoomId == room.id).
-        device = deviceLookup['ap_${ref['id']}'] ?? deviceLookup['${ref['id']}'];
-        if (device == null || _devicePmsRoomId(device) != roomId) {
-          continue;
-        }
         final apId = _parseDeviceId(device);
         if (apId != 0) {
           accessPointIds.add(apId);
-        }
-      } else {
-        device = _findDevice(ref, deviceLookup);
-        if (device == null) {
-          // Referenced non-AP device not found — surface as missing.
-          offlineDevices++;
-          issues.add(
-            Issue(
-              id: 'missing_device_${ref['type']}_${ref['id']}',
-              code: 'DEVICE_MISSING',
-              title: 'Device Not Found',
-              description:
-                  'Referenced device ${ref['type']} ${ref['id']} not found',
-              severity: IssueSeverity.critical,
-              category: IssueCategory.connectivity,
-              detectedAt: DateTime.now(),
-              metadata: {
-                'deviceId': ref['id'],
-                'deviceType': ref['type'],
-              },
-            ),
-          );
-          continue;
         }
       }
 
