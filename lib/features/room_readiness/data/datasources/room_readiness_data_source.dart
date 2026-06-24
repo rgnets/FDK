@@ -289,11 +289,12 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
         continue;
       }
 
-      // Check device status
-      final isOnline = _isDeviceOnline(device);
-      if (isOnline) {
-        onlineDevices++;
-      } else {
+      // Device offline is calculated by the app (the compliance tool doesn't
+      // cover it), but RELIABLY: only flag a device that is EXPLICITLY offline.
+      // A device whose online state is unknown or stale (e.g. a stale embedded
+      // room association) is treated as online and NOT flagged — that false
+      // positive previously turned rooms with online ONTs orange (100% + yellow).
+      if (_isDeviceExplicitlyOffline(device)) {
         offlineDevices++;
         issues.add(
           Issue.deviceOffline(
@@ -302,6 +303,8 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
             deviceType: ref['type'] as String? ?? 'Device',
           ),
         );
+      } else {
+        onlineDevices++;
       }
 
       // Check for other device issues
@@ -462,12 +465,16 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     return null;
   }
 
-  bool _isDeviceOnline(dynamic device) {
+  /// True only when the device is EXPLICITLY offline. A device whose online
+  /// state is unknown/absent (a stale embedded room association, or an
+  /// `unknown` status) is NOT treated as offline — flagging those produced
+  /// false "offline" issues that turned rooms with online devices orange.
+  bool _isDeviceExplicitlyOffline(dynamic device) {
     if (device is Map<String, dynamic>) {
-      return device['online'] == true;
+      return device['online'] == false;
     }
     try {
-      return device.status?.toLowerCase() == 'online';
+      return device.status?.toLowerCase() == 'offline';
     } catch (_) {
       return false;
     }
