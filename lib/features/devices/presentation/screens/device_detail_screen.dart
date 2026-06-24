@@ -6,6 +6,7 @@ import 'package:rgnets_fdk/features/devices/domain/entities/device.dart';
 import 'package:rgnets_fdk/features/devices/presentation/providers/devices_provider.dart';
 import 'package:rgnets_fdk/features/devices/presentation/screens/note_edit_screen.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/advanced_info_section.dart';
+import 'package:rgnets_fdk/features/devices/presentation/widgets/ap_light_indicator_reference.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_detail_sections.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_issues_section.dart';
 import 'package:rgnets_fdk/features/devices/presentation/widgets/device_speed_test_section.dart';
@@ -542,6 +543,12 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
         if (widget.device.type == DeviceTypes.accessPoint ||
             widget.device.type == DeviceTypes.ont) ...[
           DeviceSpeedTestSection(device: widget.device),
+          const SizedBox(height: 16),
+        ],
+
+        // AP Light Indicator Reference (LED meaning lookup) — APs only.
+        if (widget.device.type == DeviceTypes.accessPoint) ...[
+          const ApLightIndicatorReference(),
           const SizedBox(height: 16),
         ],
 
