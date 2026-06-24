@@ -191,13 +191,51 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     return value >= minRequired;
   }
 
+  /// Whether this test has actually been run. A row exists in `speed_test_results`
+  /// for every configured test before it runs; until it does it has no
+  /// measurements and no completion time.
+  bool _hasRun(SpeedTestResult result) =>
+      result.completedAt != null ||
+      result.downloadMbps != null ||
+      result.uploadMbps != null;
+
   bool _resultPassesForConfig(SpeedTestResult result, SpeedTestConfig config) {
+    // A test that hasn't run yet has no measurements, so it can't pass — even
+    // when the config defines no thresholds. (A null threshold means "no minimum
+    // for this metric", not "a missing measurement passes".)
+    if (!_hasRun(result)) return false;
+
     final downloadPass =
         _metricMeetsThreshold(result.downloadMbps, config.minDownloadMbps);
     final uploadPass =
         _metricMeetsThreshold(result.uploadMbps, config.minUploadMbps);
 
     return result.passed || (downloadPass && uploadPass);
+  }
+
+  /// Icon/color/label for a result's status badge. Order matters: a not-applicable
+  /// or not-yet-run result is neutral, never a green pass or red fail.
+  ({IconData icon, Color color, String label}) _statusDisplay(
+    SpeedTestResult result,
+    bool passed,
+  ) {
+    if (!result.isApplicable) {
+      return (
+        icon: Icons.remove_circle_outline,
+        color: AppColors.textSecondary,
+        label: 'Not Applicable',
+      );
+    }
+    if (!_hasRun(result)) {
+      return (
+        icon: Icons.hourglass_empty,
+        color: AppColors.textSecondary,
+        label: 'Not Run',
+      );
+    }
+    return passed
+        ? (icon: Icons.check_circle, color: AppColors.success, label: 'Passed')
+        : (icon: Icons.cancel, color: AppColors.error, label: 'Failed');
   }
 
   /// Update existing speed test result with new test data.
@@ -548,6 +586,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     final selectedConfig = selectedEntry['config'] as SpeedTestConfig;
     final selectedPassed = selectedEntry['passed'] as bool? ??
         _resultPassesForConfig(currentResult, selectedConfig);
+    final selectedStatus = _statusDisplay(currentResult, selectedPassed);
     final String resultLabel =
         (currentResult.roomType != null && currentResult.roomType!.isNotEmpty)
             ? currentResult.roomType!
@@ -622,15 +661,11 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Show different icon for not applicable tests
+                  // Neutral icon for not-applicable / not-yet-run tests.
                   Icon(
-                    !currentResult.isApplicable
-                        ? Icons.remove_circle_outline
-                        : (selectedPassed ? Icons.check_circle : Icons.cancel),
+                    selectedStatus.icon,
                     size: 24,
-                    color: !currentResult.isApplicable
-                        ? AppColors.textSecondary
-                        : (selectedPassed ? AppColors.success : AppColors.error),
+                    color: selectedStatus.color,
                   ),
                   const SizedBox(width: 4),
                   Icon(
@@ -806,6 +841,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
         final isSelected = result.id == _selectedResult?.id;
         final bool passed =
             item['passed'] as bool? ?? _resultPassesForConfig(result, config);
+        final status = _statusDisplay(result, passed);
 
         String displayText = '';
         if (result.roomType != null && result.roomType!.isNotEmpty) {
@@ -825,9 +861,7 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
               height: 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: !result.isApplicable
-                    ? AppColors.gray400
-                    : (passed ? AppColors.success : AppColors.error),
+                color: status.color,
               ),
             ),
             title: Text(
@@ -838,9 +872,9 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                 color: AppColors.textPrimary,
               ),
             ),
-            subtitle: !result.isApplicable
+            subtitle: (!result.isApplicable || !_hasRun(result))
                 ? Text(
-                    'Not Applicable',
+                    status.label,
                     style: TextStyle(
                       fontSize: 11,
                       color: AppColors.textSecondary,
@@ -857,13 +891,9 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
                       )
                     : null),
             trailing: Icon(
-              !result.isApplicable
-                  ? Icons.remove_circle_outline
-                  : (passed ? Icons.check_circle : Icons.cancel),
+              status.icon,
               size: 28,
-              color: !result.isApplicable
-                  ? AppColors.textSecondary
-                  : (passed ? AppColors.success : AppColors.error),
+              color: status.color,
             ),
             onTap: () {
               Navigator.pop(context, result);
@@ -961,13 +991,10 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
     final uploadPassed =
         _metricMeetsThreshold(result.uploadMbps, config.minUploadMbps);
     final bool passed = _resultPassesForConfig(result, config);
-    final bgColor = passed
-        ? AppColors.success.withValues(alpha: 0.1)
-        : AppColors.error.withValues(alpha: 0.1);
-    final borderColor = passed
-        ? AppColors.success.withValues(alpha: 0.3)
-        : AppColors.error.withValues(alpha: 0.3);
-    final statusColor = passed ? AppColors.success : AppColors.error;
+    final status = _statusDisplay(result, passed);
+    final statusColor = status.color;
+    final bgColor = statusColor.withValues(alpha: 0.1);
+    final borderColor = statusColor.withValues(alpha: 0.3);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -986,13 +1013,13 @@ class _RoomSpeedTestSelectorState extends ConsumerState<RoomSpeedTestSelector> {
               Row(
                 children: [
                   Icon(
-                    passed ? Icons.check_circle : Icons.cancel,
+                    status.icon,
                     color: statusColor,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    passed ? 'Passed' : 'Failed',
+                    status.label,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: statusColor,
