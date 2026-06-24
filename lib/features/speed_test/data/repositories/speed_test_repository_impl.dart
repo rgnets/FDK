@@ -137,15 +137,16 @@ class SpeedTestRepositoryImpl implements SpeedTestRepository {
 
   Failure _mapExceptionToFailure(Exception exception) {
     final message = exception.toString();
+    final lower = message.toLowerCase();
 
-    if (message.contains('not found') || message.contains('404')) {
+    if (lower.contains('not found') || lower.contains('404')) {
       return NotFoundFailure(message: message);
-    } else if (message.contains('not connected') ||
-        message.contains('network')) {
+    } else if (lower.contains('not connected') ||
+        lower.contains('network')) {
       return NetworkFailure(message: message);
-    } else if (message.contains('timeout')) {
+    } else if (lower.contains('timeout') || lower.contains('timed out')) {
       return TimeoutFailure(message: message);
-    } else if (message.contains('server') || message.contains('500')) {
+    } else if (lower.contains('server') || lower.contains('500')) {
       return ServerFailure(message: message);
     }
 

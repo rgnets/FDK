@@ -349,7 +349,20 @@ class WebSocketCacheIntegration {
     if (state == SocketConnectionState.connected) {
       _logger.i(
           'WebSocketCacheIntegration: Connected! Subscribing to resources...');
+      // A (re)connect always yields a FRESH socket whose AnyCable subscription
+      // state is empty server-side. Normal reconnects go connected→reconnecting
+      // →connected and NEVER emit `disconnected` (see WebSocketService: a drop
+      // with autoReconnect calls _scheduleReconnect → `reconnecting`, not
+      // `disconnected`), so the disconnected-branch reset is skipped and
+      // `_channelConfirmed` stays stale-true. That makes `_subscribeToChannel`
+      // skip re-sending the channel `subscribe`, so the gateway has no
+      // subscription for the new connection and drops every perform (write) as
+      // "unknown subscription" → updates time out forever until app restart.
+      // Reset the handshake here so each new socket re-subscribes cleanly.
+      _channelConfirmed = false;
       _channelSubscribeSent = false;
+      _resourcesSubscribed = false;
+      _confirmedResources.clear();
       _subscribeToChannel();
       // Load full inventory over REST on connect. The FIRST connect (app launch
       // / persisted-session reopen, `droppedAt == null`) must seed — there is
@@ -450,6 +463,30 @@ class WebSocketCacheIntegration {
       return false;
     }
     return false;
+  }
+
+  /// Whether the RxgChannel subscription is confirmed — i.e. AnyCable will
+  /// accept performs (writes) on it. Writes sent while this is false are
+  /// silently dropped server-side as "unknown subscription".
+  bool get isChannelConfirmed => _channelConfirmed;
+
+  /// Waits until the RxgChannel subscription is confirmed (kicking the
+  /// handshake if it hasn't been sent yet), up to [timeout]. Call this before
+  /// issuing a WS write so a write fired in the window between `connected` and
+  /// channel confirmation isn't silently dropped and left to time out. Returns
+  /// false if the socket is down or confirmation doesn't arrive in time.
+  Future<bool> ensureChannelReady({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (_channelConfirmed) return true;
+    if (!_webSocketService.isConnected) return false;
+    _ensureChannelSubscription();
+    final deadline = DateTime.now().add(timeout);
+    while (!_channelConfirmed && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (!_webSocketService.isConnected) return false;
+    }
+    return _channelConfirmed;
   }
 
   bool _sendActionCableMessage(Map<String, dynamic> data) {
