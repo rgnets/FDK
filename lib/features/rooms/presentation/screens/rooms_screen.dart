@@ -155,7 +155,10 @@ class _RoomsScreenState extends ConsumerState<RoomsScreen> {
                           itemBuilder: (context, index) {
                             final roomVm = filteredRooms[index];
                             final statusColor = _getStatusColor(roomVm.status);
-                            final percentage = roomVm.onlinePercentage;
+                            // Unified readiness (online + onboarding + images +
+                            // speed test), not just device-online — so the % can't
+                            // read 100% while the room is yellow.
+                            final percentage = roomVm.readinessScore;
 
                             // Build subtitle lines
                             final subtitleLines = <UnifiedInfoLine>[
