@@ -231,11 +231,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     // Extract device references from room data
     final deviceRefs = _extractDeviceReferences(roomData);
-    final totalDevices = deviceRefs.length;
-
-    _logger.i('DEBUG ROOM $roomId: Extracted ${deviceRefs.length} device refs: $deviceRefs');
-
-    if (totalDevices == 0) {
+    if (deviceRefs.isEmpty) {
       return RoomReadinessMetrics(
         roomId: roomId,
         roomName: roomName,
@@ -254,46 +250,57 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final issues = <Issue>[];
     // AP rxg primary keys present in this room. Used by the room-readiness
     // notifier to attach compliance failures (Issue.missingImages /
-    // Issue.missingSpeedTest) per spec B5 / TR-7 — no UI surface change,
-    // we just thread the AP id space through so the notifier can match.
+    // Issue.missingSpeedTest), matched by AP id.
     final accessPointIds = <int>[];
 
     for (final ref in deviceRefs) {
-      if (ref['type'] == 'AP') {
-        final apId = _parseDeviceId(ref['data'] ?? {'id': ref['id']});
+      final isAp = ref['type'] == 'AP';
+      dynamic device;
+
+      if (isAp) {
+        // AP room membership is authoritative from the LIVE device cache's
+        // pms_room_id — NOT the embedded pms_room.access_points snapshot, which
+        // goes stale when an AP is reassigned/removed and leaves "ghost" offline
+        // APs in a room they no longer belong to. Look the AP up directly in the
+        // cache (no inline fallback) and skip it unless the cache still places it
+        // in this room. Mirrors _getDevicesForRoom (device.pmsRoomId == room.id).
+        device = deviceLookup['ap_${ref['id']}'] ?? deviceLookup['${ref['id']}'];
+        if (device == null || _devicePmsRoomId(device) != roomId) {
+          continue;
+        }
+        final apId = _parseDeviceId(device);
         if (apId != 0) {
           accessPointIds.add(apId);
         }
-      }
-      final device = _findDevice(ref, deviceLookup);
-      _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
-      if (device == null) {
-        _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
-        // Device reference exists but device not found - critical issue
-        issues.add(
-          Issue(
-            id: 'missing_device_${ref['type']}_${ref['id']}',
-            code: 'DEVICE_MISSING',
-            title: 'Device Not Found',
-            description: 'Referenced device ${ref['type']} ${ref['id']} not found',
-            severity: IssueSeverity.critical,
-            category: IssueCategory.connectivity,
-            detectedAt: DateTime.now(),
-            metadata: {
-              'deviceId': ref['id'],
-              'deviceType': ref['type'],
-            },
-          ),
-        );
-        offlineDevices++;
-        continue;
+      } else {
+        device = _findDevice(ref, deviceLookup);
+        if (device == null) {
+          // Referenced non-AP device not found — surface as missing.
+          offlineDevices++;
+          issues.add(
+            Issue(
+              id: 'missing_device_${ref['type']}_${ref['id']}',
+              code: 'DEVICE_MISSING',
+              title: 'Device Not Found',
+              description:
+                  'Referenced device ${ref['type']} ${ref['id']} not found',
+              severity: IssueSeverity.critical,
+              category: IssueCategory.connectivity,
+              detectedAt: DateTime.now(),
+              metadata: {
+                'deviceId': ref['id'],
+                'deviceType': ref['type'],
+              },
+            ),
+          );
+          continue;
+        }
       }
 
       // Device offline is calculated by the app (the compliance tool doesn't
       // cover it), but RELIABLY: only flag a device that is EXPLICITLY offline.
-      // A device whose online state is unknown or stale (e.g. a stale embedded
-      // room association) is treated as online and NOT flagged — that false
-      // positive previously turned rooms with online ONTs orange (100% + yellow).
+      // A device whose online state is unknown or stale is treated as online and
+      // NOT flagged — that false positive turned rooms with online devices orange.
       if (_isDeviceExplicitlyOffline(device)) {
         offlineDevices++;
         issues.add(
@@ -312,7 +319,10 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       issues.addAll(deviceIssues);
     }
 
-    // Determine room status
+    // Count only the devices the live cache actually places in this room, so
+    // stale ghosts don't inflate the total (which would force the room partial).
+    final totalDevices = onlineDevices + offlineDevices;
+
     final status = _determineRoomStatus(
       totalDevices: totalDevices,
       onlineDevices: onlineDevices,
@@ -462,6 +472,25 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     }
 
     _logger.w('DEBUG _findDevice: NO MATCH for refId=$refId prefixedId=$prefixedId');
+    return null;
+  }
+
+  /// The device's live `pms_room_id` (the room it currently belongs to), used
+  /// to verify AP membership against the authoritative device cache rather than
+  /// a stale embedded room snapshot. Returns null when unknown.
+  int? _devicePmsRoomId(dynamic device) {
+    try {
+      final r = device.pmsRoomId;
+      if (r is int) return r;
+      if (r is String) return int.tryParse(r);
+    } catch (_) {
+      // Not a device model — fall through to map handling.
+    }
+    if (device is Map<String, dynamic>) {
+      final r = device['pms_room_id'];
+      if (r is int) return r;
+      if (r is String) return int.tryParse(r);
+    }
     return null;
   }
 
