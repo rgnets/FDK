@@ -349,7 +349,20 @@ class WebSocketCacheIntegration {
     if (state == SocketConnectionState.connected) {
       _logger.i(
           'WebSocketCacheIntegration: Connected! Subscribing to resources...');
+      // A (re)connect always yields a FRESH socket whose AnyCable subscription
+      // state is empty server-side. Normal reconnects go connected→reconnecting
+      // →connected and NEVER emit `disconnected` (see WebSocketService: a drop
+      // with autoReconnect calls _scheduleReconnect → `reconnecting`, not
+      // `disconnected`), so the disconnected-branch reset is skipped and
+      // `_channelConfirmed` stays stale-true. That makes `_subscribeToChannel`
+      // skip re-sending the channel `subscribe`, so the gateway has no
+      // subscription for the new connection and drops every perform (write) as
+      // "unknown subscription" → updates time out forever until app restart.
+      // Reset the handshake here so each new socket re-subscribes cleanly.
+      _channelConfirmed = false;
       _channelSubscribeSent = false;
+      _resourcesSubscribed = false;
+      _confirmedResources.clear();
       _subscribeToChannel();
       // Load full inventory over REST on connect. The FIRST connect (app launch
       // / persisted-session reopen, `droppedAt == null`) must seed — there is
