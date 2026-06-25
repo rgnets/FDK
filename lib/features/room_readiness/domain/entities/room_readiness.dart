@@ -65,14 +65,8 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
         .whereType<String>()
         .toSet()
         .length;
-    // Room-level issues (no device — e.g. a failed coverage speed test) each
-    // count as one extra failed check on top of the per-device checks, so the
-    // score drops below 100 even when every device is ready.
-    final roomLevelFails =
-        issues.where((i) => i.metadata['deviceId'] == null).length;
-    final totalChecks = totalDevices + roomLevelFails;
-    final ready = (totalDevices - unreadyDevices).clamp(0, totalChecks);
-    return totalChecks == 0 ? 0 : ready / totalChecks * 100;
+    final ready = (totalDevices - unreadyDevices).clamp(0, totalDevices);
+    return ready / totalDevices * 100;
   }
 
   bool get isReady => status == RoomStatus.ready;

@@ -6,8 +6,6 @@ import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/issue.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_config.dart';
-import 'package:rgnets_fdk/features/speed_test/domain/entities/speed_test_result.dart';
 
 /// Abstract interface for room readiness data source.
 abstract class RoomReadinessDataSource {
@@ -304,11 +302,6 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       issues.addAll(deviceIssues);
     }
 
-    // Room-level coverage speed test: a failed (below-threshold) coverage
-    // result is added to the room's issues so it surfaces in the issues list
-    // and downgrades readiness, just like a device problem.
-    issues.addAll(_coverageSpeedTestIssues(roomId));
-
     // Count only the devices the live cache actually places in this room, so
     // stale ghosts don't inflate the total (which would force the room partial).
     final totalDevices = onlineDevices + offlineDevices;
@@ -463,59 +456,6 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     _logger.w('DEBUG _findDevice: NO MATCH for refId=$refId prefixedId=$prefixedId');
     return null;
-  }
-
-  /// Failed (below-threshold) coverage speed tests for [roomId], as issues.
-  /// Coverage tests are room-level (matched by `pms_room_id` + a config name
-  /// containing "coverage"). Only results that have actually run and did not
-  /// pass produce an issue — a not-yet-run coverage test is not a failure.
-  List<Issue> _coverageSpeedTestIssues(int roomId) {
-    final issues = <Issue>[];
-    for (final result in _cacheIntegration.getCachedSpeedTestResults()) {
-      if (result.pmsRoomId != roomId || !result.isApplicable) {
-        continue;
-      }
-      final config = _cacheIntegration.getSpeedTestConfigById(result.speedTestId);
-      final isCoverage =
-          config?.name?.toLowerCase().contains('coverage') ?? false;
-      if (!isCoverage) {
-        continue;
-      }
-      final hasRun = result.completedAt != null ||
-          result.downloadMbps != null ||
-          result.uploadMbps != null;
-      if (!hasRun || _coveragePassed(result, config)) {
-        continue;
-      }
-      issues.add(
-        Issue.coverageSpeedTestFailed(
-          roomId: roomId,
-          testName: config?.name ?? 'Coverage Speed Test',
-          resultId: result.id,
-          downloadMbps: result.downloadMbps,
-          uploadMbps: result.uploadMbps,
-          detectedAt: result.completedAt,
-        ),
-      );
-    }
-    return issues;
-  }
-
-  /// Whether a coverage result passed: the backend-reported `passed`, or both
-  /// measured metrics meeting the config thresholds (same rule the room speed
-  /// test selector uses).
-  bool _coveragePassed(SpeedTestResult result, SpeedTestConfig? config) {
-    final downloadPass =
-        _metricMeetsThreshold(result.downloadMbps, config?.minDownloadMbps);
-    final uploadPass =
-        _metricMeetsThreshold(result.uploadMbps, config?.minUploadMbps);
-    return result.passed || (downloadPass && uploadPass);
-  }
-
-  bool _metricMeetsThreshold(double? value, double? minRequired) {
-    if (minRequired == null) return true;
-    if (value == null) return false;
-    return value >= minRequired;
   }
 
   /// The device's live `pms_room_id` (the room it currently belongs to), used
