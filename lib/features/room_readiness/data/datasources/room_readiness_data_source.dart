@@ -4,6 +4,8 @@ import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/issue.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 
@@ -509,36 +511,32 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     try {
       final onboardingStatus = _getOnboardingStatus(device, deviceType);
       if (onboardingStatus != null) {
-        if (!_isOnboardingComplete(onboardingStatus, deviceType)) {
-          final deviceId = _parseDeviceId(device);
-          final deviceName = _getDeviceName(device);
+        // Error-first: any onboarding error surfaces as a warning regardless of
+        // stage. These don't always make onboarding "incomplete" — an online,
+        // approved AP missing its CSR/Cert sits at stage 6, and an ONT with low
+        // optical levels can be otherwise complete — but the FE portal flags
+        // them and they should drop the room below 100%.
+        final error = _getOnboardingError(onboardingStatus);
+        if (error != null && error.isNotEmpty) {
+          issues.add(
+            Issue.onboardingError(
+              deviceId: _parseDeviceId(device),
+              deviceName: _getDeviceName(device),
+              deviceType: deviceType ?? 'Device',
+              error: error,
+            ),
+          );
+        } else if (!_isOnboardingComplete(onboardingStatus, deviceType)) {
           final currentStage = _getOnboardingStage(onboardingStatus);
           final totalStages = deviceType == 'AP' ? 6 : 5;
-
           if (currentStage < totalStages) {
             issues.add(
               Issue.onboardingIncomplete(
-                deviceId: deviceId,
-                deviceName: deviceName,
-                deviceType: deviceType ?? 'Device',
-                currentStage: currentStage,
-                totalStages: totalStages,
-              ),
-            );
-          }
-        } else {
-          // Onboarding stage is complete, but the status may still carry an
-          // `error` (e.g. an online, approved AP missing its CSR/Cert in the
-          // DB). The stage-only completeness check misses these; surface them
-          // as a warning so the room drops below 100%, matching the FE portal.
-          final error = _getOnboardingError(onboardingStatus);
-          if (error != null && error.isNotEmpty) {
-            issues.add(
-              Issue.onboardingError(
                 deviceId: _parseDeviceId(device),
                 deviceName: _getDeviceName(device),
                 deviceType: deviceType ?? 'Device',
-                error: error,
+                currentStage: currentStage,
+                totalStages: totalStages,
               ),
             );
           }
@@ -558,15 +556,18 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       } else if (deviceType == 'ONT') {
         return device['ont_onboarding_status'];
       }
+      return null;
     }
-    try {
-      if (deviceType == 'AP') {
-        return device.apOnboardingStatus;
-      } else if (deviceType == 'ONT') {
-        return device.ontOnboardingStatus;
-      }
-    } catch (_) {
-      // Expected: device may not have onboarding status property
+    // The live cache hands us typed `DeviceModelSealed` objects. Both the AP
+    // and ONT variants expose the onboarding payload as `onboardingStatus`
+    // (mapped from ap_onboarding_status / ont_onboarding_status); there is no
+    // `apOnboardingStatus`/`ontOnboardingStatus` getter, so read it via map.
+    if (device is DeviceModelSealed) {
+      return device.maybeMap(
+        ap: (d) => d.onboardingStatus,
+        ont: (d) => d.onboardingStatus,
+        orElse: () => null,
+      );
     }
     return null;
   }
@@ -579,6 +580,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
   }
 
   int _getOnboardingStage(dynamic status) {
+    if (status is OnboardingStatusPayload) return status.stage ?? 0;
     if (status is Map<String, dynamic>) {
       return status['stage'] as int? ?? 0;
     }
@@ -587,19 +589,15 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
   }
 
   /// The `error` string from an onboarding status (e.g. "CSR and Cert missing
-  /// from DB"), read from either the raw WebSocket map or a typed payload.
-  /// Returns null when absent or not a string.
+  /// from DB" for an AP, or a low optical-level message for an ONT), read from
+  /// either the typed payload or the raw WebSocket map. Null when absent/empty.
   String? _getOnboardingError(dynamic status) {
+    if (status is OnboardingStatusPayload) return status.error;
     if (status is Map<String, dynamic>) {
       final e = status['error'];
       return e is String ? e : null;
     }
-    try {
-      final e = status.error;
-      return e is String ? e : null;
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
   RoomStatus _determineRoomStatus({
