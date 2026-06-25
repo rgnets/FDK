@@ -389,16 +389,43 @@ class _DeviceSpeedTestSectionState
     }
   }
 
+  /// Whether this test has actually been run. A result row is pre-seeded for a
+  /// device before the test runs; until it does it has no measurements and no
+  /// completion time.
+  bool _hasRun(SpeedTestResult result) =>
+      result.completedAt != null ||
+      result.downloadMbps != null ||
+      result.uploadMbps != null;
+
   Widget _buildResultCard(SpeedTestResult result) {
-    final passedColor = result.passed ? AppColors.success : AppColors.warning;
+    final hasRun = _hasRun(result);
+    // A test that hasn't run yet has no measurements — show it as a neutral
+    // "Not Run", never a red/orange "Below Threshold" (it hasn't failed, it just
+    // hasn't been run).
+    final Color statusColor;
+    final IconData statusIcon;
+    final String statusLabel;
+    if (!hasRun) {
+      statusColor = AppColors.gray500;
+      statusIcon = Icons.hourglass_empty;
+      statusLabel = 'NOT RUN';
+    } else if (result.passed) {
+      statusColor = AppColors.success;
+      statusIcon = Icons.check_circle;
+      statusLabel = 'PASSED';
+    } else {
+      statusColor = AppColors.warning;
+      statusIcon = Icons.warning_amber;
+      statusLabel = 'BELOW THRESHOLD';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: passedColor.withValues(alpha: 0.05),
+        color: statusColor.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: passedColor.withValues(alpha: 0.2)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,57 +433,64 @@ class _DeviceSpeedTestSectionState
           // Header row with timestamp and status
           Row(
             children: [
-              Icon(
-                result.passed ? Icons.check_circle : Icons.warning_amber,
-                color: passedColor,
-                size: 16,
-              ),
+              Icon(statusIcon, color: statusColor, size: 16),
               const SizedBox(width: 6),
               Text(
-                result.passed ? 'PASSED' : 'BELOW THRESHOLD',
+                statusLabel,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: passedColor,
+                  color: statusColor,
                 ),
               ),
               const Spacer(),
-              Text(
-                _getTimeAgo(result.timestamp),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: AppColors.gray500,
+              if (hasRun)
+                Text(
+                  _getTimeAgo(result.timestamp),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: AppColors.gray500,
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
 
-          // Speed metrics row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildSpeedMetric(
-                'Download',
-                result.downloadSpeed,
-                Icons.download,
-                AppColors.success,
+          // Speed metrics — or a "not run yet" note when the test hasn't run.
+          if (hasRun)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildSpeedMetric(
+                  'Download',
+                  result.downloadSpeed,
+                  Icons.download,
+                  AppColors.success,
+                ),
+                _buildSpeedMetric(
+                  'Upload',
+                  result.uploadSpeed,
+                  Icons.upload,
+                  AppColors.info,
+                ),
+                _buildSpeedMetric(
+                  'Latency',
+                  result.latency,
+                  Icons.timer,
+                  Colors.orange,
+                  isLatency: true,
+                ),
+              ],
+            )
+          else
+            Text(
+              "This test hasn't been run yet",
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.gray500,
+                fontStyle: FontStyle.italic,
               ),
-              _buildSpeedMetric(
-                'Upload',
-                result.uploadSpeed,
-                Icons.upload,
-                AppColors.info,
-              ),
-              _buildSpeedMetric(
-                'Latency',
-                result.latency,
-                Icons.timer,
-                Colors.orange,
-                isLatency: true,
-              ),
-            ],
-          ),
+            ),
 
           // Server info
           if (result.destination != null || result.serverHost != null) ...[
