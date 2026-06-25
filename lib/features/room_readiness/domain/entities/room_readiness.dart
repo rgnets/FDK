@@ -32,6 +32,10 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
     // failures without re-walking room data. Defaults to empty so existing
     // construction sites (tests, mock rows) don't need to change.
     @Default(<int>[]) List<int> accessPointIds,
+    // ONT (MediaConverter) device ids in this room. Mirrors `accessPointIds`
+    // so the notifier can attach per-ONT compliance failures (e.g. ONT
+    // `Issue.missingImages`) matched by ONT id. Defaults to empty.
+    @Default(<int>[]) List<int> ontDeviceIds,
   }) = _RoomReadinessMetrics;
 
   const RoomReadinessMetrics._();
@@ -51,12 +55,14 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
 
   int get totalIssueCount => issues.length;
 
-  /// Single per-room readiness score (0–100): the share of the room's devices
-  /// that are fully ready — online, onboarded, and (for APs) images present and
-  /// speed test passed. Every failed check is an `Issue` tied to a device, so a
-  /// room with no issues scores 100 (green) and one device's failure(s) count
-  /// once. Empty rooms return 0 (rendered grey via `status`). Compliance only
-  /// contributes failures, so an un-run compliance check never lowers the score.
+  /// Single per-room readiness score (0–100): the share of the room's checks
+  /// that pass. Most checks are per-device (online, onboarded, and for APs
+  /// images present and speed test passed), each a device-tied `Issue`. A
+  /// room-level failure not tied to any device — e.g. a failed coverage speed
+  /// test, carrying `roomId` instead of `deviceId` — counts as one additional
+  /// failed check. A room with no issues scores 100 (green). Empty rooms return
+  /// 0 (rendered grey via `status`). Compliance only contributes failures, so
+  /// an un-run compliance check never lowers the score.
   double get readinessScore {
     if (totalDevices == 0) return 0;
     if (issues.isEmpty) return 100;
@@ -65,8 +71,18 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
         .whereType<String>()
         .toSet()
         .length;
-    final ready = (totalDevices - unreadyDevices).clamp(0, totalDevices);
-    return ready / totalDevices * 100;
+    // Room-level issues (tagged with this room's `roomId`, not a device — e.g.
+    // a failed coverage speed test) each count as one extra failed check on top
+    // of the per-device checks, so the score drops below 100 even when every
+    // device is ready. Scoped to this room's `roomId` marker so a generic issue
+    // that merely lacks a `deviceId` (or one mis-attached from another room)
+    // does not silently lower the score.
+    final roomLevelFails = issues
+        .where((i) => i.metadata['roomId'] == roomId && i.metadata['deviceId'] == null)
+        .length;
+    final totalChecks = totalDevices + roomLevelFails;
+    final ready = (totalDevices - unreadyDevices).clamp(0, totalChecks);
+    return ready / totalChecks * 100;
   }
 
   bool get isReady => status == RoomStatus.ready;

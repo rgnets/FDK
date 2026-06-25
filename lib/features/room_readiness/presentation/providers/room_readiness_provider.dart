@@ -51,7 +51,7 @@ class RoomReadinessNotifier extends _$RoomReadinessNotifier {
         },
         (metrics) {
           _logger.i('RoomReadinessNotifier: Got ${metrics.length} metrics');
-          return _attachComplianceIssues(metrics, complianceFailures);
+          return attachComplianceIssues(metrics, complianceFailures);
         },
       );
     } catch (e, stack) {
@@ -60,92 +60,156 @@ class RoomReadinessNotifier extends _$RoomReadinessNotifier {
     }
   }
 
-  /// Walks each room's device list and, for each AP id matching a
-  /// `ComplianceFailure`, appends the corresponding `Issue.missingImages`
-  /// or `Issue.missingSpeedTest` to that room's issues. Room status is
-  /// recomputed if the new issues add up to non-empty.
-  ///
-  /// Matching is by AP `deviceId` (the integer rxg PK). The data source's
-  /// device-issue list already names devices by their numeric id under the
-  /// `metadata['deviceId']` key on existing `Issue` rows, so the same id
-  /// space lines up cleanly here. Rooms whose `metadata['deviceId']` is
-  /// missing (corner-case empty rooms or unbuilt entries) simply receive no
-  /// compliance issue.
-  List<RoomReadinessMetrics> _attachComplianceIssues(
-    List<RoomReadinessMetrics> metrics,
-    List<ComplianceFailure> failures,
-  ) {
-    if (failures.isEmpty) {
-      return metrics;
-    }
-
-    // Group failures by AP id for O(rooms * apsInRoom) injection rather
-    // than O(rooms * apsInRoom * failures).
-    final byApId = <int, List<ComplianceFailure>>{};
-    for (final f in failures) {
-      if (f.deviceType != 'access_point') {
-        continue;
-      }
-      byApId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
-    }
-    if (byApId.isEmpty) {
-      return metrics;
-    }
-
-    return metrics
-        .map((m) => _injectIssuesForRoom(m, byApId))
-        .toList(growable: false);
-  }
-
-  RoomReadinessMetrics _injectIssuesForRoom(
-    RoomReadinessMetrics room,
-    Map<int, List<ComplianceFailure>> byApId,
-  ) {
-    if (room.accessPointIds.isEmpty) {
-      return room;
-    }
-    final extras = <Issue>[];
-    for (final id in room.accessPointIds) {
-      final apFailures = byApId[id];
-      if (apFailures == null) {
-        continue;
-      }
-      for (final f in apFailures) {
-        if (f.ruleName == ComplianceNames.imagesRule) {
-          extras.add(Issue.missingImages(
-            deviceId: f.deviceId,
-            deviceName: f.deviceName,
-            deviceType: 'AP',
-            detectedAt: f.checkedAt,
-          ));
-        } else if (f.ruleName == ComplianceNames.speedTestRule) {
-          extras.add(Issue.missingSpeedTest(
-            deviceId: f.deviceId,
-            deviceName: f.deviceName,
-            detectedAt: f.checkedAt,
-          ));
-        }
-      }
-    }
-    if (extras.isEmpty) {
-      return room;
-    }
-    final newIssues = [...room.issues, ...extras];
-    // If the room was `ready` and now has issues, it transitions to
-    // `partial`. `down` / `empty` remain unchanged: critical issues or
-    // zero-device rooms aren't downgraded by an informational compliance
-    // issue.
-    final newStatus = (room.status == RoomStatus.ready)
-        ? RoomStatus.partial
-        : room.status;
-    return room.copyWith(issues: newIssues, status: newStatus);
-  }
-
   /// Refresh room readiness data.
   Future<void> refresh() async {
     _logger.i('RoomReadinessNotifier: refresh() called');
     ref.invalidateSelf();
   }
+}
+
+/// Pure, test-visible mapping of compliance failures onto room readiness
+/// metrics. Two failure shapes are handled:
+///   * `access_point` failures → per-AP `Issue.missingImages` /
+///     `Issue.missingSpeedTest`, matched by AP id to the room containing it.
+///   * `pms_room` failures under the speed-test rule → a room-level
+///     `Issue.coverageSpeedTestFailed`, matched by room id. Coverage speed
+///     tests are room-scoped (no AP), so the rxg rule reports them against the
+///     `pms_room`, not an access point.
+///
+/// Rooms that gain issues move `ready -> partial`; `down` / `empty` are left
+/// unchanged. Generated issues are de-duplicated by stable `Issue.id` (across
+/// existing room issues too) so repeated failure rows or refreshes don't stack
+/// duplicates.
+List<RoomReadinessMetrics> attachComplianceIssues(
+  List<RoomReadinessMetrics> metrics,
+  List<ComplianceFailure> failures,
+) {
+  if (failures.isEmpty) {
+    return metrics;
+  }
+
+  // Group failures by AP id, ONT id, and room id in a single pass. Per-AP and
+  // per-ONT rows feed device `missingImages` / `missingSpeedTest` issues;
+  // room-level coverage failures only come from the speed-test rule.
+  final byApId = <int, List<ComplianceFailure>>{};
+  final byOntId = <int, List<ComplianceFailure>>{};
+  final byRoomId = <int, List<ComplianceFailure>>{};
+  for (final f in failures) {
+    if (f.deviceType == 'access_point') {
+      byApId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
+    } else if (f.deviceType == 'ont') {
+      byOntId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
+    } else if (f.deviceType == 'pms_room' &&
+        f.ruleName == ComplianceNames.speedTestRule) {
+      byRoomId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
+    }
+  }
+  if (byApId.isEmpty && byOntId.isEmpty && byRoomId.isEmpty) {
+    return metrics;
+  }
+
+  return metrics
+      .map((m) => _injectIssuesForRoom(m, byApId, byOntId, byRoomId))
+      .toList(growable: false);
+}
+
+RoomReadinessMetrics _injectIssuesForRoom(
+  RoomReadinessMetrics room,
+  Map<int, List<ComplianceFailure>> byApId,
+  Map<int, List<ComplianceFailure>> byOntId,
+  Map<int, List<ComplianceFailure>> byRoomId,
+) {
+  final extras = <Issue>[];
+
+  // Per-AP failures (images / speed test), matched by the room's AP ids.
+  for (final id in room.accessPointIds) {
+    final apFailures = byApId[id];
+    if (apFailures == null) {
+      continue;
+    }
+    for (final f in apFailures) {
+      if (f.ruleName == ComplianceNames.imagesRule) {
+        extras.add(Issue.missingImages(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          deviceType: 'AP',
+          detectedAt: f.checkedAt,
+        ));
+      } else if (f.ruleName == ComplianceNames.speedTestRule) {
+        extras.add(Issue.missingSpeedTest(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          detectedAt: f.checkedAt,
+        ));
+      }
+    }
+  }
+
+  // Per-ONT failures (currently: missing images), matched by the room's ONT
+  // ids. ONTs (MediaConverters) carry compliance failures under `device_type:
+  // "ont"`, attributed to the room via the data source's `ontDeviceIds`.
+  for (final id in room.ontDeviceIds) {
+    final ontFailures = byOntId[id];
+    if (ontFailures == null) {
+      continue;
+    }
+    for (final f in ontFailures) {
+      if (f.ruleName == ComplianceNames.imagesRule) {
+        extras.add(Issue.missingImages(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          deviceType: 'ONT',
+          detectedAt: f.checkedAt,
+        ));
+      } else if (f.ruleName == ComplianceNames.speedTestRule) {
+        extras.add(Issue.missingSpeedTest(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          deviceType: 'ONT',
+          detectedAt: f.checkedAt,
+        ));
+      }
+    }
+  }
+
+  // Room-level coverage speed-test failures, matched by the room id (not an
+  // AP). A room with no access points still receives these.
+  final roomFailures = byRoomId[room.roomId];
+  if (roomFailures != null) {
+    for (final f in roomFailures) {
+      extras.add(Issue.coverageSpeedTestFailed(
+        roomId: room.roomId,
+        roomName: room.roomName,
+        reason: f.reason,
+        detectedAt: f.checkedAt,
+      ));
+    }
+  }
+
+  if (extras.isEmpty) {
+    return room;
+  }
+
+  // De-duplicate by stable `Issue.id`, keeping the first occurrence so an
+  // existing issue (and its original `detectedAt`) is never overwritten by a
+  // re-injected duplicate on refresh.
+  final merged = <String, Issue>{};
+  for (final i in room.issues) {
+    merged.putIfAbsent(i.id, () => i);
+  }
+  for (final i in extras) {
+    merged.putIfAbsent(i.id, () => i);
+  }
+
+  // If the room was `ready` and now has issues, it transitions to `partial`.
+  // `down` / `empty` remain unchanged: critical issues or zero-device rooms
+  // aren't downgraded by an informational compliance issue.
+  final newStatus =
+      (room.status == RoomStatus.ready) ? RoomStatus.partial : room.status;
+  return room.copyWith(
+    issues: merged.values.toList(growable: false),
+    status: newStatus,
+  );
 }
 
 /// Provider for overall readiness percentage.
