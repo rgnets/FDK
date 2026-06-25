@@ -48,6 +48,22 @@ void main() {
       expect(issue.metadata['deviceName'], 'AP-001');
     });
 
+    test('should create coverageSpeedTestFailed issue with factory constructor', () {
+      final issue = Issue.coverageSpeedTestFailed(
+        roomId: 245,
+        roomName: '7206',
+        detectedAt: DateTime(2026, 6, 25, 9, 0, 0),
+      );
+
+      expect(issue.code, 'COVERAGE_SPEED_TEST_FAILED');
+      expect(issue.severity, IssueSeverity.warning);
+      expect(issue.category, IssueCategory.performance);
+      expect(issue.metadata['roomId'], 245);
+      expect(issue.metadata.containsKey('deviceId'), isFalse);
+      expect(issue.id, contains('245'));
+      expect(issue.resolution, isNotNull);
+    });
+
     test('should have all severity levels', () {
       expect(IssueSeverity.values, containsAll([
         IssueSeverity.critical,
@@ -275,6 +291,70 @@ void main() {
       expect(partialMetrics.statusText, 'Partial');
       expect(downMetrics.statusText, 'Down');
       expect(emptyMetrics.statusText, 'Empty');
+    });
+  });
+
+  group('readinessScore room-level issues', () {
+    test('a room-level coverage issue (no deviceId) counts as an extra failed check', () {
+      final metrics = RoomReadinessMetrics(
+        roomId: 245,
+        roomName: '7206',
+        status: RoomStatus.partial,
+        totalDevices: 2,
+        onlineDevices: 2,
+        offlineDevices: 0,
+        issues: [
+          Issue.coverageSpeedTestFailed(roomId: 245, roomName: '7206'),
+        ],
+        lastUpdated: DateTime.now(),
+      );
+
+      // 2 devices all ready, +1 room-level failed check => 2 of 3 checks pass.
+      expect(metrics.readinessScore, closeTo(66.66, 0.5));
+    });
+
+    test('a generic issue without a roomId marker does not count as a room-level fail', () {
+      final metrics = RoomReadinessMetrics(
+        roomId: 1,
+        roomName: 'Room 101',
+        status: RoomStatus.partial,
+        totalDevices: 2,
+        onlineDevices: 2,
+        offlineDevices: 0,
+        issues: [
+          // No deviceId AND no roomId — must not silently lower the score.
+          Issue(
+            id: 'adhoc-1',
+            code: 'ADHOC',
+            title: 'Ad hoc',
+            description: 'No device or room marker',
+            severity: IssueSeverity.info,
+            category: IssueCategory.maintenance,
+            detectedAt: DateTime.now(),
+          ),
+        ],
+        lastUpdated: DateTime.now(),
+      );
+
+      // 2 devices, both ready, no room-level fails => 100.
+      expect(metrics.readinessScore, 100);
+    });
+
+    test('an empty room with a coverage issue does not divide by zero', () {
+      final metrics = RoomReadinessMetrics(
+        roomId: 9,
+        roomName: 'X',
+        status: RoomStatus.empty,
+        totalDevices: 0,
+        onlineDevices: 0,
+        offlineDevices: 0,
+        issues: [
+          Issue.coverageSpeedTestFailed(roomId: 9, roomName: 'X'),
+        ],
+        lastUpdated: DateTime.now(),
+      );
+
+      expect(metrics.readinessScore, 0);
     });
   });
 

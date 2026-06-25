@@ -118,6 +118,39 @@ class Issue with _$Issue {
     );
   }
 
+  /// Room-level coverage speed test that the rxg compliance rule reported as
+  /// failed. Coverage tests are room-scoped (matched by `pms_room_id`, not an
+  /// AP), so the backend emits the failure as `device_type: "pms_room"`. Unlike
+  /// the per-AP [Issue.missingSpeedTest], this carries `roomId` and never a
+  /// `deviceId`. [reason] is the backend's failure explanation; when absent a
+  /// generic message is used.
+  factory Issue.coverageSpeedTestFailed({
+    required int roomId,
+    required String roomName,
+    String? reason,
+    DateTime? detectedAt,
+  }) {
+    final detail = (reason != null && reason.isNotEmpty)
+        ? reason
+        : 'failed its latest coverage speed test';
+    return Issue(
+      id: 'coverage_speed_test_room_$roomId',
+      code: 'COVERAGE_SPEED_TEST_FAILED',
+      title: 'Coverage Speed Test Failed',
+      description: 'Room $roomName: $detail',
+      severity: IssueSeverity.warning,
+      category: IssueCategory.performance,
+      detectedAt: detectedAt ?? DateTime.now(),
+      metadata: {
+        'roomId': roomId,
+        'roomName': roomName,
+      },
+      resolution:
+          'Re-run the coverage speed test, or improve AP placement/coverage '
+          'in this room to meet the required throughput',
+    );
+  }
+
   /// Factory constructor for onboarding issues
   factory Issue.onboardingIncomplete({
     required int deviceId,
