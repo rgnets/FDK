@@ -88,31 +88,35 @@ List<RoomReadinessMetrics> attachComplianceIssues(
     return metrics;
   }
 
-  // Group failures by AP id and by room id in a single pass. Per-AP rows feed
-  // the existing images / speed-test issues; room-level coverage failures only
-  // come from the speed-test rule.
+  // Group failures by AP id, ONT id, and room id in a single pass. Per-AP and
+  // per-ONT rows feed device `missingImages` / `missingSpeedTest` issues;
+  // room-level coverage failures only come from the speed-test rule.
   final byApId = <int, List<ComplianceFailure>>{};
+  final byOntId = <int, List<ComplianceFailure>>{};
   final byRoomId = <int, List<ComplianceFailure>>{};
   for (final f in failures) {
     if (f.deviceType == 'access_point') {
       byApId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
+    } else if (f.deviceType == 'ont') {
+      byOntId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
     } else if (f.deviceType == 'pms_room' &&
         f.ruleName == ComplianceNames.speedTestRule) {
       byRoomId.putIfAbsent(f.deviceId, () => <ComplianceFailure>[]).add(f);
     }
   }
-  if (byApId.isEmpty && byRoomId.isEmpty) {
+  if (byApId.isEmpty && byOntId.isEmpty && byRoomId.isEmpty) {
     return metrics;
   }
 
   return metrics
-      .map((m) => _injectIssuesForRoom(m, byApId, byRoomId))
+      .map((m) => _injectIssuesForRoom(m, byApId, byOntId, byRoomId))
       .toList(growable: false);
 }
 
 RoomReadinessMetrics _injectIssuesForRoom(
   RoomReadinessMetrics room,
   Map<int, List<ComplianceFailure>> byApId,
+  Map<int, List<ComplianceFailure>> byOntId,
   Map<int, List<ComplianceFailure>> byRoomId,
 ) {
   final extras = <Issue>[];
@@ -135,6 +139,33 @@ RoomReadinessMetrics _injectIssuesForRoom(
         extras.add(Issue.missingSpeedTest(
           deviceId: f.deviceId,
           deviceName: f.deviceName,
+          detectedAt: f.checkedAt,
+        ));
+      }
+    }
+  }
+
+  // Per-ONT failures (currently: missing images), matched by the room's ONT
+  // ids. ONTs (MediaConverters) carry compliance failures under `device_type:
+  // "ont"`, attributed to the room via the data source's `ontDeviceIds`.
+  for (final id in room.ontDeviceIds) {
+    final ontFailures = byOntId[id];
+    if (ontFailures == null) {
+      continue;
+    }
+    for (final f in ontFailures) {
+      if (f.ruleName == ComplianceNames.imagesRule) {
+        extras.add(Issue.missingImages(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          deviceType: 'ONT',
+          detectedAt: f.checkedAt,
+        ));
+      } else if (f.ruleName == ComplianceNames.speedTestRule) {
+        extras.add(Issue.missingSpeedTest(
+          deviceId: f.deviceId,
+          deviceName: f.deviceName,
+          deviceType: 'ONT',
           detectedAt: f.checkedAt,
         ));
       }

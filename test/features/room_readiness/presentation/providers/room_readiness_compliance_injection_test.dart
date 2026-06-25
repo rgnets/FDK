@@ -8,6 +8,7 @@ RoomReadinessMetrics _room({
   required int roomId,
   RoomStatus status = RoomStatus.ready,
   List<int> accessPointIds = const [],
+  List<int> ontDeviceIds = const [],
   int totalDevices = 2,
 }) {
   return RoomReadinessMetrics(
@@ -20,6 +21,7 @@ RoomReadinessMetrics _room({
     issues: const [],
     lastUpdated: DateTime(2026, 6, 25),
     accessPointIds: accessPointIds,
+    ontDeviceIds: ontDeviceIds,
   );
 }
 
@@ -149,6 +151,63 @@ void main() {
     test('empty failure list returns the rooms unchanged', () {
       final rooms = [_room(roomId: 245)];
       expect(attachComplianceIssues(rooms, const []), same(rooms));
+    });
+
+    test('an ont imagesRule failure maps to ONT missing images on its room', () {
+      final rooms = [_room(roomId: 245, ontDeviceIds: const [901])];
+      final failures = [
+        _failure(
+          deviceType: 'ont',
+          deviceId: 901,
+          ruleName: ComplianceNames.imagesRule,
+          reason: 'missing installation images',
+        ),
+      ];
+
+      final issues = attachComplianceIssues(rooms, failures).single.issues;
+      final missing =
+          issues.where((i) => i.code == 'MISSING_IMAGES').toList();
+
+      expect(missing, hasLength(1));
+      expect(missing.first.metadata['deviceType'], 'ONT');
+      expect(missing.first.metadata['deviceId'], 901);
+      expect(attachComplianceIssues(rooms, failures).single.status,
+          RoomStatus.partial);
+    });
+
+    test('an ont speedTestRule failure maps to ONT missing speed test on its room', () {
+      final rooms = [_room(roomId: 245, ontDeviceIds: const [901])];
+      final failures = [
+        _failure(
+          deviceType: 'ont',
+          deviceId: 901,
+          ruleName: ComplianceNames.speedTestRule,
+          reason: 'latest validation ONT speed test failed',
+        ),
+      ];
+
+      final issues = attachComplianceIssues(rooms, failures).single.issues;
+      final mst =
+          issues.where((i) => i.code == 'MISSING_SPEED_TEST').toList();
+
+      expect(mst, hasLength(1));
+      expect(mst.first.id, 'missing_speed_test_ONT_901');
+      expect(mst.first.metadata['deviceType'], 'ONT');
+      expect(attachComplianceIssues(rooms, failures).single.status,
+          RoomStatus.partial);
+    });
+
+    test('an ont failure for an ONT not in the room is not attached', () {
+      final rooms = [_room(roomId: 245, ontDeviceIds: const [901])];
+      final failures = [
+        _failure(
+          deviceType: 'ont',
+          deviceId: 999,
+          ruleName: ComplianceNames.imagesRule,
+        ),
+      ];
+
+      expect(attachComplianceIssues(rooms, failures).single.issues, isEmpty);
     });
 
     test('an empty room is not downgraded by a coverage failure', () {

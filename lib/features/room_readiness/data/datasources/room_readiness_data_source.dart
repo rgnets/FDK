@@ -252,6 +252,10 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     // notifier to attach compliance failures (Issue.missingImages /
     // Issue.missingSpeedTest), matched by AP id.
     final accessPointIds = <int>[];
+    // ONT (MediaConverter) rxg primary keys present in this room. Used by the
+    // notifier to attach per-ONT compliance failures (e.g. ONT missing images),
+    // matched by ONT id.
+    final ontDeviceIds = <int>[];
 
     for (final ref in deviceRefs) {
       final isAp = ref['type'] == 'AP';
@@ -277,6 +281,11 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
         final apId = _parseDeviceId(device);
         if (apId != 0) {
           accessPointIds.add(apId);
+        }
+      } else if (ref['type'] == 'ONT') {
+        final ontId = _parseDeviceId(device);
+        if (ontId != 0) {
+          ontDeviceIds.add(ontId);
         }
       }
 
@@ -322,6 +331,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       issues: issues,
       lastUpdated: DateTime.now(),
       accessPointIds: accessPointIds,
+      ontDeviceIds: ontDeviceIds,
     );
   }
 
@@ -498,22 +508,40 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     // Check onboarding status
     try {
       final onboardingStatus = _getOnboardingStatus(device, deviceType);
-      if (onboardingStatus != null && !_isOnboardingComplete(onboardingStatus, deviceType)) {
-        final deviceId = _parseDeviceId(device);
-        final deviceName = _getDeviceName(device);
-        final currentStage = _getOnboardingStage(onboardingStatus);
-        final totalStages = deviceType == 'AP' ? 6 : 5;
+      if (onboardingStatus != null) {
+        if (!_isOnboardingComplete(onboardingStatus, deviceType)) {
+          final deviceId = _parseDeviceId(device);
+          final deviceName = _getDeviceName(device);
+          final currentStage = _getOnboardingStage(onboardingStatus);
+          final totalStages = deviceType == 'AP' ? 6 : 5;
 
-        if (currentStage < totalStages) {
-          issues.add(
-            Issue.onboardingIncomplete(
-              deviceId: deviceId,
-              deviceName: deviceName,
-              deviceType: deviceType ?? 'Device',
-              currentStage: currentStage,
-              totalStages: totalStages,
-            ),
-          );
+          if (currentStage < totalStages) {
+            issues.add(
+              Issue.onboardingIncomplete(
+                deviceId: deviceId,
+                deviceName: deviceName,
+                deviceType: deviceType ?? 'Device',
+                currentStage: currentStage,
+                totalStages: totalStages,
+              ),
+            );
+          }
+        } else {
+          // Onboarding stage is complete, but the status may still carry an
+          // `error` (e.g. an online, approved AP missing its CSR/Cert in the
+          // DB). The stage-only completeness check misses these; surface them
+          // as a warning so the room drops below 100%, matching the FE portal.
+          final error = _getOnboardingError(onboardingStatus);
+          if (error != null && error.isNotEmpty) {
+            issues.add(
+              Issue.onboardingError(
+                deviceId: _parseDeviceId(device),
+                deviceName: _getDeviceName(device),
+                deviceType: deviceType ?? 'Device',
+                error: error,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -556,6 +584,22 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     }
     if (status is int) return status;
     return 0;
+  }
+
+  /// The `error` string from an onboarding status (e.g. "CSR and Cert missing
+  /// from DB"), read from either the raw WebSocket map or a typed payload.
+  /// Returns null when absent or not a string.
+  String? _getOnboardingError(dynamic status) {
+    if (status is Map<String, dynamic>) {
+      final e = status['error'];
+      return e is String ? e : null;
+    }
+    try {
+      final e = status.error;
+      return e is String ? e : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   RoomStatus _determineRoomStatus({

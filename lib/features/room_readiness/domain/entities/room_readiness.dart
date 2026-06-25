@@ -32,6 +32,10 @@ class RoomReadinessMetrics with _$RoomReadinessMetrics {
     // failures without re-walking room data. Defaults to empty so existing
     // construction sites (tests, mock rows) don't need to change.
     @Default(<int>[]) List<int> accessPointIds,
+    // ONT (MediaConverter) device ids in this room. Mirrors `accessPointIds`
+    // so the notifier can attach per-ONT compliance failures (e.g. ONT
+    // `Issue.missingImages`) matched by ONT id. Defaults to empty.
+    @Default(<int>[]) List<int> ontDeviceIds,
   }) = _RoomReadinessMetrics;
 
   const RoomReadinessMetrics._();

@@ -56,12 +56,27 @@ void main() {
       );
 
       expect(issue.code, 'COVERAGE_SPEED_TEST_FAILED');
-      expect(issue.severity, IssueSeverity.warning);
+      expect(issue.severity, IssueSeverity.info);
       expect(issue.category, IssueCategory.performance);
       expect(issue.metadata['roomId'], 245);
       expect(issue.metadata.containsKey('deviceId'), isFalse);
       expect(issue.id, contains('245'));
       expect(issue.resolution, isNotNull);
+    });
+
+    test('should create onboardingError issue with factory constructor', () {
+      final issue = Issue.onboardingError(
+        deviceId: 700,
+        deviceName: 'AP1-2-1206',
+        deviceType: 'AP',
+        error: 'CSR and Cert missing from DB',
+      );
+
+      expect(issue.code, 'ONBOARDING_ERROR');
+      expect(issue.severity, IssueSeverity.warning);
+      expect(issue.metadata['deviceId'], 700);
+      expect(issue.metadata['error'], 'CSR and Cert missing from DB');
+      expect(issue.description, contains('CSR and Cert missing from DB'));
     });
 
     test('should have all severity levels', () {

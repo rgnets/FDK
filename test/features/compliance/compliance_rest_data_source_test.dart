@@ -206,6 +206,21 @@ void main() {
   });
 
   group('ComplianceRestDataSource — bootstrapResult', () {
+    test('requests newest-first ordering so page 1 holds the current snapshot', () async {
+      Uri? requested;
+      final ds = ComplianceRestDataSource(
+        siteUrl: 'example.test',
+        apiKey: 'secret',
+        client: MockClient((req) async {
+          requested = req.url;
+          return http.Response(jsonEncodedSnapshotList(), 200);
+        }),
+      );
+      await ds.bootstrapResult(ruleId: 1, ruleName: "rule", fleetNodeId: 7);
+      expect(requested, isNotNull);
+      expect(requested!.queryParameters['ordering'], '-checked_at');
+    });
+
     test('returns found + matching snapshot for (rule, fleet_node)', () async {
       final ds = ComplianceRestDataSource(
         siteUrl: 'example.test',

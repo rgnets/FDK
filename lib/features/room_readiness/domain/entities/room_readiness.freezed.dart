@@ -34,6 +34,7 @@ mixin _$RoomReadinessMetrics {
 // failures without re-walking room data. Defaults to empty so existing
 // construction sites (tests, mock rows) don't need to change.
   List<int> get accessPointIds => throw _privateConstructorUsedError;
+  List<int> get ontDeviceIds => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(
@@ -45,7 +46,8 @@ mixin _$RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -60,7 +62,8 @@ mixin _$RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)?
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)?
         $default,
   ) =>
       throw _privateConstructorUsedError;
@@ -75,7 +78,8 @@ mixin _$RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)?
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)?
         $default, {
     required TResult orElse(),
   }) =>
@@ -117,7 +121,8 @@ abstract class $RoomReadinessMetricsCopyWith<$Res> {
       int offlineDevices,
       List<Issue> issues,
       DateTime lastUpdated,
-      List<int> accessPointIds});
+      List<int> accessPointIds,
+      List<int> ontDeviceIds});
 }
 
 /// @nodoc
@@ -143,6 +148,7 @@ class _$RoomReadinessMetricsCopyWithImpl<$Res,
     Object? issues = null,
     Object? lastUpdated = null,
     Object? accessPointIds = null,
+    Object? ontDeviceIds = null,
   }) {
     return _then(_value.copyWith(
       roomId: null == roomId
@@ -181,6 +187,10 @@ class _$RoomReadinessMetricsCopyWithImpl<$Res,
           ? _value.accessPointIds
           : accessPointIds // ignore: cast_nullable_to_non_nullable
               as List<int>,
+      ontDeviceIds: null == ontDeviceIds
+          ? _value.ontDeviceIds
+          : ontDeviceIds // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ) as $Val);
   }
 }
@@ -202,7 +212,8 @@ abstract class _$$RoomReadinessMetricsImplCopyWith<$Res>
       int offlineDevices,
       List<Issue> issues,
       DateTime lastUpdated,
-      List<int> accessPointIds});
+      List<int> accessPointIds,
+      List<int> ontDeviceIds});
 }
 
 /// @nodoc
@@ -225,6 +236,7 @@ class __$$RoomReadinessMetricsImplCopyWithImpl<$Res>
     Object? issues = null,
     Object? lastUpdated = null,
     Object? accessPointIds = null,
+    Object? ontDeviceIds = null,
   }) {
     return _then(_$RoomReadinessMetricsImpl(
       roomId: null == roomId
@@ -263,6 +275,10 @@ class __$$RoomReadinessMetricsImplCopyWithImpl<$Res>
           ? _value._accessPointIds
           : accessPointIds // ignore: cast_nullable_to_non_nullable
               as List<int>,
+      ontDeviceIds: null == ontDeviceIds
+          ? _value._ontDeviceIds
+          : ontDeviceIds // ignore: cast_nullable_to_non_nullable
+              as List<int>,
     ));
   }
 }
@@ -279,9 +295,11 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
       required this.offlineDevices,
       required final List<Issue> issues,
       required this.lastUpdated,
-      final List<int> accessPointIds = const <int>[]})
+      final List<int> accessPointIds = const <int>[],
+      final List<int> ontDeviceIds = const <int>[]})
       : _issues = issues,
         _accessPointIds = accessPointIds,
+        _ontDeviceIds = ontDeviceIds,
         super._();
 
   factory _$RoomReadinessMetricsImpl.fromJson(Map<String, dynamic> json) =>
@@ -328,9 +346,18 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
     return EqualUnmodifiableListView(_accessPointIds);
   }
 
+  final List<int> _ontDeviceIds;
+  @override
+  @JsonKey()
+  List<int> get ontDeviceIds {
+    if (_ontDeviceIds is EqualUnmodifiableListView) return _ontDeviceIds;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_ontDeviceIds);
+  }
+
   @override
   String toString() {
-    return 'RoomReadinessMetrics(roomId: $roomId, roomName: $roomName, status: $status, totalDevices: $totalDevices, onlineDevices: $onlineDevices, offlineDevices: $offlineDevices, issues: $issues, lastUpdated: $lastUpdated, accessPointIds: $accessPointIds)';
+    return 'RoomReadinessMetrics(roomId: $roomId, roomName: $roomName, status: $status, totalDevices: $totalDevices, onlineDevices: $onlineDevices, offlineDevices: $offlineDevices, issues: $issues, lastUpdated: $lastUpdated, accessPointIds: $accessPointIds, ontDeviceIds: $ontDeviceIds)';
   }
 
   @override
@@ -352,7 +379,9 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             (identical(other.lastUpdated, lastUpdated) ||
                 other.lastUpdated == lastUpdated) &&
             const DeepCollectionEquality()
-                .equals(other._accessPointIds, _accessPointIds));
+                .equals(other._accessPointIds, _accessPointIds) &&
+            const DeepCollectionEquality()
+                .equals(other._ontDeviceIds, _ontDeviceIds));
   }
 
   @JsonKey(ignore: true)
@@ -367,7 +396,8 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
       offlineDevices,
       const DeepCollectionEquality().hash(_issues),
       lastUpdated,
-      const DeepCollectionEquality().hash(_accessPointIds));
+      const DeepCollectionEquality().hash(_accessPointIds),
+      const DeepCollectionEquality().hash(_ontDeviceIds));
 
   @JsonKey(ignore: true)
   @override
@@ -389,11 +419,12 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)
         $default,
   ) {
     return $default(roomId, roomName, status, totalDevices, onlineDevices,
-        offlineDevices, issues, lastUpdated, accessPointIds);
+        offlineDevices, issues, lastUpdated, accessPointIds, ontDeviceIds);
   }
 
   @override
@@ -408,11 +439,12 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)?
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)?
         $default,
   ) {
     return $default?.call(roomId, roomName, status, totalDevices, onlineDevices,
-        offlineDevices, issues, lastUpdated, accessPointIds);
+        offlineDevices, issues, lastUpdated, accessPointIds, ontDeviceIds);
   }
 
   @override
@@ -427,13 +459,14 @@ class _$RoomReadinessMetricsImpl extends _RoomReadinessMetrics {
             int offlineDevices,
             List<Issue> issues,
             DateTime lastUpdated,
-            List<int> accessPointIds)?
+            List<int> accessPointIds,
+            List<int> ontDeviceIds)?
         $default, {
     required TResult orElse(),
   }) {
     if ($default != null) {
       return $default(roomId, roomName, status, totalDevices, onlineDevices,
-          offlineDevices, issues, lastUpdated, accessPointIds);
+          offlineDevices, issues, lastUpdated, accessPointIds, ontDeviceIds);
     }
     return orElse();
   }
@@ -484,7 +517,8 @@ abstract class _RoomReadinessMetrics extends RoomReadinessMetrics {
       required final int offlineDevices,
       required final List<Issue> issues,
       required final DateTime lastUpdated,
-      final List<int> accessPointIds}) = _$RoomReadinessMetricsImpl;
+      final List<int> accessPointIds,
+      final List<int> ontDeviceIds}) = _$RoomReadinessMetricsImpl;
   const _RoomReadinessMetrics._() : super._();
 
   factory _RoomReadinessMetrics.fromJson(Map<String, dynamic> json) =
@@ -512,6 +546,8 @@ abstract class _RoomReadinessMetrics extends RoomReadinessMetrics {
 // failures without re-walking room data. Defaults to empty so existing
 // construction sites (tests, mock rows) don't need to change.
   List<int> get accessPointIds;
+  @override
+  List<int> get ontDeviceIds;
   @override
   @JsonKey(ignore: true)
   _$$RoomReadinessMetricsImplCopyWith<_$RoomReadinessMetricsImpl>
