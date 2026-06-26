@@ -313,10 +313,19 @@ class ComplianceRestDataSource {
     // filterable through the dotted path, so `?compliance_rule.name=…`
     // works. Filtering by name also avoids hard-coding a rule_id that
     // varies per rxg.
+    // `ordering=-checked_at` is essential: result rows accumulate as history
+    // and the endpoint paginates at 30 rows. Without it the rxg returns the
+    // OLDEST page first, so we'd select a stale snapshot (the freshest result
+    // lives on a later page we never fetch) — surfacing already-resolved
+    // failures like "missing images" for devices that now have them. Newest-
+    // first guarantees page 1 contains the current snapshot. The rxg's
+    // rest_framework OrderingFilter honours `-checked_at` (checked_at is a
+    // serialized field, so it's orderable).
     final uri = Uri.parse(
         'https://$siteUrl/api/compliance_check_results.json'
         '?api_key=${Uri.encodeQueryComponent(apiKey)}'
-        '&compliance_rule.name=${Uri.encodeQueryComponent(ruleName)}');
+        '&compliance_rule.name=${Uri.encodeQueryComponent(ruleName)}'
+        '&ordering=-checked_at');
     LoggerService.debug('GET ${scrubUrlForLog(uri)}', tag: _tag);
     final http.Response response;
     try {

@@ -49,6 +49,19 @@ void main() {
       expect(result!.deviceName, 'Café — Lobby 北');
     });
 
+    test('parses a room-level pms_room coverage failure row', () {
+      const line =
+          'Failure: {"device_type":"pms_room","id":245,"name":"7206","reason":"latest coverage speed test failed","download_mbps":"","upload_mbps":""}';
+
+      final result = parseFailureLine(line, ruleName: 'r', ruleId: 1);
+
+      expect(result, isNotNull);
+      expect(result!.deviceType, 'pms_room');
+      expect(result.deviceId, 245);
+      expect(result.deviceName, '7206');
+      expect(result.reason, 'latest coverage speed test failed');
+    });
+
     test('returns null for a malformed JSON body', () {
       const line = 'Failure: {not really json}';
 

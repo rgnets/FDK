@@ -92,14 +92,17 @@ class Issue with _$Issue {
     );
   }
 
-  /// Factory constructor for missing speed test results issue
+  /// Factory constructor for missing/failed speed test results issue.
+  /// Used for both APs and ONTs — [deviceType] keys the id and metadata so the
+  /// two don't collide (`missing_speed_test_AP_*` vs `missing_speed_test_ONT_*`).
   factory Issue.missingSpeedTest({
     required int deviceId,
     required String deviceName,
+    String deviceType = 'AP',
     DateTime? detectedAt,
   }) {
     return Issue(
-      id: 'missing_speed_test_AP_$deviceId',
+      id: 'missing_speed_test_${deviceType}_$deviceId',
       code: 'MISSING_SPEED_TEST',
       title: 'Missing Speed Test',
       description: '$deviceName has no speed test results',
@@ -109,12 +112,77 @@ class Issue with _$Issue {
       metadata: {
         'deviceId': deviceId,
         'deviceName': deviceName,
-        'deviceType': 'AP',
+        'deviceType': deviceType,
       },
       resolution:
-          'Run a speed test using this access point to verify performance',
+          'Run a speed test for this $deviceType to verify performance',
       isAutoDismissible: true,
       autoDismissAfter: const Duration(days: 30),
+    );
+  }
+
+  /// Room-level coverage speed test that the rxg compliance rule reported as
+  /// failed. Coverage tests are room-scoped (matched by `pms_room_id`, not an
+  /// AP), so the backend emits the failure as `device_type: "pms_room"`. Unlike
+  /// the per-AP [Issue.missingSpeedTest], this carries `roomId` and never a
+  /// `deviceId`. [reason] is the backend's failure explanation; when absent a
+  /// generic message is used.
+  factory Issue.coverageSpeedTestFailed({
+    required int roomId,
+    required String roomName,
+    String? reason,
+    DateTime? detectedAt,
+  }) {
+    final detail = (reason != null && reason.isNotEmpty)
+        ? reason
+        : 'failed its latest coverage speed test';
+    return Issue(
+      id: 'coverage_speed_test_room_$roomId',
+      code: 'COVERAGE_SPEED_TEST_FAILED',
+      title: 'Coverage Speed Test Failed',
+      description: 'Room $roomName: $detail',
+      // Notice-level (like Issue.missingSpeedTest), not a warning banner — a
+      // failed coverage test is informational, surfaced alongside the other
+      // per-room notices rather than as a standalone warning.
+      severity: IssueSeverity.info,
+      category: IssueCategory.performance,
+      detectedAt: detectedAt ?? DateTime.now(),
+      metadata: {
+        'roomId': roomId,
+        'roomName': roomName,
+      },
+      resolution:
+          'Re-run the coverage speed test, or improve AP placement/coverage '
+          'in this room to meet the required throughput',
+    );
+  }
+
+  /// A device whose onboarding stage is complete but still reports an `error`
+  /// in its onboarding status — e.g. an online, approved AP that is missing its
+  /// CSR/Cert in the DB. The stage-only completeness check misses these, so they
+  /// are surfaced here to match what the FE portal flags.
+  factory Issue.onboardingError({
+    required int deviceId,
+    required String deviceName,
+    required String deviceType,
+    required String error,
+    DateTime? detectedAt,
+  }) {
+    return Issue(
+      id: 'onboarding_error_${deviceType}_$deviceId',
+      code: 'ONBOARDING_ERROR',
+      title: 'Onboarding Error',
+      description: '$deviceName: $error',
+      severity: IssueSeverity.warning,
+      category: IssueCategory.configuration,
+      detectedAt: detectedAt ?? DateTime.now(),
+      metadata: {
+        'deviceId': deviceId,
+        'deviceName': deviceName,
+        'deviceType': deviceType,
+        'error': error,
+      },
+      resolution: 'Resolve the reported error on this device',
     );
   }
 

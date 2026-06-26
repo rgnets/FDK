@@ -233,12 +233,10 @@ final roomReadinessMockDataSourceProvider =
 /// Room readiness repository provider
 final roomReadinessRepositoryProvider = Provider<RoomReadinessRepository>((ref) {
   final dataSource = ref.watch(roomReadinessDataSourceProvider);
-  final mockDataSource = ref.watch(roomReadinessMockDataSourceProvider);
   final logger = LoggerService.getLogger();
 
   return RoomReadinessRepositoryImpl(
     dataSource: dataSource,
-    mockDataSource: mockDataSource,
     logger: logger,
   );
 });

@@ -12,6 +12,7 @@ import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readines
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_device_view_model.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/room_view_models.dart';
 import 'package:rgnets_fdk/features/rooms/presentation/providers/rooms_riverpod_provider.dart';
+import 'package:rgnets_fdk/features/rooms/presentation/widgets/room_issues_section.dart';
 import 'package:rgnets_fdk/features/speed_test/presentation/widgets/room_speed_test_selector.dart';
 
 /// Room detail screen with device management
@@ -105,7 +106,7 @@ class _RoomHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(roomVm.status);
-    final healthPercentage = roomVm.onlinePercentage;
+    final readiness = roomVm.readinessScore;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -194,40 +195,59 @@ class _RoomHeader extends StatelessWidget {
           ),
           
           // Health indicator
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: healthPercentage / 100,
-                  strokeWidth: 6,
-                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    healthPercentage >= 90 ? Colors.green :
-                    healthPercentage >= 70 ? Colors.orange : Colors.red,
-                  ),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 72,
+                height: 72,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Text(
-                      '${healthPercentage.toStringAsFixed(0)}%',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // Track + progress, drawn thinner so the number has room.
+                    CircularProgressIndicator(
+                      value: readiness / 100,
+                      strokeWidth: 5,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: Colors.grey.withValues(alpha: 0.15),
+                      // Unified with the room status: green when all issues are
+                      // clear (100%), orange/red/grey otherwise.
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
-                    Text(
-                      'Health',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey,
-                      ),
+                    // Number + unit, sized to never touch the ring.
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          readiness.toStringAsFixed(0),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                            height: 1,
+                          ),
+                        ),
+                        Text(
+                          '%',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Ready',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -291,7 +311,12 @@ class _OverviewTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 16),
-          
+
+          // Room issues (Critical / Warning / Notice). Tap an issue to open the
+          // offending device's detail. Omitted when none.
+          if (int.tryParse(roomVm.id) case final int rid)
+            RoomIssuesSection(roomId: rid),
+
           // Quick Stats Grid - using actual device statistics
           Row(
             children: [

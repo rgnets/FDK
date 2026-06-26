@@ -4,6 +4,8 @@ import 'package:logger/logger.dart';
 
 import 'package:rgnets_fdk/core/services/websocket_cache_integration.dart';
 import 'package:rgnets_fdk/core/services/websocket_service.dart';
+import 'package:rgnets_fdk/features/devices/data/models/device_model_sealed.dart';
+import 'package:rgnets_fdk/features/onboarding/data/models/onboarding_status_payload.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/issue.dart';
 import 'package:rgnets_fdk/features/room_readiness/domain/entities/room_readiness.dart';
 
@@ -231,11 +233,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
 
     // Extract device references from room data
     final deviceRefs = _extractDeviceReferences(roomData);
-    final totalDevices = deviceRefs.length;
-
-    _logger.i('DEBUG ROOM $roomId: Extracted ${deviceRefs.length} device refs: $deviceRefs');
-
-    if (totalDevices == 0) {
+    if (deviceRefs.isEmpty) {
       return RoomReadinessMetrics(
         roomId: roomId,
         roomName: roomName,
@@ -254,46 +252,50 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     final issues = <Issue>[];
     // AP rxg primary keys present in this room. Used by the room-readiness
     // notifier to attach compliance failures (Issue.missingImages /
-    // Issue.missingSpeedTest) per spec B5 / TR-7 — no UI surface change,
-    // we just thread the AP id space through so the notifier can match.
+    // Issue.missingSpeedTest), matched by AP id.
     final accessPointIds = <int>[];
+    // ONT (MediaConverter) rxg primary keys present in this room. Used by the
+    // notifier to attach per-ONT compliance failures (e.g. ONT missing images),
+    // matched by ONT id.
+    final ontDeviceIds = <int>[];
 
     for (final ref in deviceRefs) {
-      if (ref['type'] == 'AP') {
-        final apId = _parseDeviceId(ref['data'] ?? {'id': ref['id']});
-        if (apId != 0) {
-          accessPointIds.add(apId);
-        }
-      }
-      final device = _findDevice(ref, deviceLookup);
-      _logger.i('DEBUG ROOM $roomId: Finding device ref=${ref['id']} type=${ref['type']} -> found=${device != null}');
-      if (device == null) {
-        _logger.w('DEBUG ROOM $roomId: DEVICE NOT FOUND - ref=$ref');
-        // Device reference exists but device not found - critical issue
-        issues.add(
-          Issue(
-            id: 'missing_device_${ref['type']}_${ref['id']}',
-            code: 'DEVICE_MISSING',
-            title: 'Device Not Found',
-            description: 'Referenced device ${ref['type']} ${ref['id']} not found',
-            severity: IssueSeverity.critical,
-            category: IssueCategory.connectivity,
-            detectedAt: DateTime.now(),
-            metadata: {
-              'deviceId': ref['id'],
-              'deviceType': ref['type'],
-            },
-          ),
-        );
-        offlineDevices++;
+      final isAp = ref['type'] == 'AP';
+
+      // Room membership is authoritative from the LIVE device cache's
+      // pms_room_id — for EVERY device type, not just APs — NOT the embedded
+      // pms_room snapshot (access_points / media_converters / switch_ports),
+      // which goes stale when a device is reassigned/removed and leaves "ghost"
+      // entries in a room it no longer belongs to. Look the device up in the
+      // cache and skip it unless the cache still places it in this room. This
+      // keeps the issue list consistent with the room's actual device list
+      // (_getDevicesForRoom, which filters the same way: pmsRoomId == room.id).
+      // Without this gate, stale ONT/Switch references produced phantom
+      // "Device Not Found" / offline issues for rooms with no associated devices.
+      final device = isAp
+          ? (deviceLookup['ap_${ref['id']}'] ?? deviceLookup['${ref['id']}'])
+          : _findDevice(ref, deviceLookup);
+      if (device == null || _devicePmsRoomId(device) != roomId) {
         continue;
       }
 
-      // Check device status
-      final isOnline = _isDeviceOnline(device);
-      if (isOnline) {
-        onlineDevices++;
-      } else {
+      if (isAp) {
+        final apId = _parseDeviceId(device);
+        if (apId != 0) {
+          accessPointIds.add(apId);
+        }
+      } else if (ref['type'] == 'ONT') {
+        final ontId = _parseDeviceId(device);
+        if (ontId != 0) {
+          ontDeviceIds.add(ontId);
+        }
+      }
+
+      // Device offline is calculated by the app (the compliance tool doesn't
+      // cover it), but RELIABLY: only flag a device that is EXPLICITLY offline.
+      // A device whose online state is unknown or stale is treated as online and
+      // NOT flagged — that false positive turned rooms with online devices orange.
+      if (_isDeviceExplicitlyOffline(device)) {
         offlineDevices++;
         issues.add(
           Issue.deviceOffline(
@@ -302,6 +304,8 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
             deviceType: ref['type'] as String? ?? 'Device',
           ),
         );
+      } else {
+        onlineDevices++;
       }
 
       // Check for other device issues
@@ -309,7 +313,10 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       issues.addAll(deviceIssues);
     }
 
-    // Determine room status
+    // Count only the devices the live cache actually places in this room, so
+    // stale ghosts don't inflate the total (which would force the room partial).
+    final totalDevices = onlineDevices + offlineDevices;
+
     final status = _determineRoomStatus(
       totalDevices: totalDevices,
       onlineDevices: onlineDevices,
@@ -326,6 +333,7 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       issues: issues,
       lastUpdated: DateTime.now(),
       accessPointIds: accessPointIds,
+      ontDeviceIds: ontDeviceIds,
     );
   }
 
@@ -462,12 +470,35 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     return null;
   }
 
-  bool _isDeviceOnline(dynamic device) {
+  /// The device's live `pms_room_id` (the room it currently belongs to), used
+  /// to verify AP membership against the authoritative device cache rather than
+  /// a stale embedded room snapshot. Returns null when unknown.
+  int? _devicePmsRoomId(dynamic device) {
+    try {
+      final r = device.pmsRoomId;
+      if (r is int) return r;
+      if (r is String) return int.tryParse(r);
+    } catch (_) {
+      // Not a device model — fall through to map handling.
+    }
     if (device is Map<String, dynamic>) {
-      return device['online'] == true;
+      final r = device['pms_room_id'];
+      if (r is int) return r;
+      if (r is String) return int.tryParse(r);
+    }
+    return null;
+  }
+
+  /// True only when the device is EXPLICITLY offline. A device whose online
+  /// state is unknown/absent (a stale embedded room association, or an
+  /// `unknown` status) is NOT treated as offline — flagging those produced
+  /// false "offline" issues that turned rooms with online devices orange.
+  bool _isDeviceExplicitlyOffline(dynamic device) {
+    if (device is Map<String, dynamic>) {
+      return device['online'] == false;
     }
     try {
-      return device.status?.toLowerCase() == 'online';
+      return device.status?.toLowerCase() == 'offline';
     } catch (_) {
       return false;
     }
@@ -479,22 +510,36 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
     // Check onboarding status
     try {
       final onboardingStatus = _getOnboardingStatus(device, deviceType);
-      if (onboardingStatus != null && !_isOnboardingComplete(onboardingStatus, deviceType)) {
-        final deviceId = _parseDeviceId(device);
-        final deviceName = _getDeviceName(device);
-        final currentStage = _getOnboardingStage(onboardingStatus);
-        final totalStages = deviceType == 'AP' ? 6 : 5;
-
-        if (currentStage < totalStages) {
+      if (onboardingStatus != null) {
+        // Error-first: any onboarding error surfaces as a warning regardless of
+        // stage. These don't always make onboarding "incomplete" — an online,
+        // approved AP missing its CSR/Cert sits at stage 6, and an ONT with low
+        // optical levels can be otherwise complete — but the FE portal flags
+        // them and they should drop the room below 100%.
+        final error = _getOnboardingError(onboardingStatus);
+        if (error != null && error.isNotEmpty) {
           issues.add(
-            Issue.onboardingIncomplete(
-              deviceId: deviceId,
-              deviceName: deviceName,
+            Issue.onboardingError(
+              deviceId: _parseDeviceId(device),
+              deviceName: _getDeviceName(device),
               deviceType: deviceType ?? 'Device',
-              currentStage: currentStage,
-              totalStages: totalStages,
+              error: error,
             ),
           );
+        } else if (!_isOnboardingComplete(onboardingStatus, deviceType)) {
+          final currentStage = _getOnboardingStage(onboardingStatus);
+          final totalStages = deviceType == 'AP' ? 6 : 5;
+          if (currentStage < totalStages) {
+            issues.add(
+              Issue.onboardingIncomplete(
+                deviceId: _parseDeviceId(device),
+                deviceName: _getDeviceName(device),
+                deviceType: deviceType ?? 'Device',
+                currentStage: currentStage,
+                totalStages: totalStages,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -511,15 +556,18 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
       } else if (deviceType == 'ONT') {
         return device['ont_onboarding_status'];
       }
+      return null;
     }
-    try {
-      if (deviceType == 'AP') {
-        return device.apOnboardingStatus;
-      } else if (deviceType == 'ONT') {
-        return device.ontOnboardingStatus;
-      }
-    } catch (_) {
-      // Expected: device may not have onboarding status property
+    // The live cache hands us typed `DeviceModelSealed` objects. Both the AP
+    // and ONT variants expose the onboarding payload as `onboardingStatus`
+    // (mapped from ap_onboarding_status / ont_onboarding_status); there is no
+    // `apOnboardingStatus`/`ontOnboardingStatus` getter, so read it via map.
+    if (device is DeviceModelSealed) {
+      return device.maybeMap(
+        ap: (d) => d.onboardingStatus,
+        ont: (d) => d.onboardingStatus,
+        orElse: () => null,
+      );
     }
     return null;
   }
@@ -532,11 +580,24 @@ class RoomReadinessWebSocketDataSource implements RoomReadinessDataSource {
   }
 
   int _getOnboardingStage(dynamic status) {
+    if (status is OnboardingStatusPayload) return status.stage ?? 0;
     if (status is Map<String, dynamic>) {
       return status['stage'] as int? ?? 0;
     }
     if (status is int) return status;
     return 0;
+  }
+
+  /// The `error` string from an onboarding status (e.g. "CSR and Cert missing
+  /// from DB" for an AP, or a low optical-level message for an ONT), read from
+  /// either the typed payload or the raw WebSocket map. Null when absent/empty.
+  String? _getOnboardingError(dynamic status) {
+    if (status is OnboardingStatusPayload) return status.error;
+    if (status is Map<String, dynamic>) {
+      final e = status['error'];
+      return e is String ? e : null;
+    }
+    return null;
   }
 
   RoomStatus _determineRoomStatus({
